@@ -20,6 +20,7 @@ config/
 │   ├── cost.yaml, catalog.yaml, settings.yaml   (optional) changes to the defaults file of the same name
 │   ├── genie-code/           (optional) this workspace's Genie Code instructions and skills
 │   └── ai-review.yaml        (optional) the AI review's model for this workspace
+├── setup.yaml                the one-time setup values (docs/SETUP.md, step 1)
 ├── ai-review.yaml            the AI review in the plan comment, for every workspace
 └── backend.hcl               where Terraform state is kept
 ```

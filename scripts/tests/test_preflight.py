@@ -88,7 +88,7 @@ class Preflight(unittest.TestCase):
 
     def test_not_an_admin(self):
         results = self.run_checks(FakeApi(me={"userName": "sp", "groups": [{"display": "users"}]}))
-        self.assertIn("sp is not a workspace admin: make it one (docs/RUNBOOK.md)", self.levels(results, "error"))
+        self.assertIn("sp is not a workspace admin: make it one (docs/SETUP.md, step 6)", self.levels(results, "error"))
 
     def test_groups_must_be_account_groups(self):
         results = self.run_checks(FakeApi(account_groups=ACCOUNT_GROUPS - {"fin_builder", "fin_explorer"},

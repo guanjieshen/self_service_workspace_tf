@@ -1,9 +1,12 @@
 """scripts/setup.py: each step's script is valid bash, safe to run again, and matches the workflows."""
 import contextlib
 import io
+import pathlib
 import re
 import subprocess
+import tempfile
 import unittest
+from unittest import mock
 
 from helpers import ROOT, load
 
@@ -96,6 +99,63 @@ class Scripts(unittest.TestCase):
                      ["github", "--repo", "org/repo", "--client-id", "a", "--tenant-id", "t", "--subscription", "s", "--approvers", "x"]):
             with self.subTest(args=args), self.assertRaises(SystemExit):
                 setup.main(args)
+
+
+class SetupFile(unittest.TestCase):
+    """Every value comes from config/setup.yaml; a flag overrides one."""
+
+    def setUp(self):
+        self.path = pathlib.Path(tempfile.mkdtemp()) / "setup.yaml"
+        self.path.write_text((ROOT / "config/setup.yaml").read_text())
+        patcher = mock.patch.object(setup, "setup_file", lambda: self.path)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def fill(self, section, key, value):
+        self.assertTrue(setup.remember(self.path, section, key, value))
+
+    def test_the_shipped_file_is_blank(self):
+        text = (ROOT / "config/setup.yaml").read_text()
+        for key in ("tenant_id", "subscription_id", "resource_group", "storage_account", "repo", "client_id", "account_id"):
+            self.assertRegex(text, rf"(?m)^  {key}: null\b", "a release ships config/setup.yaml blank")
+
+    def test_missing_values_are_named(self):
+        with self.assertRaises(SystemExit) as e:
+            setup.main(["state"])
+        self.assertIn("azure.subscription_id, state.resource_group, state.location, state.storage_account", str(e.exception))
+
+    def test_values_come_from_the_file(self):
+        for section, key, value in (("azure", "subscription_id", "sub-1"), ("state", "resource_group", "rg-1"),
+                                    ("state", "location", "canadacentral"), ("state", "storage_account", "stfile")):
+            self.fill(section, key, value)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            setup.main(["state"])
+        self.assertIn('storage_account_name = "stfile"', out.getvalue())
+        self.assertIn("az account set --subscription sub-1", out.getvalue())
+        with contextlib.redirect_stdout(io.StringIO()) as out2:
+            setup.main(["state", "--storage-account", "stflag"])
+        self.assertIn('storage_account_name = "stflag"', out2.getvalue(), "a flag overrides the file")
+
+    def test_remember_fills_only_a_null_value_and_keeps_comments(self):
+        self.fill("pipeline", "client_id", "app-1")
+        self.assertFalse(setup.remember(self.path, "pipeline", "client_id", "app-2"), "never overwrites a value")
+        self.assertIn("  client_id: app-1          # written here by", self.path.read_text())
+
+    def test_identity_ids_are_saved_when_it_runs(self):
+        script = 'echo "  client ID (AZURE_CLIENT_ID): app-9"; echo "  tenant ID (AZURE_TENANT_ID): ten-9"'
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(setup.run(script, self.path), 0)
+        text = self.path.read_text()
+        self.assertIn("  client_id: app-9", text)
+        self.assertIn("  tenant_id: ten-9", text)
+
+    def test_databricks_signs_in_with_the_azure_cli_without_a_profile(self):
+        self.fill("pipeline", "client_id", "app-1")
+        self.fill("databricks", "account_id", "acct-1")
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            setup.main(["databricks"])
+        self.assertIn("DATABRICKS_ACCOUNT_ID=acct-1 DATABRICKS_AUTH_TYPE=azure-cli", out.getvalue())
 
 
 if __name__ == "__main__":

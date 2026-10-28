@@ -1,0 +1,32 @@
+# =============================================================================
+# ONE-TIME SETUP VALUES: fill this in first (docs/SETUP.md, step 1).
+#
+# scripts/setup.py reads every value from here, so its commands need no flags:
+#   python3 scripts/setup.py state | identity | github | databricks
+# (A flag, for example --storage-account, overrides the value here for one run.)
+#
+# None of these are secrets: commit this file. null = not known yet. Each value
+# says who provides it; the steps that need it fail with its name until it is set.
+# =============================================================================
+
+azure:
+  tenant_id: null          # Entra admin. Your Entra (Azure AD) tenant ID
+  subscription_id: null    # Cloud team. The subscription that holds the Terraform state
+
+state:                     # Cloud team. Where Terraform keeps its state (step 3)
+  resource_group: null     # for example rg-databricks-tfstate (created if missing)
+  location: null           # for example canadacentral
+  storage_account: null    # 3 to 24 lowercase letters and digits, unique across Azure
+  container: tfstate
+
+github:                    # GitHub admin (step 5)
+  repo: null               # <org>/<repo>: this repository, with its final name
+  approvers: null          # <org>/<team> that must approve each apply; null = merging approves
+
+pipeline:                  # Entra admin (step 4). The identity GitHub Actions signs in as
+  name: sp-citizen-dev-terraform
+  client_id: null          # written here by `setup.py identity --run`
+
+databricks:                # Databricks account admin (step 6)
+  account_id: null         # account console, top right; also used by `workspaces.py new`
+  account_profile: null    # a Databricks CLI profile for the account; null = sign in with the Azure CLI

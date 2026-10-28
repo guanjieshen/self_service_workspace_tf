@@ -13,7 +13,21 @@ Each workspace gets:
 - **Chargeback:** required tags, a shared serverless usage policy, and team warehouses.
 - **On-request jobs** for personal, project and team schemas and team folders, run by workspace admins or by a service principal you allow (a ticketing system, or a self-service app built on top: [docs/future.md](docs/future.md)).
 
-**Setting it up for the first time: [docs/RUNBOOK.md](docs/RUNBOOK.md).** How it works, and why: [DESIGN.md](DESIGN.md). How to change the configuration: [config/README.md](config/README.md).
+## Get started
+
+> [!IMPORTANT]
+> **New here? Follow [docs/SETUP.md](docs/SETUP.md).** It goes from this zip to your first governed workspace, one team at a time. The first thing you edit is **[`config/setup.yaml`](config/setup.yaml)**: the values every setup step reads (your tenant, the state storage, this repository, the Databricks account).
+
+| Step | What | Who |
+| --- | --- | --- |
+| 1 | Fill in `config/setup.yaml` | Platform team |
+| 2 | Push this repository to your GitHub | Platform team |
+| 3 to 6 | `python3 scripts/setup.py state`, `identity`, `github`, `databricks` (each prints what it will do; `--run` does it) | Cloud team, Entra admin, GitHub admin, Databricks account admin |
+| 7 | Create the Entra groups and sync them to the account | Identity team |
+| 8 | Decide the baseline in `config/defaults/` | Platform team, security |
+| 9 | Onboard a workspace: `scripts/workspaces.py new`, `scripts/preflight.py`, a pull request | Platform team |
+
+How it works, and why: [DESIGN.md](DESIGN.md). How to change the configuration: [config/README.md](config/README.md).
 
 ## Layout
 
@@ -21,6 +35,7 @@ Each workspace gets:
 | --- | --- |
 | `config/defaults/` | The baseline every workspace gets: `access`, `compute`, `cost`, `catalog`, `settings` `.yaml`, `genie-code/` |
 | `config/workspaces/<name>/` | One folder per workspace: `workspace.yaml`, plus the same file names to change the baseline for that workspace |
+| `config/setup.yaml` | The one-time setup values ([docs/SETUP.md](docs/SETUP.md), step 1) |
 | `config/ai-review.yaml`, `config/backend.hcl`, `.github/CODEOWNERS` | The AI review's model, where state is kept, who approves what |
 | `terraform/` | The root module and modules. You do not edit these for normal operations |
 | `scripts/` | `setup.py` (one-time setup), `workspaces.py` (new workspace, which workspaces a change affects, checks), `preflight.py` (is a workspace ready?), `tf.sh` (run Terraform), `plan-guard.py`, `ai-plan-review.py`, `test.sh` |
@@ -35,7 +50,7 @@ Everything outside `config/` (and `.github/CODEOWNERS`) is the framework: you up
 1. Terraform 1.9 or later, Python 3.9 or later, and the Databricks CLI (the Azure CLI and GitHub CLI for the one-time setup).
 2. The workspace exists and uses Unity Catalog.
 3. **The groups exist as account groups** (Entra ID groups synced to the Databricks account): `{bu}_users`, `{bu}_explorer`, `{bu}_builder`, `{bu}_publisher`, `{bu}_platform_admins`. Unity Catalog and usage policies cannot use groups that exist only in a workspace.
-4. The one-time setup is done ([docs/RUNBOOK.md](docs/RUNBOOK.md)): state storage, the pipeline's service principal, the repository settings.
+4. The one-time setup is done ([docs/SETUP.md](docs/SETUP.md)): state storage, the pipeline's service principal, the repository settings.
 
 ## Onboard a workspace
 
@@ -43,11 +58,10 @@ Everything outside `config/` (and `.github/CODEOWNERS`) is the framework: you up
 
    ```bash
    python3 scripts/workspaces.py new fin-citizen-dev --bu fin --lob FIN \
-     --host https://adb-1234567890123456.7.azuredatabricks.net \
-     --account-id <databricks-account-id>
+     --host https://adb-1234567890123456.7.azuredatabricks.net
    ```
 
-2. Make the pipeline's service principal workspace admin there (a Databricks account admin): `python3 scripts/setup.py databricks --client-id <AZURE_CLIENT_ID> fin-citizen-dev`.
+2. Make the pipeline's service principal workspace admin there (a Databricks account admin): `python3 scripts/setup.py databricks fin-citizen-dev --run`.
 3. Review the files in `config/workspaces/fin-citizen-dev/`. Most are comments: keep only what this workspace changes from the baseline.
 4. Check it is ready: `python3 scripts/preflight.py fin-citizen-dev` (read-only; the plan runs it too).
 5. Open a pull request: its plan comment shows what the first apply does. Plan locally with `./scripts/tf.sh fin-citizen-dev plan`.

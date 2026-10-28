@@ -78,7 +78,7 @@ def checks(ws, get):
     if "admins" in {g.get("display") for g in me.get("groups", [])}:
         out.append(("ok", f"signed in as {who}, a workspace admin"))
     else:
-        out.append(("error", f"{who} is not a workspace admin: make it one (docs/RUNBOOK.md)"))
+        out.append(("error", f"{who} is not a workspace admin: make it one (docs/SETUP.md, step 6)"))
 
     assignment, err = get("/api/2.1/unity-catalog/current-metastore-assignment")
     metastore = None
