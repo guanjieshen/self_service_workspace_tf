@@ -76,9 +76,9 @@ jobs:
       fail-fast: false
       matrix:
         workspace: ${{ fromJson(needs.changes.outputs.workspaces) }}
-    # This job runs the pull request's code with the workspace's credentials, before the
-    # code is reviewed: see "Who can run code with the workspace credentials" in docs/github-actions.md.
-    environment: workspace-${{ matrix.workspace }}
+    # This job runs the pull request's code with the pipeline's credentials (signed in as
+    # the pull_request subject), before the code is reviewed: see "Who can run code with
+    # the workspace credentials" in docs/github-actions.md.
     steps:
       - uses: actions/checkout@v7
         with:
@@ -86,6 +86,11 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           workspace: ${{ matrix.workspace }}
+
+      # Read-only checks of what Terraform needs (sign-in, admin rights, account groups,
+      # catalog storage), with a plain message for each problem before the plan starts.
+      - name: Preflight
+        run: python3 scripts/preflight.py "${{ matrix.workspace }}" --out ".plans/${{ matrix.workspace }}.preflight.txt"
 
       - name: Plan
         run: ./scripts/tf.sh "${{ matrix.workspace }}" plan -no-color -input=false
@@ -111,8 +116,6 @@ jobs:
         id: ai
         if: always()
         run: ./scripts/ai-plan-review.py --settings "${{ matrix.workspace }}" >> "$GITHUB_OUTPUT"
-      - uses: databricks/setup-cli@v1.20.0
-        if: always() && steps.ai.outputs.enabled == 'true' && hashFiles(format('.plans/{0}.json', matrix.workspace)) != ''
       - name: AI impact review
         if: always() && steps.ai.outputs.enabled == 'true' && hashFiles(format('.plans/{0}.json', matrix.workspace)) != ''
         env:

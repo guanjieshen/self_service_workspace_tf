@@ -187,7 +187,8 @@ terraform/         root module (config.tf loads and merges the YAML, overrides.t
                    checks.tf plain-language checks)
   modules/         workspace-settings, personas, compute, budget-policies, folders, catalog
   tests/           Terraform tests with mocked providers and fixture workspaces
-scripts/           tf.sh (run Terraform), plan-guard.py, workspaces.py (new, changed,
+scripts/           setup.py (one-time setup), preflight.py (is a workspace ready), tf.sh
+                   (run Terraform), plan-guard.py, workspaces.py (new, changed,
                    check), ai-plan-review.py, test.sh
 .github/           plan, apply and drift workflows; the AI review prompt; CODEOWNERS
 dev/workspaces/    the framework's own test workspaces (not in a release)

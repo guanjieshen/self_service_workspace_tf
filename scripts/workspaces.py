@@ -14,7 +14,8 @@ Which workspaces a change affects:
   - a change to what Terraform does affects every workspace: config/defaults/, terraform/
     (not terraform/tests/), scripts/tf.sh and scripts/plan-guard.py;
   - with --plan (pull requests), so does a change to the AI review (scripts/ai-*.py,
-    .github/ai/, config/ai-review.yaml), so the pull request shows the new review;
+    .github/ai/, config/ai-review.yaml) or to scripts/preflight.py, so the pull request shows
+    the new review or checks;
   - otherwise, only the workspaces whose folder changed;
   - folders starting with "_" and workspaces with ci: false are never included.
 Tests, docs and other scripts affect no workspace, so they never re-apply one.
@@ -182,7 +183,7 @@ def check(*dirs):
 # ---- Which workspaces a change affects ----
 
 EVERYTHING = r"^(config/defaults/|terraform/(?!tests/)|scripts/tf\.sh$|scripts/plan-guard\.py$)"
-EVERYTHING_FOR_PLAN = EVERYTHING[:-1] + r"|scripts/ai-[^/]*\.py$|\.github/ai/|config/ai-review\.yaml$)"
+EVERYTHING_FOR_PLAN = EVERYTHING[:-1] + r"|scripts/ai-[^/]*\.py$|scripts/preflight\.py$|\.github/ai/|config/ai-review\.yaml$)"
 
 
 def ci_workspaces():
@@ -248,16 +249,15 @@ def main(argv):
         new(a.name, a.bu, a.lob, a.host, a.account_id, a.catalog)
         print(f"""Created config/workspaces/{a.name}/.
 
-Next steps:
-  1. Check the groups exist in Entra ID (synced to the account): {a.bu}_users, {a.bu}_explorer,
-     {a.bu}_builder, {a.bu}_publisher, {a.bu}_platform_admins (or set groups: in access.yaml).
-  2. Review the other files; keep only what this workspace changes from the baseline.
-  3. ./scripts/tf.sh {a.name} plan     (review what will change)
+Next steps (docs/RUNBOOK.md, "Onboard a workspace"):
+  1. The groups exist in Entra ID, synced to the Databricks account: {a.bu}_users, {a.bu}_explorer,
+     {a.bu}_builder, {a.bu}_publisher, {a.bu}_platform_admins (or name others under groups: in access.yaml).
+  2. The pipeline's service principal is workspace admin (a Databricks account admin):
+     python3 scripts/setup.py databricks --client-id <AZURE_CLIENT_ID> {a.name}
+  3. Review the other files; keep only what this workspace changes from the baseline.
+  4. python3 scripts/preflight.py {a.name}     (read-only: is the workspace ready?)
+  5. Open a pull request: its plan shows what the first apply does. Merge to apply.""")
 
-For GitHub Actions (docs/github-actions.md), create the workspace's two environments:
-  gh api -X PUT repos/<org>/<repo>/environments/workspace-{a.name}
-  gh api -X PUT repos/<org>/<repo>/environments/workspace-{a.name}-approval
-Then set ci: true in workspace.yaml; the next pull request's plan tests the sign-in.""")
         return 0
     if argv[:1] == ["changed"]:
         rest = argv[1:]

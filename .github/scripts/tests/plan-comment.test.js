@@ -35,6 +35,13 @@ test('a failed plan says so', () => {
   assert.match(buildBody('ws', 'm', plans({})), /_Plan failed; see the job log._/);
 });
 
+test('preflight problems are shown before the plan', () => {
+  const body = buildBody('ws', 'm', plans({ '.preflight.txt': 'error: group fin_builder (builder) does not exist in the account\n' }));
+  assert.match(body, /Preflight found problems/);
+  assert.ok(body.includes('fin_builder') && body.includes('_Plan failed; see the job log._'));
+  assert.doesNotMatch(buildBody('ws', 'm', plans({ '.preflight.txt': '' })), /Preflight/);
+});
+
 test('a long plan is cut from the start to fit in a GitHub comment', () => {
   const plan = 'start\n' + 'x'.repeat(200000) + '\nend of plan';
   const body = buildBody('ws', 'm', plans({ '.txt': plan, '.changes': '9', '.ai.md': 'review' }));

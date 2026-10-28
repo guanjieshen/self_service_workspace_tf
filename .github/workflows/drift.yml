@@ -38,7 +38,6 @@ jobs:
       fail-fast: false
       matrix:
         workspace: ${{ fromJson(needs.list.outputs.workspaces) }}
-    environment: workspace-${{ matrix.workspace }}   # this workspace's credentials
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup

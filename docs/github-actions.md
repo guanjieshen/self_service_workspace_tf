@@ -23,47 +23,37 @@ Tests and docs never re-apply a workspace. Re-applying is not free: a newer runt
 
 Workspaces with `ci: false` in their `workspace.yaml` (for example a local sandbox) and folders starting with `_` are always skipped.
 
+## How CI signs in
+
+One Entra service principal, for every workspace and for the Terraform state, through GitHub OIDC: no secret is stored in GitHub. It is workspace admin in each workspace this repository manages. Entra matches each GitHub token's subject exactly, and this repository needs only two federated credentials, whatever the number of workspaces:
+
+| Credential | Subject | Used by |
+| --- | --- | --- |
+| `github-pull-requests` | `<prefix>:pull_request` | Plan (every pull request) |
+| `github-main` | `<prefix>:ref:refs/heads/main` | Apply (merge to `main`), Drift (scheduled, or run on `main`) |
+
+`<prefix>` is the repository's, for example `repo:my-org@123456/my-repo@456789` (repositories created or renamed since July 15, 2026 include numeric IDs): `gh api repos/<org>/<repo>/actions/oidc/customization/sub --jq .sub_claim_prefix`. `scripts/setup.py identity` reads it and creates both credentials.
+
+No job that signs in runs in a GitHub Environment, because that would change its subject to `environment:<name>`. The one environment, `apply-approval`, is the approval step before each workspace's apply: it holds nothing and signs in to nothing.
+
+Onboarding a workspace therefore needs nothing in GitHub or Entra: make the service principal workspace admin there (`scripts/setup.py databricks`), add the folder, merge.
+
 ## One-time setup
 
-### 1. Terraform state storage
+`docs/RUNBOOK.md` has the order and who does what. Each step is a command that prints the script it runs (`--run` runs it), so it can be read first or sent to the team that owns it:
 
-1. Create an Azure Storage account and a container for state (for example `tfstate`), with public access disabled.
-2. Copy `config/backend.hcl.example` to `config/backend.hcl`, fill in the names, and commit it. It contains no secrets. Each workspace gets its own state file, `citizen-dev/<name>.tfstate`.
+| Step | Command | Creates |
+| --- | --- | --- |
+| 1. Terraform state | `scripts/setup.py state` | A storage account (no public access, no shared keys, versioning and soft delete), the `tfstate` container, `config/backend.hcl`. Each workspace gets its own state file, `citizen-dev/<name>.tfstate` |
+| 2. The identity | `scripts/setup.py identity` | The Entra app and service principal, its two federated credentials, Storage Blob Data Contributor on the state container |
+| 3. The repository | `scripts/setup.py github` | Variables `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`; labels `allow-risky-changes` and `drift`; the `apply-approval` environment (deployments from `main` only; `--approvers <org>/<team>` adds required reviewers); branch protection on `main` (pull requests, the **Format and validate** and **Tests** checks, code owner review) |
+| 4. Databricks | `scripts/setup.py databricks` | The service principal in the Databricks account, workspace admin in each workspace. Needs a Databricks account admin |
 
-### 2. Automation identities
+Then, by hand: give the service principal the permission to create budget policies in the account console (or set `budget_policies.enabled: false` in `config/defaults/cost.yaml`), and replace the owners in `.github/CODEOWNERS` with your teams.
 
-CI signs in with one Entra service principal through GitHub OIDC, for both the Terraform state (Azure Storage) and Databricks. No secret is stored in GitHub.
+Required reviewers on environments and branch protection need GitHub Team or Enterprise for private repositories. Without required reviewers, merging the pull request is the approval: the apply runs straight after the merge.
 
-#### 2a. GitHub OIDC subjects
-
-Entra federated credentials match the token's subject exactly. Repositories created or renamed on or after July 15, 2026 use subjects that include numeric IDs. Get this repository's prefix with:
-
-```bash
-gh api repos/<org>/<repo>/actions/oidc/customization/sub --jq .sub_claim_prefix
-# for example: repo:my-org@123456/my-repo@456789
-```
-
-Every job that signs in runs in the workspace's environment, so there is one subject per workspace, used by plan, drift and apply:
-
-```text
-<prefix>:environment:workspace-<name>
-```
-
-#### 2b. Entra service principal
-
-1. Create an Entra app registration and service principal, for example `sp-citizen-dev-terraform`.
-2. Add a **federated credential** for each subject in 2a (Certificates & secrets > Federated credentials > Other issuer). Issuer `https://token.actions.githubusercontent.com`, audience `api://AzureADTokenExchange`.
-3. Give it **Storage Blob Data Contributor** on the state container.
-4. Give it the Databricks rights in 2c.
-
-#### 2c. Databricks rights
-
-| Where | Permission |
-| --- | --- |
-| Databricks account | Add the service principal; give it the permission to create budget policies |
-| Each workspace | Assign the service principal and make it workspace admin |
-
-### 2d. Network access to the workspace
+### Network access to the workspace
 
 The jobs that run Terraform call the workspace API, so the runner must be able to reach the workspace. GitHub-hosted runners use changing public IP addresses, so they are blocked when the workspace:
 
@@ -85,28 +75,6 @@ In that case, run these jobs on a runner inside an allowed network and set the r
 
 Only the jobs that reach Databricks use `TERRAFORM_RUNNER`; format checks and workspace detection stay on `ubuntu-latest`.
 
-### 3. Repository settings
-
-1. **Variables** (Settings > Secrets and variables > Actions > Variables). These are identifiers, not secrets:
-
-   | Variable | When |
-   | --- | --- |
-   | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` | Always |
-   | `TERRAFORM_RUNNER` | Optional; JSON `runs-on` value for jobs that reach the workspace (2d), `"ubuntu-latest"` when unset |
-
-2. **Environments** (Settings > Environments): two per workspace.
-
-   | Environment | Holds | Protection | Used by |
-   | --- | --- | --- | --- |
-   | `workspace-<name>` | Nothing (it is the subject of the federated credential, 2a) | None | Plan, drift and apply jobs |
-   | `workspace-<name>-approval` | Nothing | **Required reviewers**; deployment branch `main` | The approval step before apply |
-
-   Required reviewers need a GitHub plan that supports them for private repositories (Team or Enterprise for organizations). Until they are added, merging the pull request is the only approval: the apply runs straight after the merge. GitHub also creates a missing environment automatically, without reviewers, so check each new `workspace-<name>-approval` environment has them.
-3. **Labels:** create `allow-risky-changes` and `drift`.
-4. **Branch protection** on `main`: require pull requests and the `Plan` checks to pass, including **Tests** (the plans wait for it, so a pull request that breaks a test gets no plan).
-   This is what stops a pull request being merged before its plan, plan guard and AI review have finished; without it, GitHub allows the merge while checks are still running, and the apply runs on a change nobody saw a plan for.
-   Like required reviewers, it needs a GitHub plan that supports it for private repositories. Without it, wait until every check on the pull request has finished before merging.
-
 ## What GitHub Actions does not do
 
 With the setup above done and the configuration right, a merged pull request deploys
@@ -117,16 +85,18 @@ needs, need more than workspace admin, or are a person's decision by design:
 
 | Step | Who | When | Why not in Actions |
 | --- | --- | --- | --- |
-| State storage account and `config/backend.hcl` (1) | Cloud team | Once | Terraform's own state lives there |
-| Entra service principal, its role on the state, federated credentials (2a, 2b) | Entra admin | Once; one credential per new workspace | It is the identity Actions signs in as |
-| Add the service principal to the Databricks account, with the budget policy permission (2c) | Databricks account admin | Once | Needs account admin; giving CI account admin is too broad |
-| Make the service principal workspace admin (2c) | Account or workspace admin | Per new workspace | The same: it is how CI gets in |
+| State storage and `config/backend.hcl` (`setup.py state`) | Cloud team | Once | Terraform's own state lives there |
+| The Entra service principal, its federated credentials and role on the state (`setup.py identity`) | Entra admin | Once | It is the identity Actions signs in as |
+| Repository variables, labels, `apply-approval`, branch protection (`setup.py github`), CODEOWNERS | GitHub organization admin | Once | Repository administration, not deployment |
+| Add the service principal to the Databricks account (`setup.py databricks`), with the budget policy permission | Databricks account admin | Once | Needs account admin; giving CI account admin is too broad |
+| Make the service principal workspace admin (`setup.py databricks <workspace>`) | Databricks account admin | Per new workspace | It is how CI gets in |
 | The workspace itself, with Unity Catalog | Your provisioning process | Per new workspace | This repository configures workspaces; it does not create them |
 | Entra groups synced to the account (`{bu}_users`, `{bu}_explorer`, `{bu}_builder`, `{bu}_publisher`, `{bu}_platform_admins`) | Identity team | Per business unit | Entra owns people and groups |
-| Repository variables, labels, environments with reviewers, branch protection, CODEOWNERS (3) | GitHub organization admin | Once; two environments per new workspace (`scripts/workspaces.py new` prints the commands) | Repository administration, not deployment |
-| A runner inside the network, if workspaces use Private Link or IP access lists (2d) | Cloud team | Once | Infrastructure Actions runs on |
+| A runner inside the network, if workspaces use Private Link or IP access lists | Cloud team | Once | Infrastructure Actions runs on |
 | `restrict_workspace_admins: true` | Only with an account admin running Terraform | If wanted | Needs account admin; leave it `false` otherwise |
 | Approve a deployment, add `allow-risky-changes`, act on a `drift` issue | Reviewers | Per change | A person decides, by design |
+
+The Plan workflow runs `scripts/preflight.py` before each plan: it checks, read-only, the steps above that Terraform depends on (the sign-in, workspace admin, account groups, catalog storage) and names the one that is missing in the plan comment.
 
 ## The plan comment
 
@@ -135,6 +105,7 @@ Each affected workspace gets one comment on the pull request, updated on every p
 | Section | Source | Notes |
 | --- | --- | --- |
 | Title | Plan | Number of resource changes |
+| Preflight | `scripts/preflight.py` | Only when it found a problem: what is missing, and what to do |
 | Warning | `scripts/plan-guard.py` | Only when the plan has hard-to-undo changes |
 | AI impact review | `scripts/ai-plan-review.py` | When enabled in `config/ai-review.yaml` (or the workspace's `ai-review.yaml`). Risk level, a plain-language table of changes and who they affect, and up to three things to check |
 | Changed resources | [tf-summarize](https://github.com/dineshba/tf-summarize) | Table of every resource added, changed or removed (collapsed) |
@@ -156,16 +127,15 @@ To try a different model or prompt on one pull request, change these files in th
 
 | Task | How |
 | --- | --- |
-| Change a workspace | PR editing files in `config/workspaces/<name>/`; review the plan comment; merge; approve the deployment |
+| Change a workspace | PR editing files in `config/workspaces/<name>/`; review the plan comment; merge; approve the deployment (if `apply-approval` has reviewers) |
 | Change the baseline | PR editing `config/defaults/`; the PR shows a plan for every workspace |
-| Onboard a workspace | Run `scripts/workspaces.py new`, open a PR with the new folder, create its two environments (the script prints the commands), the federated credential or federation policy for its subject, then set `ci: true` |
-| Test a workspace's credentials | Set `ci: true` and open a pull request that touches the workspace: its plan signs in with them (and changes nothing) |
-| Re-apply one workspace | Actions > Apply > Run workflow, enter the workspace name |
+| Onboard a workspace | `scripts/workspaces.py new`, `scripts/setup.py databricks <name>` (account admin), `scripts/preflight.py <name>`, then a PR with the new folder (RUNBOOK.md) |
+| Retry a failed apply | Re-run the latest Apply run (it refuses if `main` has moved on since); otherwise open a pull request |
 | Investigate drift | Open the `drift` issue; either update the configuration or re-apply |
 
 ## Who can run code with the workspace credentials
 
-The plan job runs on every pull request, with the pull request's own code (the Terraform, the scripts and even the workflow file), and with the workspace's credentials: the same workspace-admin identity apply uses. Plan cannot use a weaker identity, because reading most workspace settings needs workspace admin. So, by default, **anyone who can push a branch can act as workspace admin on every CI workspace, before anyone reviews the code.** A check inside the workflow cannot stop this, since the pull request can change the workflow; only GitHub's server-side controls can.
+The plan job runs on every pull request, with the pull request's own code (the Terraform, the scripts and even the workflow file), and with the pipeline's credentials: the same workspace-admin identity apply uses. Plan cannot use a weaker identity, because reading most workspace settings needs workspace admin. So, by default, **anyone who can push a branch can act as workspace admin on every CI workspace, before anyone reviews the code.** A check inside the workflow cannot stop this, since the pull request can change the workflow; only GitHub's server-side controls can.
 
 Set up all of these before the repository manages real workspaces:
 
@@ -174,9 +144,9 @@ Set up all of these before the repository manages real workspaces:
 | Limit write access | Repository or organization settings | Only the platform team can push branches, so only they can start a plan |
 | Code owners | `.github/CODEOWNERS` (replace the owners with your teams), plus a branch protection rule or ruleset on `main`: require a pull request, one approval, and review from code owners | Changes to `terraform/`, `scripts/`, `.github/` and `config/defaults/` need the platform team (and security for `config/defaults/settings.yaml`) before they merge, so before they apply |
 
-Plans and applies share the `workspace-<name>` environment, so it cannot be limited to `main` (plans run from pull request branches). The controls above are what keep pull request code from running with the workspace credentials unreviewed: only the platform team can push branches, and code owners review everything outside `config/`.
+The pull request credential cannot be limited to `main`, because plans run from pull request branches; pull requests from forks get no OIDC token at all, so they cannot sign in. The controls above are what keep pull request code from running with the workspace credentials unreviewed: only the platform team can push branches, and code owners review everything outside `config/`.
 
-Required reviewers on environments, branch protection and rulesets need GitHub Team or Enterprise for private repositories (this test repository has none of them, so it runs without these controls).
+Required reviewers on environments, branch protection and rulesets need GitHub Team or Enterprise for private repositories.
 
 > [!NOTE]
 > A local plan run by a different identity from the one that created a resource can show its permissions as changing: the creator's owner entry. Judge permissions drift from CI plans and the drift check, which run as the pipeline identity.
