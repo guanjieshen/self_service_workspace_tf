@@ -41,7 +41,7 @@ Two kinds of repository use this code:
 | Change a workspace's configuration | `config/README.md`, `agents/config.md` |
 | Add a workspace | `python3 scripts/workspaces.py new <name> --bu ... --lob ... --host ... --account-id ...` |
 | Add or change a Terraform option | `agents/terraform.md` |
-| Set up CI for an organization | `docs/github-actions.md` |
+| Set up an organization's instance | `docs/RUNBOOK.md` (by team), `scripts/setup.py`, `scripts/preflight.py`; CI details in `docs/github-actions.md` |
 | See ideas not built | `docs/future.md` |
 | See what changed | `CHANGELOG.md` (keep its Unreleased section current) |
 
@@ -56,8 +56,10 @@ request deploys everything with no further step. When you add something:
   click in a UI, a script on a laptop) is a bug unless no API can do it, or a person must
   decide it by design.
 - **If it cannot be automated, say so** in `docs/github-actions.md` ("What GitHub Actions does
-  not do"), with who does it, when and how, and fail early with a message naming that step
-  (a precondition in `terraform/checks.tf`, or the workflow) rather than half-way through an apply.
+  not do") and `docs/RUNBOOK.md`, with who does it, when and how; script it in
+  `scripts/setup.py` if a command can do it; and fail early with a message naming that step
+  (a check in `scripts/preflight.py` for something in the workspace, a precondition in
+  `terraform/checks.tf` for the configuration) rather than half-way through an apply.
 - **Never depend on this repository's own setup:** not a CLI profile, a laptop, `dev/`, the
   sandbox's names or IDs, or a person's account. Identities come from Terraform outputs and
   repository variables.
@@ -124,6 +126,10 @@ add that label yourself; say what the plan does and let a person decide.
   on it.
 - **Workspace-local groups** cannot be used in Unity Catalog grants or usage policies;
   the persona groups must be account groups (synced from Entra ID).
+- **One service principal, two federated credentials.** CI signs in as `pull_request` (Plan)
+  or `ref:refs/heads/main` (Apply, Drift). Never put a job that signs in into a GitHub
+  Environment: its subject becomes `environment:<name>` and sign-in fails. `apply-approval`
+  is only the approval step (`scripts/tests/test_setup.py` checks this).
 - **Local plans as a person** can show permission drift that CI does not (different
   identity). Trust CI's plan and drift check.
 - **Run tests through `scripts/test.sh`.** Plain `terraform test` in `terraform/` fails on a

@@ -1,8 +1,8 @@
 # After a pull request is merged to main: apply each affected workspace.
-# Each workspace has two GitHub Environments:
-#   workspace-<name>           its Databricks credentials (also used by plan and drift)
-#   workspace-<name>-approval  the approval step; add required reviewers to make every apply wait for one.
-# Approving the deployment counts as confirming any hard-to-undo changes the plan guard flagged.
+# The pipeline signs in as main (the federated credential for refs/heads/main), the same
+# service principal for every workspace. Before each workspace, the approval step runs in the
+# GitHub Environment apply-approval: add required reviewers to it to make every apply wait
+# for one. Approving counts as confirming any hard-to-undo changes the plan guard flagged.
 #
 # Workspaces are applied one at a time, stopping at the first failure. A merge is the only
 # way to deploy: there is no manual trigger. To retry a failed apply (for example after a
@@ -58,12 +58,11 @@ jobs:
     strategy:
       matrix:
         workspace: ${{ fromJson(needs.changes.outputs.workspaces) }}
-    environment: workspace-${{ matrix.workspace }}-approval
+    # Holds no credentials, so it does not change how the apply signs in. Without required
+    # reviewers on it, merging the pull request is the approval.
+    environment: apply-approval
     steps:
-      # For now, merging the pull request is the approval: this repository's GitHub plan
-      # cannot require reviewers on environments. To restore a reviewer gate, add required
-      # reviewers to workspace-<name>-approval; GitHub then pauses here for approval.
-      - run: echo "Approved by merge to main."
+      - run: echo "Approved."
 
   apply:
     name: Apply ${{ matrix.workspace }}
@@ -77,7 +76,6 @@ jobs:
       max-parallel: 1
       matrix:
         workspace: ${{ fromJson(needs.changes.outputs.workspaces) }}
-    environment: workspace-${{ matrix.workspace }}   # this workspace's credentials
     concurrency:
       group: apply-${{ matrix.workspace }}
       cancel-in-progress: false

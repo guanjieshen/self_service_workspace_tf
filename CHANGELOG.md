@@ -6,6 +6,16 @@ them for you: a setting missing from your baseline is left alone).
 
 ## Unreleased
 
+- CI signs in with one service principal and two federated credentials (pull requests;
+  `main`) instead of two GitHub Environments and one credential per workspace. Onboarding a
+  workspace needs nothing in GitHub or Entra. One `apply-approval` environment gates applies.
+- `scripts/setup.py`: the one-time setup as one command per team (state storage, the
+  identity, repository settings, the Databricks account), printed first, `--run` to run.
+- `scripts/preflight.py`: read-only checks that a workspace is ready (sign-in, admin rights,
+  account groups, catalog storage, legacy access, baseline placeholders). The Plan workflow
+  runs it and shows problems in the plan comment.
+- `docs/RUNBOOK.md`: setting up an organization's instance, by team.
+
 ## 1.0.0
 
 First release of the workspace baseline on its own: settings, personas, compute, the

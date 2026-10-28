@@ -13,7 +13,7 @@ Each workspace gets:
 - **Chargeback:** required tags, a shared serverless usage policy, and team warehouses.
 - **On-request jobs** for personal, project and team schemas and team folders, run by workspace admins or by a service principal you allow (a ticketing system, or a self-service app built on top: [docs/future.md](docs/future.md)).
 
-How it works, and why: [DESIGN.md](DESIGN.md). How to change the configuration: [config/README.md](config/README.md).
+**Setting it up for the first time: [docs/RUNBOOK.md](docs/RUNBOOK.md).** How it works, and why: [DESIGN.md](DESIGN.md). How to change the configuration: [config/README.md](config/README.md).
 
 ## Layout
 
@@ -23,7 +23,7 @@ How it works, and why: [DESIGN.md](DESIGN.md). How to change the configuration: 
 | `config/workspaces/<name>/` | One folder per workspace: `workspace.yaml`, plus the same file names to change the baseline for that workspace |
 | `config/ai-review.yaml`, `config/backend.hcl`, `.github/CODEOWNERS` | The AI review's model, where state is kept, who approves what |
 | `terraform/` | The root module and modules. You do not edit these for normal operations |
-| `scripts/` | `tf.sh` (run Terraform), `workspaces.py` (new workspace, which workspaces a change affects, checks), `plan-guard.py`, `ai-plan-review.py`, `test.sh` |
+| `scripts/` | `setup.py` (one-time setup), `workspaces.py` (new workspace, which workspaces a change affects, checks), `preflight.py` (is a workspace ready?), `tf.sh` (run Terraform), `plan-guard.py`, `ai-plan-review.py`, `test.sh` |
 | `.github/` | Plan, apply and drift workflows ([docs/github-actions.md](docs/github-actions.md)) |
 | `dev/` | The framework's own test workspaces; not in a release |
 | `AGENTS.md`, `agents/` | Guidance for coding agents: `AGENTS.md` is the entry point (`CLAUDE.md` points Claude Code to it), `agents/` has one guide per area |
@@ -32,10 +32,10 @@ Everything outside `config/` (and `.github/CODEOWNERS`) is the framework: you up
 
 ## Prerequisites
 
-1. Terraform 1.9 or later, Python 3.9 or later, and the Databricks CLI.
+1. Terraform 1.9 or later, Python 3.9 or later, and the Databricks CLI (the Azure CLI and GitHub CLI for the one-time setup).
 2. The workspace exists and uses Unity Catalog.
 3. **The groups exist as account groups** (Entra ID groups synced to the Databricks account): `{bu}_users`, `{bu}_explorer`, `{bu}_builder`, `{bu}_publisher`, `{bu}_platform_admins`. Unity Catalog and usage policies cannot use groups that exist only in a workspace.
-4. The identity running Terraform is a workspace admin. Usage policies also need the account-level permission to create them (otherwise set `budget_policies.enabled: false`).
+4. The one-time setup is done ([docs/RUNBOOK.md](docs/RUNBOOK.md)): state storage, the pipeline's service principal, the repository settings.
 
 ## Onboard a workspace
 
@@ -47,9 +47,11 @@ Everything outside `config/` (and `.github/CODEOWNERS`) is the framework: you up
      --account-id <databricks-account-id>
    ```
 
-2. Review the files in `config/workspaces/fin-citizen-dev/`. Most are comments: keep only what this workspace changes from the baseline.
-3. Open a pull request, or plan locally: `./scripts/tf.sh fin-citizen-dev plan`.
-4. Merge: the Apply workflow deploys it. That is the only way changes reach a workspace; `tf.sh apply` refuses outside GitHub Actions. The next plan should show no changes.
+2. Make the pipeline's service principal workspace admin there (a Databricks account admin): `python3 scripts/setup.py databricks --client-id <AZURE_CLIENT_ID> fin-citizen-dev`.
+3. Review the files in `config/workspaces/fin-citizen-dev/`. Most are comments: keep only what this workspace changes from the baseline.
+4. Check it is ready: `python3 scripts/preflight.py fin-citizen-dev` (read-only; the plan runs it too).
+5. Open a pull request: its plan comment shows what the first apply does. Plan locally with `./scripts/tf.sh fin-citizen-dev plan`.
+6. Merge: the Apply workflow deploys it. That is the only way changes reach a workspace; `tf.sh apply` refuses outside GitHub Actions. The next plan should show no changes.
 
 > [!WARNING]
 > On an existing workspace, check that nothing uses Hive metastore tables, DBFS mounts or No-isolation clusters before applying: after 30 days with legacy access disabled, the workspace is Unity Catalog only, permanently. If it is not ready, set `disable_legacy_access: null` and `disable_dbfs_root_and_mounts: null` under `settings:` in its `settings.yaml`.
