@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 """One-time setup, one step per team. Each step prints a bash script; --run runs it.
 
-    scripts/setup.py state      --subscription <id> --resource-group <rg> --location <region>
-                                --storage-account <name> [--container tfstate]          (cloud team)
-    scripts/setup.py identity   --subscription <id> --resource-group <rg> --storage-account <name>
-                                --repo <org>/<repo> [--name sp-citizen-dev-terraform]
-                                [--container tfstate]                                    (Entra admin)
-    scripts/setup.py github     --repo <org>/<repo> --client-id <app id> --tenant-id <id>
-                                --subscription <id> [--approvers <org>/<team>]          (GitHub admin)
-    scripts/setup.py databricks --client-id <app id> [--account-profile <profile>]
-                                [--name sp-citizen-dev-terraform] [<workspace> ...]      (Databricks account admin)
+    scripts/setup.py state        the cloud team
+    scripts/setup.py identity     an Entra admin
+    scripts/setup.py github       a GitHub admin
+    scripts/setup.py databricks [<workspace> ...]    a Databricks account admin
+
+Every value comes from config/setup.yaml (fill it in first: docs/SETUP.md, step 1); a flag
+with the same name overrides one value for one run (for example --storage-account x).
+`identity --run` writes the client and tenant IDs it creates back into the file. In the
+framework's own repository, dev/setup.yaml is read instead when it exists, so a release keeps
+a blank config/setup.yaml.
 
 Without --run, nothing happens: the script is printed, to read first or to send to the team
 that owns the step. With --run it runs here (bash, stopping at the first error). Every step
-checks before it creates, so running one again is safe. docs/RUNBOOK.md says who runs which
+checks before it creates, so running one again is safe. docs/SETUP.md says who runs which
 step and in what order.
 
   state       the storage account and container for Terraform state (no public access, no
@@ -21,7 +22,7 @@ step and in what order.
   identity    the Entra app and service principal CI signs in as, its two GitHub federated
               credentials (pull requests; the main branch) and its role on the state container
   github      repository variables, the labels, the apply-approval environment (main only;
-              --approvers adds required reviewers) and branch protection on main
+              github.approvers adds required reviewers) and branch protection on main
   databricks  adds the service principal to the Databricks account and makes it workspace admin
               of each workspace given (default: every folder in config/workspaces/)
 """
@@ -154,9 +155,12 @@ def databricks(a):
             raise SystemExit(f"{w}: no workspace ID (an adb-<id> host, or id: in workspace.yaml)")
         hosts.append((w, info["id"]))
     profile = f" -p {q(a.account_profile)}" if a.account_profile else ""
+    signin = "" if a.account_profile else (
+        "# Signs in to the account with the Azure CLI (az login as a Databricks account admin).\n"
+        f"export DATABRICKS_HOST=https://accounts.azuredatabricks.net DATABRICKS_ACCOUNT_ID={q(a.account_id)} DATABRICKS_AUTH_TYPE=azure-cli\n")
     lines = [f"""# The service principal in the Databricks account, and workspace admin where Terraform runs.
-# Needs a Databricks account admin.{'' if a.account_profile else ' Sign in first: databricks auth login --host https://accounts.azuredatabricks.net --account-id <id>'}
-DBX_SP=$(databricks account service-principals list{profile} --filter 'applicationId eq "{a.client_id}"' -o json |
+# Needs a Databricks account admin.
+{signin}DBX_SP=$(databricks account service-principals list{profile} --filter 'applicationId eq "{a.client_id}"' -o json |
   python3 -c 'import json, sys; r = json.load(sys.stdin); print(r[0]["id"] if r else "")')
 [ -n "$DBX_SP" ] || DBX_SP=$(databricks account service-principals create{profile} --application-id {q(a.client_id)} \\
   --display-name {q(a.name)} -o json | python3 -c 'import json, sys; print(json.load(sys.stdin)["id"])')"""]
@@ -170,41 +174,95 @@ echo "create budget policies (serverless usage policies), or set budget_policies
     return "\n".join(lines)
 
 
+# Each option: (flag, section, key in the setup file, needed by these steps).
+OPTIONS = [
+    ("--tenant-id", "azure", "tenant_id", {"github"}),
+    ("--subscription", "azure", "subscription_id", {"state", "identity", "github"}),
+    ("--resource-group", "state", "resource_group", {"state", "identity"}),
+    ("--location", "state", "location", {"state"}),
+    ("--storage-account", "state", "storage_account", {"state", "identity"}),
+    ("--container", "state", "container", {"state", "identity"}),
+    ("--repo", "github", "repo", {"identity", "github"}),
+    ("--approvers", "github", "approvers", set()),
+    ("--name", "pipeline", "name", {"identity", "databricks"}),
+    ("--client-id", "pipeline", "client_id", {"github", "databricks"}),
+    ("--account-id", "databricks", "account_id", set()),
+    ("--account-profile", "databricks", "account_profile", set()),
+]
+STEPS = {"state": state, "identity": identity, "github": github, "databricks": databricks}
+
+
+def shown(path):
+    """The path as people see it: relative to the repository when it is inside it."""
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
+def setup_file():
+    dev = ROOT / "dev/setup.yaml"
+    return dev if dev.exists() else ROOT / "config/setup.yaml"
+
+
+def remember(path, section, key, value):
+    """Write value into the setup file's section.key, if it is still null."""
+    lines, inside = path.read_text().split("\n"), False
+    for n, line in enumerate(lines):
+        if re.match(r"^\S", line):
+            inside = re.match(rf"^{section}:", line) is not None
+        elif inside and re.match(rf"^  {key}:\s*null\b", line):
+            lines[n] = re.sub(r"null", value, line, count=1)
+            path.write_text("\n".join(lines))
+            return True
+    return False
+
+
+def run(script, path):
+    """Run the script, showing its output, and keep the IDs `identity` prints in the setup file."""
+    proc = subprocess.Popen(["bash", "-euo", "pipefail", "-c", script], cwd=ROOT, stdout=subprocess.PIPE, text=True)
+    for line in proc.stdout:
+        print(line, end="", flush=True)
+        for label, section, key in (("AZURE_CLIENT_ID", "pipeline", "client_id"), ("AZURE_TENANT_ID", "azure", "tenant_id")):
+            m = re.search(rf"\({label}\): (\S+)", line)
+            if m and remember(path, section, key, m.group(1)):
+                print(f"  (saved as {section}.{key} in {shown(path)})")
+    return proc.wait()
+
+
 def main(argv):
     ap = argparse.ArgumentParser(prog="setup.py", description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="step", required=True)
-    p = sub.add_parser("state")
-    for f in ("--subscription", "--resource-group", "--location", "--storage-account"):
-        p.add_argument(f, required=True)
-    p.add_argument("--container", default="tfstate")
-    p = sub.add_parser("identity")
-    for f in ("--subscription", "--resource-group", "--storage-account", "--repo"):
-        p.add_argument(f, required=True)
-    p.add_argument("--container", default="tfstate")
-    p.add_argument("--name", default="sp-citizen-dev-terraform")
-    p = sub.add_parser("github")
-    for f in ("--repo", "--client-id", "--tenant-id", "--subscription"):
-        p.add_argument(f, required=True)
-    p.add_argument("--approvers", help="<org>/<team> required to approve each apply")
-    p = sub.add_parser("databricks")
-    p.add_argument("--client-id", required=True)
-    p.add_argument("--account-profile")
-    p.add_argument("--name", default="sp-citizen-dev-terraform")
-    p.add_argument("workspaces", nargs="*", help="workspace folders (default: all in config/workspaces/)")
-    for s in sub.choices.values():
-        s.add_argument("--run", action="store_true", help="run the script here instead of printing it")
+    for step in STEPS:
+        p = sub.add_parser(step)
+        for flag, section, key, _ in OPTIONS:
+            p.add_argument(flag, help=f"overrides {section}.{key} in the setup file")
+        if step == "databricks":
+            p.add_argument("workspaces", nargs="*", help="workspace folders (default: all in config/workspaces/)")
+        p.add_argument("--run", action="store_true", help="run the script here instead of printing it")
     a = ap.parse_args(argv)
 
-    for value in (getattr(a, "repo", None),):
-        if value is not None and not re.fullmatch(r"[\w.-]+/[\w.-]+", value):
-            raise SystemExit(f"--repo must be <org>/<repo>, not {value!r}")
-    if getattr(a, "approvers", None) and not re.fullmatch(r"[\w.-]+/[\w.-]+", a.approvers):
-        raise SystemExit(f"--approvers must be <org>/<team>, not {a.approvers!r}")
-    script = {"state": state, "identity": identity, "github": github, "databricks": databricks}[a.step](a)
+    path = setup_file()
+    missing = []
+    for flag, section, key, steps in OPTIONS:
+        attr = flag[2:].replace("-", "_")
+        if getattr(a, attr) is None:
+            setattr(a, attr, wsf.nested(path, section, key))
+        if getattr(a, attr) is None and a.step in steps:
+            missing.append(f"{section}.{key}")
+    if a.step == "databricks" and not a.account_profile and not a.account_id:
+        missing.append("databricks.account_id (or databricks.account_profile)")
+    if missing:
+        raise SystemExit(f"Set {', '.join(missing)} in {shown(path)} first (docs/SETUP.md, step 1).")
+    if a.repo is not None and not re.fullmatch(r"[\w.-]+/[\w.-]+", a.repo):
+        raise SystemExit(f"github.repo must be <org>/<repo>, not {a.repo!r}")
+    if a.approvers and not re.fullmatch(r"[\w.-]+/[\w.-]+", a.approvers):
+        raise SystemExit(f"github.approvers must be <org>/<team>, not {a.approvers!r}")
+    script = STEPS[a.step](a)
     if not a.run:
         print("#!/usr/bin/env bash\nset -euo pipefail\n" + script)
         return 0
-    return subprocess.run(["bash", "-euo", "pipefail", "-c", script], cwd=ROOT).returncode
+    return run(script, path)
 
 
 if __name__ == "__main__":

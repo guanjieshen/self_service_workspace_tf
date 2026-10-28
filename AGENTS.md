@@ -41,7 +41,7 @@ Two kinds of repository use this code:
 | Change a workspace's configuration | `config/README.md`, `agents/config.md` |
 | Add a workspace | `python3 scripts/workspaces.py new <name> --bu ... --lob ... --host ... --account-id ...` |
 | Add or change a Terraform option | `agents/terraform.md` |
-| Set up an organization's instance | `docs/RUNBOOK.md` (by team), `scripts/setup.py`, `scripts/preflight.py`; CI details in `docs/github-actions.md` |
+| Set up an organization's instance | `docs/SETUP.md` (by team), `config/setup.yaml`, `scripts/setup.py`, `scripts/preflight.py`; CI details in `docs/github-actions.md` |
 | See ideas not built | `docs/future.md` |
 | See what changed | `CHANGELOG.md` (keep its Unreleased section current) |
 
@@ -56,7 +56,7 @@ request deploys everything with no further step. When you add something:
   click in a UI, a script on a laptop) is a bug unless no API can do it, or a person must
   decide it by design.
 - **If it cannot be automated, say so** in `docs/github-actions.md` ("What GitHub Actions does
-  not do") and `docs/RUNBOOK.md`, with who does it, when and how; script it in
+  not do") and `docs/SETUP.md`, with who does it, when and how; script it in
   `scripts/setup.py` if a command can do it; and fail early with a message naming that step
   (a check in `scripts/preflight.py` for something in the workspace, a precondition in
   `terraform/checks.tf` for the configuration) rather than half-way through an apply.

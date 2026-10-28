@@ -40,7 +40,7 @@ Onboarding a workspace therefore needs nothing in GitHub or Entra: make the serv
 
 ## One-time setup
 
-`docs/RUNBOOK.md` has the order and who does what. Each step is a command that prints the script it runs (`--run` runs it), so it can be read first or sent to the team that owns it:
+`docs/SETUP.md` has the order and who does what; every value comes from `config/setup.yaml`. Each step is a command that prints the script it runs (`--run` runs it), so it can be read first or sent to the team that owns it:
 
 | Step | Command | Creates |
 | --- | --- | --- |
@@ -129,7 +129,7 @@ To try a different model or prompt on one pull request, change these files in th
 | --- | --- |
 | Change a workspace | PR editing files in `config/workspaces/<name>/`; review the plan comment; merge; approve the deployment (if `apply-approval` has reviewers) |
 | Change the baseline | PR editing `config/defaults/`; the PR shows a plan for every workspace |
-| Onboard a workspace | `scripts/workspaces.py new`, `scripts/setup.py databricks <name>` (account admin), `scripts/preflight.py <name>`, then a PR with the new folder (RUNBOOK.md) |
+| Onboard a workspace | `scripts/workspaces.py new`, `scripts/setup.py databricks <name>` (account admin), `scripts/preflight.py <name>`, then a PR with the new folder (docs/SETUP.md, step 9) |
 | Retry a failed apply | Re-run the latest Apply run (it refuses if `main` has moved on since); otherwise open a pull request |
 | Investigate drift | Open the `drift` issue; either update the configuration or re-apply |
 
