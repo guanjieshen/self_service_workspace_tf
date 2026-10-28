@@ -1,0 +1,10 @@
+catalog:
+  name: tst_citizen_dev
+  comment: Test catalog
+  schemas:
+    sandbox:
+      comment: Shared sandbox
+    finance:
+      grants:
+        tst-data-eng: [USE_SCHEMA, SELECT]
+default_catalog: tst_citizen_dev

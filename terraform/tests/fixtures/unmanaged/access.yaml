@@ -1,0 +1,3 @@
+groups: {explorer: tst-explorers, builder: tst-builders, publisher: tst-publishers,
+  platform_admins: tst-admins}
+manage: {group_assignment: false, token_permissions: false, catalog_grants: false}

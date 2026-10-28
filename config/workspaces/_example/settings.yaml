@@ -1,0 +1,24 @@
+# =============================================================================
+# SETTINGS: how this workspace's admin settings differ from the baseline.
+# Any key of config/defaults/settings.yaml can be set here, for this workspace
+# only, with the same name and shape. Keys not set keep the baseline value.
+# null = Terraform leaves the setting alone (it keeps its current value).
+#
+# Every difference from the baseline is reviewed in the pull request, so give
+# the reason in a comment next to it.
+# =============================================================================
+
+# settings:
+#   # Not ready to switch off legacy access (Hive metastore) and DBFS yet: leave
+#   # them alone until this workspace has migrated.
+#   disable_legacy_access: null
+#   disable_dbfs_root_and_mounts: null
+#
+#   # Sites where published dashboards may be embedded.
+#   dashboard_embedding:
+#     approved_domains:
+#       - contoso.sharepoint.com
+#
+#   # One key of a group: the others keep the baseline value.
+#   data_handling:
+#     results_download: false

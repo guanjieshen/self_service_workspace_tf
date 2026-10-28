@@ -1,0 +1,77 @@
+# Every Monday (and on demand): plan every workspace and open an issue for any
+# workspace whose live settings no longer match the configuration, for example
+# after a change made by hand in the admin console or an apply that failed.
+# Closes the issue once clean.
+name: Drift check
+
+on:
+  schedule:
+    - cron: "0 13 * * 1"     # Mondays 13:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  id-token: write
+
+env:
+  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    outputs:
+      workspaces: ${{ steps.list.outputs.workspaces }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: list
+        run: echo "workspaces=$(python3 scripts/workspaces.py changed --all)" >> "$GITHUB_OUTPUT"
+
+  drift:
+    name: Drift ${{ matrix.workspace }}
+    needs: list
+    if: needs.list.outputs.workspaces != '[]'
+    runs-on: ${{ fromJSON(vars.TERRAFORM_RUNNER || '"ubuntu-latest"') }}   # must reach the workspace; see docs
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace: ${{ fromJson(needs.list.outputs.workspaces) }}
+    environment: workspace-${{ matrix.workspace }}   # this workspace's credentials
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          workspace: ${{ matrix.workspace }}
+      - name: Plan
+        run: ./scripts/tf.sh "${{ matrix.workspace }}" plan -no-color -input=false
+      - name: Open, update or close the drift issue
+        uses: actions/github-script@v9
+        env:
+          WORKSPACE: ${{ matrix.workspace }}
+        with:
+          script: |
+            const fs = require('fs');
+            const ws = process.env.WORKSPACE;
+            const changes = Number(fs.readFileSync(`.plans/${ws}.changes`, 'utf8').trim());
+            const plan = fs.readFileSync(`.plans/${ws}.txt`, 'utf8');
+            const title = `Drift: ${ws}`;
+            const { owner, repo } = context.repo;
+            const open = (await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', labels: 'drift' }))
+              .find((i) => i.title === title);
+            if (changes === 0) {
+              if (open) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: open.number, body: 'No drift on the latest check. Closing.' });
+                await github.rest.issues.update({ owner, repo, issue_number: open.number, state: 'closed' });
+              }
+              return;
+            }
+            const body = [
+              `The live settings of \`${ws}\` no longer match the configuration (${changes} resource change${changes === 1 ? '' : 's'}).`,
+              'Either update the configuration to match (if the change was intended), or run the Apply workflow for this workspace to restore it.',
+              '<details><summary>Plan</summary>\n\n```\n' + plan.slice(-60000) + '\n```\n</details>',
+              `Run: ${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
+            ].join('\n\n');
+            if (open) await github.rest.issues.createComment({ owner, repo, issue_number: open.number, body });
+            else await github.rest.issues.create({ owner, repo, title, body, labels: ['drift'] });

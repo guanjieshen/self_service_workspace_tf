@@ -1,0 +1,41 @@
+# Shared setup for every Terraform job: Terraform itself, plus the sign-in settings.
+# One Entra service principal (AZURE_CLIENT_ID) signs in through GitHub OIDC, for both the
+# Terraform state (Azure Storage) and Databricks (see docs/github-actions.md).
+name: Set up Terraform and sign-in
+description: Installs Terraform and exports the sign-in settings for the azurerm backend and the Databricks provider.
+inputs:
+  sign-in:
+    description: Set to "false" for jobs that do not reach Azure or Databricks (format and validate).
+    default: "true"
+  workspace:
+    description: Workspace folder name (config/workspaces/ or dev/workspaces/). When set, DATABRICKS_HOST is set to its host.
+    default: ""
+runs:
+  using: composite
+  steps:
+    - uses: hashicorp/setup-terraform@v4
+      with:
+        terraform_version: 1.16.5
+        terraform_wrapper: false
+    # The Databricks CLI calls the model for the AI review (scripts/ai-plan-review.py).
+    - uses: databricks/setup-cli@v1.21.0
+      if: inputs.sign-in == 'true'
+    - name: Sign-in settings
+      if: inputs.sign-in == 'true'
+      shell: bash
+      env:
+        WORKSPACE: ${{ inputs.workspace }}
+      run: |
+        fail() { echo "::error::$1"; exit 1; }
+        if [[ -n "$WORKSPACE" ]]; then
+          # The same YAML reading as the rest of the scripts (quotes, comments), and the
+          # folder name is checked before it is used anywhere.
+          host="$(python3 scripts/workspaces.py field "$WORKSPACE" host)" || fail "$WORKSPACE: no host in its workspace.yaml"
+          echo "Workspace: $host"
+          echo "DATABRICKS_HOST=$host" >> "$GITHUB_ENV"
+        fi
+        {
+          echo "ARM_USE_OIDC=true"
+          echo "ARM_USE_AZUREAD=true"
+          echo "DATABRICKS_AUTH_TYPE=github-oidc-azure"
+        } >> "$GITHUB_ENV"

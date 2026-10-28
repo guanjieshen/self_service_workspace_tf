@@ -1,0 +1,354 @@
+#!/usr/bin/env python3
+"""Ask a model to summarize a plan and assess its impact.
+
+    scripts/ai-plan-review.py <workspace> [--base <git-ref>] [--endpoint <name>] [--profile <p>] [--request-only]
+    scripts/ai-plan-review.py --settings [<workspace>]
+
+Settings are in config/ai-review.yaml; a workspace can override them in its own folder's
+ai-review.yaml (for example the endpoint, since the models available differ by region).
+One call to a model in the workspace being planned (a Unity Gateway model service or a
+serving endpoint), with the pull request and the plan as its only inputs.
+--endpoint overrides the setting for a local test; --profile is the Databricks CLI profile
+of the planned workspace (local runs; CI signs in from the environment). --settings prints
+the settings as name=value lines for the workflow.
+
+Reads .plans/<workspace>.json (from `terraform show -json`) and
+.plans/<workspace>.guard.txt, plus the git diff of config/ against --base, and
+prints a markdown assessment for the pull request comment.
+
+The result is advice only: it never fails the build. On any error it prints
+nothing and explains on stderr. --request-only prints the request instead of
+sending it.
+"""
+import argparse
+import base64
+import json
+import os
+import pathlib
+import re
+import subprocess
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+SETTINGS = ROOT / "config/ai-review.yaml"
+DEFAULTS = {"enabled": False, "endpoint": "", "max_tokens": 4000, "prompt": ".github/ai/plan-review-prompt.md"}
+MAX_DIFF_CHARS = 30000
+MAX_CHANGES_CHARS = 60000
+SKIP_TYPES = {"terraform_data"}
+# Attributes that are noise for a reviewer.
+SKIP_KEYS = {"provider_config", "id", "object_id", "workspace_path", "policy_id", "data_source_id",
+             "creator_name", "jdbc_url", "odbc_params", "health", "state", "num_clusters",
+             "num_active_sessions", "object_type", "md5"}
+
+KINDS = {
+    "databricks_sql_endpoint": "SQL warehouse",
+    "databricks_cluster": "Cluster",
+    "databricks_cluster_policy": "Cluster policy",
+    "databricks_directory": "Folder",
+    "databricks_permissions": "Permissions",
+    "databricks_entitlements": "Group entitlements",
+    "databricks_workspace_conf": "Workspace settings",
+    "databricks_budget_policy": "Serverless usage policy",
+    "databricks_access_control_rule_set": "Serverless usage policy access",
+    "databricks_permission_assignment": "Group assignment to workspace",
+    "databricks_sql_global_config": "SQL warehouse settings",
+    "databricks_catalog": "Unity Catalog catalog",
+    "databricks_schema": "Unity Catalog schema",
+    "databricks_grants": "Unity Catalog grants",
+    "databricks_workspace_file": "Workspace file",
+    "databricks_default_namespace_setting": "Default catalog setting",
+    "databricks_disable_legacy_access_setting": "Disable legacy access setting",
+    "databricks_disable_legacy_dbfs_setting": "Disable DBFS root and mounts setting",
+    "databricks_restrict_workspace_admins_setting": "Restrict workspace admins setting",
+    "databricks_compliance_security_profile_workspace_setting": "Compliance security profile setting",
+    "databricks_enhanced_security_monitoring_workspace_setting": "Enhanced security monitoring setting",
+    "databricks_automatic_cluster_update_workspace_setting": "Automatic cluster update setting",
+    "databricks_aibi_dashboard_embedding_access_policy_setting": "Dashboard embedding setting",
+    "databricks_aibi_dashboard_embedding_approved_domains_setting": "Dashboard embedding approved domains",
+}
+
+
+def clean(value):
+    """Drop nulls, empty values and noise keys, recursively."""
+    if isinstance(value, dict):
+        if isinstance(value.get("content_base64"), str):  # workspace files: show the text
+            value = {**value, "content": base64.b64decode(value["content_base64"]).decode(errors="replace")}
+            del value["content_base64"]
+        out = {k: clean(v) for k, v in value.items() if k not in SKIP_KEYS}
+        return {k: v for k, v in out.items() if v not in (None, "", [], {})}
+    if isinstance(value, list):
+        return [clean(v) for v in value if v not in (None, "", [], {})]
+    if isinstance(value, str) and value.startswith("{"):
+        try:  # policy definitions and similar are JSON strings
+            return clean(json.loads(value))
+        except ValueError:
+            return value
+    return value
+
+
+def action_of(actions):
+    if actions == ["create"]:
+        return "create"
+    if actions == ["update"]:
+        return "update"
+    if actions == ["delete"]:
+        return "delete"
+    if "create" in actions and "delete" in actions:
+        return "replace"
+    return "+".join(actions)
+
+
+def name_of(rc, values):
+    for key in ("name", "path", "directory_path", "policy_name", "display_name"):
+        if values.get(key):
+            return values[key]
+    return rc.get("index", rc["name"])
+
+
+def planned_changes(plan):
+    changes = []
+    for rc in plan.get("resource_changes", []):
+        actions = rc["change"]["actions"]
+        if rc["mode"] != "managed" or rc["type"] in SKIP_TYPES or actions in (["no-op"], ["read"]):
+            continue
+        before = clean(rc["change"].get("before") or {})
+        after = clean(rc["change"].get("after") or {})
+        item = {
+            "action": action_of(actions),
+            "kind": KINDS.get(rc["type"], rc["type"]),
+            "name": name_of(rc, after or before),
+            "terraform_address": rc["address"],
+        }
+        if item["action"] == "create":
+            item["after"] = after
+        elif item["action"] == "delete":
+            item["before"] = before
+        else:
+            item["changed"] = {
+                k: {"before": before.get(k), "after": after.get(k)}
+                for k in sorted(set(before) | set(after)) if before.get(k) != after.get(k)
+            }
+        changes.append(item)
+    return changes
+
+
+def git(*args):
+    out = subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True)
+    return out.stdout if out.returncode == 0 else f"(git {args[0]} failed: {out.stderr.strip()})"
+
+
+# What a workspace may set in its own ai-review.yaml; the prompts stay shared.
+WORKSPACE_KEYS = ("enabled", "endpoint", "max_tokens")
+
+
+def read_flat(path, allowed):
+    """The flat `key: value` lines of a settings file, typed like DEFAULTS."""
+    values = {}
+    for line in path.read_text().splitlines():
+        line = line.split("#", 1)[0].strip()
+        if ":" not in line:
+            continue
+        key, value = (part.strip() for part in line.split(":", 1))
+        if key not in allowed:
+            raise ValueError(f"{path.relative_to(ROOT)}: unknown setting {key!r} (allowed: {', '.join(allowed)})")
+        if isinstance(DEFAULTS[key], bool):
+            values[key] = value.lower() == "true"
+        elif isinstance(DEFAULTS[key], int):
+            values[key] = int(value)
+        else:
+            values[key] = value.strip("\"'")
+    return values
+
+
+def load_settings(workspace=None):
+    """config/ai-review.yaml, then the workspace's own ai-review.yaml over it."""
+    settings = dict(DEFAULTS)
+    if SETTINGS.exists():
+        settings.update(read_flat(SETTINGS, DEFAULTS))
+    if workspace and (ws_dir(workspace) / "ai-review.yaml").exists():
+        settings.update(read_flat(ws_dir(workspace) / "ai-review.yaml", WORKSPACE_KEYS))
+    settings["label"] = settings["endpoint"]
+    return settings
+
+
+def ws_dir(workspace):
+    """The workspace's folder: config/workspaces/<name>/, or dev/workspaces/<name>/ for the
+    workspaces that test the framework (the same rule as scripts/workspaces.py)."""
+    found = [d for d in (ROOT / "config/workspaces" / workspace, ROOT / "dev/workspaces" / workspace)
+             if (d / "workspace.yaml").exists()]
+    return found[0] if found else ROOT / "config/workspaces" / workspace
+
+
+def config_diff(base):
+    if not base:
+        return "(no base ref given)"
+    diff = git("diff", base, "--", "config/", "dev/workspaces/")
+    if len(diff) > MAX_DIFF_CHARS:
+        diff = diff[:MAX_DIFF_CHARS] + "\n... (diff truncated)"
+    return diff or "(no configuration changes in this pull request)"
+
+
+def changed_files(base, workspace):
+    if not base:
+        return "(no base ref given)"
+    lines = []
+    for path in git("diff", "--name-only", base).split():
+        if path.startswith("config/defaults/"):
+            kind = "baseline (affects every workspace)"
+        elif re.match(rf"(config|dev)/workspaces/{re.escape(workspace)}/", path):
+            kind = "this workspace's file"
+        elif re.match(r"(config|dev)/workspaces/", path):
+            kind = "another workspace's file (not this plan)"
+        else:
+            kind = "code, workflows or docs (no direct workspace change)"
+        lines.append(f"- {path}: {kind}")
+    return "\n".join(lines) or "(none)"
+
+
+def drop_comment(line):
+    """A YAML line without its trailing comment: a # after whitespace, outside quotes."""
+    for m in re.finditer(r"\s#", line):
+        before = line[:m.start()]
+        if before.count('"') % 2 == 0 and before.count("'") % 2 == 0:
+            return before.rstrip()
+    return line.rstrip()
+
+
+def strip_comments(text):
+    """YAML without comment-only lines, trailing comments or blank lines."""
+    out = []
+    for line in text.splitlines():
+        if line.lstrip().startswith("#") or not line.strip():
+            continue
+        out.append(drop_comment(line))
+    return "\n".join(out)
+
+
+def without_comments(f):
+    """A config file's text without comments: # in YAML, <!-- --> in markdown."""
+    text = f.read_text()
+    return strip_comments(text) if f.suffix == ".yaml" else re.sub(r"(?s)<!--.*?-->", "", text).strip()
+
+
+def baseline():
+    defaults = ROOT / "config/defaults"
+    files = sorted(defaults.glob("*.yaml"))
+    return "\n\n".join(f"# {f.relative_to(ROOT)}\n{without_comments(f)}" for f in files)
+
+
+def state_note(plan):
+    resources = ((plan.get("prior_state") or {}).get("values") or {}).get("root_module") or {}
+    count = len(resources.get("resources", [])) + sum(
+        len(m.get("resources", [])) for m in resources.get("child_modules", []))
+    managed = count > 0
+    return ("Update: Terraform already manages resources in this workspace." if managed
+            else "First apply: Terraform manages nothing in this workspace yet, so the whole baseline is created.")
+
+
+def workspace_field(workspace, key):
+    """A top-level value from the workspace's workspace.yaml."""
+    text = (ws_dir(workspace) / "workspace.yaml").read_text()
+    return next((l.split(":", 1)[1].split("#")[0].strip().strip("\"'") for l in text.splitlines()
+                 if l.startswith(f"{key}:")), "")
+
+
+def build_request(workspace, base, settings):
+    plans = ROOT / ".plans"
+    plan = json.loads((plans / f"{workspace}.json").read_text())
+    guard_file = plans / f"{workspace}.guard.txt"
+    guard = guard_file.read_text().strip() if guard_file.exists() else ""
+    changes = json.dumps(planned_changes(plan), indent=1)
+    if len(changes) > MAX_CHANGES_CHARS:
+        changes = changes[:MAX_CHANGES_CHARS] + "\n... (truncated)"
+    folder = ws_dir(workspace)
+    host = workspace_field(workspace, "host")
+    ws_files = "\n\n".join(
+        f"# {f.name}\n{without_comments(f)}"
+        for f in sorted([*folder.glob("*.yaml"), *folder.glob("*.md")]) if f.name != "ai-review.yaml"
+    )
+    user = (
+        f"<workspace>\n{workspace} ({host})\n</workspace>\n\n"
+        f"<state>\n{state_note(plan)}\n</state>\n\n"
+        f"<changed_files>\n{changed_files(base, workspace)}\n</changed_files>\n\n"
+        f"<config_diff>\n{config_diff(base)}\n</config_diff>\n\n"
+        f"<workspace_files>\n{ws_files}\n</workspace_files>\n\n"
+        f"<baseline>\n{baseline()}\n</baseline>\n\n"
+        f"<planned_changes>\n{changes}\n</planned_changes>\n\n"
+        f"<plan_guard>\n{guard}\n</plan_guard>"
+    )
+    return {
+        "messages": [
+            {"role": "system", "content": (ROOT / settings["prompt"]).read_text()},
+            {"role": "user", "content": user},
+        ],
+        "max_tokens": settings["max_tokens"],
+    }
+
+
+def response_text(resp):
+    """The answer text; some models return a list of parts (reasoning + text)."""
+    content = resp["choices"][0]["message"]["content"]
+    if isinstance(content, str) and content.lstrip().startswith("[{"):
+        try:  # a JSON-encoded list of parts
+            content = json.loads(content)
+        except ValueError:
+            pass
+    if isinstance(content, list):
+        content = "\n".join(p.get("text", "") for p in content if p.get("type") == "text")
+    return content.strip()
+
+
+def model_review(endpoint, request):
+    """One call to a model. Returns the answer."""
+    if endpoint.count(".") == 2:  # a Unity Gateway model service, such as system.ai.claude-sonnet-5-5
+        cmd = ["databricks", "api", "post", "/ai-gateway/mlflow/v1/chat/completions",
+               "--json", json.dumps({"model": endpoint, **request}), "-o", "json"]
+    else:  # a model serving endpoint (disabled for databricks- models once Unity Gateway is enforced)
+        cmd = ["databricks", "serving-endpoints", "query", endpoint, "--json", json.dumps(request), "-o", "json"]
+    out = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    if out.returncode != 0:
+        raise RuntimeError(out.stderr.strip() or out.stdout.strip())
+    resp = json.loads(out.stdout)
+    usage = resp.get("usage") or {}
+    print(f"tokens: in={usage.get('prompt_tokens')} out={usage.get('completion_tokens')}", file=sys.stderr)
+    return response_text(resp)
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("workspace", nargs="?")
+    ap.add_argument("--base")
+    ap.add_argument("--endpoint")
+    ap.add_argument("--profile", default=os.environ.get("DATABRICKS_CONFIG_PROFILE", ""))
+    ap.add_argument("--request-only", action="store_true")
+    ap.add_argument("--settings", action="store_true")
+    args = ap.parse_args()
+
+    if args.settings:  # for the workflow: name=value lines, written to $GITHUB_OUTPUT
+        settings = load_settings(args.workspace)
+        for key, value in settings.items():
+            print(f"{key}={str(value).lower() if isinstance(value, bool) else value}")
+        return 0
+    if not args.workspace:
+        ap.error("workspace is required")
+
+    try:
+        plan = json.loads((ROOT / ".plans" / f"{args.workspace}.json").read_text())
+        if not planned_changes(plan):
+            print("AI review skipped: the plan has no changes.", file=sys.stderr)
+            return 0
+        settings = load_settings(args.workspace)
+        request = build_request(args.workspace, args.base, settings)
+        if args.request_only:
+            print(json.dumps(request, indent=1))
+            return 0
+        if args.profile:
+            os.environ["DATABRICKS_CONFIG_PROFILE"] = args.profile
+        print(model_review(args.endpoint or settings["endpoint"], request))
+    except Exception as e:  # advice only: never fail the build
+        print(f"AI review skipped: {e}", file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

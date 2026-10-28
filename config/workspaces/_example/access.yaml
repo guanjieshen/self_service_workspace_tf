@@ -1,0 +1,34 @@
+# =============================================================================
+# ACCESS for this workspace.
+# The personas, their groups and what each one gets are in
+# config/defaults/access.yaml; everything here is optional. Who is in each group
+# is managed in Entra ID, not here.
+# =============================================================================
+
+# The groups, if they are not named like the baseline ({bu}_explorer, ...):
+# groups:
+#   explorer: xyz-cd-explorers
+#   platform_admins: xyz-platform-admins
+
+# Teams: their tags become allowed values on the cluster policies, and a team can get
+# its own warehouse (compute.yaml), usually by a self-service request (a pull request).
+# A team folder comes from the team folder job instead. Keys: lowercase letters,
+# digits, dashes.
+teams: {}
+#  integrity:
+#    group: xyz-integrity
+#    tags:                     # must set DEPARTMENT and TEAM
+#      DEPARTMENT: INTEGRITY
+#      TEAM: "1"
+
+# ---- Changes to the baseline, for this workspace only -----------------------
+# Let builders create personal access tokens (baseline: nobody but platform admins):
+# personas:
+#   builder:
+#     can_create_tokens: true
+#
+# Leave access controls alone that something else manages here:
+# manage:
+#   group_assignment: false    # groups are assigned to the workspace elsewhere
+#   token_permissions: false   # who may create tokens is managed elsewhere
+#   catalog_grants: false      # who may use the workspace catalog is managed elsewhere

@@ -1,0 +1,37 @@
+# =============================================================================
+# WORKSPACE: which workspace this folder configures.        SET ONCE at onboarding.
+#
+# One folder per workspace under config/workspaces/<name>/ (create it with
+# scripts/workspaces.py new). The folder name is the workspace's name in this
+# repository: ./scripts/tf.sh <name> plan
+#
+#   workspace.yaml   this file: identity
+#   access.yaml      who gets what: persona groups, admins, teams, projects
+#   compute.yaml     team warehouses
+#   catalog.yaml     Unity Catalog: the workspace's catalog and default catalog
+#   cost.yaml, settings.yaml (optional)
+# Any of access, compute, cost and settings can also change keys of the baseline
+# file with the same name in config/defaults/ (config/README.md). Everything not
+# set comes from the baseline.
+# bu is part of every folder path and budget policy name; changing it later
+# recreates them (the plan check warns first).
+# =============================================================================
+
+bu: xyz                                    # business unit code, used in names: <BU>-SHARED, <BU> Default Warehouse
+lob: XYZ                                   # LOB tag on all workloads (changing it splits spend history)
+account_id: 00000000-0000-0000-0000-000000000000
+host: https://adb-0000000000000000.0.azuredatabricks.net
+ci: true                                   # false = GitHub Actions never plans or applies this workspace
+
+# Optional: a label and color next to the workspace name in the top bar, so people can tell
+# workspaces apart. Colors: coral, lemon, lime, turquoise, indigo, purple, pink.
+# Leave it out (or null) to leave the workspace's label alone.
+# label:
+#   text: DEV
+#   color: lime
+
+# Manual runs only: Databricks CLI profiles from ~/.databrickscfg.
+# Leave null in CI; the pipeline provides the sign-in.
+auth:
+  workspace_profile: null
+  account_profile: null

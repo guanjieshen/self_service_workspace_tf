@@ -1,0 +1,6 @@
+# Copy to config/backend.hcl to keep Terraform state in Azure Storage.
+# scripts/tf.sh adds key=citizen-dev/<workspace>.tfstate for each workspace.
+resource_group_name  = "rg-terraform-state"
+storage_account_name = "sttfstate000"
+container_name       = "tfstate"
+use_azuread_auth     = true

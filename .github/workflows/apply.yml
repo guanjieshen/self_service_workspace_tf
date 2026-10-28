@@ -1,0 +1,116 @@
+# After a pull request is merged to main: apply each affected workspace.
+# Each workspace has two GitHub Environments:
+#   workspace-<name>           its Databricks credentials (also used by plan and drift)
+#   workspace-<name>-approval  the approval step; add required reviewers to make every apply wait for one.
+# Approving the deployment counts as confirming any hard-to-undo changes the plan guard flagged.
+#
+# Workspaces are applied one at a time, stopping at the first failure. A merge is the only
+# way to deploy: there is no manual trigger. To retry a failed apply (for example after a
+# missing prerequisite is fixed), re-run the latest Apply run in Actions: it applies the same
+# commit, and refuses if main has moved on since. Otherwise open a pull request.
+name: Apply
+
+on:
+  push:
+    branches: [main]
+    paths:                   # only what changes what Terraform does (see scripts/workspaces.py changed)
+      - "config/**"
+      - "dev/workspaces/**"
+      - "terraform/**"
+      - "!terraform/tests/**"
+      - "scripts/tf.sh"
+      - "scripts/plan-guard.py"
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+jobs:
+  changes:
+    name: Find affected workspaces
+    runs-on: ubuntu-latest
+    outputs:
+      workspaces: ${{ steps.detect.outputs.workspaces }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: detect
+        env:
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          list="$(python3 scripts/workspaces.py changed "$BEFORE" "$SHA")"
+          echo "Workspaces to apply: $list"
+          python3 scripts/workspaces.py names "$list" >/dev/null   # checks every name is a workspace folder
+          echo "workspaces=$list" >> "$GITHUB_OUTPUT"
+
+  approve:
+    name: Approve ${{ matrix.workspace }}
+    needs: changes
+    if: needs.changes.outputs.workspaces != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        workspace: ${{ fromJson(needs.changes.outputs.workspaces) }}
+    environment: workspace-${{ matrix.workspace }}-approval
+    steps:
+      # For now, merging the pull request is the approval: this repository's GitHub plan
+      # cannot require reviewers on environments. To restore a reviewer gate, add required
+      # reviewers to workspace-<name>-approval; GitHub then pauses here for approval.
+      - run: echo "Approved by merge to main."
+
+  apply:
+    name: Apply ${{ matrix.workspace }}
+    needs: [changes, approve]
+    if: needs.changes.outputs.workspaces != '[]'
+    runs-on: ${{ fromJSON(vars.TERRAFORM_RUNNER || '"ubuntu-latest"') }}   # must reach the workspace; see docs
+    strategy:
+      # One workspace at a time, and stop at the first failure: a baseline change that
+      # breaks one workspace must not go on to the rest. Fix it, then re-run.
+      fail-fast: true
+      max-parallel: 1
+      matrix:
+        workspace: ${{ fromJson(needs.changes.outputs.workspaces) }}
+    environment: workspace-${{ matrix.workspace }}   # this workspace's credentials
+    concurrency:
+      group: apply-${{ matrix.workspace }}
+      cancel-in-progress: false
+    env:
+      CONFIRM_ENV: ${{ matrix.workspace }}   # the approval above is the confirmation
+      WORKSPACE: ${{ matrix.workspace }}
+    steps:
+      - uses: actions/checkout@v7
+      # A re-run applies its own commit: refuse once main has moved on, or it would apply
+      # older configuration over what was merged since. Re-running only failed jobs skips
+      # the job above, so the check is here.
+      - name: Check the commit is still the latest on main
+        if: github.run_attempt > 1
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          latest="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [[ "$latest" != "$SHA" ]]; then
+            echo "::error::main has moved on since this run's commit ($SHA, now $latest); re-run the latest Apply run instead."
+            exit 1
+          fi
+      - uses: ./.github/actions/setup
+        with:
+          workspace: ${{ matrix.workspace }}
+      - name: Apply
+        run: ./scripts/tf.sh "$WORKSPACE" apply -no-color -input=false
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Apply: \`$WORKSPACE\`"
+            [[ -s ".plans/$WORKSPACE.guard.txt" ]] && { echo '```'; cat ".plans/$WORKSPACE.guard.txt"; echo '```'; }
+            echo "<details><summary>Plan that was applied</summary>"; echo; echo '```'
+            tail -c 60000 ".plans/$WORKSPACE.txt" 2>/dev/null || echo "(no plan)"
+            echo '```'; echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"

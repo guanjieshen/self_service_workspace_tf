@@ -1,0 +1,2 @@
+budget_policies:
+  extra_managers: [users/owner@example.com]

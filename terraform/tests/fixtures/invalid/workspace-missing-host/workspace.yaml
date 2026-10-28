@@ -1,0 +1,4 @@
+# Test fixture: no host (so no workspace ID either).
+bu: tst
+lob: TESTLOB
+account_id: 00000000-0000-0000-0000-000000000000

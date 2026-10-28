@@ -1,0 +1,4 @@
+# Test fixture: a misspelt setting (results_download).
+settings:
+  data_handling:
+    result_download: false

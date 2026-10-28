@@ -1,0 +1,6 @@
+groups: {explorer: tst-explorers}
+teams:
+  data-eng:
+    group: tst-data-eng
+    tags: {DEPARTMENT: X, TEAM: Y}
+    warehouse: {size: Small}

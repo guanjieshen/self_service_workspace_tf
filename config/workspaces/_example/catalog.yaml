@@ -1,0 +1,21 @@
+# =============================================================================
+# CATALOG for this workspace.
+# Every workspace gets one catalog ({bu}_citizen_dev), with personal schemas created
+# on request; see config/defaults/catalog.yaml. Everything here is
+# optional. Deleting the catalog or a schema later deletes its data, so Terraform
+# refuses while they still hold tables.
+# =============================================================================
+
+# catalog:
+#   # Where managed tables are stored, if the metastore has no default storage:
+#   storage_root: abfss://<container>@<account>.dfs.core.windows.net/<path>
+#   # Shared schemas (usually added by a self-service request, a pull request):
+#   schemas:
+#     team_data:
+#       comment: Curated tables shared across the BU
+#       grants:                            # a persona, users, or a group name
+#         explorer: [SELECT]
+#         builder: [SELECT, MODIFY, CREATE_TABLE]
+
+# Where unqualified table names resolve. null = leave the workspace default alone.
+default_catalog: null                      # for example xyz_citizen_dev

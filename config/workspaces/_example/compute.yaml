@@ -1,0 +1,38 @@
+# =============================================================================
+# COMPUTE: this workspace's SQL warehouses and shared cluster.   CHANGES RARELY.
+# Any key of config/defaults/compute.yaml can be set here, for this workspace
+# only (same name and shape). Keys not set keep the baseline value.
+# =============================================================================
+
+# The default SQL warehouse (serverless), for everyone with a persona.
+# sql_warehouse:
+#   size: Medium               # 2X-Small | X-Small | Small | Medium | Large | ...
+#   min_clusters: 1            # clusters kept while it runs
+#   max_clusters: 4            # scales out to this under load
+#   auto_stop_minutes: 10      # stops after this many idle minutes
+
+# Optional second warehouse on classic compute (baseline: off). Values not
+# given come from classic_warehouse in the baseline.
+# classic_warehouse:
+#   enabled: true
+#   size: X-Small
+#   min_clusters: 1
+#   max_clusters: 1
+#   auto_stop_minutes: 10
+
+# Shared classic cluster.
+# shared_cluster:
+#   enabled: false             # false = no shared cluster in this workspace
+#   node_type: Standard_E16_v3
+
+# Warehouses for individual teams, for chargeback: the team's group gets Can use,
+# and the warehouse carries the team's tags (access.yaml). Each one is defined
+# in full here; the key must be a team in access.yaml.
+team_warehouses: {}
+#  integrity:
+#    name: XYZ Integrity Warehouse
+#    type: serverless           # serverless | pro | classic
+#    size: X-Small
+#    min_clusters: 1
+#    max_clusters: 1
+#    auto_stop_minutes: 5

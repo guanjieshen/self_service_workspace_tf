@@ -1,0 +1,37 @@
+# =============================================================================
+# COST: chargeback tags and serverless usage (budget) policies.
+#
+# Names and required tags end up in policy names and billing records: renaming
+# RECREATES policies (jobs lose the policy they used) and splits spend history;
+# scripts/tf.sh warns before applying such a change. Changing tags affects new
+# usage only. {BU} = business unit (upper case).
+# =============================================================================
+
+# Tag keys every warehouse, cluster and budget policy carries, for chargeback.
+# LOB comes from the workspace's workspace.yaml; every team in its access.yaml
+# must set the others. Adding a key later means every team must add it.
+required_tags:
+  - LOB
+  - DEPARTMENT
+  - TEAM
+
+budget_policies:
+  enabled: true                # false = do not manage budget policies at all
+
+  # Names of the serverless budget policies.
+  # If a user can use several policies and does not pick one, Databricks uses
+  # the first one alphabetically, so these names also decide the fallback.
+  shared_name: "{BU}-SHARED"           # for everyone
+  platform_name: "{BU}-PLATFORM"       # for platform admins
+
+  shared_tags:                 # LOB is added automatically from workspace.yaml
+    DEPARTMENT: SHARED
+    TEAM: SHARED
+
+  platform_tags:
+    DEPARTMENT: PLATFORM
+    TEAM: PLATFORM
+
+  # Platform admin groups always manage every policy. Add other principals here,
+  # for example: users/someone@contoso.com or servicePrincipals/<application-id>.
+  extra_managers: []

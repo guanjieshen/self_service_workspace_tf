@@ -1,0 +1,4 @@
+# Test fixture: a catalog key the baseline does not have.
+catalog:
+  name: tst_cat
+  colour: blue

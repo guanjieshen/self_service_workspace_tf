@@ -1,0 +1,141 @@
+# On every pull request: check formatting, then plan each affected workspace and
+# post the plan to the PR. A plan with hard-to-undo changes (see scripts/plan-guard.py)
+# fails the check unless the PR has the label "allow-risky-changes".
+name: Plan
+
+on:
+  pull_request:
+    paths:
+      - "config/**"
+      - "dev/**"
+      - "terraform/**"
+      - "scripts/**"
+      - ".github/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write          # GitHub OIDC sign-in (Azure and Databricks)
+
+env:
+  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+jobs:
+  checks:
+    name: Format and validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          sign-in: "false"
+      - run: terraform fmt -check -recursive terraform
+      # Across workspaces: unique hosts, ids and catalog names, budget policy names that do
+      # not collide on an account, and folder names safe for workflow commands.
+      - run: python3 scripts/workspaces.py check
+      - run: terraform -chdir=terraform init -backend=false -input=false
+      - run: terraform -chdir=terraform validate
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          sign-in: "false"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      # Mocked providers: no workspace, credentials or network. Same as ./scripts/test.sh locally.
+      - run: ./scripts/test.sh
+
+  changes:
+    name: Find affected workspaces
+    runs-on: ubuntu-latest
+    outputs:
+      workspaces: ${{ steps.detect.outputs.workspaces }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: detect
+        run: |
+          list="$(python3 scripts/workspaces.py changed --plan "origin/${{ github.base_ref }}" HEAD)"
+          echo "Affected workspaces: $list"
+          echo "workspaces=$list" >> "$GITHUB_OUTPUT"
+
+  plan:
+    name: Plan ${{ matrix.workspace }}
+    needs: [checks, tests, changes]
+    if: needs.changes.outputs.workspaces != '[]'
+    runs-on: ${{ fromJSON(vars.TERRAFORM_RUNNER || '"ubuntu-latest"') }}   # must reach the workspace; see docs
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace: ${{ fromJson(needs.changes.outputs.workspaces) }}
+    # This job runs the pull request's code with the workspace's credentials, before the
+    # code is reviewed: see "Who can run code with the workspace credentials" in docs/github-actions.md.
+    environment: workspace-${{ matrix.workspace }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0     # the AI review compares the configuration with the base branch
+      - uses: ./.github/actions/setup
+        with:
+          workspace: ${{ matrix.workspace }}
+
+      - name: Plan
+        run: ./scripts/tf.sh "${{ matrix.workspace }}" plan -no-color -input=false
+
+      # A table of every resource the plan adds, changes or removes (github.com/dineshba/tf-summarize).
+      - name: Summarize the plan
+        if: always() && hashFiles(format('.plans/{0}.json', matrix.workspace)) != ''
+        env:
+          WORKSPACE: ${{ matrix.workspace }}
+          VERSION: v0.3.20
+          SHA256: 6ab68aad6200586ee983e8112b67aa2050c61dc6e67182dbb287b30c7a97c9a8   # tf-summarize_linux_amd64.tar.gz
+        run: |
+          dir="$RUNNER_TEMP/tf-summarize"; mkdir -p "$dir"
+          curl -fsSL -o "$dir/tf-summarize.tar.gz" "https://github.com/dineshba/tf-summarize/releases/download/$VERSION/tf-summarize_linux_amd64.tar.gz"
+          echo "$SHA256  $dir/tf-summarize.tar.gz" | sha256sum -c -
+          tar -xzf "$dir/tf-summarize.tar.gz" -C "$dir" tf-summarize
+          "$dir/tf-summarize" -md ".plans/$WORKSPACE.json" > ".plans/$WORKSPACE.summary.md"
+
+      # Advice only: a model in the workspace reads the PR and the plan and assesses the impact.
+      # Settings (on or off, model, prompt) are in config/ai-review.yaml; a workspace can
+      # override them in its own folder's ai-review.yaml.
+      - name: AI review settings
+        id: ai
+        if: always()
+        run: ./scripts/ai-plan-review.py --settings "${{ matrix.workspace }}" >> "$GITHUB_OUTPUT"
+      - uses: databricks/setup-cli@v1.20.0
+        if: always() && steps.ai.outputs.enabled == 'true' && hashFiles(format('.plans/{0}.json', matrix.workspace)) != ''
+      - name: AI impact review
+        if: always() && steps.ai.outputs.enabled == 'true' && hashFiles(format('.plans/{0}.json', matrix.workspace)) != ''
+        env:
+          WORKSPACE: ${{ matrix.workspace }}
+          BASE_REF: ${{ github.base_ref }}
+        run: ./scripts/ai-plan-review.py "$WORKSPACE" --base "origin/$BASE_REF" > ".plans/$WORKSPACE.ai.md"
+
+      - name: Post plan to the pull request
+        if: always()
+        uses: actions/github-script@v9
+        env:
+          WORKSPACE: ${{ matrix.workspace }}
+          ENDPOINT: ${{ steps.ai.outputs.label }}
+        with:
+          script: |
+            const { post } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/plan-comment.js`);
+            await post({ github, context }, process.env.WORKSPACE, process.env.ENDPOINT);
+
+      - name: Block risky changes unless approved
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'allow-risky-changes') }}
+        run: |
+          status="$(cat ".plans/${{ matrix.workspace }}.guard")"
+          if [[ "$status" != "0" ]]; then
+            echo "::error::Hard-to-undo changes in ${{ matrix.workspace }}. Review the plan comment; add the label allow-risky-changes if intended."
+            exit 1
+          fi

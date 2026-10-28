@@ -1,0 +1,4 @@
+team_warehouses:
+  data-eng:
+    name: W
+    type: serverless

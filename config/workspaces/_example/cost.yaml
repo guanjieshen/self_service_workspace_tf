@@ -1,0 +1,16 @@
+# =============================================================================
+# COST: chargeback tags and serverless usage (budget) policies.  CHANGES RARELY.
+# Any key of config/defaults/cost.yaml can be set here, for this workspace only
+# (same name and shape). Keys not set keep the baseline value.
+# =============================================================================
+
+# Leave budget policies alone in this workspace (for example while something
+# else manages them):
+# budget_policies:
+#   enabled: false
+
+# Others who may manage this workspace's budget policies, next to the platform
+# admins:
+# budget_policies:
+#   extra_managers:
+#     - users/someone@contoso.com

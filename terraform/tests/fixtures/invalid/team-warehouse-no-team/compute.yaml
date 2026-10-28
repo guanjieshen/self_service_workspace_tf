@@ -1,0 +1,8 @@
+team_warehouses:
+  ghost:
+    name: W
+    type: serverless
+    size: Small
+    min_clusters: 1
+    max_clusters: 1
+    auto_stop_minutes: 5

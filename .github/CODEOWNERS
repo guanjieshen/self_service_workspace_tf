@@ -1,0 +1,17 @@
+# Who must approve a pull request, by path. Takes effect with branch protection
+# (or a ruleset) on main that requires review from code owners.
+# Replace @guanjieshen with your teams, for example @<org>/databricks-platform and
+# @<org>/security. The last matching line wins.
+
+# Workspace folders: the platform team.
+*                                   @guanjieshen
+
+# Code that runs with the workspace credentials (plan, apply, drift, AI review):
+# a change here can do anything the pipeline identity can, so it needs the platform team.
+/terraform/                         @guanjieshen
+/scripts/                           @guanjieshen
+/.github/                           @guanjieshen
+
+# The security settings every workspace gets (legacy access, DBFS, isolation, tokens, downloads):
+# the platform team and security.
+/config/defaults/settings.yaml      @guanjieshen

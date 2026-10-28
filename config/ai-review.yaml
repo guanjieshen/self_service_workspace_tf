@@ -1,0 +1,32 @@
+# =============================================================================
+# AI IMPACT REVIEW: settings for the review posted on every pull request plan.
+#
+# The plan workflow gives the pull request's configuration diff and the
+# Terraform plan to a reviewer in the workspace being planned, and posts the
+# answer in the plan comment. It is advice only: it never approves or blocks
+# a merge, and if the reviewer fails the section is left out.
+#
+# Change these settings with a pull request like any other change. A workspace
+# can override the model and limits in its own ai-review.yaml.
+# =============================================================================
+
+# false = no AI review; the plan comment still has the plan and the summary table.
+enabled: true
+
+# Model to call, in the workspace being planned. A three-part name is a Unity
+# Gateway model service (the pipeline identity needs EXECUTE on it; account
+# users have it on system.ai by default). Any other name is a model serving
+# endpoint (needs "Can query"); the databricks- pay-per-token endpoints stop
+# working once Unity Gateway is enforced (enforce_unity_gateway).
+#   system.ai.claude-sonnet-5-5   good balance of accuracy, speed and cost (tested)
+#   system.ai.claude-haiku-5-5    cheaper per token, but less accurate in testing
+#   system.ai.claude-opus-5-5     most thorough, slower and more expensive
+endpoint: system.ai.claude-sonnet-5-5
+
+# Upper limit on the answer, in tokens. The model reasons before it writes,
+# so leave room: answers in testing used 300 to 600 tokens.
+max_tokens: 4000
+
+# The instructions every reviewer follows: what the repository is, what to
+# look for, and how to format the answer. Edit that file to change the review.
+prompt: .github/ai/plan-review-prompt.md
