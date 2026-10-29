@@ -1,5 +1,7 @@
 """scripts/ai-plan-review.py: settings, what the reviewer is shown, and reading the answer."""
 import base64
+import contextlib
+import io
 import json
 import os
 import pathlib
@@ -7,6 +9,7 @@ import re
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 from helpers import ROOT, SCRIPTS, change, load
 
@@ -47,6 +50,15 @@ class Settings(unittest.TestCase):
         self.setup_yaml("ai_review_workspace: nowhere\n")
         with self.assertRaises(ValueError):
             review.load_settings()
+
+    def test_a_wrong_review_workspace_turns_the_review_off_not_the_plan(self):
+        self.setup_yaml("ai_review_workspace: nowhere\n")
+        out, err = io.StringIO(), io.StringIO()
+        with mock.patch.object(sys, "argv", ["ai-plan-review.py", "--settings"]), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            self.assertEqual(review.main(), 0)
+        self.assertIn("enabled=false", out.getvalue())
+        self.assertIn("AI review off", err.getvalue())
 
     def test_the_shipped_prompt_exists(self):
         self.assertTrue((self.orig / review.PROMPT).exists())

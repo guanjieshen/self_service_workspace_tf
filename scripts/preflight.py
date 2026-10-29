@@ -78,11 +78,20 @@ def checks(ws, get):
     bu = info["bu"]
     out = []
 
+    # In CI, the pipeline signs in as the service principal named by the repository variables.
+    # Empty ones mean the one-time setup is not done: say so, not "cannot sign in".
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        missing = [v for v in ("AZURE_CLIENT_ID", "AZURE_TENANT_ID") if not os.environ.get(v.replace("AZURE_", "ARM_"))]
+        if missing:
+            return [("error", f"the repository variables {' and '.join(missing)} are not set, so the pipeline has no "
+                              "identity to sign in with: do the one-time setup (docs/SETUP.md, steps 4 and 5: "
+                              "scripts/setup.py identity, then scripts/setup.py github).")]
     me, err = get("/api/2.0/preview/scim/v2/Me")
     if err:
-        return [("error", f"cannot sign in to {info['host']}: {err}. In CI: the service principal must be "
-                          "added to the workspace, and the runner must be allowed through its IP access list or "
-                          "Private Link (docs/github-actions.md). Locally: sign in with the Azure or Databricks CLI.")]
+        return [("error", f"cannot sign in to {info['host']}: {err.rstrip('.')}. In CI: the service principal must be "
+                          "workspace admin there (docs/SETUP.md, step 6), and the runner must reach the workspace "
+                          "(its IP access list or Private Link: docs/github-actions.md). Locally: sign in with the "
+                          "Azure or Databricks CLI.")]
     who = me.get("userName") or me.get("displayName") or "this identity"
     if "admins" in {g.get("display") for g in me.get("groups", [])}:
         out.append(("ok", f"signed in as {who}, a workspace admin"))
