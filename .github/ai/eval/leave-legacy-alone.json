@@ -28,7 +28,7 @@
  "state": "update",
  "changed_files": "- config/workspaces/self_service_1.yaml: this workspace's file",
  "config_diff": "+settings:\n+  disable_legacy_access: null   # still on Hive until the Q3 migration",
- "workspace_file": "bu: ss1\nhost: https://adb-1234567890123456.7.azuredatabricks.net\ngroups:\n  users: ss1-cd-users\n  explorer: ss1-cd-explorers\n  builder: ss1-cd-builders\n  publisher: null\ncatalog:\n  storage_root: abfss://catalogs@examplestorage.dfs.core.windows.net/self_service_1\nsql_warehouse:\n  size: X-Small\nshared_cluster:\n  enabled: false\nsettings:\n  disable_legacy_access: null",
+ "workspace_file": "bu: ss1\nhost: https://adb-1234567890123456.7.azuredatabricks.net\ngroups:\n  users: ss1-cd-users\n  explorer: ss1-cd-explorers\n  builder: ss1-cd-builders\n  publisher: null\ncatalog:\n  storage_root: abfss://catalogs@examplestorage.dfs.core.windows.net/self_service_1\nsql_warehouse:\n  size: X-Small\nsettings:\n  disable_legacy_access: null",
  "plan": [
   {
    "address": "module.workspace_settings.databricks_disable_legacy_access_setting.this[0]",

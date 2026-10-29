@@ -25,78 +25,12 @@
    }
   },
   {
-   "address": "module.budget_policies[0].databricks_access_control_rule_set.this[\"platform\"]",
+   "address": "module.budget_policies[0].databricks_access_control_rule_set.this[\"self_service\"]",
    "module_address": "module.budget_policies[0]",
    "mode": "managed",
    "type": "databricks_access_control_rule_set",
    "name": "this",
-   "index": "platform",
-   "provider_name": "registry.terraform.io/databricks/databricks",
-   "change": {
-    "actions": [
-     "create"
-    ],
-    "before": null,
-    "after": {
-     "api": null,
-     "grant_rules": [
-      {
-       "principals": [
-        "groups/ss1_platform_admins"
-       ],
-       "role": "roles/budgetPolicy.manager"
-      },
-      {
-       "principals": [
-        "groups/ss1_platform_admins"
-       ],
-       "role": "roles/budgetPolicy.user"
-      }
-     ]
-    },
-    "after_unknown": {
-     "etag": true,
-     "grant_rules": [
-      {
-       "principals": [
-        false
-       ]
-      },
-      {
-       "principals": [
-        false
-       ]
-      }
-     ],
-     "id": true,
-     "name": true,
-     "provider_config": true
-    },
-    "before_sensitive": false,
-    "after_sensitive": {
-     "grant_rules": [
-      {
-       "principals": [
-        false
-       ]
-      },
-      {
-       "principals": [
-        false
-       ]
-      }
-     ],
-     "provider_config": []
-    }
-   }
-  },
-  {
-   "address": "module.budget_policies[0].databricks_access_control_rule_set.this[\"shared\"]",
-   "module_address": "module.budget_policies[0]",
-   "mode": "managed",
-   "type": "databricks_access_control_rule_set",
-   "name": "this",
-   "index": "shared",
+   "index": "self_service",
    "provider_name": "registry.terraform.io/databricks/databricks",
    "change": {
     "actions": [
@@ -109,7 +43,8 @@
       {
        "principals": [
         "groups/ss1-cd-builders",
-        "groups/ss1-cd-explorers"
+        "groups/ss1-cd-explorers",
+        "groups/ss1_platform_admins"
        ],
        "role": "roles/budgetPolicy.user"
       },
@@ -126,6 +61,7 @@
      "grant_rules": [
       {
        "principals": [
+        false,
         false,
         false
        ]
@@ -146,6 +82,7 @@
       {
        "principals": [
         false,
+        false,
         false
        ]
       },
@@ -160,12 +97,12 @@
    }
   },
   {
-   "address": "module.budget_policies[0].databricks_budget_policy.this[\"platform\"]",
+   "address": "module.budget_policies[0].databricks_budget_policy.this[\"self_service\"]",
    "module_address": "module.budget_policies[0]",
    "mode": "managed",
    "type": "databricks_budget_policy",
    "name": "this",
-   "index": "platform",
+   "index": "self_service",
    "provider_name": "registry.terraform.io/databricks/databricks",
    "change": {
     "actions": [
@@ -178,21 +115,26 @@
      ],
      "custom_tags": [
       {
-       "key": "DEPARTMENT",
-       "value": "PLATFORM"
+       "key": "APP_ID",
+       "value": "NONE"
       },
       {
-       "key": "TEAM",
-       "value": "PLATFORM"
+       "key": "BUSINESS_UNIT",
+       "value": "SS1"
+      },
+      {
+       "key": "COST_CATEGORY",
+       "value": "CITIZEN_SELF_SERVICE"
       }
      ],
-     "policy_name": "SS1-PLATFORM"
+     "policy_name": "SS1-0-SELF-SERVICE"
     },
     "after_unknown": {
      "binding_workspace_ids": [
       false
      ],
      "custom_tags": [
+      {},
       {},
       {}
      ],
@@ -205,56 +147,6 @@
      ],
      "custom_tags": [
       {},
-      {}
-     ]
-    }
-   }
-  },
-  {
-   "address": "module.budget_policies[0].databricks_budget_policy.this[\"shared\"]",
-   "module_address": "module.budget_policies[0]",
-   "mode": "managed",
-   "type": "databricks_budget_policy",
-   "name": "this",
-   "index": "shared",
-   "provider_name": "registry.terraform.io/databricks/databricks",
-   "change": {
-    "actions": [
-     "create"
-    ],
-    "before": null,
-    "after": {
-     "binding_workspace_ids": [
-      1234567890123456
-     ],
-     "custom_tags": [
-      {
-       "key": "DEPARTMENT",
-       "value": "SHARED"
-      },
-      {
-       "key": "TEAM",
-       "value": "SHARED"
-      }
-     ],
-     "policy_name": "SS1-SHARED"
-    },
-    "after_unknown": {
-     "binding_workspace_ids": [
-      false
-     ],
-     "custom_tags": [
-      {},
-      {}
-     ],
-     "policy_id": true
-    },
-    "before_sensitive": false,
-    "after_sensitive": {
-     "binding_workspace_ids": [
-      false
-     ],
-     "custom_tags": [
       {},
       {}
      ]
@@ -451,12 +343,12 @@
    }
   },
   {
-   "address": "module.compute.databricks_cluster_policy.persona[\"builder\"]",
+   "address": "module.compute.databricks_cluster_policy.classic[\"interactive\"]",
    "module_address": "module.compute",
    "mode": "managed",
    "type": "databricks_cluster_policy",
-   "name": "persona",
-   "index": "builder",
+   "name": "classic",
+   "index": "interactive",
    "provider_name": "registry.terraform.io/databricks/databricks",
    "change": {
     "actions": [
@@ -464,11 +356,11 @@
     ],
     "before": null,
     "after": {
-     "definition": "{\"autoscale.max_workers\":{\"maxValue\":4,\"type\":\"range\"},\"autotermination_minutes\":{\"defaultValue\":60,\"maxValue\":60,\"minValue\":10,\"type\":\"range\"},\"custom_tags.DEPARTMENT\":{\"isOptional\":false,\"type\":\"allowlist\",\"values\":[\"SHARED\"]},\"custom_tags.LOB\":{\"isOptional\":false,\"type\":\"unlimited\"},\"custom_tags.PERSONA\":{\"type\":\"fixed\",\"value\":\"BUILDER\"},\"custom_tags.TEAM\":{\"isOptional\":false,\"type\":\"allowlist\",\"values\":[\"SHARED\"]},\"data_security_mode\":{\"defaultValue\":\"USER_ISOLATION\",\"type\":\"allowlist\",\"values\":[\"USER_ISOLATION\",\"DATA_SECURITY_MODE_STANDARD\"]},\"driver_node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"num_workers\":{\"maxValue\":4,\"type\":\"range\"},\"spark_version\":{\"defaultValue\":\"auto:latest-lts\",\"type\":\"allowlist\",\"values\":[\"auto:latest-lts\",\"auto:latest-lts-ml\"]}}",
+     "definition": "{\"autoscale.max_workers\":{\"maxValue\":4,\"type\":\"range\"},\"autotermination_minutes\":{\"defaultValue\":60,\"maxValue\":60,\"minValue\":10,\"type\":\"range\"},\"cluster_type\":{\"type\":\"fixed\",\"value\":\"all-purpose\"},\"custom_tags.APP_ID\":{\"defaultValue\":\"NONE\",\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.BUSINESS_UNIT\":{\"type\":\"fixed\",\"value\":\"SS1\"},\"custom_tags.COST_CATEGORY\":{\"type\":\"fixed\",\"value\":\"CITIZEN_SELF_SERVICE\"},\"custom_tags.PROJECT\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.TEAM\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"data_security_mode\":{\"defaultValue\":\"USER_ISOLATION\",\"type\":\"allowlist\",\"values\":[\"USER_ISOLATION\",\"DATA_SECURITY_MODE_STANDARD\"]},\"driver_node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"num_workers\":{\"maxValue\":4,\"type\":\"range\"},\"spark_version\":{\"defaultValue\":\"auto:latest-lts\",\"type\":\"allowlist\",\"values\":[\"auto:latest-lts\",\"auto:latest-lts-ml\"]}}",
      "description": null,
      "libraries": [],
      "max_clusters_per_user": 1,
-     "name": "SS1 Builder Compute",
+     "name": "SS1 Classic Interactive",
      "policy_family_definition_overrides": null,
      "policy_family_id": null
     },
@@ -486,12 +378,12 @@
    }
   },
   {
-   "address": "module.compute.databricks_permissions.cluster_policy[\"builder\"]",
+   "address": "module.compute.databricks_cluster_policy.classic[\"jobs\"]",
    "module_address": "module.compute",
    "mode": "managed",
-   "type": "databricks_permissions",
-   "name": "cluster_policy",
-   "index": "builder",
+   "type": "databricks_cluster_policy",
+   "name": "classic",
+   "index": "jobs",
    "provider_name": "registry.terraform.io/databricks/databricks",
    "change": {
     "actions": [
@@ -499,57 +391,58 @@
     ],
     "before": null,
     "after": {
-     "access_control": [
-      {
-       "group_name": "ss1-cd-builders",
-       "permission_level": "CAN_USE",
-       "service_principal_name": "",
-       "user_name": ""
-      }
-     ],
-     "alert_v2_id": null,
-     "app_name": null,
-     "authorization": null,
-     "cluster_id": null,
-     "dashboard_id": null,
-     "database_instance_name": null,
-     "database_project_name": null,
-     "directory_id": null,
-     "directory_path": null,
-     "experiment_id": null,
-     "instance_pool_id": null,
-     "job_id": null,
-     "knowledge_assistant_id": null,
-     "notebook_id": null,
-     "notebook_path": null,
-     "pipeline_id": null,
-     "registered_model_id": null,
-     "repo_id": null,
-     "repo_path": null,
-     "serving_endpoint_id": null,
-     "sql_alert_id": null,
-     "sql_dashboard_id": null,
-     "sql_endpoint_id": null,
-     "sql_query_id": null,
-     "supervisor_agent_id": null,
-     "vector_search_endpoint_id": null,
-     "workspace_file_id": null,
-     "workspace_file_path": null
+     "definition": "{\"autoscale.max_workers\":{\"maxValue\":4,\"type\":\"range\"},\"cluster_type\":{\"type\":\"fixed\",\"value\":\"job\"},\"custom_tags.APP_ID\":{\"defaultValue\":\"NONE\",\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.BUSINESS_UNIT\":{\"type\":\"fixed\",\"value\":\"SS1\"},\"custom_tags.COST_CATEGORY\":{\"type\":\"fixed\",\"value\":\"CITIZEN_SELF_SERVICE\"},\"custom_tags.PROJECT\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.TEAM\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"data_security_mode\":{\"defaultValue\":\"USER_ISOLATION\",\"type\":\"allowlist\",\"values\":[\"USER_ISOLATION\",\"DATA_SECURITY_MODE_STANDARD\"]},\"driver_node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"num_workers\":{\"maxValue\":4,\"type\":\"range\"},\"spark_version\":{\"defaultValue\":\"auto:latest-lts\",\"type\":\"allowlist\",\"values\":[\"auto:latest-lts\",\"auto:latest-lts-ml\"]}}",
+     "description": null,
+     "libraries": [],
+     "max_clusters_per_user": 1,
+     "name": "SS1 Classic Jobs",
+     "policy_family_definition_overrides": null,
+     "policy_family_id": null
     },
     "after_unknown": {
-     "access_control": [
-      {}
-     ],
-     "cluster_policy_id": true,
      "id": true,
-     "object_type": true,
+     "libraries": [],
+     "policy_id": true,
      "provider_config": true
     },
     "before_sensitive": false,
     "after_sensitive": {
-     "access_control": [
-      {}
-     ],
+     "libraries": [],
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.compute.databricks_cluster_policy.classic[\"pipelines\"]",
+   "module_address": "module.compute",
+   "mode": "managed",
+   "type": "databricks_cluster_policy",
+   "name": "classic",
+   "index": "pipelines",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "definition": "{\"autoscale.max_workers\":{\"maxValue\":4,\"type\":\"range\"},\"cluster_type\":{\"type\":\"fixed\",\"value\":\"dlt\"},\"custom_tags.APP_ID\":{\"defaultValue\":\"NONE\",\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.BUSINESS_UNIT\":{\"type\":\"fixed\",\"value\":\"SS1\"},\"custom_tags.COST_CATEGORY\":{\"type\":\"fixed\",\"value\":\"CITIZEN_SELF_SERVICE\"},\"custom_tags.PROJECT\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.TEAM\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"data_security_mode\":{\"defaultValue\":\"USER_ISOLATION\",\"type\":\"allowlist\",\"values\":[\"USER_ISOLATION\",\"DATA_SECURITY_MODE_STANDARD\"]},\"driver_node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"num_workers\":{\"maxValue\":4,\"type\":\"range\"}}",
+     "description": null,
+     "libraries": [],
+     "max_clusters_per_user": 1,
+     "name": "SS1 Classic Pipelines",
+     "policy_family_definition_overrides": null,
+     "policy_family_id": null
+    },
+    "after_unknown": {
+     "id": true,
+     "libraries": [],
+     "policy_id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "libraries": [],
      "provider_config": []
     }
    }
@@ -667,12 +560,16 @@
       {
        "custom_tags": [
         {
-         "key": "DEPARTMENT",
-         "value": "SHARED"
+         "key": "APP_ID",
+         "value": "NONE"
         },
         {
-         "key": "TEAM",
-         "value": "SHARED"
+         "key": "BUSINESS_UNIT",
+         "value": "SS1"
+        },
+        {
+         "key": "COST_CATEGORY",
+         "value": "CITIZEN_SELF_SERVICE"
         }
        ]
       }
@@ -696,6 +593,7 @@
       {
        "custom_tags": [
         {},
+        {},
         {}
        ]
       }
@@ -710,6 +608,7 @@
      "tags": [
       {
        "custom_tags": [
+        {},
         {},
         {}
        ]
@@ -1873,7 +1772,7 @@
     ],
     "before": null,
     "after": {
-     "content_base64": "IyBEZWZhdWx0IGluc3RydWN0aW9ucwoKU2hhcmVkIGJ5IGV2ZXJ5IGNpdGl6ZW4gZGV2ZWxvcG1lbnQgd29ya3NwYWNlLgoKVGhpcyBpcyBhIGdvdmVybmVkIGNpdGl6ZW4gZGV2ZWxvcG1lbnQgd29ya3NwYWNlIGZvciB0aGUgU1MxIGJ1c2luZXNzIHVuaXQuIEZvbGxvdyB0aGVzZSBjb252ZW50aW9ucyBpbiBldmVyeXRoaW5nIHlvdSBzdWdnZXN0IG9yIGdlbmVyYXRlLgoKIyMgRGF0YQoKLSBXb3JrIHdpdGggZGF0YSBpbiBVbml0eSBDYXRhbG9nLiBUaGUgd29ya3NwYWNlJ3MgY2F0YWxvZyBpcyBgc3MxX2NpdGl6ZW5fZGV2YC4KLSBBbHdheXMgdXNlIHRocmVlLXBhcnQgbmFtZXMgKGBjYXRhbG9nLnNjaGVtYS50YWJsZWApLiBEbyBub3QgdXNlIHRoZSBIaXZlIG1ldGFzdG9yZSwgREJGUyBwYXRocyBvciBEQkZTIG1vdW50czsgdGhleSBhcmUgc3dpdGNoZWQgb2ZmIG9yIGJlaW5nIHJldGlyZWQuCi0gRG8gbm90IGNvcHkgZGF0YSBvdXQgb2YgVW5pdHkgQ2F0YWxvZyBpbnRvIGZpbGVzLCBub3RlYm9va3Mgb3IgcGVyc29uYWwgc3RvcmFnZS4gUmVhZCBpdCB3aGVyZSBpdCBpcy4KLSBOZXZlciBwdXQgY3JlZGVudGlhbHMsIHBhc3N3b3JkcywgdG9rZW5zIG9yIGtleXMgaW4gY29kZS4gVXNlIERhdGFicmlja3Mgc2VjcmV0cyBvciB0aGUgaWRlbnRpdHkgdGhlIGpvYiBydW5zIGFzLgoKIyMgQ29tcHV0ZQoKLSBGb3IgU1FMLCB1c2UgdGhlIGBTUzEgRGVmYXVsdCBXYXJlaG91c2VgIFNRTCB3YXJlaG91c2UuCi0gRm9yIG5vdGVib29rcywgam9icyBhbmQgcGlwZWxpbmVzLCBwcmVmZXIgc2VydmVybGVzcyBjb21wdXRlLgotIFdoZW4gY2xhc3NpYyBjb21wdXRlIGlzIG5lZWRlZCwgY3JlYXRlIGNsdXN0ZXJzIG9ubHkgdGhyb3VnaCB5b3VyIHBlcnNvbmEncyBjbHVzdGVyIHBvbGljeSAobmFtZWQgYFNTMSA8UGVyc29uYT4gQ29tcHV0ZWApLiBJdCBzZXRzIHRoZSByZXF1aXJlZCB0YWdzIGFuZCBsaW1pdHMuCi0gQXZvaWQgdGhlIFBlcnNvbmFsIENvbXB1dGUgcG9saWN5IGZvciBzaGFyZWQgb3Igc2NoZWR1bGVkIHdvcms6IGl0cyBjbHVzdGVycyBkbyBub3QgY2FycnkgdGhlIHJlcXVpcmVkIHRhZ3MuCgojIyBDb3N0IGF0dHJpYnV0aW9uCgotIEV2ZXJ5IHdvcmtsb2FkIGlzIGNoYXJnZWQgYmFjayB3aXRoIHRoZSB0YWdzIGBMT0JgLCBgREVQQVJUTUVOVGAsIGBURUFNYC4gVGhpcyB3b3Jrc3BhY2Ugc2V0cyBub25lIG9uIGV2ZXJ5dGhpbmcgZm9yIHlvdS4gS2VlcCB0aGUgdGFncyBvbiBhbnkgY2x1c3RlciBvciBqb2IgeW91IGRlZmluZS4KLSBGb3Igc2VydmVybGVzcyBqb2JzLCBwaXBlbGluZXMgYW5kIG5vdGVib29rcywgc2VsZWN0IHRoZSBzZXJ2ZXJsZXNzIHVzYWdlIHBvbGljeSBgU1MxLVNIQVJFRGAgd2hlbiBvbmUgaXMgb2ZmZXJlZC4KCiMjIFNoYXJpbmcgd29yawoKLSBLZWVwIHdvcmsgaW4gcHJvZ3Jlc3MgaW4geW91ciBvd24gZm9sZGVyLgotIFB1dCBmaW5pc2hlZCB3b3JrIHRoYXQgeW91ciB0ZWFtIHNob3VsZCB1c2UgaW4geW91ciB0ZWFtJ3MgZm9sZGVyIChgL1dvcmtzcGFjZS88dGVhbT5gKSwgaWYgaXQgaGFzIG9uZS4KLSBOYW1lIG5vdGVib29rcywgam9icyBhbmQgZGFzaGJvYXJkcyBhZnRlciB3aGF0IHRoZXkgZG8sIGFuZCBhZGQgYSBzaG9ydCBkZXNjcmlwdGlvbiBvZiB0aGVpciBwdXJwb3NlIGFuZCBvd25lci4K",
+     "content_base64": "IyBEZWZhdWx0IGluc3RydWN0aW9ucwoKU2hhcmVkIGJ5IGV2ZXJ5IGNpdGl6ZW4gZGV2ZWxvcG1lbnQgd29ya3NwYWNlLgoKVGhpcyBpcyBhIGdvdmVybmVkIGNpdGl6ZW4gZGV2ZWxvcG1lbnQgd29ya3NwYWNlIGZvciB0aGUgU1MxIGJ1c2luZXNzIHVuaXQuIEZvbGxvdyB0aGVzZSBjb252ZW50aW9ucyBpbiBldmVyeXRoaW5nIHlvdSBzdWdnZXN0IG9yIGdlbmVyYXRlLgoKIyMgRGF0YQoKLSBXb3JrIHdpdGggZGF0YSBpbiBVbml0eSBDYXRhbG9nLiBUaGUgd29ya3NwYWNlJ3MgY2F0YWxvZyBpcyBgc3MxX2NpdGl6ZW5fZGV2YC4KLSBBbHdheXMgdXNlIHRocmVlLXBhcnQgbmFtZXMgKGBjYXRhbG9nLnNjaGVtYS50YWJsZWApLiBEbyBub3QgdXNlIHRoZSBIaXZlIG1ldGFzdG9yZSwgREJGUyBwYXRocyBvciBEQkZTIG1vdW50czsgdGhleSBhcmUgc3dpdGNoZWQgb2ZmIG9yIGJlaW5nIHJldGlyZWQuCi0gRG8gbm90IGNvcHkgZGF0YSBvdXQgb2YgVW5pdHkgQ2F0YWxvZyBpbnRvIGZpbGVzLCBub3RlYm9va3Mgb3IgcGVyc29uYWwgc3RvcmFnZS4gUmVhZCBpdCB3aGVyZSBpdCBpcy4KLSBOZXZlciBwdXQgY3JlZGVudGlhbHMsIHBhc3N3b3JkcywgdG9rZW5zIG9yIGtleXMgaW4gY29kZS4gVXNlIERhdGFicmlja3Mgc2VjcmV0cyBvciB0aGUgaWRlbnRpdHkgdGhlIGpvYiBydW5zIGFzLgoKIyMgQ29tcHV0ZQoKLSBGb3IgU1FMLCB1c2UgdGhlIGBTUzEgRGVmYXVsdCBXYXJlaG91c2VgIFNRTCB3YXJlaG91c2UuCi0gRm9yIG5vdGVib29rcywgam9icyBhbmQgcGlwZWxpbmVzLCBwcmVmZXIgc2VydmVybGVzcyBjb21wdXRlLgotIENsYXNzaWMgY29tcHV0ZSBpcyB0aGUgZXhjZXB0aW9uLiBXaGVuIGl0IGlzIG5lZWRlZCwgdXNlIHRoZSBjbGFzc2ljIGNsdXN0ZXIgcG9saWN5IGZvciB0aGUga2luZCBvZiBjbHVzdGVyOiBgU1MxIENsYXNzaWMgSW50ZXJhY3RpdmVgIGZvciBub3RlYm9va3MsIGBTUzEgQ2xhc3NpYyBKb2JzYCBmb3Igam9iIGNsdXN0ZXJzLCBgU1MxIENsYXNzaWMgUGlwZWxpbmVzYCBmb3IgcGlwZWxpbmVzIChhY2Nlc3MgaXMgcmVxdWVzdGVkIHRocm91Z2ggdGhlIHNlbGYtc2VydmljZSBhcHApLiBFYWNoIHNldHMgdGhlIHRhZ3MgYW5kIGxpbWl0cywgYW5kIGFza3MgZm9yIHRoZSB0YWdzIHlvdSBmaWxsIGluOyBlYWNoIGFsbG93cyBvbmUgY2x1c3RlciBwZXIgcGVyc29uLgotIEF2b2lkIHRoZSBQZXJzb25hbCBDb21wdXRlIHBvbGljeSBmb3Igc2hhcmVkIG9yIHNjaGVkdWxlZCB3b3JrOiBpdHMgY2x1c3RlcnMgZG8gbm90IGNhcnJ5IHRoZSBjaGFyZ2ViYWNrIHRhZ3MuCgojIyBDb3N0IGF0dHJpYnV0aW9uCgotIEV2ZXJ5IHdvcmtsb2FkIGlzIGNoYXJnZWQgYmFjayB3aXRoIHRoZSB0YWdzIGBBUFBfSURgLCBgQlVTSU5FU1NfVU5JVGAsIGBDT1NUX0NBVEVHT1JZYCwgYFRFQU1gLCBgUFJPSkVDVGAuIFNldCBmb3IgeW91OiBgQVBQX0lEYCA9IGBOT05FYCwgYEJVU0lORVNTX1VOSVRgID0gYFNTMWAsIGBDT1NUX0NBVEVHT1JZYCA9IGBDSVRJWkVOX1NFTEZfU0VSVklDRWAuIEtlZXAgdGhlIHRhZ3Mgb24gYW55IGNsdXN0ZXIgb3Igam9iIHlvdSBkZWZpbmUuCi0gRm9yIHNlcnZlcmxlc3Mgam9icywgcGlwZWxpbmVzIGFuZCBub3RlYm9va3MsIHNlbGVjdCBhIHNlcnZlcmxlc3MgdXNhZ2UgcG9saWN5OiBgU1MxLTAtU0VMRi1TRVJWSUNFYCBmb3IgZ2VuZXJhbCB3b3JrLCBvciB5b3VyIHByb2plY3QncyBwb2xpY3kgaWYgeW91IGhhdmUgb25lLgoKIyMgU2hhcmluZyB3b3JrCgotIEtlZXAgd29yayBpbiBwcm9ncmVzcyBpbiB5b3VyIG93biBmb2xkZXIuCi0gUHV0IGZpbmlzaGVkIHdvcmsgdGhhdCB5b3VyIHRlYW0gc2hvdWxkIHVzZSBpbiB5b3VyIHRlYW0ncyBmb2xkZXIgKGAvV29ya3NwYWNlLzx0ZWFtPmApLCBpZiBpdCBoYXMgb25lLgotIE5hbWUgbm90ZWJvb2tzLCBqb2JzIGFuZCBkYXNoYm9hcmRzIGFmdGVyIHdoYXQgdGhleSBkbywgYW5kIGFkZCBhIHNob3J0IGRlc2NyaXB0aW9uIG9mIHRoZWlyIHB1cnBvc2UgYW5kIG93bmVyLgo=",
      "md5": "different",
      "path": "/.assistant_workspace_instructions.md",
      "source": null
@@ -1905,7 +1804,7 @@
     ],
     "before": null,
     "after": {
-     "content_base64": "LS0tCm5hbWU6IGJ1aWxkLXRhZ2dlZC1hc3NldHMKZGVzY3JpcHRpb246IFVzZSB3aGVuIGNyZWF0aW5nIG9yIGNoYW5naW5nIGFueXRoaW5nIHRoYXQgcnVucyBvbiBjb21wdXRlLCBzdWNoIGFzIGEgam9iLCBwaXBlbGluZSwgY2x1c3Rlciwgc2VydmVybGVzcyBub3RlYm9vaywgbW9kZWwgc2VydmluZyBlbmRwb2ludCBvciBTUUwgd2FyZWhvdXNlLCBzbyB0aGF0IGl0IGNhcnJpZXMgdGhlIHRhZ3MgdXNlZCBmb3IgY2hhcmdlYmFjay4gQWxzbyB1c2Ugd2hlbiBhc2tlZCB3aHkgYW4gYXNzZXQgaXMgbWlzc2luZyB0YWdzIG9yIHdoaWNoIHRhZ3Mgb3IgdXNhZ2UgcG9saWN5IHRvIHVzZS4KLS0tCgojIEJ1aWxkIGFzc2V0cyB0aGF0IGNhcnJ5IHRoZSBjaGFyZ2ViYWNrIHRhZ3MKCkV2ZXJ5IGFzc2V0IHRoYXQgdXNlcyBjb21wdXRlIGluIHRoaXMgd29ya3NwYWNlIGlzIGNoYXJnZWQgYmFjayB0byB3aG9ldmVyIG93bnMgaXQsIHVzaW5nIHRoZXNlIHRhZ3M6IGBMT0JgLCBgREVQQVJUTUVOVGAsIGBURUFNYC4KCi0gU2V0IGZvciBldmVyeXRoaW5nIGluIHRoaXMgd29ya3NwYWNlLCBhdXRvbWF0aWNhbGx5OiBub25lLgotIEV2ZXJ5IG90aGVyIHJlcXVpcmVkIHRhZyB0YWtlcyB0aGUgb3duZXIncyB2YWx1ZSAoZm9yIGV4YW1wbGUgdGhlaXIgZGVwYXJ0bWVudCBvciB0ZWFtKS4KClVudGFnZ2VkIHdvcmsgY2Fubm90IGJlIGNoYXJnZWQgYmFjaywgc28gdHJlYXQgdGhlIHRhZ3MgYXMgcmVxdWlyZWQsIG5vdCBvcHRpb25hbC4KCiMjIEJlZm9yZSB5b3UgYnVpbGQKCjEuIEZpbmQgb3V0IHRoZSBvd25lcidzIHZhbHVlIGZvciBlYWNoIHJlcXVpcmVkIHRhZyB0aGUgd29ya3NwYWNlIGRvZXMgbm90IHNldC4gSWYgdGhlIHVzZXIgaGFzIG5vdCBzYWlkLCBhc2sgdGhlbS4gRG8gbm90IGd1ZXNzIG9yIG1ha2UgdXAgdmFsdWVzLgoyLiBTaGFyZWQgd29yayB0aGF0IGJlbG9uZ3MgdG8gbm8gb25lIHRlYW0gdXNlcyB0aGUgdmFsdWUgYFNIQVJFRGAuCgojIyBIb3cgdG8gdGFnIGVhY2gga2luZCBvZiBhc3NldAoKLSAqKlNlcnZlcmxlc3Mgbm90ZWJvb2tzLCBqb2JzIGFuZCBwaXBlbGluZXMqKjogc2VsZWN0IGEgc2VydmVybGVzcyB1c2FnZSBwb2xpY3kuIEl0IGFkZHMgdGhlIHRhZ3MgZm9yIHlvdS4gVXNlIGBTUzEtU0hBUkVEYC4gSWYgbm8gdXNhZ2UgcG9saWN5IGlzIG9mZmVyZWQsIHRhZyB0aGUgam9iIG9yIHBpcGVsaW5lIGl0c2VsZiBhcyBiZWxvdy4KLSAqKkpvYnMqKjogYWRkIHRoZSB0YWdzIGluIHRoZSBqb2IncyB0YWdzIChgdGFnc2AgaW4gdGhlIGpvYiBkZWZpbml0aW9uKS4gRm9yIHNlcnZlcmxlc3MgdGFza3MsIGFsc28gc2V0IHRoZSB1c2FnZSBwb2xpY3kgKGBidWRnZXRfcG9saWN5X2lkYCBpbiB0aGUgam9iIGRlZmluaXRpb24pLgotICoqQ2xhc3NpYyBjbHVzdGVycyBhbmQgam9iIGNsdXN0ZXJzKio6IGNyZWF0ZSB0aGVtIG9ubHkgZnJvbSB0aGUgdXNlcidzIHBlcnNvbmEgY2x1c3RlciBwb2xpY3kgKGBTUzEgPFBlcnNvbmE+IENvbXB1dGVgKS4gVGhlIHBvbGljeSBzZXRzIHRoZSB3b3Jrc3BhY2UncyB0YWdzIGFuZCBhc2tzIGZvciBhbGxvd2VkIHZhbHVlcyBvZiB0aGUgb3RoZXJzOyBjaG9vc2UgdGhlIG93bmVyJ3MuIERvIG5vdCB1c2UgdGhlIFBlcnNvbmFsIENvbXB1dGUgcG9saWN5IGZvciBzaGFyZWQgb3Igc2NoZWR1bGVkIHdvcmssIGJlY2F1c2UgaXRzIGNsdXN0ZXJzIGRvIG5vdCBjYXJyeSB0aGUgdGFncy4KLSAqKlBpcGVsaW5lcyBvbiBjbGFzc2ljIGNvbXB1dGUqKjogcHV0IHRoZSB0YWdzIGluIHRoZSBjdXN0b20gdGFncyBvZiB0aGUgcGlwZWxpbmUncyBjbHVzdGVycyBhbmQgdXNlIHRoZSBwZXJzb25hIGNsdXN0ZXIgcG9saWN5LgotICoqTW9kZWwgc2VydmluZyBlbmRwb2ludHMgYW5kIG90aGVyIGFzc2V0cyB0aGF0IG9mZmVyIHRhZ3Mgb3IgYSB1c2FnZSBwb2xpY3kqKjogc2V0IHRoZSB1c2FnZSBwb2xpY3kgaWYgb2ZmZXJlZCBhbmQgYWRkIHRoZSB0YWdzLgotICoqU1FMKio6IHVzZSB0aGUgZXhpc3RpbmcgYFNTMSBEZWZhdWx0IFdhcmVob3VzZWAgd2FyZWhvdXNlIChvciB0aGUgdGVhbSdzIHdhcmVob3VzZSkgcmF0aGVyIHRoYW4gY3JlYXRpbmcgYSBuZXcgb25lOyB0aG9zZSB3YXJlaG91c2VzIGFyZSBhbHJlYWR5IHRhZ2dlZC4gRGFzaGJvYXJkcyBhbmQgR2VuaWUgc3BhY2VzIGFyZSBjaGFyZ2VkIHRocm91Z2ggdGhlIHdhcmVob3VzZSB0aGV5IHVzZS4KCiMjIENoZWNrIGJlZm9yZSB5b3UgZmluaXNoCgotIFNob3cgdGhlIHVzZXIgdGhlIHRhZ3MgYW5kIHVzYWdlIHBvbGljeSB5b3Ugc2V0IG9uIGVhY2ggYXNzZXQuCi0gV2hlbiB5b3UgY2hhbmdlIGFuIGV4aXN0aW5nIGFzc2V0LCBrZWVwIGl0cyB0YWdzLiBEbyBub3QgcmVtb3ZlIG9yIHJlbmFtZSB0aGVtLgotIElmIHlvdSBjYW5ub3Qgc2V0IGEgdGFnIChmb3IgZXhhbXBsZSwgdGhlIHBvbGljeSBkb2VzIG5vdCBvZmZlciB0aGUgdXNlcidzIHRlYW0pLCBzYXkgc28gYW5kIHN1Z2dlc3QgYXNraW5nIHRoZSB3b3Jrc3BhY2UncyBwbGF0Zm9ybSB0ZWFtLCByYXRoZXIgdGhhbiBsZWF2aW5nIHRoZSBhc3NldCB1bnRhZ2dlZC4K",
+     "content_base64": "LS0tCm5hbWU6IGJ1aWxkLXRhZ2dlZC1hc3NldHMKZGVzY3JpcHRpb246IFVzZSB3aGVuIGNyZWF0aW5nIG9yIGNoYW5naW5nIGFueXRoaW5nIHRoYXQgcnVucyBvbiBjb21wdXRlLCBzdWNoIGFzIGEgam9iLCBwaXBlbGluZSwgY2x1c3Rlciwgc2VydmVybGVzcyBub3RlYm9vaywgbW9kZWwgc2VydmluZyBlbmRwb2ludCBvciBTUUwgd2FyZWhvdXNlLCBzbyB0aGF0IGl0IGNhcnJpZXMgdGhlIHRhZ3MgdXNlZCBmb3IgY2hhcmdlYmFjay4gQWxzbyB1c2Ugd2hlbiBhc2tlZCB3aHkgYW4gYXNzZXQgaXMgbWlzc2luZyB0YWdzIG9yIHdoaWNoIHRhZ3Mgb3IgdXNhZ2UgcG9saWN5IHRvIHVzZS4KLS0tCgojIEJ1aWxkIGFzc2V0cyB0aGF0IGNhcnJ5IHRoZSBjaGFyZ2ViYWNrIHRhZ3MKCkV2ZXJ5IGFzc2V0IHRoYXQgdXNlcyBjb21wdXRlIGluIHRoaXMgd29ya3NwYWNlIGlzIGNoYXJnZWQgYmFjayB0byB3aG9ldmVyIG93bnMgaXQsIHVzaW5nIHRoZXNlIHRhZ3M6IGBBUFBfSURgLCBgQlVTSU5FU1NfVU5JVGAsIGBDT1NUX0NBVEVHT1JZYCwgYFRFQU1gLCBgUFJPSkVDVGAuCgotIFNldCBmb3IgeW91IG9uIHNlcnZlcmxlc3MgdXNhZ2UsIHRoZSBTUUwgd2FyZWhvdXNlIGFuZCBjbGFzc2ljIGNsdXN0ZXJzOiBgQVBQX0lEYCA9IGBOT05FYCwgYEJVU0lORVNTX1VOSVRgID0gYFNTMWAsIGBDT1NUX0NBVEVHT1JZYCA9IGBDSVRJWkVOX1NFTEZfU0VSVklDRWAuCi0gT24gYSBjbGFzc2ljIGNsdXN0ZXIgdGhlIHVzZXIgYWxzbyBmaWxscyBpbiB0aGUgb3RoZXIgdGFncyAoZm9yIGV4YW1wbGUgdGhlaXIgdGVhbSBhbmQgcHJvamVjdCksIGluIHVwcGVyIGNhc2UuCgpVbnRhZ2dlZCB3b3JrIGNhbm5vdCBiZSBjaGFyZ2VkIGJhY2ssIHNvIHRyZWF0IHRoZSB0YWdzIGFzIHJlcXVpcmVkLCBub3Qgb3B0aW9uYWwuCgojIyBCZWZvcmUgeW91IGJ1aWxkCgoxLiBGaW5kIG91dCB0aGUgb3duZXIncyB2YWx1ZSBmb3IgZWFjaCB0YWcgdGhlIHVzZXIgbXVzdCBmaWxsIGluICh0ZWFtLCBwcm9qZWN0KS4gSWYgdGhlIHVzZXIgaGFzIG5vdCBzYWlkLCBhc2sgdGhlbS4gRG8gbm90IGd1ZXNzIG9yIG1ha2UgdXAgdmFsdWVzLgoyLiBWYWx1ZXMgYXJlIHVwcGVyIGNhc2UgbGV0dGVycywgZGlnaXRzLCBgX2AgYW5kIGAtYCwgZm9yIGV4YW1wbGUgYFJJU0tfQ0xBU1NJRklDQVRJT05gLgoKIyMgSG93IHRvIHRhZyBlYWNoIGtpbmQgb2YgYXNzZXQKCi0gKipTZXJ2ZXJsZXNzIG5vdGVib29rcywgam9icyBhbmQgcGlwZWxpbmVzKio6IHNlbGVjdCBhIHNlcnZlcmxlc3MgdXNhZ2UgcG9saWN5LiBJdCBhZGRzIHRoZSB0YWdzIGZvciB5b3UuIFVzZSB0aGUgcHJvamVjdCdzIHBvbGljeSBpZiB0aGUgdXNlciBoYXMgb25lLCBvdGhlcndpc2UgYFNTMS0wLVNFTEYtU0VSVklDRWAuIElmIG5vIHVzYWdlIHBvbGljeSBpcyBvZmZlcmVkLCB0YWcgdGhlIGpvYiBvciBwaXBlbGluZSBpdHNlbGYgYXMgYmVsb3cuCi0gKipKb2JzKio6IGFkZCB0aGUgdGFncyBpbiB0aGUgam9iJ3MgdGFncyAoYHRhZ3NgIGluIHRoZSBqb2IgZGVmaW5pdGlvbikuIEZvciBzZXJ2ZXJsZXNzIHRhc2tzLCBhbHNvIHNldCB0aGUgdXNhZ2UgcG9saWN5IChgYnVkZ2V0X3BvbGljeV9pZGAgaW4gdGhlIGpvYiBkZWZpbml0aW9uKS4KLSAqKkNsYXNzaWMgY2x1c3RlcnMgYW5kIGpvYiBjbHVzdGVycyoqOiBjcmVhdGUgdGhlbSBvbmx5IGZyb20gYFNTMSBDbGFzc2ljIEludGVyYWN0aXZlYCAoYWxsLXB1cnBvc2UgY2x1c3RlcnMpIG9yIGBTUzEgQ2xhc3NpYyBKb2JzYCAoam9iIGNsdXN0ZXJzKTsgdGhlIHVzZXIgcmVxdWVzdHMgYWNjZXNzIHRocm91Z2ggdGhlIHNlbGYtc2VydmljZSBhcHAuIFRoZSBwb2xpY3kgc2V0cyB0aGUgZml4ZWQgdGFncyBhbmQgYXNrcyBmb3IgdGhlIG90aGVyczsgZmlsbCBpbiB0aGUgb3duZXIncy4gRG8gbm90IHVzZSB0aGUgUGVyc29uYWwgQ29tcHV0ZSBwb2xpY3kgZm9yIHNoYXJlZCBvciBzY2hlZHVsZWQgd29yaywgYmVjYXVzZSBpdHMgY2x1c3RlcnMgZG8gbm90IGNhcnJ5IHRoZSB0YWdzLgotICoqUGlwZWxpbmVzIG9uIGNsYXNzaWMgY29tcHV0ZSoqOiBwdXQgdGhlIHRhZ3MgaW4gdGhlIGN1c3RvbSB0YWdzIG9mIHRoZSBwaXBlbGluZSdzIGNsdXN0ZXJzIGFuZCB1c2UgdGhlIGBTUzEgQ2xhc3NpYyBQaXBlbGluZXNgIGNsdXN0ZXIgcG9saWN5LgotICoqTW9kZWwgc2VydmluZyBlbmRwb2ludHMgYW5kIG90aGVyIGFzc2V0cyB0aGF0IG9mZmVyIHRhZ3Mgb3IgYSB1c2FnZSBwb2xpY3kqKjogc2V0IHRoZSB1c2FnZSBwb2xpY3kgaWYgb2ZmZXJlZCBhbmQgYWRkIHRoZSB0YWdzLgotICoqU1FMKio6IHVzZSB0aGUgZXhpc3RpbmcgYFNTMSBEZWZhdWx0IFdhcmVob3VzZWAgd2FyZWhvdXNlIChvciBhIHRlYW0ncyB3YXJlaG91c2UgZnJvbSB0aGUgc2VsZi1zZXJ2aWNlIGFwcCkgcmF0aGVyIHRoYW4gY3JlYXRpbmcgYSBuZXcgb25lOyB0aG9zZSB3YXJlaG91c2VzIGFyZSBhbHJlYWR5IHRhZ2dlZC4gRGFzaGJvYXJkcyBhbmQgR2VuaWUgc3BhY2VzIGFyZSBjaGFyZ2VkIHRocm91Z2ggdGhlIHdhcmVob3VzZSB0aGV5IHVzZS4KCiMjIENoZWNrIGJlZm9yZSB5b3UgZmluaXNoCgotIFNob3cgdGhlIHVzZXIgdGhlIHRhZ3MgYW5kIHVzYWdlIHBvbGljeSB5b3Ugc2V0IG9uIGVhY2ggYXNzZXQuCi0gV2hlbiB5b3UgY2hhbmdlIGFuIGV4aXN0aW5nIGFzc2V0LCBrZWVwIGl0cyB0YWdzLiBEbyBub3QgcmVtb3ZlIG9yIHJlbmFtZSB0aGVtLgotIElmIHlvdSBjYW5ub3Qgc2V0IGEgdGFnIChmb3IgZXhhbXBsZSwgdGhlIHBvbGljeSBkb2VzIG5vdCBvZmZlciB0aGUgdXNlcidzIHRlYW0pLCBzYXkgc28gYW5kIHN1Z2dlc3QgYXNraW5nIHRoZSB3b3Jrc3BhY2UncyBwbGF0Zm9ybSB0ZWFtLCByYXRoZXIgdGhhbiBsZWF2aW5nIHRoZSBhc3NldCB1bnRhZ2dlZC4K",
      "md5": "different",
      "path": "/.assistant/skills/build-tagged-assets/SKILL.md",
      "source": null
