@@ -39,6 +39,13 @@ One state per workspace. `scripts/tf.sh <workspace> plan` runs it (and the plan 
 5. **Document it** in `config/README.md` (if operators set it), DESIGN.md (if it changes
    the design) and `CHANGELOG.md` (Unreleased; say what the first plan will show).
 
+## The tests' baseline
+
+The tests read `terraform/tests/defaults/`, a copy of `config/defaults/` as released, never
+the organization's own `config/defaults/`: an organization changing its baseline must not
+break the framework's tests. When you change a baseline file, change it in both places
+(the copy keeps the shipped values, for example `required_tags: [LOB, DEPARTMENT, TEAM]`).
+
 ## The on-request jobs
 
 `modules/catalog/personal_schema.py` and `modules/folders/team_folder.py` are Databricks

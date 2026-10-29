@@ -1,2 +1,12 @@
 budget_policies:
   extra_managers: [users/owner@example.com]
+  policies:
+    # Changes a baseline block (repeated in full) and adds one for builders and publishers.
+    platform:
+      name: "{BU}-ADMIN"
+      used_by: platform_admins
+      tags: {DEPARTMENT: IT, TEAM: PLATFORM}
+    builders:
+      name: "{BU}-BUILDERS"
+      used_by: [builder, publisher]
+      tags: {DEPARTMENT: FINANCE, TEAM: BUILD}

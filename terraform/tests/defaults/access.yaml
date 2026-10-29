@@ -1,0 +1,98 @@
+# =============================================================================
+# ACCESS: the personas, the groups that hold them, and what each one gets.
+#
+# Everything is granted to groups, never to people. Who is in a group is managed
+# in Entra ID (synced to the Databricks account), for example through access
+# packages or a ticketing system: adding someone to {bu}_builder gives them everything a builder gets, with
+# no change here. A workspace's access.yaml can change any key below for that
+# workspace only (same name and shape).
+#
+# Permission values (as shown in the Databricks UI):
+#   Warehouse:  CAN_VIEW | CAN_MONITOR | CAN_USE | CAN_MANAGE
+#   Cluster:    CAN_ATTACH_TO | CAN_RESTART | CAN_MANAGE
+#   Folder:     CAN_READ | CAN_RUN | CAN_EDIT | CAN_MANAGE
+#   null = no access
+# =============================================================================
+
+# ---- The groups --------------------------------------------------------------
+# Account groups (Entra ID groups synced to the Databricks account): Unity Catalog
+# and serverless usage policies cannot use groups that exist only in a workspace.
+# {bu} = the workspace's business unit code, lower case.
+groups:
+  users: "{bu}_users"                       # everyone who may use the workspace
+  explorer: "{bu}_explorer"
+  builder: "{bu}_builder"
+  publisher: "{bu}_publisher"
+  platform_admins: "{bu}_platform_admins"   # workspace admins; own the workspace catalog
+
+# ---- Everyone ----------------------------------------------------------------
+# The users group's access tier (see the personas below): consumer = Databricks One
+# only, where people find dashboards, Genie spaces and apps.
+users:
+  access: consumer
+
+# ---- The personas --------------------------------------------------------------
+# access is the tier, each including the one before:
+#   consumer   "Consumer access": Databricks One only
+#   sql        "Databricks SQL access": Databricks One, plus the SQL editor, queries,
+#              dashboards and Genie
+#   workspace  "Workspace access" and SQL access: the full workspace (notebooks, jobs, ...)
+# Nobody gets "Allow unrestricted cluster creation", and no persona is workspace
+# admin: persona groups join the workspace as users; only platform_admins are admins.
+# Every persona can use the shared serverless usage policy, gets USE CATALOG and
+# USE SCHEMA on the workspace catalog (catalog.yaml), and a personal schema there on request.
+personas:
+
+  # ---- Explorer: finds and analyzes trusted data (SQL, dashboards, Genie) ----
+  explorer:
+    access: sql
+    default_warehouse: CAN_USE         # permission on the default SQL warehouse
+    shared_cluster: null               # permission on the shared classic cluster
+    cluster_policy: false              # true = may create one cluster with the persona's cluster policy
+    can_create_tokens: false           # may create personal access tokens
+
+  # ---- Builder: prototypes and builds in notebooks, jobs and pipelines -------
+  builder:
+    access: workspace
+    default_warehouse: CAN_USE
+    shared_cluster: CAN_ATTACH_TO      # run work on it; cannot start, restart or change it
+    cluster_policy: true
+    can_create_tokens: false
+
+  # ---- Publisher: shares finished work with the BU ---------------------------
+  # The same as builder in this project; what makes a publisher different is
+  # handled outside it.
+  publisher:
+    access: workspace
+    default_warehouse: CAN_USE
+    shared_cluster: CAN_ATTACH_TO      # run work on it; cannot start, restart or change it
+    cluster_policy: true
+    can_create_tokens: false
+
+# ---- Workspace folders --------------------------------------------------------
+# Created on request by the "<BU> team folder" job (Terraform deploys it): the
+# an admin, or a runner (below), runs it with a folder name, the requester and,
+# optionally, one of the requester's groups. Both get Can manage, and share it further
+# with the folder's Share button. A folder at the top of the workspace inherits only
+# admins, so only the people and groups given access can reach it.
+folders:
+  root: /Workspace                     # folders go inside it
+  # Where the self-service jobs' notebooks live. A folder at the top of the workspace,
+  # which only workspace admins can see (the workspace root grants only admins); not
+  # under /Shared, which every user can reach.
+  admin: /Admin/self-service
+
+# ---- Self-service jobs --------------------------------------------------------
+# The personal schema and team folder jobs. Only workspace admins can see and run them;
+# runners adds service principals (application IDs) that may run them too, for example
+# a ticketing system's or a self-service app's. Each run takes the parameters listed in
+# the job (request_id: an optional ticket or request reference, kept with the run).
+jobs:
+  runners: []
+
+# ---- What this project manages about access ---------------------------------
+# false = leave it alone, for example when something else already manages it.
+manage:
+  group_assignment: true     # assign the groups above to the workspace
+  token_permissions: true    # who may create personal access tokens (can_create_tokens)
+  catalog_grants: true       # the personas' and platform admins' privileges on the workspace catalog

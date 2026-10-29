@@ -26,7 +26,7 @@ locals {
   unknown_overrides = flatten([
     for s, o in local.overrides : can(keys(o)) && can(keys(local.defaults[s])) ? flatten([
       for k in keys(o) : !contains(keys(local.defaults[s]), k) ? ["${s}.${k}"] : (
-        can(keys(o[k])) && can(keys(local.defaults[s][k])) && !endswith(k, "tags") && length(try(keys(local.defaults[s][k]), [])) > 0 ?
+        can(keys(o[k])) && can(keys(local.defaults[s][k])) && !endswith(k, "tags") && k != "policies" && length(try(keys(local.defaults[s][k]), [])) > 0 ?
         [for k2 in keys(o[k]) : "${s}.${k}.${k2}" if !contains(keys(local.defaults[s][k]), k2)] : []
       )
     ]) : []

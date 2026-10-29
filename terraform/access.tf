@@ -76,7 +76,7 @@ locals {
   # ---- Genie Code: workspace instructions and skills ----
   # Each lives in a genie-code/ folder: the default in config/defaults/,
   # this workspace's additions in config/workspaces/<name>/.
-  genie_default_dir   = "${local.project_root}/config/defaults/genie-code"
+  genie_default_dir   = "${local.defaults_dir}/genie-code"
   genie_workspace_dir = "${local.ws_dir}/genie-code"
   # settings.genie_code in settings.yaml: true = deploy, null = leave alone.
   manage_genie_instructions = try(local.settings.genie_code.instructions, null) == true

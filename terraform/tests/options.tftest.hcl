@@ -7,6 +7,7 @@ mock_provider "databricks" {
 }
 
 variables {
+  defaults_dir     = "tests/defaults"
   workspaces_dir   = "tests/fixtures"
   use_cli_profiles = false
 }
@@ -27,6 +28,18 @@ run "access" {
     condition     = contains(local.budget_policy_managers, "users/owner@example.com")
     error_message = "budget_policies.extra_managers in a workspace cost.yaml adds managers next to the platform admins."
   }
+  assert {
+    condition     = sort(keys(local.budget_policies)) == tolist(["builders", "platform", "shared"])
+    error_message = "A workspace's cost.yaml adds policy blocks to the baseline's."
+  }
+  assert {
+    condition     = local.budget_policies.platform.name == "TST-ADMIN" && local.budget_policies.platform.tags == { LOB = "TESTLOB", DEPARTMENT = "IT", TEAM = "PLATFORM" }
+    error_message = "A block repeated in a workspace's cost.yaml replaces the baseline's (name and tags)."
+  }
+  assert {
+    condition     = sort(local.budget_policies.builders.groups) == tolist(["tst-builders", "tst-publishers"]) && local.budget_policies.builders.name == "TST-BUILDERS"
+    error_message = "used_by can list personas: the policy goes to their groups."
+  }
 }
 
 run "teams" {
@@ -34,8 +47,8 @@ run "teams" {
   variables { workspace = "full" }
 
   assert {
-    condition     = sort(keys(local.budget_policies)) == tolist(["platform", "shared"])
-    error_message = "Teams get no usage policy of their own: there are two, shared and platform."
+    condition     = !contains(keys(local.budget_policies), "data-eng")
+    error_message = "Teams get no usage policy of their own: only the blocks in cost.yaml are policies."
   }
   assert {
     condition     = contains(local.allowed_tag_values.TEAM, "DATA-ENG") && contains(local.allowed_tag_values.TEAM, "SHARED") && contains(local.allowed_tag_values.DEPARTMENT, "FINANCE")

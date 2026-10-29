@@ -1,0 +1,49 @@
+# =============================================================================
+# COST: chargeback tags and serverless usage (budget) policies.
+#
+# Names and required tags end up in policy names and billing records: renaming
+# RECREATES policies (jobs lose the policy they used) and splits spend history;
+# scripts/tf.sh warns before applying such a change. Changing tags affects new
+# usage only. {BU} = business unit (upper case).
+# =============================================================================
+
+# Tag keys every warehouse, cluster and budget policy carries, for chargeback.
+# LOB comes from the workspace's workspace.yaml; every team in its access.yaml
+# must set the others. Adding a key later means every team must add it.
+required_tags:
+  - LOB
+  - DEPARTMENT
+  - TEAM
+
+budget_policies:
+  enabled: true                # false = do not manage budget policies at all
+
+  # One block per policy. A policy tags the serverless usage (notebooks, jobs,
+  # pipelines, apps) of the people who may use it, so billing shows that usage
+  # under its tags. LOB is added automatically from workspace.yaml.
+  #   name:     shown in Databricks; {BU} = the business unit. When someone may use
+  #             several policies and does not pick one, Databricks uses the first
+  #             name alphabetically, so the names also decide the fallback.
+  #   used_by:  who may use it: everyone (every persona), platform_admins, or a list
+  #             of personas, for example [builder, publisher].
+  #   tags:     the chargeback tags on its usage (required_tags above, except LOB).
+  # The key (shared, platform) is how Terraform tracks the policy: a new key adds a
+  # policy, a removed key deletes it (the plan flags that). A workspace's cost.yaml
+  # can add a block, or change one by repeating the whole block.
+  policies:
+    shared:
+      name: "{BU}-SHARED"
+      used_by: everyone
+      tags:
+        DEPARTMENT: SHARED
+        TEAM: SHARED
+    platform:
+      name: "{BU}-PLATFORM"
+      used_by: platform_admins
+      tags:
+        DEPARTMENT: PLATFORM
+        TEAM: PLATFORM
+
+  # Who may manage every policy (its name, tags and users), besides the platform
+  # admin groups: users/<email> or servicePrincipals/<application-id>.
+  extra_managers: []

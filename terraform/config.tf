@@ -12,7 +12,7 @@ locals {
   # ---- Baseline: every YAML file under config/defaults/ (except genie-code/) ----
   # A section may be split across files;
   # each setting must appear in only one file.
-  defaults_dir      = "${local.project_root}/config/defaults"
+  defaults_dir      = var.defaults_dir == "" ? "${local.project_root}/config/defaults" : var.defaults_dir
   defaults_files    = sort([for f in fileset(local.defaults_dir, "**/*.yaml") : f if !strcontains(f, "genie-code/")])
   defaults_parts    = [for f in local.defaults_files : try({ for k, v in yamldecode(file("${local.defaults_dir}/${f}")) : k => v }, {})]
   defaults_sections = distinct(flatten([for part in local.defaults_parts : keys(part)]))

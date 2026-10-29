@@ -14,3 +14,14 @@
 # budget_policies:
 #   extra_managers:
 #     - users/someone@contoso.com
+
+# One more policy in this workspace, for example for one team's builders (a new
+# key adds a policy; repeating a baseline key replaces that whole block):
+# budget_policies:
+#   policies:
+#     data_eng:
+#       name: "{BU}-DATA-ENG"
+#       used_by: [builder]
+#       tags:
+#         DEPARTMENT: FINANCE
+#         TEAM: DATA-ENG

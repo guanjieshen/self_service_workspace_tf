@@ -8,6 +8,7 @@ mock_provider "databricks" {
 }
 
 variables {
+  defaults_dir     = "tests/defaults"
   workspaces_dir   = "tests/fixtures/invalid"
   use_cli_profiles = false
 }
@@ -156,6 +157,13 @@ run "team_no_tags" {
 run "bad_label" {
   command = plan
   variables { workspace = "bad-label" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# A budget policy used by someone who is not everyone, platform_admins or a persona
+run "bad_budget_policy" {
+  command = plan
+  variables { workspace = "bad-budget-policy" }
   expect_failures = [terraform_data.config_checks]
 }
 
