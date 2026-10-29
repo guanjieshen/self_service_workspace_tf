@@ -17,7 +17,7 @@ and checks what Terraform needs but cannot fix itself:
   - placeholders in the baseline that must be replaced (the Git allowlist's <org>).
 
 Changes nothing. Prints ok / warning / error lines and exits 1 if there is an error. The
-Plan workflow runs it before every plan; run it yourself before onboarding a workspace.
+workspace's workflow runs it before every plan; run it yourself before onboarding a workspace.
 """
 import json
 import os

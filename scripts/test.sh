@@ -4,7 +4,7 @@
 #   ./scripts/test.sh              all suites
 #   ./scripts/test.sh terraform    one suite: terraform | python | node | scaffold
 #
-# CI runs the same suites in the "Tests" job of .github/workflows/plan.yml.
+# CI runs the same suites in the "Tests" job of .github/workflows/checks.yml.
 # TERRAFORM=<path> picks the Terraform binary (default: terraform on the PATH).
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"

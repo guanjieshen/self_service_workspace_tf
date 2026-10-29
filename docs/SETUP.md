@@ -116,8 +116,8 @@ It creates the app registration and service principal (`pipeline_name`), two fed
 
 | Federated credential | Subject | Lets sign in |
 | --- | --- | --- |
-| `github-pull-requests` | `<repo prefix>:pull_request` | The Plan workflow, on every pull request |
-| `github-main` | `<repo prefix>:ref:refs/heads/main` | The Apply and Drift workflows, from `main` |
+| `github-pull-requests` | `<repo prefix>:pull_request` | Plans, on every pull request |
+| `github-main` | `<repo prefix>:ref:refs/heads/main` | Applies and drift checks, from `main` |
 
 No client secret is created: GitHub exchanges its own short-lived token for an Entra token on each run. One service principal serves every workspace, so new workspaces need nothing here.
 
@@ -195,7 +195,7 @@ What each setting does is in the comment beside it, and in [config/README.md](..
 
 **Who:** the platform team. Repeat for every workspace.
 
-1. **Create its folder:**
+1. **Create its folder and its workflow:**
 
    ```bash
    python3 scripts/workspaces.py new fin-citizen-dev --bu fin --lob FIN \
@@ -211,8 +211,8 @@ What each setting does is in the comment beside it, and in [config/README.md](..
    ```
 
    It checks the sign-in and admin rights, the metastore, that every group is an account group, the catalog's storage, what still uses legacy access, and placeholders left in the baseline. Fix every `error` before the pull request; read every `warning`.
-5. **Open a pull request** with the folder. The Plan workflow runs preflight again as the pipeline, then plans, and posts the plan, the plan guard's warnings and the AI review as a comment. The first plan creates everything; check that it changes nothing you did not expect.
-6. **Merge.** The Apply workflow waits for approval in `apply-approval` (if it has reviewers), then applies.
+5. **Open a pull request** with the folder and its workflow (`.github/workflows/workspace-fin-citizen-dev.yml`, written by step 1). The workspace's workflow runs preflight again as the pipeline, then plans, and posts the plan, the plan guard's warnings and the AI review as a comment. The first plan creates everything; check that it changes nothing you did not expect.
+6. **Merge.** The workspace's workflow waits for approval in `apply-approval` (if it has reviewers), then applies.
 7. **Verify:** the next pull request (or the Monday drift check) shows no changes for the workspace. In the workspace: the persona groups under Settings > Identity and access, the `<BU> Default Warehouse`, the `{bu}_citizen_dev` catalog.
 
 > [!WARNING]
@@ -224,7 +224,7 @@ What each setting does is in the comment beside it, and in [config/README.md](..
 | --- | --- |
 | Give someone a persona | Add them to the group in Entra ID; no change here |
 | Change one workspace | Pull request editing `config/workspaces/<name>/`: only that workspace is planned and applied |
-| Change every workspace | Pull request editing `config/defaults/`: every workspace is planned, and applied one at a time, stopping at the first failure |
+| Change every workspace | Pull request editing `config/defaults/`: every workspace is planned, and applied, each by its own workflow (one that fails does not stop the others) |
 | A plan is flagged as risky | Review the warning in the plan comment; if intended, a person adds the label `allow-risky-changes` |
 | A `drift` issue opens | Someone changed a setting by hand: update the configuration to match, or re-apply to restore it |
 | Retry a failed apply | Fix the cause, then re-run the latest Apply run (it refuses if `main` has moved on) |

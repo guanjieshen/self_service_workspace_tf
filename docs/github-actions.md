@@ -2,26 +2,34 @@
 
 ## Overview
 
-Every change to a workspace goes through a pull request:
+**One workflow per workspace.** Each workspace folder has its own small workflow,
+`.github/workflows/workspace-<name>.yml`, which only names the workspace and the paths that
+concern it; all the steps are in the shared `.github/workflows/workspace.yml`. `scripts/workspaces.py new`
+writes a new workspace's workflow, and `workspaces.py check` (in **Format and validate**)
+fails if a folder has no workflow, a workflow has no folder, or a workflow differs from the
+template (`workspaces.py workflows` rewrites them all).
 
-1. **Open a PR** that edits a workspace folder or the baseline.
-2. **Plan** (`.github/workflows/plan.yml`) checks formatting, works out which workspaces the change affects, plans each one, and posts the plan as a PR comment. If a plan contains hard-to-undo changes (deleted folders, replaced warehouses, disabling legacy access) or weakens security (a security setting turned off or loosened, a catalog opened to every workspace, a grant to `account users`, more groups allowed to create tokens), the check fails until someone adds the label `allow-risky-changes`. Controls newly left unmanaged are listed as releases and do not fail it.
-3. **Merge** the PR to `main`.
-4. **Apply** (`.github/workflows/apply.yml`) applies each affected workspace after a reviewer approves the deployment in the workspace's approval environment. It rolls out in rings (`ring` in `workspace.yaml`: 0 first, then 1, the default, then 2), one workspace at a time, and stops at the first workspace that fails, so a broken baseline change does not go on to the rest; fix it and re-run. Run it by hand with **plan only** to preview a rollout.
-5. **Drift check** (`.github/workflows/drift.yml`) plans every workspace every Monday and opens an issue labelled `drift` for any workspace whose live settings no longer match the configuration. The issue closes itself once the workspace is clean again.
+| Workflow | Runs on | Does |
+| --- | --- | --- |
+| `checks.yml` (**Format and validate**, **Tests**) | Every pull request | Formatting, `terraform validate`, the cross-workspace checks, every test. Required by branch protection |
+| `workspace-<name>.yml`, on a pull request | A change that concerns the workspace (below) | Preflight, plan, and the plan comment: the plan, the plan guard's warnings, an AI review. A plan with hard-to-undo or security-weakening changes fails until someone adds the label `allow-risky-changes` |
+| `workspace-<name>.yml`, on merge to `main` | The same changes, without the review-only ones | The approval step (`apply-approval`), then apply |
+| `workspace-<name>.yml`, every Monday (or Run workflow) | Schedule | Drift check: plans, and opens an issue labelled `drift` if the live settings no longer match; closes it once clean |
 
-Which workspaces a change affects:
+Which changes concern a workspace:
 
 | Change | Planned (pull request) | Applied (merge) |
 | --- | --- | --- |
 | `config/workspaces/<name>/` | That workspace | That workspace |
 | `config/defaults/`, `terraform/` (except `terraform/tests/`), `scripts/tf.sh`, `scripts/plan-guard.py` | Every workspace | Every workspace |
-| The AI review: `scripts/ai-*.py`, `.github/ai/` | Every workspace, to show the new review | None |
+| What the plan comment shows: `scripts/preflight.py`, `scripts/ai-plan-review.py`, `.github/ai/`, `config/setup.yaml`, the workflows | Every workspace | None |
 | Anything else: tests, docs, other scripts | None | None |
 
-Tests and docs never re-apply a workspace. Re-applying is not free: a newer runtime, for example, restarts the shared cluster.
-
-Workspaces with `ci: false` in their `workspace.yaml` (for example a local sandbox) and folders starting with `_` are always skipped.
+A change to every workspace applies them all at the same time, each in its own workflow:
+one that fails does not stop the others. Fix it in a pull request; or, if a missing
+prerequisite was fixed, re-run that workspace's latest run (it refuses if `main` has moved
+on). Each workspace's applies run one at a time. Tests and docs never re-apply a workspace:
+re-applying is not free (a newer runtime, for example, restarts the shared cluster).
 
 ## How CI signs in
 
@@ -29,14 +37,14 @@ One Entra service principal, for every workspace and for the Terraform state, th
 
 | Credential | Subject | Used by |
 | --- | --- | --- |
-| `github-pull-requests` | `<prefix>:pull_request` | Plan (every pull request) |
-| `github-main` | `<prefix>:ref:refs/heads/main` | Apply (merge to `main`), Drift (scheduled, or run on `main`) |
+| `github-pull-requests` | `<prefix>:pull_request` | Plans (every pull request) |
+| `github-main` | `<prefix>:ref:refs/heads/main` | Applies (merge to `main`), drift checks (scheduled, or run on `main`) |
 
 `<prefix>` is the repository's, for example `repo:my-org@123456/my-repo@456789` (repositories created or renamed since July 15, 2026 include numeric IDs): `gh api repos/<org>/<repo>/actions/oidc/customization/sub --jq .sub_claim_prefix`. `scripts/setup.py identity` reads it and creates both credentials.
 
 No job that signs in runs in a GitHub Environment, because that would change its subject to `environment:<name>`. The one environment, `apply-approval`, is the approval step before each workspace's apply: it holds nothing and signs in to nothing.
 
-Onboarding a workspace therefore needs nothing in GitHub or Entra: make the service principal workspace admin there (by hand, [SETUP.md](SETUP.md) step 6), add the folder, merge.
+Onboarding a workspace therefore needs nothing in GitHub settings or Entra: make the service principal workspace admin there (by hand, [SETUP.md](SETUP.md) step 6), add the folder and its workflow (`workspaces.py new` writes both), merge.
 
 ## Setup
 

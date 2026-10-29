@@ -48,7 +48,7 @@ Each workspace gets:
 | `config/backend.hcl`, `.github/CODEOWNERS` | Where state is kept (written by `setup.py state`), who approves what |
 | `terraform/` | The root module and modules. You do not edit these for normal operations |
 | `scripts/` | `setup.py` (one-time setup), `workspaces.py` (new workspace, which workspaces a change affects, checks), `preflight.py` (is a workspace ready?), `tf.sh` (run Terraform), `plan-guard.py`, `ai-plan-review.py`, `test.sh` |
-| `.github/` | Plan, apply and drift workflows ([docs/github-actions.md](docs/github-actions.md)) |
+| `.github/` | One workflow per workspace (`workspace-<name>.yml`), the shared steps (`workspace.yml`) and the pull request checks ([docs/github-actions.md](docs/github-actions.md)) |
 | `docs/` | Setup, design and CI documentation |
 | `dev/` | The framework's own test workspaces; not in a release |
 | `AGENTS.md`, `agents/` | Guidance for coding agents: `AGENTS.md` is the entry point (`CLAUDE.md` points Claude Code to it), `agents/` has one guide per area |

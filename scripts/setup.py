@@ -40,7 +40,7 @@ import workspaces as wsf  # noqa: E402
 
 ROOT = wsf.ROOT
 ISSUER = "https://token.actions.githubusercontent.com"
-# The checks branch protection requires: the Plan workflow's jobs that run on every pull request.
+# The checks branch protection requires: the Checks workflow's jobs, on every pull request.
 REQUIRED_CHECKS = ["Format and validate", "Tests"]
 q = shlex.quote
 
@@ -92,8 +92,8 @@ fi
 
 def identity(a):
     name, repo = q(a.name), a.repo
-    creds = [("github-pull-requests", "pull_request", "Plan workflow: every pull request"),
-             ("github-main", "ref:refs/heads/main", "Apply and Drift workflows: the main branch")]
+    creds = [("github-pull-requests", "pull_request", "Plans: every pull request"),
+             ("github-main", "ref:refs/heads/main", "Applies and drift checks: the main branch")]
     lines = [f"""# The identity GitHub Actions signs in as (no secret: GitHub OIDC federated credentials).
 echo "Repository: {repo} (from {a.repo_source}). Entra will trust only its pull requests and main branch."
 {signed_in(a)}
@@ -139,7 +139,7 @@ def github(a):
         "required_pull_request_reviews": {"require_code_owner_reviews": True, "required_approving_review_count": 1},
         "restrictions": None,
     })
-    return f"""# Repository settings for the Plan, Apply and Drift workflows (docs/github-actions.md).
+    return f"""# Repository settings for the workflows (docs/github-actions.md).
 echo "Repository: {a.repo} (from {a.repo_source})."
 gh variable set AZURE_CLIENT_ID -R {repo} -b {q(a.client_id)}
 gh variable set AZURE_TENANT_ID -R {repo} -b {q(a.tenant_id)}

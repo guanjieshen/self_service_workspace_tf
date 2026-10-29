@@ -10,7 +10,7 @@
 #   ./scripts/tf.sh fin-citizen-dev plan
 #   ./scripts/tf.sh all plan            # review a baseline change across every workspace
 #
-# apply and destroy run in the Apply workflow after a merge; locally they refuse
+# apply and destroy run in the workspace's workflow after a merge; locally they refuse
 # unless ALLOW_LOCAL_APPLY=1 (break glass).
 #
 # plan and apply run scripts/plan-guard.py, which warns about changes that are
@@ -53,7 +53,7 @@ done
 [[ -n "$ws_root" ]] ||
   { echo "No workspace folder $workspace (config/workspaces/$workspace/workspace.yaml). Available: $(list_workspaces | tr '\n' ' ')"; exit 1; }
 
-# Changes reach a workspace only through a merged pull request and the Apply workflow.
+# Changes reach a workspace only through a merged pull request and its workflow.
 # Outside GitHub Actions, apply and destroy refuse unless ALLOW_LOCAL_APPLY=1 (break glass:
 # CI is down and a workspace needs a fix now; open a pull request with the same change after).
 if [[ ("$cmd" == "apply" || "$cmd" == "destroy") && "${GITHUB_ACTIONS:-}" != "true" && "${ALLOW_LOCAL_APPLY:-}" != "1" ]]; then

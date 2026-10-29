@@ -48,11 +48,11 @@ Each topic has one home. Update that file; link to it from elsewhere instead of 
 2. **Change the code, its tests and its docs together** (the table below).
 3. **Run the tests:** `./scripts/test.sh` (no workspace or credentials needed) and
    `terraform fmt -recursive terraform`.
-4. **Open a pull request.** CI runs **Format and validate** and **Tests**, then plans every
-   workspace the change affects and posts the plan, the plan guard's findings and an AI
-   review as a comment. Read the plan comment, not only the checks.
-5. **Merge** when the checks pass and a person has read the plan. The Apply workflow
-   applies each affected workspace, one at a time. Watch it (`gh run watch`).
+4. **Open a pull request.** CI runs **Format and validate** and **Tests**, and the workflow
+   of every workspace the change concerns plans it and posts the plan, the plan guard's
+   findings and an AI review as a comment. Read the plan comment, not only the checks.
+5. **Merge** when the checks pass and a person has read the plan. Each concerned
+   workspace's workflow applies it. Watch them (`gh run watch`).
 
 ### What to change with what
 
@@ -64,7 +64,9 @@ Each topic has one home. Update that file; link to it from elsewhere instead of 
 | A check (a wrong value fails the plan) | `terraform/checks.tf`: the message names the key, the file and what to do | A fixture under `terraform/tests/fixtures/invalid/` and a run in `validation.tftest.hcl` |
 | A setup step or a manual step | `scripts/setup.py` if a command can do it, else the checklist in `docs/SETUP.md`; a `scripts/preflight.py` check if Terraform depends on it | `scripts/tests/test_setup.py`, `test_preflight.py` |
 | A value in `config/setup.yaml` | `docs/SETUP.md` step 1 table; `OPTIONS` in `scripts/setup.py` (or `scripts/ai-plan-review.py` for `ai_review_*`) | `test_setup.py` checks every key in the file is read |
-| A workflow | `docs/github-actions.md`; `scripts/workspaces.py` if it changes what a change plans or applies | `scripts/tests/test_changed_workspaces.py`; a job that signs in must not run in a GitHub Environment (`test_setup.py`) |
+| A workflow step | `.github/workflows/workspace.yml` (shared by every workspace); `docs/github-actions.md` | A job that signs in must not run in a GitHub Environment (`test_setup.py`) |
+| What a change plans or applies | The template in `scripts/workspaces.py` (`workflow_text`), then `python3 scripts/workspaces.py workflows` to rewrite every workspace's workflow; `docs/github-actions.md` | `scripts/tests/test_workspaces.py` |
+| A new workspace | `python3 scripts/workspaces.py new ...`: its folder and its workflow, in one pull request | `workspaces.py check` fails without the workflow |
 | Something removed | Every doc that mentions it (search the repository), and its tests and fixtures | The suite still passes with nothing skipped |
 
 ### Keep it simple
