@@ -26,7 +26,7 @@ catalog:
   # Data classification: scans every schema (new ones too) and finds sensitive data
   # (names, emails, card numbers, ...) so it can be tagged and governed. It runs on
   # serverless, so the identity running Terraform needs a serverless usage policy
-  # (budget_policies in config/defaults/cost.yaml); without one, turning it on fails with "Usage
+  # (serverless_policy in config/defaults/cost.yaml); without one, turning it on fails with "Usage
   # policy ID must not be empty".
   data_classification: true
 

@@ -8,9 +8,9 @@ Each workspace gets:
 
 - **Secure admin settings:** legacy access and DBFS off, user isolation, token limits, downloads, Git allowlist, Unity Gateway, Microsoft Teams only, and more.
 - **Three personas granted to groups:** explorer (SQL), builder and publisher (full workspace); everyone else gets Consumer access (Databricks One). Who is in each group is managed in Entra ID, for example through access packages.
-- **Compute people can use straight away:** a default serverless SQL warehouse, a shared classic cluster, and a cluster policy for one personal cluster each.
+- **Serverless first:** a default serverless SQL warehouse and one serverless usage policy every persona can use; one classic cluster policy, for people the self-service app approves.
 - **One Unity Catalog catalog** with predictive optimization and data classification; its schemas come from the self-service app.
-- **Chargeback:** required tags, a shared serverless usage policy, and team warehouses.
+- **Chargeback tags** from one list (`config/defaults/cost.yaml`), on the usage policy, the warehouse and every classic cluster.
 
 ## Get started
 
@@ -22,7 +22,7 @@ Each workspace gets:
 | 1 | Fill in `config/setup.yaml` | Platform team |
 | 2 | Push this repository to your GitHub | Platform team |
 | 3 to 5 | `python3 scripts/setup.py state`, `identity`, `github` (each prints what it will do; `--run` does it) | Cloud team, Entra admin, GitHub admin |
-| 6 | In the Databricks account console, by hand: add the service principal, make it workspace admin, let it create budget policies | Databricks account admin |
+| 6 | In the Databricks account console, by hand: add the service principal, make it workspace admin, let it create serverless usage (budget) policies | Databricks account admin |
 | 7 | Create the Entra groups and sync them to the account | Identity team |
 | 8 | Decide the baseline in `config/defaults/` | Platform team, security |
 | 9 | Onboard a workspace: copy `config/workspaces/_example.yaml` to `<name>.yaml`, fill it in, open a pull request | Platform team |

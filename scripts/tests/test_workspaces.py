@@ -19,15 +19,15 @@ class Fleet(unittest.TestCase):
         self.root = pathlib.Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.root)
 
-    def add(self, name, bu="fin", account="acct-1", host=None, id_=None, catalog=None, budget_policies=True, extra=""):
+    def add(self, name, bu="fin", account="acct-1", host=None, id_=None, catalog=None, serverless_policy=True, extra=""):
         f = self.root / f"{name}.yaml"
         host = host or f"https://adb-{abs(hash(name)) % 10**6}.1.azuredatabricks.net"
         id_ = id_ or str(abs(hash(name + "id")) % 10**9)
         text = f"bu: {bu}          # business unit\naccount_id: \"{account}\"\nhost: {host}   # url\nid: {id_}\n"
         if catalog:
             text += f"default_catalog: null\ncatalog:\n  name: {catalog}   # metastore-wide\n"
-        if not budget_policies:
-            text += "budget_policies:\n  enabled: false   # managed elsewhere\n"
+        if not serverless_policy:
+            text += "serverless_policy:\n  enabled: false   # managed elsewhere\n"
         f.write_text(text + extra)
         return f
 
@@ -49,8 +49,8 @@ class Fleet(unittest.TestCase):
 
     def test_same_default_catalog(self):
         # Without a catalog name, both get the baseline's {bu}_citizen_dev.
-        self.add("fin-dev", bu="fin", account="acct-1", budget_policies=False)
-        b = self.add("fin-prd", bu="fin", account="acct-2", budget_policies=False)
+        self.add("fin-dev", bu="fin", account="acct-1", serverless_policy=False)
+        b = self.add("fin-prd", bu="fin", account="acct-2", serverless_policy=False)
         self.assertIn("same catalog name (fin_citizen_dev)", " ".join(self.problems()))
         b.write_text(b.read_text() + "catalog: null   # no catalog here\n")
         self.assertEqual(self.problems(), [])
@@ -67,17 +67,17 @@ class Fleet(unittest.TestCase):
         self.add("b", bu="b", catalog="shared_cat")
         self.assertIn("same catalog name (shared_cat)", " ".join(self.problems()))
 
-    def test_same_bu_on_one_account_collides_on_budget_policies(self):
+    def test_same_bu_on_one_account_collides_on_the_usage_policy(self):
         self.add("fin-dev", bu="fin", catalog="fin_dev")
         self.add("fin-prd", bu="FIN", catalog="fin_prd")
         got = self.problems()
         self.assertEqual(len(got), 1, got)
-        self.assertIn("FIN-SHARED", got[0])
+        self.assertIn("FIN-0-SELF-SERVICE", got[0])
 
-    def test_same_bu_is_fine_on_another_account_or_without_budget_policies(self):
+    def test_same_bu_is_fine_on_another_account_or_without_the_usage_policy(self):
         self.add("fin-dev", bu="fin", account="acct-1", catalog="fin_dev")
         self.add("fin-prd", bu="fin", account="acct-2", catalog="fin_prd")
-        self.add("fin-test", bu="fin", account="acct-1", budget_policies=False, catalog="fin_test")
+        self.add("fin-test", bu="fin", account="acct-1", serverless_policy=False, catalog="fin_test")
         self.assertEqual(self.problems(), [])
 
     def test_unsafe_file_names(self):

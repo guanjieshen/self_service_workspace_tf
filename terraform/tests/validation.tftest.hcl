@@ -34,27 +34,6 @@ run "catalog_unknown_field" {
   expect_failures = [terraform_data.config_checks]
 }
 
-# team warehouses are team_warehouses:, not under teams:
-run "team_warehouse_in_team" {
-  command = plan
-  variables { workspace = "team-warehouse-in-team" }
-  expect_failures = [terraform_data.config_checks]
-}
-
-# team_warehouses keys must be teams
-run "team_warehouse_no_team" {
-  command = plan
-  variables { workspace = "team-warehouse-no-team" }
-  expect_failures = [terraform_data.config_checks]
-}
-
-# team warehouses are defined in full
-run "team_warehouse_fields" {
-  command = plan
-  variables { workspace = "team-warehouse-fields" }
-  expect_failures = [terraform_data.config_checks]
-}
-
 # sql_warehouse may only set keys the baseline has
 run "warehouse_unknown_key" {
   command = plan
@@ -83,27 +62,6 @@ run "unknown_persona" {
   expect_failures = [terraform_data.config_checks]
 }
 
-# every team sets the required tags
-run "team_missing_tag" {
-  command = plan
-  variables { workspace = "team-missing-tag" }
-  expect_failures = [terraform_data.config_checks]
-}
-
-# team keys are lowercase letters, digits and dashes
-run "team_bad_key" {
-  command = plan
-  variables { workspace = "team-bad-key" }
-  expect_failures = [terraform_data.config_checks]
-}
-
-# every team needs a group
-run "team_no_group" {
-  command = plan
-  variables { workspace = "team-no-group" }
-  expect_failures = [terraform_data.config_checks]
-}
-
 # groups must name the platform admins group
 run "no_platform_admins" {
   command = plan
@@ -118,24 +76,10 @@ run "instructions_too_long" {
   expect_failures = [terraform_data.config_checks]
 }
 
-# a team without tags fails the required-tags check, not with an error
-run "team_no_tags" {
-  command = plan
-  variables { workspace = "team-no-tags" }
-  expect_failures = [terraform_data.config_checks]
-}
-
 # a workspace file's label needs text and one of the allowed colors
 run "bad_label" {
   command = plan
   variables { workspace = "bad-label" }
-  expect_failures = [terraform_data.config_checks]
-}
-
-# A budget policy used by someone who is not everyone, platform_admins or a persona
-run "bad_budget_policy" {
-  command = plan
-  variables { workspace = "bad-budget-policy" }
   expect_failures = [terraform_data.config_checks]
 }
 
@@ -146,7 +90,7 @@ run "unknown_override" {
   expect_failures = [terraform_data.config_checks]
 }
 
-# Data classification needs serverless usage policies
+# Data classification needs the serverless usage policy
 run "classification_without_usage_policies" {
   command = plan
   variables { workspace = "classification-without-usage-policies" }
@@ -160,3 +104,24 @@ run "null_section" {
   expect_failures = [terraform_data.config_checks]
 }
 
+
+# A key that was removed (team config now comes from the self-service app) is an unknown key
+run "removed_teams_key" {
+  command = plan
+  variables { workspace = "removed-teams-key" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# A tag users fill in on classic clusters starts from a value they could not type (lower case)
+run "user_tag_bad_default" {
+  command = plan
+  variables { workspace = "user-tag-bad-default" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# A tag key with a space
+run "bad_tag_key" {
+  command = plan
+  variables { workspace = "bad-tag-key" }
+  expect_failures = [terraform_data.config_checks]
+}

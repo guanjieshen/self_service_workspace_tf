@@ -41,24 +41,22 @@ users:
 #   workspace  "Workspace access" and SQL access: the full workspace (notebooks, jobs, ...)
 # Nobody gets "Allow unrestricted cluster creation", and no persona is workspace
 # admin: persona groups join the workspace as users; only platform_admins are admins.
-# Every persona can use the shared serverless usage policy, gets USE CATALOG and
-# USE SCHEMA on the workspace catalog (config/defaults/catalog.yaml).
+# Every persona can use the workspace's serverless usage policy (config/defaults/cost.yaml)
+# and gets USE CATALOG and USE SCHEMA on the workspace catalog (config/defaults/catalog.yaml).
+# Classic compute is by request, through the self-service app: no persona can use the
+# classic cluster policy (config/defaults/compute.yaml) until the app grants it.
 personas:
 
   # ---- Explorer: finds and analyzes trusted data (SQL, dashboards, Genie) ----
   explorer:
     access: sql
     default_warehouse: CAN_USE         # permission on the default SQL warehouse
-    shared_cluster: null               # permission on the shared classic cluster
-    cluster_policy: false              # true = may create one cluster with the persona's cluster policy
     can_create_tokens: false           # may create personal access tokens
 
   # ---- Builder: prototypes and builds in notebooks, jobs and pipelines -------
   builder:
     access: workspace
     default_warehouse: CAN_USE
-    shared_cluster: CAN_ATTACH_TO      # run work on it; cannot start, restart or change it
-    cluster_policy: true
     can_create_tokens: false
 
   # ---- Publisher: shares finished work with the BU ---------------------------
@@ -67,6 +65,4 @@ personas:
   publisher:
     access: workspace
     default_warehouse: CAN_USE
-    shared_cluster: CAN_ATTACH_TO      # run work on it; cannot start, restart or change it
-    cluster_policy: true
     can_create_tokens: false

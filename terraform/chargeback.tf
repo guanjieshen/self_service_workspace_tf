@@ -1,35 +1,28 @@
-# Serverless usage (budget) policies for this workspace, and the tag values cluster policies allow.
+# The chargeback tags (tags: and classic_user_tags in config/defaults/cost.yaml), and the
+# workspace's serverless usage policy.
 
 locals {
-  # ---- Budget policies ----
-  bp = local.config.budget_policies
-  # The groups behind each value of used_by: everyone, platform_admins, or a persona.
-  policy_audiences = merge(
-    { everyone = distinct(flatten(values(local.persona_groups))), platform_admins = local.platform_admins },
-    local.persona_groups,
-  )
-  # used_by as a list (one value or several), per policy.
-  policy_used_by = {
-    for k, p in try(local.bp.policies, {}) : k => try(tolist(p.used_by), [tostring(p.used_by)], []) if p != null
+  # ---- Tags ----
+  # The baseline's tags: and the workspace's, key by key (a workspace may add a tag, so this
+  # is not the usual merge, which keeps only the baseline's keys), with {BU} / {bu} filled
+  # in; a tag set to null in the workspace's file is dropped.
+  tag_values = merge(try(local.defaults.tags, {}), try(local.overrides.tags, {}))
+  chargeback_tags = {
+    for k, v in local.tag_values : k => replace(replace(tostring(v), "{BU}", local.bu_upper), "{bu}", local.bu) if v != null
   }
-  budget_policies = {
-    for k, p in try(local.bp.policies, {}) : k => {
-      name   = replace(replace(tostring(p.name), "{BU}", local.bu_upper), "{bu}", local.bu)
-      tags   = merge(local.workspace_tags, try(p.tags, {}))
-      groups = distinct(flatten([for u in local.policy_used_by[k] : try(local.policy_audiences[u], [])]))
-    } if p != null
-  }
-  budget_policy_managers = distinct(concat(
-    [for g in local.platform_admins : "groups/${g}"],
-    try(tolist(local.bp.extra_managers), []),
-  ))
+  classic_user_tags = [for t in try(tolist(local.config.classic_user_tags), []) : tostring(t)]
+  # What a user may type in a classic_user_tags tag: one spelling per value.
+  user_tag_pattern = "^[A-Z0-9_-]+$"
+  # Every tag key, for the Genie Code text ({TAGS}).
+  all_tag_keys = distinct(concat(keys(local.chargeback_tags), local.classic_user_tags))
 
-  # Tag values allowed on cluster policies, for each required tag the workspace does not set itself.
-  shared_tag_values = merge(try(local.config.sql_warehouse.tags, {}), try(local.config.classic_warehouse.tags, {}), try(local.config.shared_cluster.tags, {}))
-  allowed_tag_values = {
-    for tag in local.config.required_tags : tag => distinct(compact(concat(
-      [try(tostring(local.shared_tag_values[tag]), "")],
-      [for t in values(local.teams) : try(tostring(t.tags[tag]), "")],
-    ))) if !contains(keys(local.workspace_tags), tag)
+  # ---- Serverless usage policy ----
+  sp = local.config.serverless_policy
+  serverless_policies = {
+    self_service = {
+      name   = replace(replace(tostring(local.sp.name), "{BU}", local.bu_upper), "{bu}", local.bu)
+      tags   = local.chargeback_tags
+      groups = distinct(concat(flatten(values(local.persona_groups)), local.platform_admins))
+    }
   }
 }

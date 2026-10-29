@@ -149,8 +149,8 @@ Then, if needed:
 
 1. **Add the service principal to the account:** User management > Service principals > Add service principal > **Microsoft Entra ID managed**, with the application ID `pipeline_client_id` and the name `pipeline_name` (default `sp-citizen-dev-terraform`).
 2. **Make it workspace admin** of each workspace this repository manages: Workspaces > the workspace > Permissions > Add permissions > the service principal, **Admin**.
-3. **Let it create budget policies** (serverless usage policies), in the account console. If you will not grant this, set `budget_policies.enabled: false` in `config/defaults/cost.yaml` instead (and `catalog.data_classification: null`, which needs them).
-4. **Note the account ID** (account console, top right) for `account_id` in `config/defaults/cost.yaml` (step 8): budget policies belong to the account.
+3. **Let it create budget policies** (serverless usage policies), in the account console. If you will not grant this, set `serverless_policy.enabled: false` in `config/defaults/cost.yaml` instead (and `catalog.data_classification: null`, which needs them).
+4. **Note the account ID** (account console, top right) for `account_id` in `config/defaults/cost.yaml` (step 8): usage policies belong to the account.
 5. Check that each workspace's metastore can hold the workspace catalog: either the metastore has a storage root, or the workspace's file sets `catalog.storage_root` to an external location (the Unity Catalog team creates the storage credential and external location). Preflight checks this.
 
 The service principal is never account admin: it needs workspace admin in the workspaces it manages, plus the budget policy permission. `scripts/preflight.py` (step 9) confirms items 2 and 5 for each workspace.
@@ -166,7 +166,7 @@ Create Entra ID groups and sync them to the Databricks account (automatic identi
 | Platform admins | `{bu}_platform_admins`, one per business unit (the baseline) | Workspace admin; owns the workspace catalog |
 | Users | Per workspace, in its file (`groups.users`) | Consumer access (Databricks One): dashboards, Genie spaces, apps |
 | Explorers | Per workspace (`groups.explorer`) | SQL access: the SQL editor, queries, dashboards, Genie |
-| Builders, publishers | Per workspace (`groups.builder`, `groups.publisher`) | Workspace access: notebooks, jobs, the shared cluster, one personal cluster |
+| Builders, publishers | Per workspace (`groups.builder`, `groups.publisher`) | Workspace access: notebooks, jobs, pipelines on serverless; classic compute only through the self-service app |
 
 A workspace that leaves a persona's group `null` simply has nobody with that persona.
 
@@ -184,9 +184,9 @@ The baseline in `config/defaults/` is what every workspace gets. Most of it is a
 | Dashboard embedding domains | `defaults/settings.yaml` `dashboard_embedding.approved_domains` | none | For example your SharePoint domain |
 | Personal access tokens | `defaults/settings.yaml` `personal_access_tokens`, `defaults/access.yaml` `personas.<persona>.can_create_tokens` | On, 90 days, no persona may create them | Only admins create tokens unless a persona is allowed |
 | Platform admins group name | `defaults/access.yaml` `groups.platform_admins` | `{bu}_platform_admins` | Match your Entra naming convention; `{bu}` is the workspace's business unit code. Persona groups are named per workspace |
-| Databricks account | `defaults/cost.yaml` `account_id` | none | Required while budget policies are on (account console, top right) |
-| Required tags | `defaults/cost.yaml` `required_tags` | `BUSINESS_UNIT`, `DEPARTMENT`, `TEAM`, `COST_CENTER`, `PROJECT`, `ENVIRONMENT` (placeholders) | A tag a workspace sets for everything (`tags:` in its file) is not asked of each team. Changing them later affects new workloads only |
-| Budget (usage) policies | `defaults/cost.yaml` `budget_policies.enabled` | `true` | Needs an account-level permission for the pipeline (step 6); set `false` if you will not grant it. Data classification needs them |
+| Databricks account | `defaults/cost.yaml` `account_id` | none | Required while the serverless usage policy is on (account console, top right) |
+| Chargeback tags | `defaults/cost.yaml` `tags`, `classic_user_tags` | `BUSINESS_UNIT` (from `bu`), `APP_ID: NONE`, `COST_CATEGORY: CITIZEN_SELF_SERVICE`; users fill in `APP_ID`, `TEAM`, `PROJECT` on classic clusters | One list, on the usage policy, the warehouse and classic clusters. Each workspace sets its own `APP_ID` (`tags:` in its file). Changing them later affects new usage only |
+| Serverless usage policy | `defaults/cost.yaml` `serverless_policy` | On, `{BU}-0-SELF-SERVICE`, every persona | Needs an account-level permission for the pipeline (step 6); set `enabled: false` if you will not grant it. Data classification needs it |
 | Catalog name and features | `defaults/catalog.yaml` `catalog` | `{bu}_citizen_dev`, predictive optimization, data classification and data quality monitoring on | `catalog.storage_root` is needed when the metastore has no storage root (preflight says so) |
 | Restrict workspace admins | `defaults/settings.yaml` `restrict_workspace_admins` | `false` | Needs account admin to change; leave `false` |
 | AI review of each plan | `config/setup.yaml` `ai_review_host`, `ai_review_model` | Off until a host is set; then `system.ai.claude-sonnet-5-5` there | Advice in the plan comment only. One workspace that has the model reviews every plan; the pipeline's service principal needs to be in it, with `EXECUTE` on the model (account users have it on `system.ai` by default) |
@@ -264,8 +264,8 @@ State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (ste
 | Preflight: `is not a workspace admin` | Step 6 not done for this workspace | Step 6, item 2, for this workspace |
 | Preflight: group `does not exist in the account` or `exists only in this workspace` | The Entra group is missing, not synced, or a workspace-local group has the same name | Step 7; or name the right group under `groups:` in the workspace's file |
 | Preflight: `the metastore has no storage root` | New catalogs have nowhere to store data | Set `catalog.storage_root` in the workspace's file to an external location URL |
-| Apply fails creating a budget policy (permission denied) | The service principal lacks the account-level budget policy permission | Step 6, item 3, or `budget_policies.enabled: false` |
-| `Usage policy ID must not be empty` | Data classification runs on serverless and needs a usage policy | Turn on budget policies, or set `catalog.data_classification: null` |
+| Apply fails creating a budget policy (permission denied) | The service principal lacks the account-level budget policy permission | Step 6, item 3, or `serverless_policy.enabled: false` |
+| `Usage policy ID must not be empty` | Data classification runs on serverless and needs a usage policy | Turn on the serverless usage policy, or set `catalog.data_classification: null` |
 | A local plan shows permission changes that CI does not | Local plans run as you, not the pipeline: the owner entry differs | Trust the CI plan and the drift check |
 | The plan comment has no AI review | `ai_review_host` is not set, the service principal is not in that workspace, or the model is unavailable to it there (region, Unity Gateway, missing EXECUTE) | Set `ai_review_host` to a workspace that has the model, add the service principal to it, or change `ai_review_model`; the review is advice only |
 | Apply ran straight after the merge, without approval | `apply-approval` has no required reviewers (or the GitHub plan does not support them) | Add reviewers to the environment (`apply_approvers`, then step 5 again) |

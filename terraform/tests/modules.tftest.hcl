@@ -16,41 +16,20 @@ run "compute" {
     source = "./modules/compute"
   }
   variables {
-    names          = { BU = "TST", bu = "tst" }
-    workspace_tags = { LOB = "TESTLOB" }
+    names             = { BU = "TST", bu = "tst" }
+    tags              = { BUSINESS_UNIT = "TST", APP_ID = "TST-APP", COST_CATEGORY = "CITIZEN_SELF_SERVICE" }
+    classic_user_tags = ["APP_ID", "TEAM"]
+    user_tag_pattern  = "^[A-Z0-9_-]+$"
     sql_warehouse = {
       name         = "{BU} Default Warehouse", type = "serverless", size = "Small",
-      min_clusters = 1, max_clusters = 2, auto_stop_minutes = 5, workspace_default = true, tags = { TEAM = "SHARED" }
+      min_clusters = 1, max_clusters = 2, auto_stop_minutes = 5, workspace_default = true
     }
-    classic_warehouse = {
-      enabled      = true, name = "{BU} Classic Warehouse", type = "classic", size = "Small",
-      min_clusters = 1, max_clusters = 1, auto_stop_minutes = 10, tags = {}
+    cluster_policy = {
+      name        = "{BU} Classic Compute", runtime = "lts_only", access_modes = ["STANDARD"], node_types = ["Standard_E8_v3", "Standard_E16_v3"],
+      max_workers = 4, max_autotermination_minutes = 60, max_clusters_per_user = 1
     }
-    team_warehouses = {
-      data-eng = {
-        group     = "tst-data-eng"
-        tags      = { TEAM = "DATA-ENG" }
-        warehouse = { name = "TST Data Eng", type = "pro", size = "X-Small", min_clusters = 1, max_clusters = 1, auto_stop_minutes = 5 }
-      }
-    }
-    shared_cluster = {
-      enabled     = true, name = "{BU} Shared Single Node", runtime = "15.4.x-scala2.12", node_type = "Standard_E8_v3",
-      single_node = true, num_workers = 0, autotermination_minutes = 60, tags = { TEAM = "SHARED" }
-    }
-    cluster_policies = {
-      builder = {
-        name   = "TST Builder Compute"
-        groups = ["tst-builders"]
-        tags   = { PERSONA = "BUILDER" }
-        template = {
-          runtime     = "lts_only", access_modes = ["STANDARD"], node_types = ["Standard_E8_v3", "Standard_E16_v3"],
-          max_workers = 4, max_autotermination_minutes = 60, max_clusters_per_user = 1
-        }
-      }
-    }
-    allowed_tag_values = { TEAM = ["SHARED", "DATA-ENG"], DEPARTMENT = [] }
-    acl                = { sql_warehouse = { tst-explorers = "CAN_USE" }, shared_cluster = { tst-builders = "CAN_RESTART" } }
-    platform_admins    = ["tst-admins"]
+    warehouse_acl   = { tst-explorers = "CAN_USE" }
+    platform_admins = ["tst-admins"]
   }
 
   assert {
@@ -62,69 +41,63 @@ run "compute" {
     error_message = "{BU} is filled in the warehouse name; type serverless makes it serverless."
   }
   assert {
-    condition     = toset([for t in databricks_sql_endpoint.default.tags[0].custom_tags : "${t.key}=${t.value}"]) == toset(["LOB=TESTLOB", "TEAM=SHARED"])
-    error_message = "The warehouse carries LOB plus its own tags."
+    condition     = toset([for t in databricks_sql_endpoint.default.tags[0].custom_tags : "${t.key}=${t.value}"]) == toset(["BUSINESS_UNIT=TST", "APP_ID=TST-APP", "COST_CATEGORY=CITIZEN_SELF_SERVICE"])
+    error_message = "The warehouse carries the chargeback tags."
   }
   assert {
     condition     = toset([for a in databricks_permissions.default_warehouse[0].access_control : "${a.group_name}=${a.permission_level}"]) == toset(["tst-explorers=CAN_USE", "tst-admins=CAN_MANAGE"])
     error_message = "Personas get their warehouse permission; platform admins Can manage."
   }
   assert {
-    condition     = databricks_sql_endpoint.classic[0].name == "TST Classic Warehouse" && databricks_sql_endpoint.classic[0].warehouse_type == "CLASSIC" && !databricks_sql_endpoint.classic[0].enable_serverless_compute
-    error_message = "The classic warehouse is a classic (not serverless) warehouse."
-  }
-  assert {
-    condition     = databricks_sql_endpoint.team["data-eng"].warehouse_type == "PRO" && toset([for a in databricks_permissions.team_warehouse["data-eng"].access_control : "${a.group_name}=${a.permission_level}"]) == toset(["tst-data-eng=CAN_USE", "tst-admins=CAN_MANAGE"])
-    error_message = "A team warehouse is granted to the team's group (Can use) and platform admins (Can manage)."
+    condition     = databricks_cluster_policy.classic.name == "TST Classic Compute" && databricks_cluster_policy.classic.max_clusters_per_user == 1
+    error_message = "One classic cluster policy, named from its input."
   }
   assert {
     condition = (
-      databricks_cluster.shared[0].cluster_name == "TST Shared Single Node" &&
-      databricks_cluster.shared[0].spark_version == "15.4.x-scala2.12" &&
-      databricks_cluster.shared[0].custom_tags == tomap({ LOB = "TESTLOB", TEAM = "SHARED", ResourceClass = "SingleNode" })
+      jsondecode(databricks_cluster_policy.classic.definition)["custom_tags.BUSINESS_UNIT"] == { type = "fixed", value = "TST" } &&
+      jsondecode(databricks_cluster_policy.classic.definition)["custom_tags.COST_CATEGORY"] == { type = "fixed", value = "CITIZEN_SELF_SERVICE" }
     )
-    error_message = "The shared cluster is named, versioned and tagged from its inputs; single node adds ResourceClass."
+    error_message = "The chargeback tags users do not fill in are fixed on every cluster."
   }
   assert {
     condition = (
-      jsondecode(databricks_cluster_policy.persona["builder"].definition)["custom_tags.LOB"] == { type = "fixed", value = "TESTLOB" } &&
-      jsondecode(databricks_cluster_policy.persona["builder"].definition)["custom_tags.PERSONA"] == { type = "fixed", value = "BUILDER" } &&
-      jsondecode(databricks_cluster_policy.persona["builder"].definition)["custom_tags.TEAM"].type == "allowlist" &&
-      jsondecode(databricks_cluster_policy.persona["builder"].definition)["custom_tags.DEPARTMENT"].type == "unlimited"
+      jsondecode(databricks_cluster_policy.classic.definition)["custom_tags.APP_ID"] == { type = "regex", pattern = "^[A-Z0-9_-]+$", isOptional = false, defaultValue = "TST-APP" } &&
+      jsondecode(databricks_cluster_policy.classic.definition)["custom_tags.TEAM"] == { type = "regex", pattern = "^[A-Z0-9_-]+$", isOptional = false }
     )
-    error_message = "Cluster policies fix LOB and PERSONA, allow the known TEAM values, and require DEPARTMENT when no values are known."
+    error_message = "Tags users fill in are required and must match the pattern; one with a chargeback value starts from it."
   }
   assert {
-    condition     = jsondecode(databricks_cluster_policy.persona["builder"].definition)["data_security_mode"].defaultValue == "USER_ISOLATION"
+    condition     = jsondecode(databricks_cluster_policy.classic.definition)["data_security_mode"].defaultValue == "USER_ISOLATION"
     error_message = "STANDARD access mode means shared (user isolation) clusters."
   }
 }
 
-run "compute_off" {
+run "compute_minimal" {
   command = plan
   module {
     source = "./modules/compute"
   }
   variables {
-    names              = { BU = "TST", bu = "tst" }
-    lob                = "TESTLOB"
-    sql_warehouse      = { name = "W", type = "serverless", size = "Small", min_clusters = 1, max_clusters = 1, auto_stop_minutes = 5 }
-    classic_warehouse  = { enabled = false }
-    team_warehouses    = {}
-    shared_cluster     = { enabled = false, single_node = true }
-    cluster_policies   = {}
-    allowed_tag_values = {}
-    acl                = { sql_warehouse = {}, shared_cluster = {} }
-    platform_admins    = []
+    names             = { BU = "TST", bu = "tst" }
+    tags              = {}
+    classic_user_tags = []
+    user_tag_pattern  = "^[A-Z0-9_-]+$"
+    sql_warehouse     = { name = "W", type = "serverless", size = "Small", min_clusters = 1, max_clusters = 1, auto_stop_minutes = 5 }
+    cluster_policy = {
+      name        = "{BU} Classic Compute", runtime = "lts_only", access_modes = ["STANDARD"], node_types = ["Standard_E8_v3", "Standard_E16_v3"],
+      max_workers = 4, max_autotermination_minutes = 60, max_clusters_per_user = 1
+    }
+    warehouse_acl   = {}
+    platform_admins = []
   }
 
   assert {
-    condition     = length(databricks_workspace_setting_v2.default_warehouse) == 0
-    error_message = "Without workspace_default the workspace's Default warehouse setting is left alone."
+    condition     = length(databricks_workspace_setting_v2.default_warehouse) == 0 && length(databricks_permissions.default_warehouse) == 0
+    error_message = "Without workspace_default the Default warehouse setting is left alone; empty grants create no permissions."
   }
   assert {
-    condition     = length(databricks_sql_endpoint.classic) == 0 && length(databricks_cluster.shared) == 0 && length(databricks_permissions.default_warehouse) == 0
-    error_message = "Disabled compute and empty grants create nothing."
+    condition     = length([for k in keys(jsondecode(databricks_cluster_policy.classic.definition)) : k if startswith(k, "custom_tags.")]) == 0
+    error_message = "No tags: the policy sets no tag rules."
   }
 }
 

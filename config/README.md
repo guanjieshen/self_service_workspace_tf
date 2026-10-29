@@ -8,7 +8,7 @@ Everything your organization edits is in this folder (plus `.github/CODEOWNERS`)
 config/
 ├── defaults/                 the baseline: what every workspace gets
 │   ├── access.yaml           the personas and what each gets; the platform admins group
-│   ├── compute.yaml          SQL warehouses, shared cluster, the cluster policy
+│   ├── compute.yaml          the default SQL warehouse, the classic cluster policy
 │   ├── cost.yaml             the account ID, chargeback tags, usage (budget) policies
 │   ├── catalog.yaml          the workspace catalog and its grants
 │   ├── settings.yaml         admin console settings (security, downloads, tokens, Genie Code, ...)
@@ -65,9 +65,6 @@ The workspace keys (not in the baseline):
 | `bu` | Required. The business unit code, used in every name |
 | `host` | Required. The workspace URL; the workspace ID is read from it (or set `id`) |
 | `groups` | The group for each persona (a baseline key: the platform admins group comes from the baseline) |
-| `tags` | Tags with one value for the whole workspace, on every warehouse, cluster and policy. A required tag set here is not asked of each team |
-| `teams` | Each team: a group and tags (allowed values on the cluster policies) |
-| `team_warehouses` | A team's own warehouse, defined in full; the key must be one of the teams |
 | `genie_code_instructions` | Genie Code instructions for this workspace (Markdown), after the baseline's |
 | `label` | A label and color next to the workspace name in the top bar |
 | `account_id`, `auth`, `id` | Rarely: another Databricks account than the baseline's; CLI profiles for local runs; the workspace ID when the host does not show it |
@@ -82,14 +79,15 @@ The workspace keys (not in the baseline):
 | Change which group holds a persona | | `groups.<persona>` in its file |
 | Change what a persona can do | `personas` in `defaults/access.yaml` | `personas.<persona>.<key>` in its file |
 | Let another persona create tokens | `personas.<persona>.can_create_tokens` in `defaults/access.yaml` | the same key in its file |
-| Add a team (its tags allowed on cluster policies) | | `teams` in its file |
-| Give a team its own warehouse | | `team_warehouses` in its file |
-| Tag everything in a workspace | | `tags` in its file |
+| Add, remove or rename a chargeback tag | `tags` (and `classic_user_tags`) in `defaults/cost.yaml` | `tags.<KEY>` in its file (`null` drops it) |
+| Set a workspace's APP_ID (or another tag value) | | `tags.APP_ID` in its file |
+| Change the classic cluster policy's limits | `cluster_policy` in `defaults/compute.yaml` | `cluster_policy.<key>` in its file |
+| A team warehouse, a project usage policy, access to classic compute | | The self-service app, not this repository |
 | Resize the default warehouse | `sql_warehouse` in `defaults/compute.yaml` | `sql_warehouse.size` (etc.) in its file |
 | Change an admin setting | `settings.<key>` in `defaults/settings.yaml` | the same key in its file |
 | Not ready to switch off legacy access and DBFS | | `settings.disable_legacy_access`, `disable_dbfs_root_and_mounts` and `enforce_user_isolation`: `null` in its file |
 | Leave a setting alone (something else manages it) | the key set to `null` in `defaults/` | the key set to `null` in its file |
-| Leave budget policies alone | `budget_policies.enabled: false` in `defaults/cost.yaml` | the same in its file |
+| Leave the serverless usage policy alone | `serverless_policy.enabled: false` in `defaults/cost.yaml` | the same in its file |
 | Change Genie Code instructions | `defaults/genie-code/instructions.md` | `genie_code_instructions` in its file (appended after the default) |
 | Add a Genie Code skill | a folder in `defaults/genie-code/skills/` | (every workspace gets the baseline's skills) |
 | Leave Genie Code alone (managed elsewhere) | `settings.genie_code` in `defaults/settings.yaml` | `settings.genie_code: null` in its file |
@@ -113,8 +111,7 @@ Put the reason for a difference in a comment next to it: the reviewer sees it in
 | --- | --- |
 | `null` | Terraform leaves the setting alone. |
 | `{BU}` / `{bu}` | The workspace's business unit code, upper / lower case. |
-| `{PERSONA}` | A persona name, such as Builder. |
-| `{TAGS}`, `{WORKSPACE_TAGS}` (Genie Code text) | The required tags; the tags the workspace sets for everything in it. |
+| `{TAGS}`, `{WORKSPACE_TAGS}` (Genie Code text) | Every chargeback tag; the ones set for you, with their values. |
 | `CAN_USE`, `CAN_RESTART`, ... | Databricks permission levels, as shown in the workspace UI. |
 | `ONE-WAY` in a comment | Cannot be undone once applied. |
 | "Decide at onboarding" | Switching it later on a busy workspace is disruptive; decide it before the first apply. |

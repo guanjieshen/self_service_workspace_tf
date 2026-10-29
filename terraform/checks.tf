@@ -27,39 +27,20 @@ resource "terraform_data" "config_checks" {
       error_message = "Genie Code instructions are ${length(coalesce(local.genie_instructions, ""))} characters (default plus workspace); Genie Code reads at most 20,000. Shorten genie_code_instructions or config/defaults/genie-code/instructions.md."
     }
     precondition {
-      condition     = alltrue([for k, t in local.teams : try(t.warehouse, null) == null])
-      error_message = "Team warehouses go under team_warehouses in the workspace file, not inside a team."
+      condition     = alltrue([for k, v in local.tag_values : can(regex("^[A-Za-z0-9_.-]+$", k)) && (v == null || can(tostring(v)))])
+      error_message = "tags: each key must be letters, digits, _, . or - and each value a single value (or null to drop the tag)."
     }
     precondition {
-      condition     = alltrue([for k in keys(local.team_warehouses) : contains(keys(local.teams), k)])
-      error_message = "team_warehouses: every key must be one of the workspace's teams (teams: ${join(", ", keys(local.teams))})."
+      condition     = can(tolist(local.config.classic_user_tags)) && alltrue([for k, v in local.chargeback_tags : can(regex(local.user_tag_pattern, v)) if contains(local.classic_user_tags, k)])
+      error_message = "classic_user_tags lists tags users fill in on a classic cluster, which must be upper case letters, digits, _ and -; a starting value under tags: must be too: ${join(", ", [for k, v in local.chargeback_tags : "${k} = ${v}" if contains(local.classic_user_tags, k) && !can(regex(local.user_tag_pattern, v))])}."
     }
     precondition {
-      condition = alltrue([
-        for k, w in local.team_warehouses : alltrue([
-          for f in ["name", "type", "size", "min_clusters", "max_clusters", "auto_stop_minutes"] : try(w[f], null) != null
-        ]) && contains(["serverless", "pro", "classic"], try(w.type, ""))
-      ])
-      error_message = "Each team warehouse (team_warehouses in the workspace's file) needs name, type (serverless, pro or classic), size, min_clusters, max_clusters and auto_stop_minutes."
+      condition     = !local.sp.enabled || can(regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", coalesce(local.account_id, "-")))
+      error_message = "The serverless usage policy is account-level: set account_id in config/defaults/cost.yaml to the Databricks account ID (a GUID), or set serverless_policy.enabled: false."
     }
     precondition {
-      condition     = contains(["classic", "pro"], try(local.config.classic_warehouse.type, "classic"))
-      error_message = "classic_warehouse.type must be classic or pro (the serverless one is sql_warehouse)."
-    }
-    precondition {
-      condition = alltrue([for k, p in try(local.config.budget_policies.policies, {}) : p == null || (
-        can(tostring(p.name)) && length(local.policy_used_by[k]) > 0 &&
-        alltrue([for u in local.policy_used_by[k] : contains(keys(local.policy_audiences), u)])
-      )])
-      error_message = "Each block under budget_policies.policies (config/defaults/cost.yaml or the workspace's file) needs a name and used_by: everyone, platform_admins, or personas (${join(", ", keys(local.persona_groups))})."
-    }
-    precondition {
-      condition     = !local.config.budget_policies.enabled || can(regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", coalesce(local.account_id, "-")))
-      error_message = "Budget policies are account-level: set account_id in config/defaults/cost.yaml to the Databricks account ID (a GUID), or set budget_policies.enabled: false."
-    }
-    precondition {
-      condition     = try(local.catalog.data_classification, null) != true || local.config.budget_policies.enabled == true
-      error_message = "catalog.data_classification needs serverless usage policies (budget_policies.enabled in config/defaults/cost.yaml): data classification runs on serverless and fails without one (\"Usage policy ID must not be empty\"). Turn on budget policies, or set catalog.data_classification: null in this workspace's catalog.yaml."
+      condition     = try(local.catalog.data_classification, null) != true || local.sp.enabled == true
+      error_message = "catalog.data_classification needs the serverless usage policy (serverless_policy.enabled in config/defaults/cost.yaml): data classification runs on serverless and fails without one (\"Usage policy ID must not be empty\"). Turn on the policy, or set catalog.data_classification: null in this workspace's file."
     }
     precondition {
       condition     = contains(["ALLOW_ALL", "ALLOW_SLACK", "ALLOW_TEAMS", "DENY_ALL"], coalesce(try(local.settings.collaboration_platforms.allowed, null), "ALLOW_ALL"))
@@ -87,22 +68,6 @@ resource "terraform_data" "config_checks" {
     precondition {
       condition     = alltrue([for k, g in local.config.groups : g == null || can(regex("^[^\\s]", g))]) && length(local.platform_admins) > 0
       error_message = "access.yaml groups: each must be a group name (or null for none), and platform_admins must be set."
-    }
-    precondition {
-      condition = alltrue(flatten([
-        for k, t in local.teams : [
-          for tag in local.config.required_tags : contains(keys(local.workspace_tags), tag) || contains(keys(try(t.tags, {})), tag)
-        ]
-      ]))
-      error_message = "Every team must set these required tags (the ones the workspace's tags: does not set): ${join(", ", [for t in local.config.required_tags : t if !contains(keys(local.workspace_tags), t)])}."
-    }
-    precondition {
-      condition     = alltrue([for k in keys(local.teams) : can(regex("^[a-z0-9][a-z0-9-]*$", k))])
-      error_message = "Team keys must be lowercase letters, digits and dashes (they are used in folder and policy names)."
-    }
-    precondition {
-      condition     = alltrue([for k, t in local.teams : try(t.group, null) != null])
-      error_message = "Every team needs a group."
     }
     precondition {
       condition     = try(local.settings.compliance_security_profile, null) == null || can(tolist(local.settings.compliance_security_profile))

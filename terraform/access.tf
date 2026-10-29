@@ -10,11 +10,8 @@ locals {
   platform_admins = compact([try(local.group_names.platform_admins, "")])
   users_group     = try(local.group_names.users, null)
 
-  # Groups referenced only by teams still need to be assigned to the workspace.
-  extra_groups = distinct(concat(
-    compact([for t in values(local.teams) : try(t.group, "")]),
-    compact([local.users_group == null ? "" : local.users_group]),
-  ))
+  # The users group is assigned to the workspace like the persona groups.
+  extra_groups = compact([local.users_group == null ? "" : local.users_group])
 
   # ---- Entitlements: an access tier per persona (and for the users group) ----
   access_tiers = {
@@ -35,7 +32,7 @@ locals {
     CAN_USE  = 3, CAN_RESTART = 3, CAN_EDIT = 3, CAN_MANAGE = 4,
   }
   persona_grants = {
-    for attr in ["default_warehouse", "shared_cluster"] : attr => flatten([
+    for attr in ["default_warehouse"] : attr => flatten([
       for p, gs in local.persona_groups : [
         for g in gs : { group = g, level = local.personas[p][attr] }
       ] if try(local.personas[p][attr], null) != null
@@ -82,9 +79,9 @@ locals {
   # removed, each under a heading.
   genie_default_text   = try(trimspace(replace(file("${local.genie_default_dir}/instructions.md"), "/(?s)<!--.*?-->/", "")), "")
   genie_workspace_text = trimspace(replace(try(tostring(local.ws_all.genie_code_instructions), ""), "/(?s)<!--.*?-->/", ""))
-  # {TAGS}: the required tags; {WORKSPACE_TAGS}: the ones this workspace sets for everything in it.
-  genie_tags           = join(", ", [for t in local.config.required_tags : "`${t}`"])
-  genie_workspace_tags = length(local.workspace_tags) == 0 ? "none" : join(", ", [for k, v in local.workspace_tags : "`${k}` = `${v}`"])
+  # {TAGS}: every chargeback tag; {WORKSPACE_TAGS}: the ones set for you, with their values.
+  genie_tags           = join(", ", [for t in local.all_tag_keys : "`${t}`"])
+  genie_workspace_tags = length(local.chargeback_tags) == 0 ? "none" : join(", ", [for k, v in local.chargeback_tags : "`${k}` = `${v}`"])
   genie_parts = compact([
     local.genie_default_text == "" ? "" : "# Default instructions\n\nShared by every citizen development workspace.\n\n${local.genie_default_text}",
     local.genie_workspace_text == "" ? "" : "# Workspace instructions\n\nFor this workspace only${local.genie_default_text == "" ? "" : ", in addition to the default instructions"}.\n\n${local.genie_workspace_text}",

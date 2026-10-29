@@ -164,7 +164,7 @@ class Releases(unittest.TestCase):
         users = self.at(change("databricks_entitlements", ["delete"]), "module.personas.databricks_entitlements.users[0]")
         conf = self.at(change("databricks_workspace_conf", ["delete"]),
                        'module.workspace_settings.databricks_workspace_conf.key["enableTokensConfig"]')
-        policy = self.at(change("databricks_budget_policy", ["delete"]), 'module.budget_policies[0].databricks_budget_policy.this["shared"]')
+        policy = self.at(change("databricks_budget_policy", ["delete"]), 'module.budget_policies[0].databricks_budget_policy.this["self_service"]')
         code, out = run(users, conf, policy, released=[
             "module.personas.databricks_entitlements.users",
             'module.workspace_settings.databricks_workspace_conf.key["enableTokensConfig"]',

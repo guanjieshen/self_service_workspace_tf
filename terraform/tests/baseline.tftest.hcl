@@ -20,8 +20,8 @@ run "names_and_tags" {
   command = plan
 
   assert {
-    condition     = local.bu == "tst" && local.bu_upper == "TST" && local.workspace_tags == { LOB = "TESTLOB" }
-    error_message = "bu and the workspace's tags come from its file."
+    condition     = local.bu == "tst" && local.bu_upper == "TST" && local.chargeback_tags == { BUSINESS_UNIT = "TST", APP_ID = "TST-APP", COST_CATEGORY = "CITIZEN_SELF_SERVICE" }
+    error_message = "The chargeback tags are the baseline's tags: with BUSINESS_UNIT from bu ({BU}) and the workspace's own APP_ID. Got: ${jsonencode(local.chargeback_tags)}"
   }
   assert {
     condition     = local.account_host == "https://accounts.azuredatabricks.net"
@@ -40,20 +40,12 @@ run "names_and_tags" {
     error_message = "SQL results download, UI uploads and MLflow artifact downloads are managed (on); collaboration platforms are limited to Microsoft Teams; public messages are left alone."
   }
   assert {
-    condition     = local.config.sql_warehouse.tags == { DEPARTMENT = "SHARED", TEAM = "SHARED" }
-    error_message = "Shared compute is tagged DEPARTMENT and TEAM SHARED (LOB is added by the module)."
+    condition     = tolist(local.classic_user_tags) == tolist(["APP_ID", "TEAM", "PROJECT"]) && local.all_tag_keys == tolist(["APP_ID", "BUSINESS_UNIT", "COST_CATEGORY", "TEAM", "PROJECT"])
+    error_message = "Users fill in APP_ID, TEAM and PROJECT on classic clusters. Got: ${jsonencode(local.all_tag_keys)}"
   }
   assert {
-    condition     = local.config.classic_warehouse.enabled == false && local.config.shared_cluster.enabled == true
-    error_message = "Classic warehouse off, shared cluster on by default."
-  }
-  assert {
-    condition     = can(regex("^[0-9]+\\.[0-9x]+(\\.x)?-scala[0-9.]+$", local.config.shared_cluster.runtime))
-    error_message = "The shared cluster's runtime is a pinned version, not latest_lts: a new LTS would restart it on an unrelated apply."
-  }
-  assert {
-    condition     = tolist(local.config.required_tags) == tolist(["LOB", "DEPARTMENT", "TEAM"])
-    error_message = "Required tags are LOB, DEPARTMENT and TEAM."
+    condition     = local.config.cluster_policy.name == "{BU} Classic Compute" && tolist(local.config.cluster_policy.access_modes) == tolist(["STANDARD"])
+    error_message = "One classic cluster policy, Standard access mode only."
   }
 }
 
@@ -65,14 +57,6 @@ run "personas" {
     error_message = "One group per persona, from groups (baseline and the workspace's file)."
   }
   assert {
-    condition     = sort(keys(local.cluster_policies)) == tolist(["builder", "publisher"])
-    error_message = "Only personas with cluster_policy: true (builder, publisher) get a cluster policy."
-  }
-  assert {
-    condition     = local.cluster_policies.builder.name == "TST Builder Compute" && jsonencode(local.cluster_policies.builder.groups) == jsonencode(["tst-builders"]) && local.cluster_policies.publisher.tags == { PERSONA = "PUBLISHER" }
-    error_message = "Cluster policies are named {BU} {PERSONA} Compute, granted to the persona's group and tagged with the persona."
-  }
-  assert {
     condition     = !contains(keys(local.persona_acl), "bu_folder")
     error_message = "The BU folder has no persona permissions: /Workspace/Shared already gives everyone access."
   }
@@ -81,8 +65,8 @@ run "personas" {
     error_message = "Every persona can use the default warehouse."
   }
   assert {
-    condition     = local.persona_acl.shared_cluster == { "tst-builders" = "CAN_ATTACH_TO", "tst-publishers" = "CAN_ATTACH_TO" }
-    error_message = "Explorers get nothing on the shared cluster; builders and publishers can attach to it, not restart it."
+    condition     = alltrue([for p, d in local.config.personas : !contains(keys(d), "cluster_policy") && !contains(keys(d), "shared_cluster")])
+    error_message = "No persona gets classic compute: access to the classic cluster policy comes from the self-service app."
   }
   assert {
     condition = (
@@ -109,32 +93,24 @@ run "personas" {
   }
 }
 
-run "serverless_usage_policies" {
+run "serverless_usage_policy" {
   command = plan
 
   assert {
-    condition     = sort(keys(local.budget_policies)) == tolist(["platform", "shared"])
-    error_message = "Without teams there are two usage policies: shared and platform."
+    condition     = tolist(keys(local.serverless_policies)) == tolist(["self_service"]) && local.serverless_policies.self_service.name == "TST-0-SELF-SERVICE"
+    error_message = "One usage policy per workspace, named {BU}-0-SELF-SERVICE (first alphabetically, so it is the fallback)."
   }
   assert {
-    condition     = local.budget_policies.shared.name == "TST-SHARED" && local.budget_policies.platform.name == "TST-PLATFORM"
-    error_message = "Usage policies are named {BU}-SHARED and {BU}-PLATFORM."
+    condition     = local.serverless_policies.self_service.tags == local.chargeback_tags
+    error_message = "The usage policy carries the chargeback tags."
   }
   assert {
-    condition     = local.budget_policies.shared.tags == { LOB = "TESTLOB", DEPARTMENT = "SHARED", TEAM = "SHARED" }
-    error_message = "The shared usage policy carries LOB and the shared tags."
-  }
-  assert {
-    condition     = sort(local.budget_policies.shared.groups) == tolist(["tst-builders", "tst-explorers", "tst-publishers"]) && local.budget_policies.platform.groups == tolist(["tst-admins"])
-    error_message = "Every persona may use the shared policy; platform admins the platform one."
-  }
-  assert {
-    condition     = local.budget_policy_managers == tolist(["groups/tst-admins"])
-    error_message = "Platform admins manage the usage policies."
+    condition     = sort(local.serverless_policies.self_service.groups) == tolist(["tst-admins", "tst-builders", "tst-explorers", "tst-publishers"])
+    error_message = "Every persona and the platform admins may use it."
   }
   assert {
     condition     = length(module.budget_policies) == 1
-    error_message = "Usage policies are managed by default."
+    error_message = "The usage policy is managed by default."
   }
 }
 
@@ -181,7 +157,7 @@ run "genie_code_defaults" {
     error_message = "Without genie-code/instructions.md there is no workspace section."
   }
   assert {
-    condition     = !strcontains(local.genie_instructions, "<!--") && length(regexall("\\{(BU|LOB|CATALOG|WAREHOUSE)\\}", local.genie_instructions)) == 0
+    condition     = !strcontains(local.genie_instructions, "<!--") && length(regexall("\\{(BU|TAGS|WORKSPACE_TAGS|CATALOG|WAREHOUSE)\\}", local.genie_instructions)) == 0
     error_message = "Comments are removed and placeholders filled."
   }
   assert {
@@ -190,13 +166,13 @@ run "genie_code_defaults" {
   }
   assert {
     condition = (
-      length(regexall("\\{(BU|LOB|CATALOG|WAREHOUSE)\\}", base64decode(local.genie_skills["build-tagged-assets/SKILL.md"]))) == 0 &&
+      length(regexall("\\{(BU|TAGS|WORKSPACE_TAGS|CATALOG|WAREHOUSE)\\}", base64decode(local.genie_skills["build-tagged-assets/SKILL.md"]))) == 0 &&
       strcontains(base64decode(local.genie_skills["build-tagged-assets/SKILL.md"]), "TST Default Warehouse")
     )
     error_message = "Placeholders in skills are filled ({WAREHOUSE} = the default warehouse's name)."
   }
   assert {
-    condition     = strcontains(base64decode(local.genie_skills["build-tagged-assets/SKILL.md"]), "`LOB`, `DEPARTMENT`, `TEAM`")
-    error_message = "{TAGS} in a skill is the required tags."
+    condition     = strcontains(base64decode(local.genie_skills["build-tagged-assets/SKILL.md"]), "`APP_ID`, `BUSINESS_UNIT`, `COST_CATEGORY`, `TEAM`, `PROJECT`")
+    error_message = "{TAGS} in a skill is every chargeback tag."
   }
 }
