@@ -21,7 +21,7 @@ them for you: a setting missing from your baseline is left alone).
     `{BU} Classic Jobs` and `{BU} Classic Pipelines`, one cluster per person each, from one
     set of rules (`cluster_policy`). The tags are fixed, except `classic_user_tags`, which
     users must fill in (upper case, digits, `_`, `-`). Terraform does not manage who may use
-    them; the app grants them.
+    them; the app grants them. A kind set to `null` is left alone (released), never deleted.
   - **Removed:** the per-persona cluster policies (and the persona keys `cluster_policy` and
     `shared_cluster`), the shared cluster, the classic warehouse, `teams` and
     `team_warehouses`. A workspace file that still has one of these keys fails the plan

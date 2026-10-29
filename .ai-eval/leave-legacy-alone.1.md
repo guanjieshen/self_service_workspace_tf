@@ -1,13 +1,11 @@
-**Risk:** 🟡 **Medium**: security-relevant deviation (legacy access left unmanaged) with a reason given; nothing in the workspace changes.
+**Risk:** 🟡 **Medium**: Security-relevant deviation (legacy access left unmanaged), reason given; nothing in the workspace changes.
 
 #### What changes
-
 | | Change | Details | Affects |
 |---|---|---|---|
-| ✏️ | Disable legacy access: Terraform stops managing it | Stays disabled (current value); no longer enforced by Terraform | all users |
+| ✏️ | Disable legacy access | Managed (true) → left unmanaged; stays disabled | Nobody now; all users if changed by hand |
 
 #### Check before merging
-
-- Deviation: disable legacy access `true` → `null` (unmanaged). The reason given is "still on Hive until the Q3 migration".
-- This does not restore Hive access. Preflight shows legacy access is already disabled, and `null` leaves it that way. To use Hive, someone must re-enable legacy access by hand. If it was disabled more than 30 days ago, that is permanent and cannot be undone; the inputs don't show when it was disabled.
-- Decide whether this deviation is still wanted. If Hive cannot or will not be re-enabled, the release only stops Terraform from protecting the setting.
+- Deviation: disable legacy access `true` → `null`. Reason given: "still on Hive until the Q3 migration."
+- Preflight says legacy access is **already disabled**, so Hive is already blocked. This PR won't re-enable it; someone must do that by hand.
+- Disabled legacy access becomes permanent after 30 days, and the inputs don't show when it was disabled. If Hive is needed, re-enable it by hand quickly.

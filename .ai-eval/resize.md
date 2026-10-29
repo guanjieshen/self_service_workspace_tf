@@ -1,11 +1,11 @@
-**Risk:** 🟢 **Low**: warehouse capacity increase back to the baseline size; nothing removed, and another pull request can undo it.
+**Risk:** 🟢 **Low**: in-place warehouse size increase that brings the workspace back to the baseline; easily reverted.
 
 #### What changes
 
 | | Change | Details | Affects |
 |---|---|---|---|
-| ✏️ | SS1 Default Warehouse size | X-Small → Small (more capacity) | explorers (ss1-cd-explorers), builders (ss1-cd-builders) |
+| ✏️ | SS1 Default Warehouse size | X-Small → Small; same warehouse ID, so dashboards, alerts and jobs keep working | explorers (ss1-cd-explorers), builders (ss1-cd-builders) |
 
 #### Check before merging
 
-- `sql_warehouse.size: Small` now matches the baseline. Decide whether to delete this line so the workspace follows future baseline changes to warehouse size.
+- Decide whether to delete `sql_warehouse: size: Small` from `self_service_1.yaml`. It now equals the baseline, but keeping it pins the size here if the baseline changes later.

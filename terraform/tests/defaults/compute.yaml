@@ -34,7 +34,9 @@ sql_warehouse:
 # max_clusters_per_user x (1 + max_workers) nodes per policy, so keep these small.
 # For whoever the self-service app approves: Terraform creates the policies but does
 # not manage who may use them, so the app's grants stay. Workspace admins can always
-# use them. null for a kind (for example pipelines: null) means no such policy.
+# use them. null for a kind (for example pipelines: null) means Terraform leaves it
+# alone: a new workspace gets no such policy, and an applied one keeps it, unmanaged
+# (delete it by hand if it should go).
 # On every cluster, the chargeback tags are fixed, except the ones in
 # classic_user_tags (config/defaults/cost.yaml), which the user must fill in.
 cluster_policy:
