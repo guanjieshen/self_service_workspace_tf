@@ -11,9 +11,12 @@
 # LOB comes from the workspace's workspace.yaml; every team in its access.yaml
 # must set the others. Adding a key later means every team must add it.
 required_tags:
-  - LOB
+  - BUSINESS_UNIT
   - DEPARTMENT
   - TEAM
+  - COST_CENTER
+  - PROJECT
+  - ENVIRONMENT
 
 budget_policies:
   enabled: true                # false = do not manage budget policies at all
