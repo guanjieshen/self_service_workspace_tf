@@ -13,18 +13,11 @@ Add a new guide to `agents/` and to this table; don't start a new AGENTS.md else
 
 ## What this repository is
 
-A governed baseline for Databricks citizen development workspaces, run from Git. It has
-two parts:
+A governed baseline for Databricks citizen development workspaces, run from Git:
+`config/` (YAML) plus `terraform/`, one Terraform state per workspace, applied by CI.
+What people request (schemas, workspace folders) belongs to the self-service app, not
+to this repository.
 
-| Part | Where | Deployed by | How often |
-| --- | --- | --- | --- |
-| Workspace baseline | `config/` (YAML) + `terraform/` | Terraform, one state per workspace | Rarely; reviewed carefully |
-| On-request jobs (personal, project and team schemas; team folders) | `terraform/modules/catalog/`, `terraform/modules/folders/` (notebooks) | The baseline, into every workspace | With the baseline |
-
-**The jobs are an interface and a security boundary.** Workspace admins run them, and so can
-the service principals in `jobs.runners` (a ticketing system, a self-service app built on
-top): the caller asks, the job checks and acts. Keep their parameters and tags
-(`cd_self_service`, `cd_catalog`, `cd_prefix`, `cd_root`) stable; callers depend on them.
 
 Two kinds of repository use this code:
 
@@ -75,8 +68,7 @@ request deploys everything with no further step. When you add something:
    fix the cause.
 3. **Do not handle secrets.** Never create, print or export tokens or client secrets;
    CI signs in with GitHub OIDC (Entra). Locally, sign in with the Azure or Databricks CLI.
-4. **Grant to groups, never to people.** The only per-person objects (personal schemas,
-   team folders) come from the jobs.
+4. **Grant to groups, never to people.**
 5. **Leaving a setting alone releases it; it never destroys it.** `null` in YAML means
    "Terraform leaves this alone": `tf.sh` removes it from the state before apply, because
    destroying a Databricks setting resets it. Keep that property in anything you add.
@@ -94,8 +86,7 @@ request deploys everything with no further step. When you add something:
 ```
 
 - `terraform`: `terraform/tests/*.tftest.hcl` with mocked providers and fixture workspaces.
-- `python`: `scripts/tests/` (standard library only), including the job notebooks, run
-  against stand-ins for the Databricks SDK.
+- `python`: `scripts/tests/` (standard library only).
 - CI runs the same suites in the **Tests** check, then plans each affected workspace and
   posts the plan, an AI review and the plan guard's findings on the PR.
 

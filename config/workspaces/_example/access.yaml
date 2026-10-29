@@ -1,18 +1,22 @@
 # =============================================================================
 # ACCESS for this workspace.
-# The personas, their groups and what each one gets are in
-# config/defaults/access.yaml; everything here is optional. Who is in each group
-# is managed in Entra ID, not here.
+# What each persona gets is in config/defaults/access.yaml. Here: which Entra ID
+# group holds each persona in this workspace. Who is in each group is managed in
+# Entra ID, not here.
 # =============================================================================
 
-# The groups, if they are not named like the baseline ({bu}_explorer, ...):
-# groups:
-#   explorer: xyz-cd-explorers
-#   platform_admins: xyz-platform-admins
+# One account group per persona (Entra ID, synced to the Databricks account).
+# null = nobody gets that persona here; the others still apply. The platform admins
+# group comes from the baseline ({bu}_platform_admins); set it here only to use another.
+groups:
+  users: null          # everyone who may use the workspace: consumer access (Databricks One)
+  explorer: null       # SQL, dashboards and Genie
+  builder: null        # the full workspace: notebooks, jobs, pipelines
+  publisher: null      # the same as builder here
 
 # Teams: their tags become allowed values on the cluster policies, and a team can get
 # its own warehouse (compute.yaml), usually by a self-service request (a pull request).
-# A team folder comes from the team folder job instead. Keys: lowercase letters,
+# Keys: lowercase letters,
 # digits, dashes.
 teams: {}
 #  integrity:
@@ -26,9 +30,3 @@ teams: {}
 # personas:
 #   builder:
 #     can_create_tokens: true
-#
-# Leave access controls alone that something else manages here:
-# manage:
-#   group_assignment: false    # groups are assigned to the workspace elsewhere
-#   token_permissions: false   # who may create tokens is managed elsewhere
-#   catalog_grants: false      # who may use the workspace catalog is managed elsewhere

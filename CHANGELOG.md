@@ -6,6 +6,14 @@ them for you: a setting missing from your baseline is left alone).
 
 ## Unreleased
 
+- Self-service is the app's: removed the team folder and personal schema jobs, their
+  notebooks and the admin folder, `jobs.runners`, `personal_schemas`, shared schemas
+  (`catalog.schemas`) and data quality monitoring (it watched those schemas).
+- Removed the `manage` switches: group assignment, token permissions and catalog grants
+  are always managed.
+- Persona groups are named per workspace (`groups:` in its `access.yaml`); the baseline
+  names only `{bu}_platform_admins`. A persona without a group is skipped.
+
 - CI signs in with one service principal and two federated credentials (pull requests;
   `main`) instead of two GitHub Environments and one credential per workspace. Onboarding a
   workspace needs nothing in GitHub or Entra. One `apply-approval` environment gates applies.

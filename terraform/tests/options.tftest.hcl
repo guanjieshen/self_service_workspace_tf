@@ -1,4 +1,4 @@
-# Workspace options: fixtures/full sets every option, fixtures/unmanaged leaves every control alone.
+# Workspace options: fixtures/full sets every option, fixtures/unmanaged leaves every setting alone.
 # Lists are compared with tolist() on both sides: YAML lists are tuples, which never equal lists.
 
 mock_provider "databricks" {}
@@ -83,8 +83,8 @@ run "catalog_and_settings" {
   variables { workspace = "full" }
 
   assert {
-    condition     = length(module.catalog) == 1 && local.catalog.name == "tst_citizen_dev" && jsonencode(keys(local.catalog.schemas)) == jsonencode(["finance", "sandbox"])
-    error_message = "catalog.yaml names the catalog and its shared schemas."
+    condition     = length(module.catalog) == 1 && local.catalog.name == "tst_citizen_dev"
+    error_message = "catalog.yaml names the catalog."
   }
   assert {
     condition     = local.default_catalog == "tst_citizen_dev"
@@ -152,10 +152,6 @@ run "settings_left_alone" {
     error_message = "budget_policies.enabled: false in cost.yaml stops managing usage policies."
   }
   assert {
-    condition     = !local.manage_group_assignment && !local.manage_token_permissions && !local.manage_catalog_grants
-    error_message = "manage.group_assignment, token_permissions and catalog_grants false leave them alone."
-  }
-  assert {
     condition     = !local.manage_genie_instructions && !local.manage_genie_skills
     error_message = "settings.genie_code: null leaves the instructions and skills alone."
   }
@@ -163,7 +159,6 @@ run "settings_left_alone" {
     condition = alltrue([for a in [
       "module.budget_policies",
       "module.personas.databricks_entitlements.users",
-      "module.personas.databricks_permission_assignment.this",
       "module.workspace_settings.databricks_disable_legacy_access_setting.this",
       "module.workspace_settings.databricks_workspace_conf.key[\"enableTokensConfig\"]",
       "module.workspace_settings.databricks_workspace_conf.key[\"enforceUserIsolation\"]",
@@ -198,12 +193,26 @@ run "all_settings_left_alone" {
   }
 }
 
-run "job_runners" {
+# A workspace that names only some persona groups: the others are skipped, nothing fails.
+run "some_groups" {
   command = plan
-  variables { workspace = "full" }
+  variables { workspace = "some-groups" }
 
   assert {
-    condition     = local.job_runners == tolist(["11111111-2222-3333-4444-555555555555"])
-    error_message = "access.yaml jobs.runners are the service principals that may run the self-service jobs, and nobody else."
+    condition     = tolist(keys(local.persona_groups)) == tolist(["explorer"])
+    error_message = "Only the personas with a group are granted. Got: ${jsonencode(local.persona_groups)}"
+  }
+  assert {
+    condition     = local.users_group == null && !contains(keys(local.entitlement_groups), "users")
+    error_message = "No users group: no users entitlements. Got: ${jsonencode(local.users_group)}"
+  }
+  assert {
+    condition     = local.platform_admins == tolist(["tst_platform_admins"])
+    error_message = "The platform admins group comes from the baseline: {bu}_platform_admins."
+  }
+  assert {
+    condition     = length(local.cluster_policies) == 0 && local.budget_policies.shared.groups == tolist(["tst-explorers"])
+    error_message = "No builder or publisher group: no cluster policies; the shared usage policy goes to the explorers only."
   }
 }
+

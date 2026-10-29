@@ -1,2 +1,2 @@
-groups: {explorer: tst-explorers, builder: tst-builders, publisher: tst-publishers,
+groups: {users: tst_users, explorer: tst-explorers, builder: tst-builders, publisher: tst-publishers,
   platform_admins: tst-admins}

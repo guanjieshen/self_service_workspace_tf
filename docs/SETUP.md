@@ -66,7 +66,7 @@ Two more things to know before you start; they live in their own files, not here
 | --- | --- | --- | --- |
 | The network path to the workspaces | Public, IP access list or Private Link | Cloud team | Step 5: a runner, if not public |
 | For each workspace: name, business unit code, LOB, URL, and the Databricks account ID | `fin-citizen-dev`, `fin`, `FIN`, `https://adb-....azuredatabricks.net` | Platform team | Step 9: `workspaces.py new` |
-| For each business unit: the five Entra groups | `fin_users`, `fin_explorer`, `fin_builder`, `fin_publisher`, `fin_platform_admins` | Identity team | Step 7; names in `config/defaults/access.yaml` |
+| For each workspace: its persona groups; for each business unit: `{bu}_platform_admins` | `fin_platform_admins`, `fin-cd-explorers`, ... | Identity team | Step 7; persona groups in each workspace's `access.yaml` |
 
 ## 2. Put the repository in your GitHub
 
@@ -155,14 +155,16 @@ The service principal is never account admin: it needs workspace admin in the wo
 
 **Who:** the identity team.
 
-For each business unit, create five Entra ID groups and sync them to the Databricks account (automatic identity management or SCIM provisioning): by default `{bu}_users`, `{bu}_explorer`, `{bu}_builder`, `{bu}_publisher`, `{bu}_platform_admins`. They must be **account groups**: Unity Catalog grants and usage policies cannot use groups created inside a workspace. Terraform assigns them to the workspace; it never adds people. Who is in each group stays in Entra ID.
+Create Entra ID groups and sync them to the Databricks account (automatic identity management or SCIM provisioning). They must be **account groups**: Unity Catalog grants and usage policies cannot use groups created inside a workspace. Terraform assigns them to the workspace; it never adds people. Who is in each group stays in Entra ID.
 
-| Group | Gets |
-| --- | --- |
-| `{bu}_users` | Consumer access (Databricks One): dashboards, Genie spaces, apps |
-| `{bu}_explorer` | SQL access: the SQL editor, queries, dashboards, Genie |
-| `{bu}_builder`, `{bu}_publisher` | Workspace access: notebooks, jobs, the shared cluster, one personal cluster |
-| `{bu}_platform_admins` | Workspace admin; owns the workspace catalog |
+| Group | Named | Gets |
+| --- | --- | --- |
+| Platform admins | `{bu}_platform_admins`, one per business unit (the baseline) | Workspace admin; owns the workspace catalog |
+| Users | Per workspace, in its `access.yaml` (`groups.users`) | Consumer access (Databricks One): dashboards, Genie spaces, apps |
+| Explorers | Per workspace (`groups.explorer`) | SQL access: the SQL editor, queries, dashboards, Genie |
+| Builders, publishers | Per workspace (`groups.builder`, `groups.publisher`) | Workspace access: notebooks, jobs, the shared cluster, one personal cluster |
+
+A workspace that leaves a persona's group `null` simply has nobody with that persona.
 
 ## 8. Decide the baseline
 
@@ -177,7 +179,7 @@ The baseline in `config/defaults/` is what every workspace gets. Most of it is a
 | Collaboration platforms | `settings.yaml` `collaboration_platforms.allowed` | `ALLOW_TEAMS` | `ALLOW_ALL`, `ALLOW_SLACK`, `ALLOW_TEAMS` or `DENY_ALL` |
 | Dashboard embedding domains | `settings.yaml` `dashboard_embedding.approved_domains` | none | For example your SharePoint domain |
 | Personal access tokens | `settings.yaml` `personal_access_tokens`, `access.yaml` `personas.<persona>.can_create_tokens` | On, 90 days, no persona may create them | Only admins create tokens unless a persona is allowed |
-| Group names | `access.yaml` `groups` | `{bu}_users`, `{bu}_explorer`, ... | Match your Entra naming convention; `{bu}` is the workspace's business unit code |
+| Platform admins group name | `access.yaml` `groups.platform_admins` | `{bu}_platform_admins` | Match your Entra naming convention; `{bu}` is the workspace's business unit code. Persona groups are named per workspace |
 | Required tags | `cost.yaml` `required_tags` | `LOB`, `DEPARTMENT`, `TEAM` | Changing them later affects new workloads only |
 | Budget (usage) policies | `cost.yaml` `budget_policies.enabled` | `true` | Needs an account-level permission for the pipeline (step 6); set `false` if you will not grant it. Data classification needs them |
 | Catalog name and features | `catalog.yaml` `catalog` | `{bu}_citizen_dev`, predictive optimization, data classification and data quality monitoring on | `catalog.storage_root` is needed when the metastore has no storage root (preflight says so) |
@@ -208,7 +210,7 @@ What each setting does is in the comment beside it, and in [config/README.md](..
    It checks the sign-in and admin rights, the metastore, that every group is an account group, the catalog's storage, what still uses legacy access, and placeholders left in the baseline. Fix every `error` before the pull request; read every `warning`.
 5. **Open a pull request** with the folder. The Plan workflow runs preflight again as the pipeline, then plans, and posts the plan, the plan guard's warnings and the AI review as a comment. The first plan creates everything; check that it changes nothing you did not expect.
 6. **Merge.** The Apply workflow waits for approval in `apply-approval` (if it has reviewers), then applies.
-7. **Verify:** the next pull request (or the Monday drift check) shows no changes for the workspace. In the workspace: the persona groups under Settings > Identity and access, the `<BU> Default Warehouse`, the `{bu}_citizen_dev` catalog, and the `<BU> personal schema` and `<BU> team folder` jobs.
+7. **Verify:** the next pull request (or the Monday drift check) shows no changes for the workspace. In the workspace: the persona groups under Settings > Identity and access, the `<BU> Default Warehouse`, the `{bu}_citizen_dev` catalog.
 
 > [!WARNING]
 > Applying the baseline to an existing workspace changes its settings for everyone in it (downloads, tokens, Git folders, legacy access). Read the plan comment's settings changes with the workspace's owners before merging.
@@ -220,7 +222,6 @@ What each setting does is in the comment beside it, and in [config/README.md](..
 | Give someone a persona | Add them to the group in Entra ID; no change here |
 | Change one workspace | Pull request editing `config/workspaces/<name>/`: only that workspace is planned and applied |
 | Change every workspace | Pull request editing `config/defaults/`: every workspace is planned, and applied one at a time, stopping at the first failure |
-| Create a personal schema or a team folder | Run the `<BU> personal schema` or `<BU> team folder` job (admins), or let a service principal run them (`jobs.runners` in `access.yaml`, for example a ticketing system) |
 | A plan is flagged as risky | Review the warning in the plan comment; if intended, a person adds the label `allow-risky-changes` |
 | A `drift` issue opens | Someone changed a setting by hand: update the configuration to match, or re-apply to restore it |
 | Retry a failed apply | Fix the cause, then re-run the latest Apply run (it refuses if `main` has moved on) |

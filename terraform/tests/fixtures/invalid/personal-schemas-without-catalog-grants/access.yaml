@@ -1,4 +1,0 @@
-groups: {explorer: tst-explorers, builder: tst-builders, publisher: tst-publishers,
-  platform_admins: tst-admins}
-manage:
-  catalog_grants: false

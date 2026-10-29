@@ -6,7 +6,7 @@ locals {
   }
 
   # Workspace assignment: platform admins get their role; everyone else is USER.
-  assignments = !var.manage_assignment ? {} : merge(
+  assignments = merge(
     { for g in distinct(concat(local.persona_group_list, var.extra_groups)) : g => ["USER"] },
     { for g in var.platform_admins : g => [var.platform_admin_role] },
   )

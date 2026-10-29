@@ -9,7 +9,7 @@ and checks what Terraform needs but cannot fix itself:
 
   - the identity can sign in, and is a workspace admin;
   - the workspace has a Unity Catalog metastore;
-  - every group in access.yaml exists as an ACCOUNT group (Entra ID, synced to the account):
+  - every group set in access.yaml exists as an ACCOUNT group (Entra ID, synced to the account):
     Unity Catalog grants and usage policies cannot use workspace-local groups;
   - the workspace catalog has somewhere to keep its data (a metastore storage root, or
     catalog.storage_root in catalog.yaml);
@@ -88,12 +88,12 @@ def checks(ws, get):
         metastore, err = get(f"/api/2.1/unity-catalog/metastores/{assignment['metastore_id']}")
         out.append(("ok", f"metastore {(metastore or {}).get('name', assignment['metastore_id'])}"))
 
-    # Groups: in this workspace's access.yaml, or the baseline's pattern.
-    unmanaged = lookup(d, "access.yaml", "manage", "group_assignment") == "false" and \
-        lookup(d, "access.yaml", "manage", "catalog_grants") == "false"
+    # Groups: in this workspace's access.yaml, or the baseline's (platform admins). A
+    # persona without a group is skipped: nobody gets it here.
     for key in GROUP_KEYS:
         name = lookup(d, "access.yaml", "groups", key)
         if not name:
+            out.append(("ok", f"no {key} group: skipped (nobody gets it in this workspace)"))
             continue
         name = name.replace("{bu}", bu).replace("{BU}", bu.upper())
         flt = urllib.parse.quote(f'displayName eq "{name}"')
@@ -106,8 +106,7 @@ def checks(ws, get):
             local, _ = get(f"/api/2.0/preview/scim/v2/Groups?filter={flt}&attributes=displayName")
             what = ("exists only in this workspace (a workspace-local group)" if (local or {}).get("totalResults", 0)
                     else "does not exist in the account")
-            level = "warning" if unmanaged else "error"
-            out.append((level, f"group {name} ({key}) {what}: create it in Entra ID and sync it to the account, "
+            out.append(("error", f"group {name} ({key}) {what}: create it in Entra ID and sync it to the account, "
                                f"or name another group under groups.{key} in access.yaml"))
 
     # The workspace catalog needs storage: the metastore's, or its own storage_root.

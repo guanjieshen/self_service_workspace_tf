@@ -36,10 +36,10 @@ the framework and the next upgrade replaces them.
 
 | File | What it holds |
 | --- | --- |
-| `defaults/access.yaml` | Personas, their groups and rights, folders, who may run the self-service jobs (`jobs.runners`) |
+| `defaults/access.yaml` | Personas and their rights; the platform admins group (each workspace names its persona groups) |
 | `defaults/compute.yaml` | SQL warehouse, shared cluster, cluster policies |
 | `defaults/cost.yaml` | Usage (budget) policies and tags |
-| `defaults/catalog.yaml` | The workspace catalog, personal schemas |
+| `defaults/catalog.yaml` | The workspace catalog and its grants |
 | `defaults/settings.yaml` | Workspace admin and security settings |
 | `defaults/genie-code/` | Genie Code instructions and skills for every workspace |
 | `workspaces/<name>/` | One folder per workspace (`_example/` is the template; create one with `scripts/workspaces.py new`) |

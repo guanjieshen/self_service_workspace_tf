@@ -1,10 +1,9 @@
 # =============================================================================
-# CATALOG: the workspace's one Unity Catalog catalog, and the personal schemas
-# in it.
+# CATALOG: the workspace's one Unity Catalog catalog.
 #
-# Each workspace gets one catalog, bound to it only. It holds the personal schemas
-# users ask for (cd_<name>, created by the personal schema job below, not by
-# Terraform) and any shared schemas listed under schemas.
+# Each workspace gets one catalog, bound to it only. The schemas in it come from the
+# self-service app, not from Terraform: Terraform manages the catalog, its data
+# features and who may use it.
 # A workspace's catalog.yaml can change any key below (same name and shape).
 # =============================================================================
 
@@ -16,8 +15,8 @@ catalog:
   # abfss://catalogs@<storage account>.dfs.core.windows.net/<catalog>
   storage_root: null
   workspace_only: true               # true = only this workspace can use the catalog
-  # Owner of the catalog and of every personal schema: a key of groups in
-  # access.yaml (or a group name). null = leave the owner alone.
+  # Owner of the catalog: a key of groups in access.yaml (or a group name).
+  # null = leave the owner alone.
   owner: platform_admins
 
   # Data features for everything in the catalog. true = on, false = off, null = leave alone.
@@ -30,14 +29,11 @@ catalog:
   # (budget_policies in cost.yaml); without one, turning it on fails with "Usage
   # policy ID must not be empty".
   data_classification: true
-  # Data quality monitoring (anomaly detection): watches each schema's tables for
-  # freshness and completeness problems. Turned on for every shared schema below.
-  data_quality_monitoring: true
 
   # On the whole catalog, for every persona: enough to reach a schema and use what
   # was shared with them, nothing more. USE SCHEMA does not show any data: a table
-  # owner still has to grant SELECT. No CREATE SCHEMA: personal schemas come from
-  # the job, shared ones from this file.
+  # owner still has to grant SELECT. No CREATE SCHEMA: schemas come from the
+  # self-service app.
   persona_privileges:
     - USE_CATALOG
     - USE_SCHEMA
@@ -45,33 +41,7 @@ catalog:
     - ALL_PRIVILEGES
     - MANAGE
 
-  # Shared schemas Terraform creates, each with optional grants. A grant's
-  # principal can be a persona (explorer, builder, publisher), users, or a group name.
-  #   team_data:
-  #     comment: Curated tables for the BU
-  #     grants:
-  #       explorer: [SELECT, READ_VOLUME]
-  #       builder: [SELECT, MODIFY, CREATE_TABLE]
-  schemas: {}
 
 # The workspace's default catalog (where unqualified table names resolve).
 # null = leave it alone. Set it to the catalog's name once the catalog exists.
 default_catalog: null
-
-# ---- Personal schemas ----------------------------------------------------------
-# A job in each workspace (deployed by Terraform) creates one user's schema when an admin
-# or a runner (access.yaml jobs.runners) asks for it: it creates the schema if it does not exist, tags it
-# (cd_managed_by = self_service, cd_user, cd_created, cd_request_id), grants it to the
-# user and gives it to the catalog owner. The default name is the prefix plus the part
-# of the email before the @, with everything but letters and digits replaced by _
-# (jane.doe@contoso.com -> cd_jane_doe). Terraform does not track the schemas.
-# The notebook is terraform/modules/catalog/personal_schema.py.
-personal_schemas:
-  enabled: true
-  prefix: cd_
-  # Granted to the person who asked, on their personal, project or team schema (and to the team's group). MANAGE lets them
-  # grant and revoke access to it themselves (Catalog Explorer > Permissions, or GRANT).
-  # The people they share with also need USE CATALOG (every persona has it).
-  privileges:
-    - ALL_PRIVILEGES
-    - MANAGE

@@ -1,4 +1,4 @@
-groups: {explorer: tst-explorers, builder: tst-builders, publisher: tst-publishers,
+groups: {users: tst_users, explorer: tst-explorers, builder: tst-builders, publisher: tst-publishers,
   platform_admins: tst-admins}
 personas:
   builder: {can_create_tokens: true}
@@ -7,5 +7,3 @@ teams:
   data-eng:
     group: tst-data-eng
     tags: {DEPARTMENT: FINANCE, TEAM: DATA-ENG}
-jobs:
-  runners: ["11111111-2222-3333-4444-555555555555"]   # a ticketing system's service principal

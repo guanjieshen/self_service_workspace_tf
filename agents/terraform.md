@@ -17,7 +17,7 @@ access.tf      persona groups and grants;  chargeback.tf  usage policies and tag
 main.tf        module inputs, then one block per module
         │
         ▼
-modules/  workspace-settings  personas  compute  budget-policies  catalog  folders
+modules/  workspace-settings  personas  compute  budget-policies  catalog
 ```
 
 One state per workspace. `scripts/tf.sh <workspace> plan` runs it (and the plan guard);
@@ -46,27 +46,6 @@ the organization's own `config/defaults/`: an organization changing its baseline
 break the framework's tests. When you change a baseline file, change it in both places
 (the copy keeps the shipped values, for example `required_tags: [LOB, DEPARTMENT, TEAM]`).
 
-## The on-request jobs
-
-`modules/catalog/personal_schema.py` and `modules/folders/team_folder.py` are Databricks
-notebooks rendered with `templatefile`. Fixed settings (prefix, privileges, owner,
-allowed catalogs, folder root) are written into the notebook as `${jsonencode(x)}`,
-never passed as job or task parameters: a run can pass any parameter, so a parameter
-could override them. Job parameters carry only the request (`user`, `schema`,
-`catalog`, `owner_group`, `reason`, `request_id`; `folder`, `requested_by`, `owner_group`, `reason`,
-`request_id`). `reason` is free text: keep it out of every query and filter.
-
-- The jobs and notebooks live in the admin folder (`folders.admin`, `/Admin/self-service`),
-  which only workspace admins can see. Only admins and `jobs.runners` can run the jobs.
-- Each job is tagged so callers can find it: `cd_self_service` (its kind) plus what a
-  caller needs (`cd_catalog`, `cd_prefix`, `cd_root`).
-- **The job checks every request again** and refuses to touch something that exists and
-  is not the requester's. Keep the notebooks short and readable: admins read them.
-- **They are an interface.** Callers outside this repository (a ticketing system, a
-  self-service app) send the parameters and find the jobs by their tags: changing either
-  is a breaking change (say so in `CHANGELOG.md`). `scripts/tests/test_personal_schema.py`
-  and `test_team_folder.py` run the notebooks against stand-ins for the SDK.
-
 ## Provider and Terraform gotchas
 
 - **Never put a module-level `depends_on` on `module.personas`** (or any module with data
@@ -79,9 +58,6 @@ could override them. Job parameters carry only the request (`user`, `schema`,
   iterate keys. `merge(null)` is `{}`. YAML lists and maps arrive as tuples and objects:
   compare with `tolist()` / `tomap()` in tests.
 - **`count` and `for_each` must not depend on apply-time values;** pass a bool or known keys.
-- **Values templated into the job notebooks are Python, not HCL:** `jsonencode(true)` writes
-  `true`, which is not Python. Pass strings (or `jsonencode` a list or map, which reads as
-  Python too) and test the rendered notebook (`scripts/tests/helpers.py`, `render_notebook`).
 - **`coalesce()` fails when every argument is null or empty;** use a conditional
   (`x == null ? "" : x`).
 - **Tests:** `mock_provider` runs cannot see child-module resources from the root (assert
