@@ -11,7 +11,7 @@ personas:
   builder: {can_create_tokens: true}
   publisher: {can_create_tokens: false}
 sql_warehouse: {size: Medium, max_clusters: 4}
-cluster_policy: {max_workers: 8}
+cluster_policy: {max_workers: 8, pipelines: null}
 catalog: {name: tst_citizen_dev, comment: Test catalog}
 default_catalog: tst_citizen_dev
 settings:

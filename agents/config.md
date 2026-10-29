@@ -44,7 +44,7 @@ the framework and the next upgrade replaces them.
 | File | What it holds |
 | --- | --- |
 | `defaults/access.yaml` | Personas and their rights; the platform admins group (each workspace names its persona groups) |
-| `defaults/compute.yaml` | The default SQL warehouse and the classic cluster policy |
+| `defaults/compute.yaml` | The default SQL warehouse and the classic cluster policies |
 | `defaults/cost.yaml` | The chargeback tags and the serverless usage policy |
 | `defaults/catalog.yaml` | The workspace catalog and its grants |
 | `defaults/settings.yaml` | Workspace admin and security settings |

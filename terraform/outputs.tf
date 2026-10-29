@@ -10,8 +10,8 @@ output "default_warehouse_id" {
   value = module.compute.default_warehouse_id
 }
 
-output "cluster_policy_id" {
-  value = module.compute.cluster_policy_id
+output "cluster_policy_ids" {
+  value = module.compute.cluster_policy_ids
 }
 
 output "serverless_policy_ids" {

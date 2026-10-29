@@ -25,8 +25,10 @@ run "compute" {
       min_clusters = 1, max_clusters = 2, auto_stop_minutes = 5, workspace_default = true
     }
     cluster_policy = {
-      name        = "{BU} Classic Compute", runtime = "lts_only", access_modes = ["STANDARD"], node_types = ["Standard_E8_v3", "Standard_E16_v3"],
-      max_workers = 4, max_autotermination_minutes = 60, max_clusters_per_user = 1
+      runtime     = "lts_only", access_modes = ["STANDARD"], node_types = ["Standard_E8_v3", "Standard_E16_v3"], max_workers = 4
+      interactive = { name = "{BU} Classic Interactive", max_clusters_per_user = 1, max_autotermination_minutes = 60 }
+      jobs        = { name = "{BU} Classic Jobs", max_clusters_per_user = 1 }
+      pipelines   = { name = "{BU} Classic Pipelines", max_clusters_per_user = 1 }
     }
     warehouse_acl   = { tst-explorers = "CAN_USE" }
     platform_admins = ["tst-admins"]
@@ -49,25 +51,41 @@ run "compute" {
     error_message = "Personas get their warehouse permission; platform admins Can manage."
   }
   assert {
-    condition     = databricks_cluster_policy.classic.name == "TST Classic Compute" && databricks_cluster_policy.classic.max_clusters_per_user == 1
-    error_message = "One classic cluster policy, named from its input."
+    condition     = sort(keys(databricks_cluster_policy.classic)) == tolist(["interactive", "jobs", "pipelines"]) && databricks_cluster_policy.classic["jobs"].name == "TST Classic Jobs" && databricks_cluster_policy.classic["interactive"].max_clusters_per_user == 1
+    error_message = "One classic cluster policy per kind, named from its input."
   }
   assert {
     condition = (
-      jsondecode(databricks_cluster_policy.classic.definition)["custom_tags.BUSINESS_UNIT"] == { type = "fixed", value = "TST" } &&
-      jsondecode(databricks_cluster_policy.classic.definition)["custom_tags.COST_CATEGORY"] == { type = "fixed", value = "CITIZEN_SELF_SERVICE" }
+      jsondecode(databricks_cluster_policy.classic["interactive"].definition)["cluster_type"] == { type = "fixed", value = "all-purpose" } &&
+      jsondecode(databricks_cluster_policy.classic["jobs"].definition)["cluster_type"] == { type = "fixed", value = "job" } &&
+      jsondecode(databricks_cluster_policy.classic["pipelines"].definition)["cluster_type"] == { type = "fixed", value = "dlt" }
+    )
+    error_message = "Each policy is fixed to its kind of cluster, so an interactive cluster cannot use the jobs policy's allowance."
+  }
+  assert {
+    condition = (
+      contains(keys(jsondecode(databricks_cluster_policy.classic["interactive"].definition)), "autotermination_minutes") && !contains(keys(jsondecode(databricks_cluster_policy.classic["jobs"].definition)), "autotermination_minutes") &&
+      contains(keys(jsondecode(databricks_cluster_policy.classic["jobs"].definition)), "spark_version") &&
+      !contains(keys(jsondecode(databricks_cluster_policy.classic["pipelines"].definition)), "spark_version") && !contains(keys(jsondecode(databricks_cluster_policy.classic["pipelines"].definition)), "autotermination_minutes")
+    )
+    error_message = "Only interactive clusters get an auto-stop rule; pipelines get no runtime rule (pipeline compute rejects both)."
+  }
+  assert {
+    condition = (
+      jsondecode(databricks_cluster_policy.classic["jobs"].definition)["custom_tags.BUSINESS_UNIT"] == { type = "fixed", value = "TST" } &&
+      jsondecode(databricks_cluster_policy.classic["jobs"].definition)["custom_tags.COST_CATEGORY"] == { type = "fixed", value = "CITIZEN_SELF_SERVICE" }
     )
     error_message = "The chargeback tags users do not fill in are fixed on every cluster."
   }
   assert {
     condition = (
-      jsondecode(databricks_cluster_policy.classic.definition)["custom_tags.APP_ID"] == { type = "regex", pattern = "^[A-Z0-9_-]+$", isOptional = false, defaultValue = "TST-APP" } &&
-      jsondecode(databricks_cluster_policy.classic.definition)["custom_tags.TEAM"] == { type = "regex", pattern = "^[A-Z0-9_-]+$", isOptional = false }
+      jsondecode(databricks_cluster_policy.classic["jobs"].definition)["custom_tags.APP_ID"] == { type = "regex", pattern = "^[A-Z0-9_-]+$", isOptional = false, defaultValue = "TST-APP" } &&
+      jsondecode(databricks_cluster_policy.classic["jobs"].definition)["custom_tags.TEAM"] == { type = "regex", pattern = "^[A-Z0-9_-]+$", isOptional = false }
     )
     error_message = "Tags users fill in are required and must match the pattern; one with a chargeback value starts from it."
   }
   assert {
-    condition     = jsondecode(databricks_cluster_policy.classic.definition)["data_security_mode"].defaultValue == "USER_ISOLATION"
+    condition     = jsondecode(databricks_cluster_policy.classic["jobs"].definition)["data_security_mode"].defaultValue == "USER_ISOLATION"
     error_message = "STANDARD access mode means shared (user isolation) clusters."
   }
 }
@@ -84,8 +102,10 @@ run "compute_minimal" {
     user_tag_pattern  = "^[A-Z0-9_-]+$"
     sql_warehouse     = { name = "W", type = "serverless", size = "Small", min_clusters = 1, max_clusters = 1, auto_stop_minutes = 5 }
     cluster_policy = {
-      name        = "{BU} Classic Compute", runtime = "lts_only", access_modes = ["STANDARD"], node_types = ["Standard_E8_v3", "Standard_E16_v3"],
-      max_workers = 4, max_autotermination_minutes = 60, max_clusters_per_user = 1
+      runtime     = "any", access_modes = ["STANDARD"], node_types = ["Standard_E8_v3"], max_workers = 1
+      interactive = { name = "I", max_clusters_per_user = 1, max_autotermination_minutes = 60 }
+      jobs        = null
+      pipelines   = null
     }
     warehouse_acl   = {}
     platform_admins = []
@@ -96,8 +116,8 @@ run "compute_minimal" {
     error_message = "Without workspace_default the Default warehouse setting is left alone; empty grants create no permissions."
   }
   assert {
-    condition     = length([for k in keys(jsondecode(databricks_cluster_policy.classic.definition)) : k if startswith(k, "custom_tags.")]) == 0
-    error_message = "No tags: the policy sets no tag rules."
+    condition     = tolist(keys(databricks_cluster_policy.classic)) == tolist(["interactive"]) && length([for k in keys(jsondecode(databricks_cluster_policy.classic["interactive"].definition)) : k if startswith(k, "custom_tags.") || k == "spark_version"]) == 0
+    error_message = "A kind set to null gets no policy; no tags means no tag rules; runtime any means no runtime rule."
   }
 }
 

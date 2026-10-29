@@ -6,14 +6,14 @@ It applies one standard baseline to the Azure Databricks workspaces of a governe
 
 People edit only YAML:
 
-- `config/defaults/`: the baseline for every workspace (workspace settings, personas, the default SQL warehouse, the classic cluster policy, the chargeback tags and the serverless usage policy, the default Genie Code instructions and skills). **A change here affects every workspace**; each one gets its own plan and review.
+- `config/defaults/`: the baseline for every workspace (workspace settings, personas, the default SQL warehouse, the classic cluster policies, the chargeback tags and the serverless usage policy, the default Genie Code instructions and skills). **A change here affects every workspace**; each one gets its own plan and review.
 - `config/workspaces/<name>.yaml`: one file per workspace. **It may set any top-level key of the baseline**, with the same shape: maps merge key by key, a list or value replaces the default, and `null` means Terraform leaves that setting alone (it keeps its current value). Every such key is a deviation from the standard baseline for that workspace. Besides those, the file holds what only the workspace has:
   - `bu`, `host`: identity, set once. `bu` is part of every warehouse, catalog and policy name, so changing it recreates them.
   - `groups`: the Entra ID group that holds each persona in this workspace (`null` = nobody gets that persona). Nobody is listed by name: people join personas through the groups, in Entra ID.
   - `tags`: the workspace's chargeback tag values (for example its `APP_ID`), on the usage policy, the default warehouse and every classic cluster; `null` drops a tag. A changed tag affects new usage only and splits cost reports.
   - `catalog`, `default_catalog`: changes to the workspace catalog (bound to this workspace only; personas get only USE CATALOG and USE SCHEMA on it). Changing `default_catalog` changes where unqualified table names resolve in every notebook, query and job. Schemas are created by the self-service app, not by Terraform, so they never appear in the plan.
   - `settings`: changes to the baseline's admin settings, for example `disable_legacy_access: null` while a workspace still uses Hive.
-  - `serverless_policy`: the workspace's one serverless usage policy, for every persona (`enabled: false` leaves it alone). `cluster_policy`: limits of the one classic cluster policy. Team and project usage policies, other warehouses and who may use classic compute come from the self-service app, never from this repository.
+  - `serverless_policy`: the workspace's one serverless usage policy, for every persona (`enabled: false` leaves it alone). `cluster_policy`: rules of the three classic cluster policies (interactive, jobs, pipelines; one cluster per person each, so each person's clusters use subnet IP addresses: a higher limit or more workers uses more). Team and project usage policies, other warehouses and who may use classic compute come from the self-service app, never from this repository.
   - `genie_code_instructions` (optional): Genie Code instructions appended after the default ones in `config/defaults/genie-code/instructions.md`. They shape what Genie Code suggests to every user of the workspace; review changes to them like guidance to all users.
 - **Setting a key to `null` means Terraform stops managing it**; the current value stays. **Removing such a line means Terraform starts enforcing the baseline value**, usually for every user of the workspace.
 
@@ -26,7 +26,7 @@ Personas, as defined in the baseline:
 | builder | Workspace and SQL access | Can use | may use | the same |
 | publisher | Workspace and SQL access | Can use | may use | the same |
 
-No persona gets classic compute: the classic cluster policy's users are granted by the self-service app, and Terraform does not manage them.
+No persona gets classic compute: the classic cluster policies' users are granted by the self-service app, and Terraform does not manage them.
 
 Platform admins own the workspace catalog, have all privileges on it, and are the only workspace admins. Only platform admins may create personal access tokens. Data access is granted per schema, never on the whole catalog: a change that grants a data privilege (SELECT, MODIFY, CREATE_SCHEMA, ...) at catalog level to a persona exposes every schema in the catalog, so flag it as High.
 

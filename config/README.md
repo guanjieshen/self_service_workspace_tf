@@ -8,7 +8,7 @@ Everything your organization edits is in this folder (plus `.github/CODEOWNERS`)
 config/
 ├── defaults/                 the baseline: what every workspace gets
 │   ├── access.yaml           the personas and what each gets; the platform admins group
-│   ├── compute.yaml          the default SQL warehouse, the classic cluster policy
+│   ├── compute.yaml          the default SQL warehouse, the classic cluster policies
 │   ├── cost.yaml             the account ID, chargeback tags, usage (budget) policies
 │   ├── catalog.yaml          the workspace catalog and its grants
 │   ├── settings.yaml         admin console settings (security, downloads, tokens, Genie Code, ...)
@@ -81,7 +81,7 @@ The workspace keys (not in the baseline):
 | Let another persona create tokens | `personas.<persona>.can_create_tokens` in `defaults/access.yaml` | the same key in its file |
 | Add, remove or rename a chargeback tag | `tags` (and `classic_user_tags`) in `defaults/cost.yaml` | `tags.<KEY>` in its file (`null` drops it) |
 | Set a workspace's APP_ID (or another tag value) | | `tags.APP_ID` in its file |
-| Change the classic cluster policy's limits | `cluster_policy` in `defaults/compute.yaml` | `cluster_policy.<key>` in its file |
+| Change the classic cluster policies' limits | `cluster_policy` in `defaults/compute.yaml` (shared rules, then `interactive`, `jobs`, `pipelines`) | `cluster_policy.<key>` in its file; `cluster_policy.pipelines: null` for no pipelines policy |
 | A team warehouse, a project usage policy, access to classic compute | | The self-service app, not this repository |
 | Resize the default warehouse | `sql_warehouse` in `defaults/compute.yaml` | `sql_warehouse.size` (etc.) in its file |
 | Change an admin setting | `settings.<key>` in `defaults/settings.yaml` | the same key in its file |

@@ -30,7 +30,7 @@ This is a governed citizen development workspace for the {BU} business unit. Fol
 
 - For SQL, use the `{WAREHOUSE}` SQL warehouse.
 - For notebooks, jobs and pipelines, prefer serverless compute.
-- Classic compute is the exception. When it is needed, create clusters only through the `{BU} Classic Compute` cluster policy (access is requested through the self-service app). It sets the tags and limits, and asks for the tags you fill in.
+- Classic compute is the exception. When it is needed, use the classic cluster policy for the kind of cluster: `{BU} Classic Interactive` for notebooks, `{BU} Classic Jobs` for job clusters, `{BU} Classic Pipelines` for pipelines (access is requested through the self-service app). Each sets the tags and limits, and asks for the tags you fill in; each allows one cluster per person.
 - Avoid the Personal Compute policy for shared or scheduled work: its clusters do not carry the chargeback tags.
 
 ## Cost attribution

@@ -75,7 +75,7 @@ workspace. What keeps that safe:
 **Groups.** One account group per role, named from a pattern in
 `config/defaults/access.yaml` (a workspace can rename one):
 
-| Persona (its group) | Entitlement | Default warehouse | Usage policy | Classic cluster policy | Catalog |
+| Persona (its group) | Entitlement | Default warehouse | Usage policy | Classic cluster policies | Catalog |
 |---|---|---|---|---|---|
 | users (`groups.users`): everyone | Consumer (Databricks One) | | | | |
 | explorer (`groups.explorer`) | SQL access | Can use | User | By request (app) | USE CATALOG, USE SCHEMA |
@@ -88,8 +88,11 @@ workspace. What keeps that safe:
   access (the full workspace). A group gets the highest tier any of its personas has;
   the provider accepts Consumer access only on its own, so the module sets it only then.
 - **Serverless first.** Every persona gets one serverless usage policy. Classic compute is
-  the exception: one generic cluster policy per workspace, whose users the self-service app
-  grants on request. Terraform does not manage who may use it, so the app's grants stay.
+  the exception: three cluster policies per workspace (interactive, jobs, pipelines), one
+  cluster per person each, whose users the self-service app grants on request. Terraform does
+  not manage who may use them, so the app's grants stay. Each person's clusters take IP
+  addresses from the workspace's subnets; policies cap clusters per person, not per
+  workspace, so the number of people approved is what bounds the total.
 - Nobody gets "Allow unrestricted cluster creation". No persona is workspace admin:
   persona groups join the workspace as users; only the platform admins group as admin.
 - Builder and publisher are the same here; what makes a publisher different is handled
@@ -155,7 +158,7 @@ them from the self-service app.
 | A2 | Private endpoints from serverless to the organization's storage? | Not managed |
 | A3 | Budget alerts per BU (account-level)? | Not managed |
 | A4 | Audit log delivery to the SIEM? | Not managed |
-| A5 | Personal Compute account setting: Delegate? (With On, every user can create personal clusters outside the classic cluster policy) | Not managed |
+| A5 | Personal Compute account setting: Delegate? (With On, every user can create personal clusters outside the classic cluster policies) | Not managed |
 | S1 | Compliance security profile (one-way) or enhanced security monitoring? | Neither |
 | S2 | Automatic cluster updates, and the window? | Not managed |
 | S3 | Verbose audit logs (only useful with A4)? | Not managed |
