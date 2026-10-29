@@ -33,29 +33,23 @@ locals {
     ]
   ])
 
-  # ---- This workspace: config/workspaces/<workspace>/*.yaml, one file per part ----
-  # A missing file, or one with only comments, counts as empty (baseline values).
-  ws_dir = "${coalesce(var.workspaces_dir, "${local.project_root}/config/workspaces")}/${var.workspace}"
-  # The keys each workspace file may set: the sections of the baseline file of the same
-  # name (overrides), plus the workspace-only keys in overrides.tf.
-  default_sections = { for i, f in local.defaults_files : trimsuffix(f, ".yaml") => keys(local.defaults_parts[i]) }
-  ws_file_keys = {
-    workspace = ["bu", "lob", "account_id", "host", "id", "label", "auth"]
-    access    = concat(try(local.default_sections.access, []), local.workspace_only_keys.access)
-    compute   = concat(try(local.default_sections.compute, []), local.workspace_only_keys.compute)
-    cost      = try(local.default_sections.cost, [])
-    catalog   = try(local.default_sections.catalog, [])
-    settings  = try(local.default_sections.settings, [])
-  }
-  ws_parts = {
-    for f in keys(local.ws_file_keys) : f => try({ for k, v in yamldecode(file("${local.ws_dir}/${f}.yaml")) : k => v }, {})
-  }
-  workspace       = local.ws_parts.workspace
-  access_file     = local.ws_parts.access
-  team_warehouses = try({ for k, v in local.ws_parts.compute.team_warehouses : k => v }, {})
+  # ---- This workspace: config/workspaces/<workspace>.yaml ----
+  # One file: who the workspace is (workspace_keys), and any baseline key it changes, at the
+  # top level with the same name and shape. A file with only comments counts as empty.
+  ws_file = "${coalesce(var.workspaces_dir, "${local.project_root}/config/workspaces")}/${var.workspace}.yaml"
+  ws_all  = try({ for k, v in yamldecode(file(local.ws_file)) : k => v }, {})
+  # Keys only a workspace has, besides the baseline's own sections.
+  workspace_keys  = ["bu", "host", "id", "label", "auth", "tags", "teams", "team_warehouses", "genie_code_instructions"]
+  workspace       = { for k in ["bu", "host", "id", "label", "auth"] : k => local.ws_all[k] if contains(keys(local.ws_all), k) }
+  teams           = try({ for k, v in local.ws_all.teams : k => v }, {})
+  team_warehouses = try({ for k, v in local.ws_all.team_warehouses : k => v }, {})
+  # Tags with one value for the whole workspace, on every warehouse, cluster and policy.
+  workspace_tags = try({ for k, v in local.ws_all.tags : k => tostring(v) }, {})
+  # Keys that are neither a baseline section nor a workspace key (usually a typo).
+  unknown_keys = [for k in keys(local.ws_all) : k if !contains(concat(local.defaults_sections, local.workspace_keys), k)]
 
-  # Merge rule, per top-level section of config/defaults/ (overrides come from the
-  # workspace's file of the same name, overrides.tf):
+  # Merge rule, per top-level section of config/defaults/ (overrides: the same key in the
+  # workspace's file):
   #   - a key missing from the workspace file keeps the default;
   #   - a key set to null becomes null (Terraform leaves the setting alone);
   #   - a map value is merged key by key; any other value is replaced.
@@ -86,12 +80,13 @@ locals {
     ]
   }
 
-  # The workspace ID: id in workspace.yaml, or the number in an Azure workspace URL (adb-<id>.<n>).
+  # The workspace ID: id in the workspace file, or the number in an Azure workspace URL (adb-<id>.<n>).
   workspace_id = try(tostring(local.workspace.id), regex("adb-([0-9]+)\\.", local.workspace.host)[0], null)
 
-  bu       = lower(local.workspace.bu)
-  bu_upper = upper(local.workspace.bu)
-  lob      = tostring(local.workspace.lob)
+  # The Databricks account: the baseline's (cost.yaml), or the workspace file's.
+  account_id = try(tostring(local.config.account_id), null)
+  bu         = lower(try(local.workspace.bu, ""))
+  bu_upper   = upper(try(local.workspace.bu, ""))
   auth = {
     workspace_profile = try(local.workspace.auth.workspace_profile, null)
     account_profile   = try(local.workspace.auth.account_profile, null)

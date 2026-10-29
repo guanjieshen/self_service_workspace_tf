@@ -1,0 +1,41 @@
+# Test fixture: full (one workspace file).
+bu: tst
+account_id: 00000000-0000-0000-0000-000000000000
+host: https://adb-1111111111111111.1.azuredatabricks.net
+id: 1111111111111111
+tags: {LOB: TESTLOB}
+label: {text: TEST, color: indigo}
+auth: {workspace_profile: null, account_profile: null}
+groups: {users: tst_users, explorer: tst-explorers, builder: tst-builders, publisher: tst-publishers, platform_admins: tst-admins}
+personas:
+  builder: {can_create_tokens: true}
+  publisher: {can_create_tokens: false}
+teams:
+  data-eng:
+    group: tst-data-eng
+    tags: {DEPARTMENT: FINANCE, TEAM: DATA-ENG}
+sql_warehouse: {size: Medium, max_clusters: 4}
+classic_warehouse: {enabled: true}
+shared_cluster: {node_type: Standard_E16_v3}
+team_warehouses:
+  data-eng: {name: TST Data Eng Warehouse, type: serverless, size: X-Small, min_clusters: 1, max_clusters: 1, auto_stop_minutes: 5}
+budget_policies:
+  extra_managers: [users/owner@example.com]
+  policies:
+    platform:
+      name: '{BU}-ADMIN'
+      used_by: platform_admins
+      tags: {DEPARTMENT: IT, TEAM: PLATFORM}
+    builders:
+      name: '{BU}-BUILDERS'
+      used_by: [builder, publisher]
+      tags: {DEPARTMENT: FINANCE, TEAM: BUILD}
+catalog: {name: tst_citizen_dev, comment: Test catalog}
+default_catalog: tst_citizen_dev
+settings:
+  dashboard_embedding:
+    approved_domains: [contoso.sharepoint.com]
+  data_handling: {notebook_export: null}
+genie_code_instructions: |
+  <!-- a comment that must not be deployed -->
+  Use the {BU} warehouse {WAREHOUSE} and the catalog {CATALOG}; tags {WORKSPACE_TAGS}.

@@ -58,7 +58,7 @@ module "compute" {
   source = "./modules/compute"
 
   names              = { BU = local.bu_upper, bu = local.bu }
-  lob                = local.lob
+  workspace_tags     = local.workspace_tags
   sql_warehouse      = local.config.sql_warehouse
   classic_warehouse  = local.config.classic_warehouse
   team_warehouses    = { for k, w in local.team_warehouse_inputs : k => merge(w, { group = lookup(local.group, w.group, w.group) }) }
@@ -83,7 +83,7 @@ module "budget_policies" {
   count     = local.config.budget_policies.enabled ? 1 : 0
   providers = { databricks = databricks.account }
 
-  account_id   = local.workspace.account_id
+  account_id   = local.account_id
   workspace_id = local.workspace_id
   policies     = local.budget_policies
   managers     = local.budget_policy_managers

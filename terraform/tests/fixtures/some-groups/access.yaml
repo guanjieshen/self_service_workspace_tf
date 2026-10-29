@@ -1,3 +1,0 @@
-# Test fixture: only the explorer persona has a group here; the others are skipped.
-groups:
-  explorer: tst-explorers

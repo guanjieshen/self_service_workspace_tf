@@ -8,7 +8,7 @@ inputs:
     description: Set to "false" for jobs that do not reach Azure or Databricks (format and validate).
     default: "true"
   workspace:
-    description: Workspace folder name (config/workspaces/ or dev/workspaces/). When set, DATABRICKS_HOST is set to its host.
+    description: Workspace name (config/workspaces/<name>.yaml). When set, DATABRICKS_HOST is set to its host.
     default: ""
 runs:
   using: composite
@@ -29,12 +29,16 @@ runs:
         fail() { echo "::error::$1"; exit 1; }
         if [[ -n "$WORKSPACE" ]]; then
           # The same YAML reading as the rest of the scripts (quotes, comments), and the
-          # folder name is checked before it is used anywhere.
-          host="$(python3 scripts/workspaces.py field "$WORKSPACE" host)" || fail "$WORKSPACE: no host in its workspace.yaml"
+          # name is checked before it is used anywhere.
+          host="$(python3 scripts/workspaces.py field "$WORKSPACE" host)" || fail "$WORKSPACE: no host in config/workspaces/$WORKSPACE.yaml"
           echo "Workspace: $host"
           echo "DATABRICKS_HOST=$host" >> "$GITHUB_ENV"
         fi
+        # Providers downloaded once per runner, not once per job (long-lived self-hosted runners).
+        cache="${RUNNER_TOOL_CACHE:-$HOME/.cache}/terraform-plugins"
+        mkdir -p "$cache"
         {
+          echo "TF_PLUGIN_CACHE_DIR=$cache"
           echo "ARM_USE_OIDC=true"
           echo "ARM_USE_AZUREAD=true"
           echo "DATABRICKS_AUTH_TYPE=github-oidc-azure"

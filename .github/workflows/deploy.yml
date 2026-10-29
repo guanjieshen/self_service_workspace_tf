@@ -1,0 +1,263 @@
+# Deploys the workspaces in config/workspaces/: one job per workspace a change concerns.
+#   pull request   plan each one, and post its plan to the pull request
+#   merge to main  approve (environment apply-approval), then apply each one; a deleted
+#                  workspace file removes that workspace's Terraform state
+#   Mondays        drift check of every workspace (and Run workflow, by hand)
+#
+# Which workspaces a change concerns (scripts/workspaces.py affected): a workspace's own file
+# means that workspace; config/defaults/ or the Terraform code means all of them; docs and
+# tests mean none. CI signs in with one Entra service principal through GitHub OIDC: as the
+# pull_request subject for plans, as refs/heads/main for the rest (docs/github-actions.md).
+name: Deploy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 13 * * 1"     # drift check, Mondays 13:00 UTC
+  workflow_dispatch:         # drift check, by hand
+
+permissions:
+  contents: read
+  pull-requests: write       # the plan comments
+  issues: write              # the drift issues
+  id-token: write            # GitHub OIDC sign-in (Azure and Databricks)
+
+env:
+  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+jobs:
+  route:
+    name: Find the workspaces
+    runs-on: ${{ fromJSON(vars.CHECKS_RUNNER || '"ubuntu-latest"') }}
+    outputs:
+      workspaces: ${{ steps.route.outputs.workspaces }}
+      removed: ${{ steps.route.outputs.removed }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: route
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          case "$EVENT" in
+            pull_request) result="$(python3 scripts/workspaces.py affected --plan "origin/$BASE_REF" HEAD)" ;;
+            push)         result="$(python3 scripts/workspaces.py affected "$BEFORE" "$SHA")" ;;
+            *)            result="{\"workspaces\": $(python3 scripts/workspaces.py list), \"removed\": []}" ;;
+          esac
+          echo "Workspaces: $result"
+          python3 -c 'import json, sys; r = json.loads(sys.argv[1]); print("workspaces=" + json.dumps(r["workspaces"])); print("removed=" + json.dumps(r["removed"]))' "$result" >> "$GITHUB_OUTPUT"
+
+  plan:
+    name: Plan ${{ matrix.workspace }}
+    needs: route
+    if: github.event_name == 'pull_request' && needs.route.outputs.workspaces != '[]'
+    runs-on: ${{ fromJSON(vars.TERRAFORM_RUNNER || '"ubuntu-latest"') }}   # must reach the workspaces; see docs
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace: ${{ fromJSON(needs.route.outputs.workspaces) }}
+    env:
+      WORKSPACE: ${{ matrix.workspace }}
+    # This job runs the pull request's code with the pipeline's credentials, before the code
+    # is reviewed: see "Who can run code with the workspace credentials" in docs/github-actions.md.
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0     # the AI review compares the configuration with the base branch
+      - uses: ./.github/actions/setup
+        with:
+          workspace: ${{ matrix.workspace }}
+
+      # Read-only checks of what Terraform needs (sign-in, admin rights, account groups,
+      # catalog storage), with a plain message for each problem before the plan starts.
+      - name: Preflight
+        run: python3 scripts/preflight.py "$WORKSPACE" --out ".plans/$WORKSPACE.preflight.txt"
+
+      - name: Plan
+        run: ./scripts/tf.sh "$WORKSPACE" plan -no-color -input=false
+
+      # A table of every resource the plan adds, changes or removes (github.com/dineshba/tf-summarize).
+      - name: Summarize the plan
+        if: always() && hashFiles(format('.plans/{0}.json', matrix.workspace)) != ''
+        env:
+          VERSION: v0.3.20
+          SHA256: 6ab68aad6200586ee983e8112b67aa2050c61dc6e67182dbb287b30c7a97c9a8   # tf-summarize_linux_amd64.tar.gz
+        run: |
+          dir="$RUNNER_TEMP/tf-summarize"; mkdir -p "$dir"
+          curl -fsSL -o "$dir/tf-summarize.tar.gz" "https://github.com/dineshba/tf-summarize/releases/download/$VERSION/tf-summarize_linux_amd64.tar.gz"
+          echo "$SHA256  $dir/tf-summarize.tar.gz" | sha256sum -c -
+          tar -xzf "$dir/tf-summarize.tar.gz" -C "$dir" tf-summarize
+          "$dir/tf-summarize" -md ".plans/$WORKSPACE.json" > ".plans/$WORKSPACE.summary.md"
+
+      # Advice only: on when config/setup.yaml names ai_review_workspace, whose model
+      # reviews every workspace's plan.
+      - name: AI review settings
+        id: ai
+        if: always()
+        run: ./scripts/ai-plan-review.py --settings >> "$GITHUB_OUTPUT"
+      - name: AI impact review
+        if: always() && steps.ai.outputs.enabled == 'true' && hashFiles(format('.plans/{0}.json', matrix.workspace)) != ''
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: ./scripts/ai-plan-review.py "$WORKSPACE" --base "origin/$BASE_REF" > ".plans/$WORKSPACE.ai.md"
+
+      # One comment per workspace, updated on every push; none for a plan without changes.
+      - name: Post the plan to the pull request
+        if: always()
+        uses: actions/github-script@v9
+        env:
+          ENDPOINT: ${{ steps.ai.outputs.label }}
+        with:
+          script: |
+            const { post } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/plan-comment.js`);
+            await post({ github, context }, process.env.WORKSPACE, process.env.ENDPOINT);
+
+      - name: Block risky changes unless approved
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'allow-risky-changes') }}
+        run: |
+          status="$(cat ".plans/$WORKSPACE.guard")"
+          if [[ "$status" != "0" ]]; then
+            echo "::error::Hard-to-undo changes in $WORKSPACE. Review the plan comment; add the label allow-risky-changes if intended."
+            exit 1
+          fi
+
+  approve:
+    name: Approve
+    needs: route
+    if: github.event_name == 'push' && (needs.route.outputs.workspaces != '[]' || needs.route.outputs.removed != '[]')
+    runs-on: ${{ fromJSON(vars.CHECKS_RUNNER || '"ubuntu-latest"') }}
+    # Holds no credentials, so it does not change how the applies sign in. Without required
+    # reviewers on it, merging the pull request is the approval.
+    environment: apply-approval
+    steps:
+      - run: echo "Approved."
+
+  apply:
+    name: Apply ${{ matrix.workspace }}
+    needs: [route, approve]
+    if: needs.route.outputs.workspaces != '[]'
+    runs-on: ${{ fromJSON(vars.TERRAFORM_RUNNER || '"ubuntu-latest"') }}
+    strategy:
+      fail-fast: false        # one workspace failing does not stop the others
+      matrix:
+        workspace: ${{ fromJSON(needs.route.outputs.workspaces) }}
+    # One apply at a time per workspace; the others wait (they share its state).
+    concurrency:
+      group: apply-${{ matrix.workspace }}
+      cancel-in-progress: false
+    env:
+      WORKSPACE: ${{ matrix.workspace }}
+      CONFIRM_ENV: ${{ matrix.workspace }}   # the approval above is the confirmation
+    steps:
+      - uses: actions/checkout@v7
+      # A re-run applies its own commit: refuse once main has moved on, or it would apply
+      # older configuration over what was merged since.
+      - name: Check the commit is still the latest on main
+        if: github.run_attempt > 1
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          latest="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [[ "$latest" != "$SHA" ]]; then
+            echo "::error::main has moved on since this run's commit ($SHA, now $latest); re-run the latest run instead."
+            exit 1
+          fi
+      - uses: ./.github/actions/setup
+        with:
+          workspace: ${{ matrix.workspace }}
+      - name: Apply
+        run: ./scripts/tf.sh "$WORKSPACE" apply -no-color -input=false
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Apply: \`$WORKSPACE\`"
+            [[ -s ".plans/$WORKSPACE.guard.txt" ]] && { echo '```'; cat ".plans/$WORKSPACE.guard.txt"; echo '```'; }
+            echo "<details><summary>Plan that was applied</summary>"; echo; echo '```'
+            tail -c 60000 ".plans/$WORKSPACE.txt" 2>/dev/null || echo "(no plan)"
+            echo '```'; echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # A workspace whose file was deleted: Terraform stops managing it. Its state file goes, so a
+  # workspace added later under the same name starts clean. Nothing in Databricks changes.
+  retire:
+    name: Retire ${{ matrix.workspace }}
+    needs: [route, approve]
+    if: needs.route.outputs.removed != '[]'
+    runs-on: ${{ fromJSON(vars.TERRAFORM_RUNNER || '"ubuntu-latest"') }}   # must reach the state storage
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace: ${{ fromJSON(needs.route.outputs.removed) }}
+    concurrency:
+      group: apply-${{ matrix.workspace }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Remove the workspace's Terraform state
+        env:
+          WORKSPACE: ${{ matrix.workspace }}
+        run: |
+          value() { sed -n "s/^$1 *= *\"\(.*\)\"/\1/p" config/backend.hcl; }
+          az storage blob delete --auth-mode login --account-name "$(value storage_account_name)" \
+            --container-name "$(value container_name)" --name "citizen-dev/$WORKSPACE.tfstate" --delete-snapshots include
+          echo "### Retired: \`$WORKSPACE\` (Terraform state removed; the workspace itself is unchanged)" >> "$GITHUB_STEP_SUMMARY"
+
+  drift:
+    name: Drift ${{ matrix.workspace }}
+    needs: route
+    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && needs.route.outputs.workspaces != '[]'
+    runs-on: ${{ fromJSON(vars.TERRAFORM_RUNNER || '"ubuntu-latest"') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace: ${{ fromJSON(needs.route.outputs.workspaces) }}
+    env:
+      WORKSPACE: ${{ matrix.workspace }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          workspace: ${{ matrix.workspace }}
+      - name: Plan
+        run: ./scripts/tf.sh "$WORKSPACE" plan -no-color -input=false
+      - name: Open, update or close the drift issue
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            const ws = process.env.WORKSPACE;
+            const changes = Number(fs.readFileSync(`.plans/${ws}.changes`, 'utf8').trim());
+            const plan = fs.readFileSync(`.plans/${ws}.txt`, 'utf8');
+            const title = `Drift: ${ws}`;
+            const { owner, repo } = context.repo;
+            const open = (await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', labels: 'drift' }))
+              .find((i) => i.title === title);
+            if (changes === 0) {
+              if (open) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: open.number, body: 'No drift on the latest check. Closing.' });
+                await github.rest.issues.update({ owner, repo, issue_number: open.number, state: 'closed' });
+              }
+              return;
+            }
+            const body = [
+              `The live settings of \`${ws}\` no longer match the configuration (${changes} resource change${changes === 1 ? '' : 's'}).`,
+              'Either update the configuration to match (if the change was intended), or re-apply: re-run the latest Deploy run that applied it, or merge a pull request that touches it.',
+              '<details><summary>Plan</summary>\n\n```\n' + plan.slice(-60000) + '\n```\n</details>',
+              `Run: ${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
+            ].join('\n\n');
+            if (open) await github.rest.issues.createComment({ owner, repo, issue_number: open.number, body });
+            else await github.rest.issues.create({ owner, repo, title, body, labels: ['drift'] });

@@ -33,7 +33,8 @@ Each topic has one home. Update that file; link to it from elsewhere instead of 
 | --- | --- | --- |
 | `README.md` | Everyone, first | What the project does, the Get started steps, the layout, links to the rest |
 | `docs/SETUP.md` | The teams setting it up | Step by step from the zip to the first workspace, by team; day to day; upgrades; troubleshooting |
-| `config/README.md` | Whoever changes the configuration | The merge rule and a task table: which key to set for what |
+| `config/README.md` | Whoever changes the configuration | The workspace file, the merge rule and a task table: which key to set for what |
+| `docs/user-journeys.md` | Everyone | The everyday journeys, step by step: add a workspace, change one or all, give access, retire one |
 | `docs/design.md` | Maintainers, reviewers | Why it works the way it does: config model, access model, catalog, caveats, open questions, what is not built |
 | `docs/github-actions.md` | Maintainers | The workflows: how CI signs in, which workspaces a change plans and applies, runners, the plan comment, who can run code with the credentials |
 | `CHANGELOG.md` | Everyone upgrading | What changed in each release, and what the first plan after an upgrade shows |
@@ -64,9 +65,9 @@ Each topic has one home. Update that file; link to it from elsewhere instead of 
 | A check (a wrong value fails the plan) | `terraform/checks.tf`: the message names the key, the file and what to do | A fixture under `terraform/tests/fixtures/invalid/` and a run in `validation.tftest.hcl` |
 | A setup step or a manual step | `scripts/setup.py` if a command can do it, else the checklist in `docs/SETUP.md`; a `scripts/preflight.py` check if Terraform depends on it | `scripts/tests/test_setup.py`, `test_preflight.py` |
 | A value in `config/setup.yaml` | `docs/SETUP.md` step 1 table; `OPTIONS` in `scripts/setup.py` (or `scripts/ai-plan-review.py` for `ai_review_*`) | `test_setup.py` checks every key in the file is read |
-| A workflow step | `.github/workflows/workspace.yml` (shared by every workspace); `docs/github-actions.md` | A job that signs in must not run in a GitHub Environment (`test_setup.py`) |
-| What a change plans or applies | The template in `scripts/workspaces.py` (`workflow_text`), then `python3 scripts/workspaces.py workflows` to rewrite every workspace's workflow; `docs/github-actions.md` | `scripts/tests/test_workspaces.py` |
-| A new workspace | `python3 scripts/workspaces.py new ...`: its folder and its workflow, in one pull request | `workspaces.py check` fails without the workflow |
+| A workflow step | `.github/workflows/deploy.yml`; `docs/github-actions.md` | A job that signs in must not run in a GitHub Environment (`test_setup.py`) |
+| What a change plans or applies | `EVERYTHING` and `PLAN_ONLY` in `scripts/workspaces.py`; `docs/github-actions.md` | `scripts/tests/test_workspaces.py` (`Affected`) |
+| A new workspace key (in a workspace file, not the baseline) | `workspace_keys` in `terraform/config.tf`; `config/workspaces/_example.yaml`; the workspace keys table in `config/README.md` | A fixture and an assertion |
 | Something removed | Every doc that mentions it (search the repository), and its tests and fixtures | The suite still passes with nothing skipped |
 
 ### Keep it simple
@@ -122,7 +123,7 @@ further step. When you add something:
   pinned baseline in `terraform/tests/defaults/` (never the organization's `config/defaults/`).
 - `python`: `scripts/tests/` (standard library only).
 - `node`: the plan comment (`.github/scripts/tests/`).
-- `scaffold`: `scripts/workspaces.py new` makes a folder that plans.
+- `scaffold`: a workspace file copied from `_example.yaml` and filled in plans.
 
 ## Writing style
 

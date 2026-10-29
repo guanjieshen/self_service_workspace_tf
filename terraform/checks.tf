@@ -15,8 +15,8 @@ resource "terraform_data" "config_checks" {
       error_message = "These keys are not in the baseline (config/defaults/), so they change nothing; check the spelling: ${join(", ", local.unknown_overrides)}."
     }
     precondition {
-      condition     = alltrue(flatten([for f, allowed in local.ws_file_keys : [for k in keys(local.ws_parts[f]) : contains(allowed, k)]]))
-      error_message = "A workspace file has a setting it does not take. Allowed: ${join("; ", [for f, allowed in local.ws_file_keys : "${f}.yaml: ${join(", ", allowed)}"])}."
+      condition     = length(local.unknown_keys) == 0
+      error_message = "The workspace file has keys that are neither a baseline setting nor a workspace key (usually a typo): ${join(", ", local.unknown_keys)}. Workspace keys: ${join(", ", local.workspace_keys)}; baseline settings: ${join(", ", sort(local.defaults_sections))}."
     }
     precondition {
       condition     = local.catalog == null || can(regex("^[a-z0-9_]+$", try(local.catalog.name, "")))
@@ -24,26 +24,15 @@ resource "terraform_data" "config_checks" {
     }
     precondition {
       condition     = local.genie_instructions == null || length(coalesce(local.genie_instructions, "")) <= 19800
-      error_message = "Genie Code instructions are ${length(coalesce(local.genie_instructions, ""))} characters (default plus workspace); Genie Code reads at most 20,000. Shorten genie-code/instructions.md."
-    }
-    precondition {
-      condition     = length(local.genie_skill_clashes) == 0
-      error_message = "These Genie Code skills exist both in config/defaults/genie-code/skills/ and in this workspace's genie-code/skills/: ${join(", ", local.genie_skill_clashes)}. Give the workspace skill another name."
-    }
-    precondition {
-      condition = alltrue([
-        for s in distinct([for f in keys(local.genie_skill_sources) : split("/", f)[0]]) :
-        can(regex("^[a-z0-9]+(-[a-z0-9]+)*$", s)) && try(local.genie_skill_meta[s].name, null) == s && try(trimspace(local.genie_skill_meta[s].description), "") != ""
-      ])
-      error_message = "Each Genie Code skill is a folder named in lowercase letters, digits and hyphens, with a SKILL.md that starts with front matter (between --- lines) giving name: <the folder name> and a description."
+      error_message = "Genie Code instructions are ${length(coalesce(local.genie_instructions, ""))} characters (default plus workspace); Genie Code reads at most 20,000. Shorten genie_code_instructions or config/defaults/genie-code/instructions.md."
     }
     precondition {
       condition     = alltrue([for k, t in local.teams : try(t.warehouse, null) == null])
-      error_message = "Team warehouses have moved: define them under team_warehouses in compute.yaml."
+      error_message = "Team warehouses go under team_warehouses in the workspace file, not inside a team."
     }
     precondition {
       condition     = alltrue([for k in keys(local.team_warehouses) : contains(keys(local.teams), k)])
-      error_message = "compute.yaml team_warehouses: every key must be a team in access.yaml (teams: ${join(", ", keys(local.teams))})."
+      error_message = "team_warehouses: every key must be one of the workspace's teams (teams: ${join(", ", keys(local.teams))})."
     }
     precondition {
       condition = alltrue([
@@ -65,6 +54,10 @@ resource "terraform_data" "config_checks" {
       error_message = "Each block under budget_policies.policies in cost.yaml needs a name and used_by: everyone, platform_admins, or personas (${join(", ", keys(local.persona_groups))})."
     }
     precondition {
+      condition     = !local.config.budget_policies.enabled || can(regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", coalesce(local.account_id, "-")))
+      error_message = "Budget policies are account-level: set account_id in config/defaults/cost.yaml to the Databricks account ID (a GUID), or set budget_policies.enabled: false."
+    }
+    precondition {
       condition     = try(local.catalog.data_classification, null) != true || local.config.budget_policies.enabled == true
       error_message = "catalog.data_classification needs serverless usage policies (budget_policies.enabled in cost.yaml): data classification runs on serverless and fails without one (\"Usage policy ID must not be empty\"). Turn on budget policies, or set catalog.data_classification: null in this workspace's catalog.yaml."
     }
@@ -79,13 +72,13 @@ resource "terraform_data" "config_checks" {
         try(trimspace(local.workspace.label.text), "") != "" &&
         contains(["coral", "lemon", "lime", "turquoise", "indigo", "purple", "pink"], try(local.workspace.label.color, ""))
       )
-      error_message = "workspace.yaml label needs text (not empty) and color: one of coral, lemon, lime, turquoise, indigo, purple, pink."
+      error_message = "The workspace file's label needs text (not empty) and color: one of coral, lemon, lime, turquoise, indigo, purple, pink."
     }
     precondition {
       condition = alltrue([
-        for k in ["bu", "lob", "account_id", "host"] : try(local.workspace[k], null) != null
+        for k in ["bu", "host"] : try(local.workspace[k], null) != null
       ]) && local.workspace_id != null
-      error_message = "workspace.yaml must set bu, lob, account_id and host (an https://adb-<id>.<n>.azuredatabricks.net URL, or set id as well)."
+      error_message = "The workspace file must set bu and host (an https://adb-<id>.<n>.azuredatabricks.net URL, or set id as well)."
     }
     precondition {
       condition     = alltrue([for p, d in merge(local.personas, { users = local.config.users }) : contains(keys(local.access_tiers), try(d.access, ""))])
@@ -98,10 +91,10 @@ resource "terraform_data" "config_checks" {
     precondition {
       condition = alltrue(flatten([
         for k, t in local.teams : [
-          for tag in local.config.required_tags : tag == "LOB" || contains(keys(try(t.tags, {})), tag)
+          for tag in local.config.required_tags : contains(keys(local.workspace_tags), tag) || contains(keys(try(t.tags, {})), tag)
         ]
       ]))
-      error_message = "Every team must set these tags: ${join(", ", [for t in local.config.required_tags : t if t != "LOB"])}."
+      error_message = "Every team must set these required tags (the ones the workspace's tags: does not set): ${join(", ", [for t in local.config.required_tags : t if !contains(keys(local.workspace_tags), t)])}."
     }
     precondition {
       condition     = alltrue([for k in keys(local.teams) : can(regex("^[a-z0-9][a-z0-9-]*$", k))])

@@ -54,17 +54,23 @@ class FakeApi:
 class Preflight(unittest.TestCase):
     def setUp(self):
         self.root = pathlib.Path(tempfile.mkdtemp())
-        self.d = self.root / "fin-dev"
-        self.d.mkdir()
-        (self.d / "workspace.yaml").write_text(
-            "bu: fin\nlob: FIN\naccount_id: acct\nhost: https://adb-123.1.azuredatabricks.net\n")
-        (self.d / "settings.yaml").write_text(GIT)   # the baseline's Git allowlist is a placeholder
-        (self.d / "access.yaml").write_text(GROUPS)  # each workspace names its persona groups
+        # The workspace's file, composed from parts so a test can change one.
+        self.parts = {"workspace": "bu: fin\nhost: https://adb-123.1.azuredatabricks.net\n",
+                      "settings": GIT,       # the baseline's Git allowlist is a placeholder
+                      "access": GROUPS}      # each workspace names its persona groups
+        self.write()
         patches = [mock.patch.object(pf.wsf, "WORKSPACES", self.root), mock.patch.object(pf.wsf, "DEV_WORKSPACES", self.root / "none")]
         for p in patches:
             p.start()
             self.addCleanup(p.stop)
         self.addCleanup(shutil.rmtree, self.root)
+
+    def write(self):
+        (self.root / "fin-dev.yaml").write_text("".join(self.parts.values()))
+
+    def set(self, part, text):
+        self.parts[part] = text
+        self.write()
 
     def run_checks(self, api):
         return pf.checks("fin-dev", api)
@@ -78,7 +84,7 @@ class Preflight(unittest.TestCase):
         self.assertIn("signed in as sp-terraform, a workspace admin", self.levels(results, "ok"))
 
     def test_the_git_allowlist_placeholder_is_flagged(self):
-        (self.d / "settings.yaml").unlink()
+        self.set("settings", "")
         warnings = self.levels(self.run_checks(FakeApi()), "warning")
         self.assertEqual(len(warnings), 1)
         self.assertIn("still has the placeholder https://github.com/<org>/", warnings[0])
@@ -101,12 +107,12 @@ class Preflight(unittest.TestCase):
         self.assertIn("fin_explorer (explorer) does not exist in the account", errors[0] + errors[1])
 
     def test_a_workspace_names_its_own_groups(self):
-        (self.d / "access.yaml").write_text("groups:\n  builder: data-builders   # Entra\n")
+        self.set("access", "groups:\n  builder: data-builders   # Entra\n")
         api = FakeApi(account_groups=(ACCOUNT_GROUPS - {"fin_builder"}) | {"data-builders"})
         self.assertEqual(self.levels(self.run_checks(api), "error"), [])
 
     def test_a_persona_without_a_group_is_skipped(self):
-        (self.d / "access.yaml").write_text("groups:\n  explorer: fin_explorer\n")
+        self.set("access", "groups:\n  explorer: fin_explorer\n")
         results = self.run_checks(FakeApi())
         self.assertEqual(self.levels(results, "error"), [])
         oks = " ".join(self.levels(results, "ok"))
@@ -116,7 +122,7 @@ class Preflight(unittest.TestCase):
 
     def test_catalog_storage(self):
         self.assertIn("the metastore has no storage root", " ".join(self.levels(self.run_checks(FakeApi(storage_root=None)), "error")))
-        (self.d / "catalog.yaml").write_text("catalog:\n  storage_root: abfss://catalogs@acct.dfs.core.windows.net/fin\n")
+        self.set("catalog", "catalog:\n  storage_root: abfss://catalogs@acct.dfs.core.windows.net/fin\n")
         self.assertEqual(self.levels(self.run_checks(FakeApi(storage_root=None)), "error"), [])
 
     def test_an_existing_catalog_needs_no_storage(self):
@@ -133,7 +139,7 @@ class Preflight(unittest.TestCase):
     def test_legacy_checks_skipped_once_disabled_or_left_alone(self):
         api = FakeApi(legacy_disabled=True, hive=["sales"])
         self.assertEqual(self.levels(self.run_checks(api), "warning"), [])
-        (self.d / "settings.yaml").write_text(GIT + "  disable_legacy_access: null\n")
+        self.set("settings", GIT + "  disable_legacy_access: null\n")
         api = FakeApi(hive=["sales"])
         self.run_checks(api)
         self.assertFalse(any("hive_metastore" in p for p in api.paths), "left alone: nothing to check")

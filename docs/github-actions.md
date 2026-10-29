@@ -2,34 +2,32 @@
 
 ## Overview
 
-**One workflow per workspace.** Each workspace folder has its own small workflow,
-`.github/workflows/workspace-<name>.yml`, which only names the workspace and the paths that
-concern it; all the steps are in the shared `.github/workflows/workspace.yml`. `scripts/workspaces.py new`
-writes a new workspace's workflow, and `workspaces.py check` (in **Format and validate**)
-fails if a folder has no workflow, a workflow has no folder, or a workflow differs from the
-template (`workspaces.py workflows` rewrites them all).
+**One deploy workflow, one job per workspace.** `.github/workflows/deploy.yml` first works out
+which workspaces a change concerns (`scripts/workspaces.py affected`), then runs one job for
+each, in parallel on the runners there are, each with its own log and Re-run button.
+`checks.yml` runs the pull request checks.
 
 | Workflow | Runs on | Does |
 | --- | --- | --- |
 | `checks.yml` (**Format and validate**, **Tests**) | Every pull request | Formatting, `terraform validate`, the cross-workspace checks, every test. Required by branch protection |
-| `workspace-<name>.yml`, on a pull request | A change that concerns the workspace (below) | Preflight, plan, and the plan comment: the plan, the plan guard's warnings, an AI review. A plan with hard-to-undo or security-weakening changes fails until someone adds the label `allow-risky-changes` |
-| `workspace-<name>.yml`, on merge to `main` | The same changes, without the review-only ones | The approval step (`apply-approval`), then apply |
-| `workspace-<name>.yml`, every Monday (or Run workflow) | Schedule | Drift check: plans, and opens an issue labelled `drift` if the live settings no longer match; closes it once clean |
+| `deploy.yml`, on a pull request | The workspaces the change concerns (below) | For each: preflight, plan, and a plan comment (the plan, the plan guard's warnings, an AI review) when the plan changes something. A plan with hard-to-undo or security-weakening changes fails until someone adds the label `allow-risky-changes` |
+| `deploy.yml`, on merge to `main` | The same workspaces, without the review-only changes | The approval step (`apply-approval`), then an apply for each. A deleted workspace file: its Terraform state is removed (the workspace is unchanged) |
+| `deploy.yml`, every Monday (or Run workflow) | Every workspace | Drift check: plans each, and opens an issue labelled `drift` for each that no longer matches; closes it once clean |
 
-Which changes concern a workspace:
+Which workspaces a change concerns:
 
 | Change | Planned (pull request) | Applied (merge) |
 | --- | --- | --- |
-| `config/workspaces/<name>/` | That workspace | That workspace |
+| `config/workspaces/<name>.yaml` | That workspace | That workspace (a deleted file: its state is removed) |
 | `config/defaults/`, `terraform/` (except `terraform/tests/`), `scripts/tf.sh`, `scripts/plan-guard.py` | Every workspace | Every workspace |
-| What the plan comment shows: `scripts/preflight.py`, `scripts/ai-plan-review.py`, `.github/ai/`, `config/setup.yaml`, the workflows | Every workspace | None |
+| What the plan comment shows: `scripts/preflight.py`, `scripts/ai-plan-review.py`, `.github/ai/`, `config/setup.yaml`, `deploy.yml` and what it uses | Every workspace | None |
 | Anything else: tests, docs, other scripts | None | None |
 
-A change to every workspace applies them all at the same time, each in its own workflow:
-one that fails does not stop the others. Fix it in a pull request; or, if a missing
-prerequisite was fixed, re-run that workspace's latest run (it refuses if `main` has moved
-on). Each workspace's applies run one at a time. Tests and docs never re-apply a workspace:
-re-applying is not free (a newer runtime, for example, restarts the shared cluster).
+A change to every workspace applies them all, each in its own job: one that fails does not
+stop the others. Fix it in a pull request; or, if a missing prerequisite was fixed, re-run
+that job (it refuses if `main` has moved on). Each workspace's applies run one at a time.
+Tests and docs never re-apply a workspace: re-applying is not free (a newer runtime, for
+example, restarts the shared cluster).
 
 ## How CI signs in
 
@@ -44,7 +42,7 @@ One Entra service principal, for every workspace and for the Terraform state, th
 
 No job that signs in runs in a GitHub Environment, because that would change its subject to `environment:<name>`. The one environment, `apply-approval`, is the approval step before each workspace's apply: it holds nothing and signs in to nothing.
 
-Onboarding a workspace therefore needs nothing in GitHub settings or Entra: make the service principal workspace admin there (by hand, [SETUP.md](SETUP.md) step 6), add the folder and its workflow (`workspaces.py new` writes both), merge.
+Onboarding a workspace therefore needs nothing in GitHub settings or Entra: make the service principal workspace admin there (by hand, [SETUP.md](SETUP.md) step 6), add its file, merge.
 
 ## Setup
 
@@ -72,7 +70,7 @@ In that case, run these jobs on a runner inside an allowed network and set the r
 | Self-hosted runner in the Azure network (VM or container) | Register it to the repository or organization with a label such as `citizen-dev`, then set `TERRAFORM_RUNNER` to `"citizen-dev"`. Needs `bash`, `python3`, `git` and outbound access to GitHub and the workspace. |
 | GitHub-hosted runners with Azure private networking | GitHub Team or Enterprise; runners join an Azure VNet you provide. Set `TERRAFORM_RUNNER` to the runner group, for example `{"group": "my-runner-group", "labels": "linux-4core"}`. |
 
-Only the jobs that reach Databricks use `TERRAFORM_RUNNER`; format checks and workspace detection stay on `ubuntu-latest`.
+The jobs that reach Databricks or the state use `TERRAFORM_RUNNER`. The checks and the routing step use `CHECKS_RUNNER` (default `ubuntu-latest`): set it too if your organization has no GitHub-hosted runners.
 
 ## The plan comment
 
@@ -87,7 +85,7 @@ Each affected workspace gets one comment on the pull request, updated on every p
 | Changed resources | [tf-summarize](https://github.com/dineshba/tf-summarize) | Table of every resource added, changed or removed (collapsed) |
 | Full Terraform plan | Plan | Collapsed; the start is cut if the comment would exceed GitHub's size limit |
 
-The AI review is one call to a model in **one review workspace** (`ai_review_workspace` in `config/setup.yaml`, a workspace folder this repository manages), whatever workspace the plan is for, signed in as the pipeline. Only that workspace needs the model: `ai_review_model`, by default the Unity Gateway model service `system.ai.claude-sonnet-5-5` (the pipeline identity needs EXECUTE on it; account users have it on `system.ai` by default). It sees the pull request's configuration diff, the planned changes and the plan guard output, nothing else, and takes seconds. The instructions it follows are `.github/ai/plan-review-prompt.md`.
+The AI review is one call to a model in **one review workspace** (`ai_review_workspace` in `config/setup.yaml`, a workspace this repository manages), whatever workspace the plan is for, signed in as the pipeline. Only that workspace needs the model: `ai_review_model`, by default the Unity Gateway model service `system.ai.claude-sonnet-5-5` (the pipeline identity needs EXECUTE on it; account users have it on `system.ai` by default). It sees the pull request's configuration diff, the planned changes and the plan guard output, nothing else, and takes seconds. The instructions it follows are `.github/ai/plan-review-prompt.md`.
 
 The review is advice only: it never fails the check, and if the model is unavailable the section is left out. With Enforce Unity Gateway on, the `databricks-` serving endpoints are switched off, so use a `system.ai` model service. A change to `config/setup.yaml` or the prompt re-plans every workspace on its pull request, so the comment shows the new review.
 
@@ -110,4 +108,4 @@ Required reviewers on environments, branch protection and rulesets need GitHub T
 > A local plan run by a different identity from the one that created a resource can show its permissions as changing: the creator's owner entry. Judge permissions drift from CI plans and the drift check, which run as the pipeline identity.
 
 > [!TIP]
-> Local runs (`./scripts/tf.sh`) and CI runs use the same script. In CI it ignores the CLI profiles in `workspace.yaml`, never prompts, and requires `config/backend.hcl`.
+> Local runs (`./scripts/tf.sh`) and CI runs use the same script. In CI it ignores the CLI profiles in the workspace's file (`auth:`), never prompts, and requires `config/backend.hcl`.

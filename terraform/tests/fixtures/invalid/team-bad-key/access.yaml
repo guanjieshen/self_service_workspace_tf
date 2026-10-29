@@ -1,5 +1,0 @@
-groups: {explorer: tst-explorers}
-teams:
-  Data_Eng:
-    group: tst-data-eng
-    tags: {DEPARTMENT: X, TEAM: Y}

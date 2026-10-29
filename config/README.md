@@ -1,34 +1,51 @@
 # Configuration
 
-Everything your organization edits is in this folder (plus `.github/CODEOWNERS`). An upgrade of the framework never changes these files ([docs/SETUP.md](../docs/SETUP.md), "Upgrade to a new release"); the exceptions are this README and `workspaces/_example/`, which come with the framework.
+Everything your organization edits is in this folder (plus `.github/CODEOWNERS`). An upgrade of the framework never changes these files ([docs/SETUP.md](../docs/SETUP.md), "Upgrade to a new release"); the exceptions are this README and `workspaces/_example.yaml`, which come with the framework.
 
-**People are not in this folder.** Everything is granted to groups (each workspace names its own in `access.yaml`); who is in a group is managed in Entra ID, for example through access packages or a ticketing system. Giving someone a persona never needs a change here.
+**People are not in this folder.** Everything is granted to groups (each workspace names its own); who is in a group is managed in Entra ID, for example through access packages or a ticketing system. Giving someone a persona never needs a change here.
 
 ```
 config/
 ├── defaults/                 the baseline: what every workspace gets
-│   ├── access.yaml           the groups, the personas and what each gets, folders
+│   ├── access.yaml           the personas and what each gets; the platform admins group
 │   ├── compute.yaml          SQL warehouses, shared cluster, the cluster policy
-│   ├── cost.yaml             chargeback tags, usage (budget) policies
+│   ├── cost.yaml             the account ID, chargeback tags, usage (budget) policies
 │   ├── catalog.yaml          the workspace catalog and its grants
 │   ├── settings.yaml         admin console settings (security, downloads, tokens, Genie Code, ...)
-│   └── genie-code/           default Genie Code instructions and skills
-├── workspaces/<name>/        one folder per workspace
-│   ├── workspace.yaml        which workspace (set once)
-│   ├── access.yaml           teams                    + changes to defaults/access.yaml
-│   ├── compute.yaml          team warehouses          + changes to defaults/compute.yaml
-│   ├── cost.yaml, catalog.yaml, settings.yaml   (optional) changes to the defaults file of the same name
-│   └── genie-code/           (optional) this workspace's Genie Code instructions and skills
+│   └── genie-code/           Genie Code instructions and skills, for every workspace
+├── workspaces/               one file per workspace: the list of workspaces CI deploys
+│   ├── _example.yaml         the template to copy
+│   └── <name>.yaml           a workspace: bu, host, its groups, and any change to the baseline
 ├── setup.yaml                the setup values (docs/SETUP.md, step 1), and the AI review's workspace
-└── backend.hcl               where Terraform state is kept
+└── backend.hcl               where Terraform state is kept (written by scripts/setup.py state)
 ```
 
-## The rule: same file, same keys
+## A workspace is one file
 
-**A workspace changes a default by setting the same key, in the file with the same name.** Any key in `defaults/<file>.yaml` can be set in `workspaces/<name>/<file>.yaml`, with the same name and shape, and the workspace's value wins for that workspace:
+`workspaces/<name>.yaml` says who the workspace is and how it differs from the baseline. Copy [`workspaces/_example.yaml`](workspaces/_example.yaml) and fill it in:
 
 ```yaml
-# defaults/settings.yaml                 # workspaces/fin-dev/settings.yaml
+# workspaces/hr-citizen-dev.yaml
+bu: hr                     # business unit code: used in names ({bu}_citizen_dev, <BU> Default Warehouse, ...)
+host: https://adb-6543210987654321.3.azuredatabricks.net
+groups:                    # the Entra ID group that holds each persona; null = nobody
+  users: hr-cd-users
+  explorer: hr-cd-explorers
+  builder: hr-cd-builders
+  publisher: null
+
+settings:                  # a change to the baseline, for this workspace only
+  disable_legacy_access: null   # not ready for Unity Catalog only yet
+```
+
+`<name>` (the file name) is the workspace's name in this repository: in its workflow jobs, its plan comment and its state file. Adding a file adds a workspace; deleting it stops managing that workspace (nothing in it changes).
+
+## The rule: the same key as the baseline
+
+**A workspace changes a default by setting the same top-level key, with the same shape.** Every key in `defaults/` is defined in exactly one of its files, so the workspace file does not need to know which:
+
+```yaml
+# defaults/settings.yaml                 # workspaces/fin-dev.yaml
 settings:                                settings:
   data_handling:                           data_handling:
     results_download: true                   results_download: false   # this workspace only
@@ -38,47 +55,54 @@ settings:                                settings:
 - **Maps merge key by key.** Above, `fin-dev` turns off results download and keeps the baseline `notebook_export: true`.
 - **A list or a single value replaces the default.**
 - **`null` means Terraform leaves the setting alone.** The workspace keeps its current value. If Terraform managed the setting before, it stops managing it without changing it (`tf.sh` removes it from the state, a "release"): it is never reset.
-- **A key the baseline does not have fails the plan**, with its name, so a typo cannot silently do nothing.
+- **A key that is neither in the baseline nor a workspace key fails the plan**, with its name, so a typo cannot silently do nothing.
 - **A key a workspace does not set keeps the baseline value**, so a change in `defaults/` reaches every workspace that has not changed that key.
 
-A few keys exist only in a workspace's files, because they say who and what is in that workspace:
+The workspace keys (not in the baseline):
 
-| File | Workspace-only keys |
+| Key | |
 | --- | --- |
-| `workspace.yaml` | `bu`, `lob`, `account_id`, `host` (the workspace ID is read from it), `ci`, `label`, `auth` |
-| `access.yaml` | `teams` (each with a group and tags: a folder, a usage policy) |
-| `compute.yaml` | `team_warehouses` (each defined in full; the key must be a team in `access.yaml`) |
-
-Start a new workspace from [`workspaces/_example/`](workspaces/_example/) with `scripts/workspaces.py new`. A missing file, or one with only comments, means the baseline.
+| `bu` | Required. The business unit code, used in every name |
+| `host` | Required. The workspace URL; the workspace ID is read from it (or set `id`) |
+| `groups` | The group for each persona (a baseline key: the platform admins group comes from the baseline) |
+| `tags` | Tags with one value for the whole workspace, on every warehouse, cluster and policy. A required tag set here is not asked of each team |
+| `teams` | Each team: a group and tags (allowed values on the cluster policies) |
+| `team_warehouses` | A team's own warehouse, defined in full; the key must be one of the teams |
+| `genie_code_instructions` | Genie Code instructions for this workspace (Markdown), after the baseline's |
+| `label` | A label and color next to the workspace name in the top bar |
+| `account_id`, `auth`, `id` | Rarely: another Databricks account than the baseline's; CLI profiles for local runs; the workspace ID when the host does not show it |
 
 ## Common tasks
 
 | Task | Every workspace | One workspace |
 | --- | --- | --- |
+| Add a workspace | | Copy `workspaces/_example.yaml` to `workspaces/<name>.yaml` and fill in `bu`, `host`, `groups` |
+| Stop managing a workspace | | Delete its file (its Terraform state goes; the workspace is unchanged) |
 | Give someone a persona | | Add them to the workspace's group for it in Entra ID; no change here |
-| Use differently named groups | `groups` in `defaults/access.yaml` | `groups.<persona>` in its `access.yaml` |
-| Change what a persona can do | `personas` in `defaults/access.yaml` | `personas.<persona>.<key>` in its `access.yaml` |
-| Let another persona create tokens | `personas.<persona>.can_create_tokens` in `defaults/access.yaml` | the same key in its `access.yaml` |
-| Add a team (its tags allowed on cluster policies) | | `teams` in its `access.yaml` |
-| Give a team its own warehouse | | `team_warehouses` in its `compute.yaml` |
-| Resize the default warehouse | `sql_warehouse` in `defaults/compute.yaml` | `sql_warehouse.size` (etc.) in its `compute.yaml` |
-| Change an admin setting | `settings.<key>` in `defaults/settings.yaml` | the same key in its `settings.yaml` |
-| Not ready to switch off legacy access and DBFS | | `settings.disable_legacy_access: null` and `disable_dbfs_root_and_mounts: null` in its `settings.yaml` |
+| Change which group holds a persona | | `groups.<persona>` in its file |
+| Change what a persona can do | `personas` in `defaults/access.yaml` | `personas.<persona>.<key>` in its file |
+| Let another persona create tokens | `personas.<persona>.can_create_tokens` in `defaults/access.yaml` | the same key in its file |
+| Add a team (its tags allowed on cluster policies) | | `teams` in its file |
+| Give a team its own warehouse | | `team_warehouses` in its file |
+| Tag everything in a workspace | | `tags` in its file |
+| Resize the default warehouse | `sql_warehouse` in `defaults/compute.yaml` | `sql_warehouse.size` (etc.) in its file |
+| Change an admin setting | `settings.<key>` in `defaults/settings.yaml` | the same key in its file |
+| Not ready to switch off legacy access and DBFS | | `settings.disable_legacy_access: null` and `disable_dbfs_root_and_mounts: null` in its file |
 | Leave a setting alone (something else manages it) | the key set to `null` in `defaults/` | the key set to `null` in its file |
-| Leave budget policies alone | `budget_policies.enabled: false` in `defaults/cost.yaml` | the same in its `cost.yaml` |
-| Change Genie Code instructions | `defaults/genie-code/instructions.md` | its `genie-code/instructions.md` (appended after the default) |
-| Add a Genie Code skill | a folder in `defaults/genie-code/skills/` | a folder in its `genie-code/skills/` |
-| Leave Genie Code alone (managed elsewhere) | `settings.genie_code` in `defaults/settings.yaml` | `settings.genie_code: null` in its `settings.yaml` |
-| Show a label next to the workspace name | | `label` in its `workspace.yaml` |
+| Leave budget policies alone | `budget_policies.enabled: false` in `defaults/cost.yaml` | the same in its file |
+| Change Genie Code instructions | `defaults/genie-code/instructions.md` | `genie_code_instructions` in its file (appended after the default) |
+| Add a Genie Code skill | a folder in `defaults/genie-code/skills/` | (every workspace gets the baseline's skills) |
+| Leave Genie Code alone (managed elsewhere) | `settings.genie_code` in `defaults/settings.yaml` | `settings.genie_code: null` in its file |
+| Show a label next to the workspace name | | `label` in its file |
 
-After an edit: open a pull request. Its plan comment shows what changes in each workspace. Locally: `./scripts/tf.sh <name> plan`, or `./scripts/tf.sh all plan` after changing `defaults/`.
+After an edit: open a pull request. Its plan comments show what changes in each workspace it concerns. Locally: `./scripts/tf.sh <name> plan`, or `./scripts/tf.sh all plan` after changing `defaults/`. More examples: [docs/user-journeys.md](../docs/user-journeys.md).
 
 ## How changes are reviewed
 
 Any default can be changed for one workspace, so differences from the baseline are caught in the pull request rather than forbidden by the code:
 
-- **Plan guard** (`scripts/tf.sh`, and the plan check on every pull request) fails the check when a plan deletes or replaces something people depend on (folders, warehouses, clusters, policies, budget policies, permissions, grants, catalogs), or weakens security: a security setting turned off, deleted or loosened, a catalog opened to every workspace, a grant to everyone, more groups allowed to create tokens. A person must add the label `allow-risky-changes`.
-- **The AI review** in the plan comment calls out every workspace file that changes a baseline value, with the old and new value, and flags security-relevant ones first.
+- **Plan guard** (`scripts/tf.sh`, and the plan check on every pull request) fails the check when a plan deletes or replaces something people depend on (warehouses, clusters, policies, budget policies, permissions, grants, catalogs), or weakens security: a security setting turned off, deleted or loosened, a catalog opened to every workspace, a grant to everyone, more groups allowed to create tokens. A person must add the label `allow-risky-changes`.
+- **The AI review** in the plan comment calls out every value in a workspace file that differs from the baseline, with the old and new value, and flags security-relevant ones first.
 - **Code owners** (`.github/CODEOWNERS`) decide who must approve which files: the platform team for `defaults/` and everything outside `config/`, security for `defaults/settings.yaml`.
 
 Put the reason for a difference in a comment next to it: the reviewer sees it in the diff.
@@ -89,8 +113,8 @@ Put the reason for a difference in a comment next to it: the reviewer sees it in
 | --- | --- |
 | `null` | Terraform leaves the setting alone. |
 | `{BU}` / `{bu}` | The workspace's business unit code, upper / lower case. |
-| `{KEY}` | A team or project key, upper case. |
 | `{PERSONA}` | A persona name, such as Builder. |
+| `{TAGS}`, `{WORKSPACE_TAGS}` (Genie Code text) | The required tags; the tags the workspace sets for everything in it. |
 | `CAN_USE`, `CAN_RESTART`, ... | Databricks permission levels, as shown in the workspace UI. |
 | `ONE-WAY` in a comment | Cannot be undone once applied. |
 | "Decide at onboarding" | Switching it later on a busy workspace is disruptive; decide it before the first apply. |

@@ -20,8 +20,8 @@ run "names_and_tags" {
   command = plan
 
   assert {
-    condition     = local.bu == "tst" && local.bu_upper == "TST" && local.lob == "TESTLOB"
-    error_message = "bu and lob come from workspace.yaml."
+    condition     = local.bu == "tst" && local.bu_upper == "TST" && local.workspace_tags == { LOB = "TESTLOB" }
+    error_message = "bu and the workspace's tags come from its file."
   }
   assert {
     condition     = local.account_host == "https://accounts.azuredatabricks.net"
@@ -196,7 +196,7 @@ run "genie_code_defaults" {
     error_message = "Placeholders in skills are filled ({WAREHOUSE} = the default warehouse's name)."
   }
   assert {
-    condition     = local.genie_skill_meta["build-tagged-assets"].name == "build-tagged-assets"
-    error_message = "The skill's front matter is read."
+    condition     = strcontains(base64decode(local.genie_skills["build-tagged-assets/SKILL.md"]), "`LOB`, `DEPARTMENT`, `TEAM`")
+    error_message = "{TAGS} in a skill is the required tags."
   }
 }

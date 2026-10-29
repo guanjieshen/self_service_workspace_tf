@@ -2,8 +2,7 @@
 
 locals {
   # ---- Budget policies ----
-  bp       = local.config.budget_policies
-  lob_tags = { LOB = local.lob }
+  bp = local.config.budget_policies
   # The groups behind each value of used_by: everyone, platform_admins, or a persona.
   policy_audiences = merge(
     { everyone = distinct(flatten(values(local.persona_groups))), platform_admins = local.platform_admins },
@@ -16,7 +15,7 @@ locals {
   budget_policies = {
     for k, p in try(local.bp.policies, {}) : k => {
       name   = replace(replace(tostring(p.name), "{BU}", local.bu_upper), "{bu}", local.bu)
-      tags   = merge(local.lob_tags, try(p.tags, {}))
+      tags   = merge(local.workspace_tags, try(p.tags, {}))
       groups = distinct(flatten([for u in local.policy_used_by[k] : try(local.policy_audiences[u], [])]))
     } if p != null
   }
@@ -25,12 +24,12 @@ locals {
     try(tolist(local.bp.extra_managers), []),
   ))
 
-  # Tag values allowed for each non-LOB required tag on cluster policies.
+  # Tag values allowed on cluster policies, for each required tag the workspace does not set itself.
   shared_tag_values = merge(try(local.config.sql_warehouse.tags, {}), try(local.config.classic_warehouse.tags, {}), try(local.config.shared_cluster.tags, {}))
   allowed_tag_values = {
     for tag in local.config.required_tags : tag => distinct(compact(concat(
       [try(tostring(local.shared_tag_values[tag]), "")],
       [for t in values(local.teams) : try(tostring(t.tags[tag]), "")],
-    ))) if tag != "LOB"
+    ))) if !contains(keys(local.workspace_tags), tag)
   }
 }

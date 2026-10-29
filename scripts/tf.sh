@@ -3,8 +3,8 @@
 #
 #   ./scripts/tf.sh <workspace|all> <validate|plan|apply|destroy|output> [extra terraform args]
 #
-# <workspace> is a folder name in config/workspaces/ (or dev/workspaces/, the workspaces
-# that test the framework itself).
+# <workspace> is a file name, without .yaml, in config/workspaces/ (or dev/workspaces/, the
+# workspaces that test the framework itself).
 #
 # Examples:
 #   ./scripts/tf.sh fin-citizen-dev plan
@@ -30,7 +30,7 @@ workspace="$1"; cmd="$2"; shift 2
 ws_roots=("$root/config/workspaces" "$root/dev/workspaces")
 list_workspaces() {
   for r in "${ws_roots[@]}"; do
-    for d in "$r"/*/workspace.yaml; do [[ -f "$d" ]] || continue; d="${d%/workspace.yaml}"; d="${d##*/}"; [[ "$d" == _* ]] || echo "$d"; done
+    for f in "$r"/*.yaml; do [[ -f "$f" ]] || continue; f="${f##*/}"; f="${f%.yaml}"; [[ "$f" == _* ]] || echo "$f"; done
   done | sort
 }
 
@@ -46,12 +46,12 @@ fi
 
 ws_root=""
 for r in "${ws_roots[@]}"; do
-  [[ -f "$r/$workspace/workspace.yaml" ]] || continue
+  [[ -f "$r/$workspace.yaml" ]] || continue
   [[ -z "$ws_root" ]] || { echo "$workspace is in both config/workspaces/ and dev/workspaces/: keep one."; exit 1; }
   ws_root="$r"
 done
 [[ -n "$ws_root" ]] ||
-  { echo "No workspace folder $workspace (config/workspaces/$workspace/workspace.yaml). Available: $(list_workspaces | tr '\n' ' ')"; exit 1; }
+  { echo "No workspace file config/workspaces/$workspace.yaml. Available: $(list_workspaces | tr '\n' ' ')"; exit 1; }
 
 # Changes reach a workspace only through a merged pull request and its workflow.
 # Outside GitHub Actions, apply and destroy refuse unless ALLOW_LOCAL_APPLY=1 (break glass:

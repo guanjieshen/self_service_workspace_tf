@@ -60,7 +60,7 @@ pipeline_client_id: null
 | `github_repo` | The repository that runs the pipeline, `<org>/<repo>`: Entra lets only its pull requests and `main` branch sign in, and step 5 configures it. Default: this clone's GitHub origin (steps 4 and 5 print which one they use). Set it only to run setup from a copy without that origin | GitHub admin | 4, 5 |
 | `pipeline_name` | Display name of the service principal CI signs in as. Default `sp-citizen-dev-terraform` | Entra admin | 4, 6 |
 | `apply_approvers` | `<org>/<team>` that must approve each apply in GitHub. Default: none, merging approves | Platform team | 5 |
-| `ai_review_workspace`, `ai_review_model` | The workspace folder whose model reviews every plan, and the model. Default: no AI review; the model `system.ai.claude-sonnet-5-5` | Platform team | 9 (after the workspace is onboarded) |
+| `ai_review_workspace`, `ai_review_model` | The workspace whose model reviews every plan, and the model. Default: no AI review; the model `system.ai.claude-sonnet-5-5` | Platform team | 9 (after the workspace is onboarded) |
 | `pipeline_client_id` | The service principal's client ID: step 4 creates it and writes it here | | 5, 6 (by hand) |
 
 Two more things to know before you start; they live in their own files, not here:
@@ -68,8 +68,9 @@ Two more things to know before you start; they live in their own files, not here
 | What | Example | Who | Where it goes |
 | --- | --- | --- | --- |
 | The network path to the workspaces | Public, IP access list or Private Link | Cloud team | Step 5: a runner, if not public |
-| For each workspace: name, business unit code, LOB, URL, and the Databricks account ID | `fin-citizen-dev`, `fin`, `FIN`, `https://adb-....azuredatabricks.net` | Platform team | Step 9: `workspaces.py new` |
-| For each workspace: its persona groups; for each business unit: `{bu}_platform_admins` | `fin_platform_admins`, `fin-cd-explorers`, ... | Identity team | Step 7; persona groups in each workspace's `access.yaml` |
+| For each workspace: name, business unit code, URL | `fin-citizen-dev`, `fin`, `https://adb-....azuredatabricks.net` | Platform team | Step 9: its file |
+| The Databricks account ID | `00000000-...` | Databricks account admin | Step 8: `account_id` in `config/defaults/cost.yaml` |
+| For each workspace: its persona groups; for each business unit: `{bu}_platform_admins` | `fin_platform_admins`, `fin-cd-explorers`, ... | Identity team | Step 7; persona groups in each workspace's file |
 
 ## 2. Put the repository in your GitHub
 
@@ -149,8 +150,8 @@ Then, if needed:
 1. **Add the service principal to the account:** User management > Service principals > Add service principal > **Microsoft Entra ID managed**, with the application ID `pipeline_client_id` and the name `pipeline_name` (default `sp-citizen-dev-terraform`).
 2. **Make it workspace admin** of each workspace this repository manages: Workspaces > the workspace > Permissions > Add permissions > the service principal, **Admin**.
 3. **Let it create budget policies** (serverless usage policies), in the account console. If you will not grant this, set `budget_policies.enabled: false` in `config/defaults/cost.yaml` instead (and `catalog.data_classification: null`, which needs them).
-4. **Note the account ID** (account console, top right): `workspaces.py new --account-id` writes it into each workspace's `workspace.yaml` (step 9), because budget policies belong to the account.
-5. Check that each workspace's metastore can hold the workspace catalog: either the metastore has a storage root, or the workspace's `catalog.yaml` sets `catalog.storage_root` to an external location (the Unity Catalog team creates the storage credential and external location). Preflight checks this.
+4. **Note the account ID** (account console, top right) for `account_id` in `config/defaults/cost.yaml` (step 8): budget policies belong to the account.
+5. Check that each workspace's metastore can hold the workspace catalog: either the metastore has a storage root, or the workspace's file sets `catalog.storage_root` to an external location (the Unity Catalog team creates the storage credential and external location). Preflight checks this.
 
 The service principal is never account admin: it needs workspace admin in the workspaces it manages, plus the budget policy permission. `scripts/preflight.py` (step 9) confirms items 2 and 5 for each workspace.
 
@@ -163,7 +164,7 @@ Create Entra ID groups and sync them to the Databricks account (automatic identi
 | Group | Named | Gets |
 | --- | --- | --- |
 | Platform admins | `{bu}_platform_admins`, one per business unit (the baseline) | Workspace admin; owns the workspace catalog |
-| Users | Per workspace, in its `access.yaml` (`groups.users`) | Consumer access (Databricks One): dashboards, Genie spaces, apps |
+| Users | Per workspace, in its file (`groups.users`) | Consumer access (Databricks One): dashboards, Genie spaces, apps |
 | Explorers | Per workspace (`groups.explorer`) | SQL access: the SQL editor, queries, dashboards, Genie |
 | Builders, publishers | Per workspace (`groups.builder`, `groups.publisher`) | Workspace access: notebooks, jobs, the shared cluster, one personal cluster |
 
@@ -183,7 +184,8 @@ The baseline in `config/defaults/` is what every workspace gets. Most of it is a
 | Dashboard embedding domains | `settings.yaml` `dashboard_embedding.approved_domains` | none | For example your SharePoint domain |
 | Personal access tokens | `settings.yaml` `personal_access_tokens`, `access.yaml` `personas.<persona>.can_create_tokens` | On, 90 days, no persona may create them | Only admins create tokens unless a persona is allowed |
 | Platform admins group name | `access.yaml` `groups.platform_admins` | `{bu}_platform_admins` | Match your Entra naming convention; `{bu}` is the workspace's business unit code. Persona groups are named per workspace |
-| Required tags | `cost.yaml` `required_tags` | `LOB`, `DEPARTMENT`, `TEAM` | Changing them later affects new workloads only |
+| Databricks account | `cost.yaml` `account_id` | none | Required while budget policies are on (account console, top right) |
+| Required tags | `cost.yaml` `required_tags` | `LOB`, `DEPARTMENT`, `TEAM` (placeholders) | A tag a workspace sets for everything (`tags:` in its file) is not asked of each team. Changing them later affects new workloads only |
 | Budget (usage) policies | `cost.yaml` `budget_policies.enabled` | `true` | Needs an account-level permission for the pipeline (step 6); set `false` if you will not grant it. Data classification needs them |
 | Catalog name and features | `catalog.yaml` `catalog` | `{bu}_citizen_dev`, predictive optimization, data classification and data quality monitoring on | `catalog.storage_root` is needed when the metastore has no storage root (preflight says so) |
 | Restrict workspace admins | `settings.yaml` `restrict_workspace_admins` | `false` | Needs account admin to change; leave `false` |
@@ -193,27 +195,22 @@ What each setting does is in the comment beside it, and in [config/README.md](..
 
 ## 9. Onboard a workspace
 
-**Who:** the platform team. Repeat for every workspace.
+**Who:** the platform team. Repeat for every workspace. Step by step, with what you see at each point: [user-journeys.md](user-journeys.md), journey 1.
 
-1. **Create its folder and its workflow:**
+Before you start: the workspace exists and the runners can reach it (its private endpoint and DNS), the pipeline's service principal is workspace admin there (step 6, item 2), and its persona groups exist in Entra ID (step 7).
 
-   ```bash
-   python3 scripts/workspaces.py new fin-citizen-dev --bu fin --lob FIN \
-     --host https://adb-1234567890123456.7.azuredatabricks.net --account-id <databricks-account-id>
-   ```
-
-2. **Make the pipeline workspace admin there** (a Databricks account admin): step 6, items 2 and 4, for this workspace.
-3. **Review the files** in `config/workspaces/fin-citizen-dev/`. Most are comments; set only what this workspace changes from the baseline (for example `catalog.storage_root`, or `settings.disable_legacy_access: null` for an existing workspace that is not ready).
-4. **Check it is ready** (read-only), signed in as yourself with the Azure or Databricks CLI:
+1. **Create its file:** copy `config/workspaces/_example.yaml` to `config/workspaces/fin-citizen-dev.yaml` and fill in `bu`, `host` and `groups`. The file name is the workspace's name in this repository.
+2. **Set anything that differs from the baseline**, in the same file (for example `catalog.storage_root`, or `settings.disable_legacy_access: null` for an existing workspace that is not ready). Leave the rest out.
+3. **Check it is ready** (optional; the pull request runs it too), signed in with the Azure or Databricks CLI:
 
    ```bash
    python3 scripts/preflight.py fin-citizen-dev
    ```
 
-   It checks the sign-in and admin rights, the metastore, that every group is an account group, the catalog's storage, what still uses legacy access, and placeholders left in the baseline. Fix every `error` before the pull request; read every `warning`.
-5. **Open a pull request** with the folder and its workflow (`.github/workflows/workspace-fin-citizen-dev.yml`, written by step 1). The workspace's workflow runs preflight again as the pipeline, then plans, and posts the plan, the plan guard's warnings and the AI review as a comment. The first plan creates everything; check that it changes nothing you did not expect.
-6. **Merge.** The workspace's workflow waits for approval in `apply-approval` (if it has reviewers), then applies.
-7. **Verify:** the next pull request (or the Monday drift check) shows no changes for the workspace. In the workspace: the persona groups under Settings > Identity and access, the `<BU> Default Warehouse`, the `{bu}_citizen_dev` catalog.
+   It checks the sign-in and admin rights, the metastore, that every group is an account group, the catalog's storage, what still uses legacy access, and placeholders left in the baseline.
+4. **Open a pull request.** The deploy workflow plans only this workspace and posts its plan: everything the first apply creates. Preflight problems are at the top of the comment.
+5. **Merge.** After the approval step (if `apply-approval` has reviewers), the workspace is deployed.
+6. **Verify:** the next pull request that touches it (or the Monday drift check) shows no changes. In the workspace: the persona groups under Settings > Identity and access, the `<BU> Default Warehouse`, and the `{bu}_citizen_dev` catalog.
 
 > [!WARNING]
 > Applying the baseline to an existing workspace changes its settings for everyone in it (downloads, tokens, Git folders, legacy access). Read the plan comment's settings changes with the workspace's owners before merging.
@@ -223,8 +220,9 @@ What each setting does is in the comment beside it, and in [config/README.md](..
 | Task | How |
 | --- | --- |
 | Give someone a persona | Add them to the group in Entra ID; no change here |
-| Change one workspace | Pull request editing `config/workspaces/<name>/`: only that workspace is planned and applied |
-| Change every workspace | Pull request editing `config/defaults/`: every workspace is planned, and applied, each by its own workflow (one that fails does not stop the others) |
+| Change one workspace | Pull request editing `config/workspaces/<name>.yaml`: only that workspace is planned and applied |
+| Change every workspace | Pull request editing `config/defaults/`: every workspace is planned, and applied, each in its own job (one that fails does not stop the others) |
+| Retire a workspace | Delete its file in a pull request: its Terraform state is removed on merge; the workspace itself is unchanged |
 | A plan is flagged as risky | Review the warning in the plan comment; if intended, a person adds the label `allow-risky-changes` |
 | A `drift` issue opens | Someone changed a setting by hand: update the configuration to match, or re-apply to restore it |
 | Retry a failed apply | Fix the cause, then re-run the latest Apply run (it refuses if `main` has moved on) |
@@ -264,8 +262,8 @@ State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (ste
 | `AuthorizationPermissionMismatch` or `403` reading the state | The role on the state container is missing or still propagating | Wait a few minutes after step 4; check Storage Blob Data Contributor on the container |
 | `state blob is already locked` | Two runs on the same workspace at once (a pull request plan and an apply) | Wait for the other run, then re-run |
 | Preflight: `is not a workspace admin` | Step 6 not done for this workspace | Step 6, item 2, for this workspace |
-| Preflight: group `does not exist in the account` or `exists only in this workspace` | The Entra group is missing, not synced, or a workspace-local group has the same name | Step 7; or name the right group under `groups:` in the workspace's `access.yaml` |
-| Preflight: `the metastore has no storage root` | New catalogs have nowhere to store data | Set `catalog.storage_root` in the workspace's `catalog.yaml` to an external location URL |
+| Preflight: group `does not exist in the account` or `exists only in this workspace` | The Entra group is missing, not synced, or a workspace-local group has the same name | Step 7; or name the right group under `groups:` in the workspace's file |
+| Preflight: `the metastore has no storage root` | New catalogs have nowhere to store data | Set `catalog.storage_root` in the workspace's file to an external location URL |
 | Apply fails creating a budget policy (permission denied) | The service principal lacks the account-level budget policy permission | Step 6, item 2, or `budget_policies.enabled: false` |
 | `Usage policy ID must not be empty` | Data classification runs on serverless and needs a usage policy | Turn on budget policies, or set `catalog.data_classification: null` |
 | A local plan shows permission changes that CI does not | Local plans run as you, not the pipeline: the owner entry differs | Trust the CI plan and the drift check |

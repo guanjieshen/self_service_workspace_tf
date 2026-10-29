@@ -35,11 +35,11 @@ run "default_plus_workspace" {
 
   assert {
     condition     = strcontains(local.genie_instructions, "# Default instructions") && strcontains(local.genie_instructions, "# Workspace instructions")
-    error_message = "A workspace's instructions.md is appended after the default instructions."
+    error_message = "A workspace's genie_code_instructions are appended after the default instructions."
   }
   assert {
-    condition     = contains(keys(local.genie_skills), "build-tagged-assets/SKILL.md") && contains(keys(local.genie_skills), "team-howto/SKILL.md")
-    error_message = "A workspace's skills are deployed next to the default ones."
+    condition     = tolist(keys(local.genie_skills)) == tolist(["build-tagged-assets/SKILL.md"])
+    error_message = "Every workspace gets the baseline's skills, and only those."
   }
 }
 

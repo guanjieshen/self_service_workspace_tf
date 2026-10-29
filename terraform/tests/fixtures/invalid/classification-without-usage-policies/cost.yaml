@@ -1,3 +1,0 @@
-# Test fixture: data classification on (the baseline) without usage policies.
-budget_policies:
-  enabled: false

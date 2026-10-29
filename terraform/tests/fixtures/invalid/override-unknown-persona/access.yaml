@@ -1,3 +1,0 @@
-groups: {explorer: tst-explorers}
-personas:
-  wizard: {can_create_tokens: true}

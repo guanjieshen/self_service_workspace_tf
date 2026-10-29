@@ -109,24 +109,12 @@ run "genie_code_workspace_parts" {
     error_message = "Default and workspace instructions each get their heading, default first."
   }
   assert {
-    condition     = strcontains(local.genie_instructions, "Use the TST warehouse TST Default Warehouse and the catalog tst_citizen_dev for TESTLOB.")
-    error_message = "Placeholders in the workspace instructions are filled ({BU}, {WAREHOUSE}, {CATALOG}, {LOB})."
+    condition     = strcontains(local.genie_instructions, "Use the TST warehouse TST Default Warehouse and the catalog tst_citizen_dev; tags `LOB` = `TESTLOB`.")
+    error_message = "Placeholders in the workspace instructions are filled ({BU}, {WAREHOUSE}, {CATALOG}, {WORKSPACE_TAGS})."
   }
   assert {
     condition     = !strcontains(local.genie_instructions, "must not be deployed")
     error_message = "Comments are removed from the workspace instructions."
-  }
-  assert {
-    condition     = tolist(sort(keys(local.genie_skills))) == tolist(["build-tagged-assets/SKILL.md", "team-howto/SKILL.md", "team-howto/notes.txt"])
-    error_message = "The workspace's own skills are deployed next to the default ones, with every file in the skill folder."
-  }
-  assert {
-    condition     = base64decode(local.genie_skills["team-howto/SKILL.md"]) == "---\nname: team-howto\ndescription: Test skill. Use when asked how the TST team works.\n---\n\nAsk in the TST channel.\n"
-    error_message = "Skill markdown has comments removed and placeholders filled."
-  }
-  assert {
-    condition     = base64decode(local.genie_skills["team-howto/notes.txt"]) == "not markdown, deployed as is\n"
-    error_message = "Other files in a skill folder are deployed unchanged."
   }
 }
 

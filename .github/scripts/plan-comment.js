@@ -1,5 +1,5 @@
 // Builds and posts the plan comment for one workspace on a pull request.
-// Used by .github/workflows/workspace.yml through actions/github-script.
+// Used by .github/workflows/deploy.yml through actions/github-script.
 //
 // Reads the files scripts/tf.sh and the plan workflow write to .plans/:
 //   <ws>.txt         full plan            <ws>.changes     number of changes
@@ -42,15 +42,26 @@ function buildBody(ws, endpoint, dir = '.plans') {
   return sections.filter(Boolean).join('\n\n');
 }
 
-// Creates the workspace's comment, or updates it on later pushes.
-async function post({ github, context }, ws, endpoint) {
-  const body = buildBody(ws, endpoint);
+// Whether a workspace's plan is worth a comment: it changes something, failed, or preflight
+// found a problem. A workspace a change does not touch plans no changes and gets none.
+function worthPosting(ws, dir = '.plans') {
+  const read = (name) => {
+    const f = `${dir}/${ws}${name}`;
+    return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim() : '';
+  };
+  return read('.changes') !== '0' || read('.preflight.txt') !== '';
+}
+
+// Creates the workspace's comment, or updates it on later pushes (an existing comment is
+// updated even when there is nothing to show any more, so it never goes stale).
+async function post({ github, context }, ws, endpoint, dir = '.plans') {
+  const body = buildBody(ws, endpoint, dir);
   const { owner, repo } = context.repo;
   const issue_number = context.issue.number;
   const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
   const mine = comments.find((c) => c.body.startsWith(marker(ws)));
   if (mine) await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
-  else await github.rest.issues.createComment({ owner, repo, issue_number, body });
+  else if (worthPosting(ws, dir)) await github.rest.issues.createComment({ owner, repo, issue_number, body });
 }
 
-module.exports = { buildBody, post };
+module.exports = { buildBody, post, worthPosting };

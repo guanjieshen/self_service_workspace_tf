@@ -127,8 +127,8 @@ class TfShRelease(unittest.TestCase):
         for f in ("tf.sh", "plan-guard.py"):
             shutil.copy(SCRIPTS / f, self.repo / "scripts")
         (self.repo / "terraform").mkdir()
-        (self.repo / "config/workspaces/ws").mkdir(parents=True)
-        (self.repo / "config/workspaces/ws/workspace.yaml").write_text("bu: x\n")
+        (self.repo / "config/workspaces").mkdir(parents=True)
+        (self.repo / "config/workspaces/ws.yaml").write_text("bu: x\n")
         self.fake = self.repo / "fake"
         self.fake.mkdir()
         tf = self.fake / "terraform"
