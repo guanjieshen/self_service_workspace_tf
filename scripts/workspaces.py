@@ -244,13 +244,13 @@ def main(argv):
         ap.add_argument("name")
         for a in ("--bu", "--lob", "--host"):
             ap.add_argument(a, required=True)
-        ap.add_argument("--account-id", help="default: databricks.account_id in config/setup.yaml")
+        ap.add_argument("--account-id", help="default: databricks_account_id in config/setup.yaml")
         ap.add_argument("--catalog")
         a = ap.parse_args(argv[1:])
         setup_file = next((f for f in (ROOT / "dev/setup.yaml", ROOT / "config/setup.yaml") if f.exists()), None)
-        a.account_id = a.account_id or (nested(setup_file, "databricks", "account_id") if setup_file else None)
+        a.account_id = a.account_id or (top_level(setup_file).get("databricks_account_id") if setup_file else None)
         if not a.account_id:
-            raise SystemExit("Set databricks.account_id in config/setup.yaml, or pass --account-id.")
+            raise SystemExit("Fill in databricks_account_id in config/setup.yaml, or pass --account-id.")
         new(a.name, a.bu, a.lob, a.host, a.account_id, a.catalog)
         print(f"""Created config/workspaces/{a.name}/.
 

@@ -46,7 +46,7 @@ Onboarding a workspace therefore needs nothing in GitHub or Entra: make the serv
 | --- | --- | --- |
 | 1. Terraform state | `scripts/setup.py state` | A storage account (no public access, no shared keys, versioning and soft delete), the `tfstate` container, `config/backend.hcl`. Each workspace gets its own state file, `citizen-dev/<name>.tfstate` |
 | 2. The identity | `scripts/setup.py identity` | The Entra app and service principal, its two federated credentials, Storage Blob Data Contributor on the state container |
-| 3. The repository | `scripts/setup.py github` | Variables `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`; labels `allow-risky-changes` and `drift`; the `apply-approval` environment (deployments from `main` only; `--approvers <org>/<team>` adds required reviewers); branch protection on `main` (pull requests, the **Format and validate** and **Tests** checks, code owner review) |
+| 3. The repository | `scripts/setup.py github` | Variables `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`; labels `allow-risky-changes` and `drift`; the `apply-approval` environment (deployments from `main` only; `apply_approvers` in `config/setup.yaml` adds required reviewers); branch protection on `main` (pull requests, the **Format and validate** and **Tests** checks, code owner review) |
 | 4. Databricks | `scripts/setup.py databricks` | The service principal in the Databricks account, workspace admin in each workspace. Needs a Databricks account admin |
 
 Then, by hand: give the service principal the permission to create budget policies in the account console (or set `budget_policies.enabled: false` in `config/defaults/cost.yaml`), and replace the owners in `.github/CODEOWNERS` with your teams.

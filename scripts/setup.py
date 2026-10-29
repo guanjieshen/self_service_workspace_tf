@@ -6,9 +6,10 @@
     scripts/setup.py github       a GitHub admin
     scripts/setup.py databricks [<workspace> ...]    a Databricks account admin
 
-Every value comes from config/setup.yaml (fill it in first: docs/SETUP.md, step 1); a flag
-with the same name overrides one value for one run (for example --storage-account x).
-`identity --run` writes the client and tenant IDs it creates back into the file. In the
+Every value comes from config/setup.yaml: four required values at the top, optional ones
+with defaults below (docs/SETUP.md, step 1). A flag overrides one value for one run (for
+example --storage-account x). `identity --run` writes the tenant and client IDs it creates
+into the file, for the steps after it. In the
 framework's own repository, dev/setup.yaml is read instead when it exists, so a release keeps
 a blank config/setup.yaml.
 
@@ -22,7 +23,7 @@ step and in what order.
   identity    the Entra app and service principal CI signs in as, its two GitHub federated
               credentials (pull requests; the main branch) and its role on the state container
   github      repository variables, the labels, the apply-approval environment (main only;
-              github.approvers adds required reviewers) and branch protection on main
+              apply_approvers adds required reviewers) and branch protection on main
   databricks  adds the service principal to the Databricks account and makes it workspace admin
               of each workspace given (default: every folder in config/workspaces/)
 """
@@ -52,14 +53,20 @@ def state(a):
                f'container_name       = "{a.container}"\n'
                f'use_azuread_auth     = true\n')
     rg, sa = q(a.resource_group), q(a.storage_account)
+    if a.location:
+        group = f"""LOCATION={q(a.location)}
+az group show -n {rg} >/dev/null 2>&1 || az group create -n {rg} -l "$LOCATION" -o none"""
+    else:
+        group = f"""LOCATION=$(az group show -n {rg} --query location -o tsv 2>/dev/null || true)
+[ -n "$LOCATION" ] || {{ echo "Resource group {a.resource_group} does not exist: set state_location in config/setup.yaml to create it."; exit 1; }}"""
     return f"""# Terraform state storage: one container, one state file per workspace.
 az account set --subscription {q(a.subscription)}
-az group show -n {rg} >/dev/null 2>&1 || az group create -n {rg} -l {q(a.location)} -o none
+{group}
 if az storage account show -n {sa} -g {rg} >/dev/null 2>&1; then
   # Someone else's account: use it as it is (only the container below is added).
   echo "Using the existing storage account {a.storage_account}; its settings are left as they are."
 else
-  az storage account create -n {sa} -g {rg} -l {q(a.location)} --sku Standard_ZRS --kind StorageV2 \\
+  az storage account create -n {sa} -g {rg} -l "$LOCATION" --sku Standard_ZRS --kind StorageV2 \\
     --min-tls-version TLS1_2 --allow-blob-public-access false --allow-shared-key-access false -o none
   # Keep earlier versions of each state file, and deleted ones for 30 days.
   az storage account blob-service-properties update -n {sa} -g {rg} --enable-versioning true \\
@@ -121,7 +128,7 @@ def github(a):
         reviewers = f'TEAM_ID=$(gh api orgs/{q(org)}/teams/{q(team)} --jq .id)\n'
         env["reviewers"] = [{"type": "Team", "id": "__TEAM_ID__"}]
     env_json = json.dumps(env).replace('"__TEAM_ID__"', "$TEAM_ID")
-    # Without --approvers, only create it: a PUT would drop reviewers added since in the UI.
+    # Without apply_approvers, only create it: a PUT would drop reviewers added since in the UI.
     put_env = "" if a.approvers else f"gh api repos/{a.repo}/environments/apply-approval >/dev/null 2>&1 ||\n  "
     protection = json.dumps({
         "required_status_checks": {"strict": False, "contexts": REQUIRED_CHECKS},
@@ -178,21 +185,22 @@ echo "create budget policies (serverless usage policies), or set budget_policies
     return "\n".join(lines)
 
 
-# Each option: (flag, section, key in the setup file, needed by these steps).
+# Each value: (flag, key in config/setup.yaml, default, the steps it is required for).
 OPTIONS = [
-    ("--tenant-id", "azure", "tenant_id", {"github"}),
-    ("--subscription", "azure", "subscription_id", {"state", "identity", "github"}),
-    ("--resource-group", "state", "resource_group", {"state", "identity"}),
-    ("--location", "state", "location", {"state"}),
-    ("--storage-account", "state", "storage_account", {"state", "identity"}),
-    ("--container", "state", "container", {"state", "identity"}),
-    ("--repo", "github", "repo", set()),   # null = this checkout's GitHub origin
-    ("--approvers", "github", "approvers", set()),
-    ("--name", "pipeline", "name", {"identity", "databricks"}),
-    ("--client-id", "pipeline", "client_id", {"github", "databricks"}),
-    ("--account-id", "databricks", "account_id", set()),
-    ("--account-profile", "databricks", "account_profile", set()),
+    ("--subscription", "subscription_id", None, {"state", "identity", "github"}),
+    ("--resource-group", "state_resource_group", None, {"state", "identity"}),
+    ("--storage-account", "state_storage_account", None, {"state", "identity"}),
+    ("--account-id", "databricks_account_id", None, {"databricks"}),
+    ("--location", "state_location", None, set()),            # default: the resource group's
+    ("--container", "state_container", "tfstate", set()),
+    ("--repo", "github_repo", None, set()),                   # default: this checkout's GitHub origin
+    ("--name", "pipeline_name", "sp-citizen-dev-terraform", set()),
+    ("--approvers", "apply_approvers", None, set()),
+    ("--account-profile", "databricks_account_profile", None, set()),
+    ("--tenant-id", "tenant_id", None, {"github"}),            # written by identity
+    ("--client-id", "pipeline_client_id", None, {"github", "databricks"}),   # written by identity
 ]
+WRITTEN_BY_IDENTITY = {"tenant_id", "pipeline_client_id"}
 STEPS = {"state": state, "identity": identity, "github": github, "databricks": databricks}
 
 
@@ -216,13 +224,11 @@ def setup_file():
     return dev if dev.exists() else ROOT / "config/setup.yaml"
 
 
-def remember(path, section, key, value):
-    """Write value into the setup file's section.key, if it is still null."""
-    lines, inside = path.read_text().split("\n"), False
+def remember(path, key, value):
+    """Write value into the setup file's key, if it is still null."""
+    lines = path.read_text().split("\n")
     for n, line in enumerate(lines):
-        if re.match(r"^\S", line):
-            inside = re.match(rf"^{section}:", line) is not None
-        elif inside and re.match(rf"^  {key}:\s*null\b", line):
+        if re.match(rf"^{key}:\s*null\b", line):
             lines[n] = re.sub(r"null", value, line, count=1)
             path.write_text("\n".join(lines))
             return True
@@ -234,10 +240,10 @@ def run(script, path):
     proc = subprocess.Popen(["bash", "-euo", "pipefail", "-c", script], cwd=ROOT, stdout=subprocess.PIPE, text=True)
     for line in proc.stdout:
         print(line, end="", flush=True)
-        for label, section, key in (("AZURE_CLIENT_ID", "pipeline", "client_id"), ("AZURE_TENANT_ID", "azure", "tenant_id")):
+        for label, key in (("AZURE_CLIENT_ID", "pipeline_client_id"), ("AZURE_TENANT_ID", "tenant_id")):
             m = re.search(rf"\({label}\): (\S+)", line)
-            if m and remember(path, section, key, m.group(1)):
-                print(f"  (saved as {section}.{key} in {shown(path)})")
+            if m and remember(path, key, m.group(1)):
+                print(f"  (saved as {key} in {shown(path)})")
     return proc.wait()
 
 
@@ -246,33 +252,35 @@ def main(argv):
     sub = ap.add_subparsers(dest="step", required=True)
     for step in STEPS:
         p = sub.add_parser(step)
-        for flag, section, key, _ in OPTIONS:
-            p.add_argument(flag, help=f"overrides {section}.{key} in the setup file")
+        for flag, key, _, _ in OPTIONS:
+            p.add_argument(flag, help=f"overrides {key} in the setup file")
         if step == "databricks":
             p.add_argument("workspaces", nargs="*", help="workspace folders (default: all in config/workspaces/)")
         p.add_argument("--run", action="store_true", help="run the script here instead of printing it")
     a = ap.parse_args(argv)
 
     path = setup_file()
-    missing = []
-    for flag, section, key, steps in OPTIONS:
+    values = wsf.top_level(path)
+    missing, later = [], []
+    for flag, key, default, required in OPTIONS:
         attr = flag[2:].replace("-", "_")
         if getattr(a, attr) is None:
-            setattr(a, attr, wsf.nested(path, section, key))
-        if getattr(a, attr) is None and a.step in steps:
-            missing.append(f"{section}.{key}")
-    if a.step == "databricks" and not a.account_profile and not a.account_id:
-        missing.append("databricks.account_id (or databricks.account_profile)")
+            setattr(a, attr, values.get(key) or default)
+        if getattr(a, attr) is None and a.step in required:
+            (later if key in WRITTEN_BY_IDENTITY else missing).append(key)
     if missing:
-        raise SystemExit(f"Set {', '.join(missing)} in {shown(path)} first (docs/SETUP.md, step 1).")
+        raise SystemExit(f"Fill in {', '.join(missing)} in {shown(path)} first (docs/SETUP.md, step 1).")
+    if later:
+        raise SystemExit(f"{', '.join(later)} not set yet in {shown(path)}: run `python3 scripts/setup.py identity --run` first "
+                         "(it writes them), or ask the Entra admin who ran it.")
     if a.repo is None and a.step in ("identity", "github"):
         a.repo = origin_repo()
         if a.repo is None:
-            raise SystemExit(f"Set github.repo in {shown(path)} (this checkout has no GitHub origin to take it from).")
+            raise SystemExit(f"Fill in github_repo in {shown(path)} (this checkout has no GitHub origin to take it from).")
     if a.repo is not None and not re.fullmatch(r"[\w.-]+/[\w.-]+", a.repo):
-        raise SystemExit(f"github.repo must be <org>/<repo>, not {a.repo!r}")
+        raise SystemExit(f"github_repo must be <org>/<repo>, not {a.repo!r}")
     if a.approvers and not re.fullmatch(r"[\w.-]+/[\w.-]+", a.approvers):
-        raise SystemExit(f"github.approvers must be <org>/<team>, not {a.approvers!r}")
+        raise SystemExit(f"apply_approvers must be <org>/<team>, not {a.approvers!r}")
     script = STEPS[a.step](a)
     if not a.run:
         print("#!/usr/bin/env bash\nset -euo pipefail\n" + script)

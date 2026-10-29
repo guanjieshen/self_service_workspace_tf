@@ -16,7 +16,7 @@ STEPS = {
     "state": ["--subscription", "sub", "--resource-group", "rg-tf", "--location", "canadacentral", "--storage-account", "sttf"],
     "identity": ["--subscription", "sub", "--resource-group", "rg-tf", "--storage-account", "sttf", "--repo", "org/repo"],
     "github": ["--repo", "org/repo", "--client-id", "app", "--tenant-id", "tenant", "--subscription", "sub"],
-    "databricks": ["--client-id", "app", "--account-profile", "acct"],
+    "databricks": ["--client-id", "app", "--account-id", "acct-1", "--account-profile", "acct"],
 }
 
 
@@ -126,24 +126,23 @@ class SetupFile(unittest.TestCase):
     def setUp(self):
         self.path = pathlib.Path(tempfile.mkdtemp()) / "setup.yaml"
         # The repository's own file, with every value emptied (it may be filled in here).
-        blank = re.sub(r"(?m)^(  (?!container|name)\w+:)[ \t]*[^\s#]+", r"\1 null", (ROOT / "config/setup.yaml").read_text())
+        blank = re.sub(r"(?m)^(\w+:)[ \t]*[^\s#]+", r"\1 null", (ROOT / "config/setup.yaml").read_text())
         self.path.write_text(blank)
         patcher = mock.patch.object(setup, "setup_file", lambda: self.path)
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def fill(self, section, key, value):
-        self.assertTrue(setup.remember(self.path, section, key, value))
+    def fill(self, key, value):
+        self.assertTrue(setup.remember(self.path, key, value))
 
     def test_missing_values_are_named(self):
         with self.assertRaises(SystemExit) as e:
             setup.main(["state"])
-        self.assertIn("azure.subscription_id, state.resource_group, state.location, state.storage_account", str(e.exception))
+        self.assertIn("Fill in subscription_id, state_resource_group, state_storage_account in", str(e.exception))
 
     def test_values_come_from_the_file(self):
-        for section, key, value in (("azure", "subscription_id", "sub-1"), ("state", "resource_group", "rg-1"),
-                                    ("state", "location", "canadacentral"), ("state", "storage_account", "stfile")):
-            self.fill(section, key, value)
+        for key, value in (("subscription_id", "sub-1"), ("state_resource_group", "rg-1"), ("state_storage_account", "stfile")):
+            self.fill(key, value)
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             setup.main(["state"])
@@ -153,22 +152,46 @@ class SetupFile(unittest.TestCase):
             setup.main(["state", "--storage-account", "stflag"])
         self.assertIn('storage_account_name = "stflag"', out2.getvalue(), "a flag overrides the file")
 
+    def test_required_values_are_at_the_top_and_the_rest_have_defaults(self):
+        text = (ROOT / "config/setup.yaml").read_text()
+        required = text[text.index("# ---- REQUIRED"):text.index("# ---- OPTIONAL")]
+        self.assertEqual(re.findall(r"(?m)^(\w+):", required),
+                         ["subscription_id", "state_resource_group", "state_storage_account", "databricks_account_id"])
+        keys = re.findall(r"(?m)^(\w+):", text)
+        self.assertEqual(sorted(keys), sorted(k for _, k, _, _ in setup.OPTIONS), "every value in the file is read, and only those")
+
+    def test_the_location_defaults_to_the_resource_groups(self):
+        for key, value in (("subscription_id", "sub-1"), ("state_resource_group", "rg-1"), ("state_storage_account", "st1")):
+            self.fill(key, value)
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            setup.main(["state"])
+        self.assertIn("LOCATION=$(az group show -n rg-1 --query location -o tsv", out.getvalue())
+        self.assertIn('-l "$LOCATION"', out.getvalue())
+
+    def test_ids_from_identity_are_asked_for_by_name(self):
+        for key, value in (("subscription_id", "sub-1"),):
+            self.fill(key, value)
+        with self.assertRaises(SystemExit) as e:
+            setup.main(["github", "--repo", "o/r"])
+        self.assertIn("tenant_id, pipeline_client_id not set yet", str(e.exception))
+        self.assertIn("setup.py identity --run", str(e.exception))
+
     def test_remember_fills_only_a_null_value_and_keeps_comments(self):
-        self.fill("pipeline", "client_id", "app-1")
-        self.assertFalse(setup.remember(self.path, "pipeline", "client_id", "app-2"), "never overwrites a value")
-        self.assertIn("  client_id: app-1          # written here by", self.path.read_text())
+        self.fill("pipeline_client_id", "app-1")
+        self.assertFalse(setup.remember(self.path, "pipeline_client_id", "app-2"), "never overwrites a value")
+        self.assertRegex(self.path.read_text(), r"(?m)^pipeline_client_id: app-1 +# the service principal")
 
     def test_identity_ids_are_saved_when_it_runs(self):
         script = 'echo "  client ID (AZURE_CLIENT_ID): app-9"; echo "  tenant ID (AZURE_TENANT_ID): ten-9"'
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(setup.run(script, self.path), 0)
         text = self.path.read_text()
-        self.assertIn("  client_id: app-9", text)
-        self.assertIn("  tenant_id: ten-9", text)
+        self.assertIn("pipeline_client_id: app-9", text)
+        self.assertIn("tenant_id: ten-9", text)
 
     def test_databricks_signs_in_with_the_azure_cli_without_a_profile(self):
-        self.fill("pipeline", "client_id", "app-1")
-        self.fill("databricks", "account_id", "acct-1")
+        self.fill("pipeline_client_id", "app-1")
+        self.fill("databricks_account_id", "acct-1")
         with contextlib.redirect_stdout(io.StringIO()) as out:
             setup.main(["databricks"])
         self.assertIn("DATABRICKS_ACCOUNT_ID=acct-1 DATABRICKS_AUTH_TYPE=azure-cli", out.getvalue())
