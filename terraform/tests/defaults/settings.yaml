@@ -56,7 +56,7 @@ settings:
   automatic_cluster_update: null
 
   # Log the text of every notebook command and SQL query in the audit logs.
-  # Only useful when audit logs are delivered somewhere (DESIGN.md open
+  # Only useful when audit logs are delivered somewhere (docs/design.md open
   # question A4); query text can contain sensitive values.
   verbose_audit_logs: null
 

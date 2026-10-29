@@ -27,7 +27,16 @@ Each workspace gets:
 | 8 | Decide the baseline in `config/defaults/` | Platform team, security |
 | 9 | Onboard a workspace: `scripts/workspaces.py new`, `scripts/preflight.py`, a pull request | Platform team |
 
-How it works, and why: [DESIGN.md](DESIGN.md). How to change the configuration: [config/README.md](config/README.md).
+## Documentation
+
+| Read | For |
+| --- | --- |
+| [docs/SETUP.md](docs/SETUP.md) | Setting it up, onboarding workspaces, day to day, upgrades, troubleshooting |
+| [config/README.md](config/README.md) | Changing the configuration: which key to set for what |
+| [docs/design.md](docs/design.md) | Why it works the way it does |
+| [docs/github-actions.md](docs/github-actions.md) | The plan, apply and drift workflows |
+| [CHANGELOG.md](CHANGELOG.md) | What changed in each release |
+| [AGENTS.md](AGENTS.md) | Changing the project itself (for coding agents and maintainers) |
 
 ## Layout
 
@@ -40,36 +49,11 @@ How it works, and why: [DESIGN.md](DESIGN.md). How to change the configuration: 
 | `terraform/` | The root module and modules. You do not edit these for normal operations |
 | `scripts/` | `setup.py` (one-time setup), `workspaces.py` (new workspace, which workspaces a change affects, checks), `preflight.py` (is a workspace ready?), `tf.sh` (run Terraform), `plan-guard.py`, `ai-plan-review.py`, `test.sh` |
 | `.github/` | Plan, apply and drift workflows ([docs/github-actions.md](docs/github-actions.md)) |
+| `docs/` | Setup, design and CI documentation |
 | `dev/` | The framework's own test workspaces; not in a release |
 | `AGENTS.md`, `agents/` | Guidance for coding agents: `AGENTS.md` is the entry point (`CLAUDE.md` points Claude Code to it), `agents/` has one guide per area |
 
 Everything outside `config/` (and `.github/CODEOWNERS`) is the framework: you upgrade it, you do not edit it.
-
-## Prerequisites
-
-1. Terraform 1.9 or later, Python 3.9 or later, and the Databricks CLI (the Azure CLI and GitHub CLI for the one-time setup).
-2. The workspace exists and uses Unity Catalog.
-3. **The groups exist as account groups** (Entra ID groups synced to the Databricks account): `{bu}_platform_admins`, and the persona groups each workspace names in its `access.yaml`. Unity Catalog and usage policies cannot use groups that exist only in a workspace.
-4. The one-time setup is done ([docs/SETUP.md](docs/SETUP.md)): state storage, the pipeline's service principal, the repository settings.
-
-## Onboard a workspace
-
-1. Create its folder:
-
-   ```bash
-   python3 scripts/workspaces.py new fin-citizen-dev --bu fin --lob FIN \
-     --host https://adb-1234567890123456.7.azuredatabricks.net \
-     --account-id <databricks-account-id>
-   ```
-
-2. Make the pipeline's service principal workspace admin there (by hand, a Databricks account admin: [docs/SETUP.md](docs/SETUP.md), step 6).
-3. Review the files in `config/workspaces/fin-citizen-dev/`. Most are comments: keep only what this workspace changes from the baseline.
-4. Check it is ready: `python3 scripts/preflight.py fin-citizen-dev` (read-only; the plan runs it too).
-5. Open a pull request: its plan comment shows what the first apply does. Plan locally with `./scripts/tf.sh fin-citizen-dev plan`.
-6. Merge: the Apply workflow deploys it. That is the only way changes reach a workspace; `tf.sh apply` refuses outside GitHub Actions. The next plan should show no changes.
-
-> [!WARNING]
-> On an existing workspace, check that nothing uses Hive metastore tables, DBFS mounts or No-isolation clusters before applying: after 30 days with legacy access disabled, the workspace is Unity Catalog only, permanently. If it is not ready, set `disable_legacy_access: null` and `disable_dbfs_root_and_mounts: null` under `settings:` in its `settings.yaml`.
 
 ## Tests
 
@@ -78,32 +62,3 @@ Everything outside `config/` (and `.github/CODEOWNERS`) is the framework: you up
 ```
 
 Runs every test without a workspace or credentials (Terraform against mocked providers), the same as the **Tests** check on every pull request.
-
-## Installing and upgrading
-
-Releases are git tags (`v1.2.0`), with what changed in `CHANGELOG.md`.
-
-**Install** a release into your organization's repository:
-```bash
-git archive --remote=<framework repo> v1.2.0 | tar -x     # or download the tag's source archive
-rm -rf dev config/backend.hcl                              # the framework's own test workspaces and state
-```
-
-**Upgrade** to a newer release: replace the framework files, keep your configuration.
-```bash
-git fetch <framework repo> 'refs/tags/*:refs/tags/*'
-git restore --source=v1.3.0 --staged --worktree -- \
-  terraform scripts .github/workflows .github/actions .github/scripts .github/ai docs \
-  README.md DESIGN.md CHANGELOG.md AGENTS.md CLAUDE.md agents config/README.md config/AGENTS.md \
-  config/workspaces/_example
-```
-`git restore` also removes files the release dropped, and touches nothing else: not `config/defaults/`, your workspaces, `config/ai-review.yaml` or `.github/CODEOWNERS`. A baseline setting that is new in the release is absent from your `config/defaults/` until you add it, which means "leave alone", so an upgrade never turns something on by itself; `CHANGELOG.md` lists new settings to add. Open a pull request: its plan shows what the new version changes in each workspace before anything is applied.
-
-> [!WARNING]
-> Do not edit framework files in your repository: the next upgrade replaces them. Send a fix to the framework maintainers so it is in the next release.
-
-## State and teardown
-
-State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (copy `config/backend.hcl.example`); then each workspace has its own state file in Azure Storage, which CI requires.
-
-`./scripts/tf.sh <name> destroy` removes what this project manages. It resets the workspace configuration keys it manages (`enable*`, `enforce*`) to `false`, which includes turning personal access tokens off; review the plan before confirming.

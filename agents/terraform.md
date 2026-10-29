@@ -36,7 +36,7 @@ One state per workspace. `scripts/tf.sh <workspace> plan` runs it (and the plan 
 4. **Test it:** a fixture under `tests/fixtures/` and an assertion in the matching
    `tests/*.tftest.hcl`. For a check, a fixture under `tests/fixtures/invalid/` that breaks
    exactly that rule, and a run in `tests/validation.tftest.hcl`.
-5. **Document it** in `config/README.md` (if operators set it), DESIGN.md (if it changes
+5. **Document it** in `config/README.md` (if operators set it), docs/design.md (if it changes
    the design) and `CHANGELOG.md` (Unreleased; say what the first plan will show).
 
 ## The tests' baseline

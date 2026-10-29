@@ -17,6 +17,10 @@ A workspace changes a default by setting **the same key in its file of the same 
   silently do nothing.
 - Keys only a workspace has: `workspace.yaml` (identity: `bu`, `lob`, `host`,
   `account_id`, ...), `teams` (access.yaml), `team_warehouses` (compute.yaml).
+- Each workspace names its persona groups (`groups:` in its access.yaml); a persona left
+  `null` is skipped. Only `groups.platform_admins` comes from the baseline.
+- Open maps take new keys in a workspace file: `tags`, and `budget_policies.policies`
+  (a new key adds a policy; repeating one replaces its whole block).
 
 ## Helping someone change the configuration
 
@@ -44,4 +48,5 @@ the framework and the next upgrade replaces them.
 | `defaults/genie-code/` | Genie Code instructions and skills for every workspace |
 | `workspaces/<name>/` | One folder per workspace (`_example/` is the template; create one with `scripts/workspaces.py new`) |
 | `ai-review.yaml` | The model the AI plan review uses |
-| `backend.hcl` | Where Terraform keeps state (copy `backend.hcl.example`) |
+| `backend.hcl` | Where Terraform keeps state (written by `scripts/setup.py state`) |
+| `setup.yaml` | The one-time setup values (`docs/SETUP.md`, step 1); not read by Terraform |

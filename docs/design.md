@@ -1,9 +1,8 @@
 # Citizen Development Workspace Baseline: Design
 
-What this project does, how it is built, and why. The operating guide (how to change
-the configuration) is [config/README.md](config/README.md); CI setup is
-[docs/github-actions.md](docs/github-actions.md); ideas not built yet are in
-[docs/future.md](docs/future.md).
+Why the project works the way it does. How to set it up is [SETUP.md](SETUP.md); how to
+change the configuration is [config/README.md](../config/README.md); the workflows are
+[github-actions.md](github-actions.md).
 
 ## 1. Purpose
 
@@ -142,38 +141,7 @@ them from the self-service app.
 8. **Provider workaround:** `effective_workspace_label` is set to the label too (provider
    1.137.0 declares it optional instead of computed, which failed the apply).
 
-## 7. Repository layout
-
-```
-config/            the organization's configuration (config/README.md)
-  defaults/        access, compute, cost, catalog, settings .yaml; genie-code/
-  workspaces/      one folder per workspace; _example/ is the template
-  ai-review.yaml   the AI review's model
-terraform/         root module (config.tf loads and merges the YAML, overrides.tf what a
-                   workspace may set and what leaving alone releases, access.tf groups and
-                   grants, chargeback.tf budget policies,
-                   checks.tf plain-language checks)
-  modules/         workspace-settings, personas, compute, budget-policies, folders, catalog
-  tests/           Terraform tests with mocked providers and fixture workspaces
-scripts/           setup.py (one-time setup), preflight.py (is a workspace ready), tf.sh
-                   (run Terraform), plan-guard.py, workspaces.py (new, changed,
-                   check), ai-plan-review.py, test.sh
-.github/           plan, apply and drift workflows; the AI review prompt; CODEOWNERS
-dev/workspaces/    the framework's own test workspaces (not in a release)
-```
-
-Releases are git tags; install and upgrade with git (README.md).
-
-## 8. Testing
-
-`./scripts/test.sh` runs every suite without a workspace or credentials, as the **Tests**
-check on every pull request does: Terraform tests against mocked providers (baseline,
-options, modules, Genie Code, and one fixture per validation check), Python unit tests
-(plan guard, release, workspaces, preflight, setup, the AI review), the plan comment (Node), and a scaffolded workspace. A new option comes with a fixture and an
-assertion; a new check with a fixture that fails it. Before a change merges, its plan on
-the test workspaces in `dev/` shows what it does.
-
-## 9. Open questions
+## 7. Open questions
 
 | # | Question | Default until decided |
 |---|---|---|
@@ -190,3 +158,29 @@ the test workspaces in `dev/` shows what it does.
 | P7 | GitHub org URL for the Git allowlist? | Placeholder |
 | P8 | Required tag keys (LOB, DEPARTMENT, TEAM)? | As is |
 | P12 | Remove `users` from `/Workspace/Shared` so folder permissions mean something? | Organisation only |
+
+## 8. Not built yet
+
+Ideas that are not built. Each needs review and a decision before work starts; the configuration is designed so they can be added without changing how workspaces are configured today.
+
+| # | Addition | What it adds | Depends on |
+| - | --- | --- | --- |
+| F1 | Combined mode | Creating the workspace itself | Network design (VNet, PrivateLink, DNS) |
+| F2 | Unity Catalog stream | Catalogs shared between workspaces, storage credentials, external locations | The Unity Catalog team |
+| F3 | The self-service app | Schemas and workspace folders on request | Its own repository; the catalog this repository creates |
+
+### Combined mode (F1)
+
+A second stack creates the workspace itself (Premium, VNet injection into an existing VNet, no public IP, front-end and back-end PrivateLink, private DNS) and passes the workspace URL to this stack. `workspace.yaml` would gain a `create: true` option and network settings; the onboarding steps stay the same.
+
+### Unity Catalog stream (F2)
+
+Catalogs shared between workspaces, storage credentials and external locations stay with the Unity Catalog team. This project manages only a workspace's own catalog (`catalog.yaml`) and expects the metastore and the rest to exist.
+
+### The self-service app (F3)
+
+Schemas and workspace folders are requested through the self-service app, which lives in its own repository and deploys its own jobs. What it relies on here:
+
+- **The workspace catalog** (`{bu}_citizen_dev`), owned by the platform admins group. Personas have only `USE CATALOG` and `USE SCHEMA` on it; the app grants on the schemas it creates.
+- **Catalog grants are authoritative:** a privilege granted on the catalog outside `catalog.yaml` is removed on the next apply. The app's service principal needs a privilege on the catalog (for example `CREATE SCHEMA`): add it to `catalog.yaml`, not by hand.
+- **The persona groups** each workspace names in its `access.yaml`.

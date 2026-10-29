@@ -1,6 +1,6 @@
 # Configuration
 
-Everything your organization edits is in this folder (plus `.github/CODEOWNERS`). An upgrade of the framework never changes these files (README.md, "Installing and upgrading"); the exceptions are this README, `backend.hcl.example` and `workspaces/_example/`, which come with the framework.
+Everything your organization edits is in this folder (plus `.github/CODEOWNERS`). An upgrade of the framework never changes these files ([docs/SETUP.md](../docs/SETUP.md), "Upgrade to a new release"); the exceptions are this README, `backend.hcl.example` and `workspaces/_example/`, which come with the framework.
 
 **People are not in this folder.** Everything is granted to groups (each workspace names its own in `access.yaml`); who is in a group is managed in Entra ID, for example through access packages or a ticketing system. Giving someone a persona never needs a change here.
 

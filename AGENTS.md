@@ -1,69 +1,100 @@
 # AGENTS.md
 
 Guidance for coding agents (and people) working in this repository. Read this first, then
-the guide in [`agents/`](agents/) for what you are changing. All agent guidance lives in that
-folder; the AGENTS.md files in `terraform/` and `config/` only point to it.
+the guide in [`agents/`](agents/) for the folder you are changing. All agent guidance lives
+there; the AGENTS.md files in `terraform/` and `config/` only point to it.
 
 | You are changing | Read |
 | --- | --- |
-| `terraform/` (modules, checks, tests, the job notebooks) | [agents/terraform.md](agents/terraform.md) |
+| `terraform/` (root module, modules, checks, tests) | [agents/terraform.md](agents/terraform.md) |
 | `config/` (an organization's settings) | [agents/config.md](agents/config.md) |
-
-Add a new guide to `agents/` and to this table; don't start a new AGENTS.md elsewhere.
+| `scripts/`, `.github/`, docs | This file |
 
 ## What this repository is
 
-A governed baseline for Databricks citizen development workspaces, run from Git:
-`config/` (YAML) plus `terraform/`, one Terraform state per workspace, applied by CI.
-What people request (schemas, workspace folders) belongs to the self-service app, not
-to this repository.
-
+A governed baseline for Azure Databricks citizen development workspaces, run from Git:
+YAML in `config/`, Terraform in `terraform/`, one state per workspace, planned on every pull
+request and applied on merge by GitHub Actions. What people request (schemas, workspace
+folders) belongs to the self-service app, in its own repository, not here.
 
 Two kinds of repository use this code:
 
-- **The framework repository** (this one, with `dev/`): the maintainers change anything.
-- **An organization's instance** (installed from a release tag, without `dev/`): the organization edits **only** `config/` and `.github/CODEOWNERS`.
-  Everything else is the framework and is replaced on upgrade (README.md, "Installing and
-  upgrading"). In an instance, a fix to framework code goes to the framework maintainers.
+- **The framework repository** (this one, with `dev/`): maintainers change anything.
+- **An organization's instance** (installed from a release, without `dev/`): the
+  organization edits **only** `config/` and `.github/CODEOWNERS`. Everything else is the
+  framework and is replaced on upgrade (`docs/SETUP.md`, "Upgrade to a new release"). In
+  an instance, a fix to framework code goes to the framework maintainers.
 
-## Where things are
+## Where the docs are
 
-| You want to | Look at |
-| --- | --- |
-| Understand what it does and why | `DESIGN.md` (purpose, config model, access model, catalog, caveats) |
-| Change a workspace's configuration | `config/README.md`, `agents/config.md` |
-| Add a workspace | `python3 scripts/workspaces.py new <name> --bu ... --lob ... --host ... --account-id ...` |
-| Add or change a Terraform option | `agents/terraform.md` |
-| Set up an organization's instance | `docs/SETUP.md` (by team), `config/setup.yaml`, `scripts/setup.py`, `scripts/preflight.py`; CI details in `docs/github-actions.md` |
-| See ideas not built | `docs/future.md` |
-| See what changed | `CHANGELOG.md` (keep its Unreleased section current) |
+Each topic has one home. Update that file; link to it from elsewhere instead of repeating it.
+
+| File | For | Holds |
+| --- | --- | --- |
+| `README.md` | Everyone, first | What the project does, the Get started steps, the layout, links to the rest |
+| `docs/SETUP.md` | The teams setting it up | Step by step from the zip to the first workspace, by team; day to day; upgrades; troubleshooting |
+| `config/README.md` | Whoever changes the configuration | The merge rule and a task table: which key to set for what |
+| `docs/design.md` | Maintainers, reviewers | Why it works the way it does: config model, access model, catalog, caveats, open questions, what is not built |
+| `docs/github-actions.md` | Maintainers | The workflows: how CI signs in, which workspaces a change plans and applies, runners, the plan comment, who can run code with the credentials |
+| `CHANGELOG.md` | Everyone upgrading | What changed in each release, and what the first plan after an upgrade shows |
+| `AGENTS.md`, `agents/*.md` | Coding agents | How to change the project (this file), and one guide per folder |
+| `config/defaults/*.yaml`, `config/setup.yaml` | Whoever edits them | The comment beside each key is its documentation |
+
+## How to update this project
+
+### The workflow
+
+1. **Branch from `main`**; never commit to `main` directly. One topic per pull request.
+2. **Change the code, its tests and its docs together** (the table below).
+3. **Run the tests:** `./scripts/test.sh` (no workspace or credentials needed) and
+   `terraform fmt -recursive terraform`.
+4. **Open a pull request.** CI runs **Format and validate** and **Tests**, then plans every
+   workspace the change affects and posts the plan, the plan guard's findings and an AI
+   review as a comment. Read the plan comment, not only the checks.
+5. **Merge** when the checks pass and a person has read the plan. The Apply workflow
+   applies each affected workspace, one at a time. Watch it (`gh run watch`).
+
+### What to change with what
+
+| You change | Also change | Tests |
+| --- | --- | --- |
+| A baseline value in `config/defaults/` | The comment beside it; `CHANGELOG.md` if it changes what workspaces get | None, unless the shipped baseline changes: then the copy in `terraform/tests/defaults/` too |
+| A new baseline key (an option) | The same key in `terraform/tests/defaults/`; its use in `terraform/`; `config/README.md` (task table) if operators set it; `CHANGELOG.md` (what the first plan shows) | A fixture under `terraform/tests/fixtures/` and an assertion (`agents/terraform.md`) |
+| A Databricks setting | Map it in `terraform/overrides.tf` (`setting_addresses`) so `null` releases it | `scripts/tests/test_release.py` checks the mapping |
+| A check (a wrong value fails the plan) | `terraform/checks.tf`: the message names the key, the file and what to do | A fixture under `terraform/tests/fixtures/invalid/` and a run in `validation.tftest.hcl` |
+| A setup step or a manual step | `scripts/setup.py` if a command can do it, else the checklist in `docs/SETUP.md`; a `scripts/preflight.py` check if Terraform depends on it | `scripts/tests/test_setup.py`, `test_preflight.py` |
+| A value in `config/setup.yaml` | `docs/SETUP.md` step 1 table; `OPTIONS` in `scripts/setup.py` | `test_setup.py` checks every key in the file is read |
+| A workflow | `docs/github-actions.md`; `scripts/workspaces.py` if it changes what a change plans or applies | `scripts/tests/test_changed_workspaces.py`; a job that signs in must not run in a GitHub Environment (`test_setup.py`) |
+| Something removed | Every doc that mentions it (search the repository), and its tests and fixtures | The suite still passes with nothing skipped |
+
+### Keep it simple
+
+Simplicity and ease of use come first. Before adding an option, ask whether a fixed,
+sensible behavior would do; prefer removing a feature to adding a switch, and a short
+readable script to a framework. A value people must fill in is required only if it is a
+fact about their environment or a decision they must make; everything else gets a
+default.
 
 ## Where it runs: an organization's GitHub, deployed only by GitHub Actions
 
-This repository is installed into the customer's own GitHub (an organization's instance,
-above), and **everything reaches their workspaces through GitHub Actions**: with the
-one-time setup in `docs/github-actions.md` done and the configuration right, a merged pull
-request deploys everything with no further step. When you add something:
+With the setup in `docs/SETUP.md` done, a merged pull request deploys everything with no
+further step. When you add something:
 
-- **Make Terraform or a workflow do it.** A step someone must run by hand (a CLI command, a
-  click in a UI, a script on a laptop) is a bug unless no API can do it, or a person must
-  decide it by design.
-- **If it cannot be automated, say so** in `docs/github-actions.md` ("What GitHub Actions does
-  not do") and `docs/SETUP.md`, with who does it, when and how; script it in
-  `scripts/setup.py` if a command can do it; and fail early with a message naming that step
-  (a check in `scripts/preflight.py` for something in the workspace, a precondition in
-  `terraform/checks.tf` for the configuration) rather than half-way through an apply.
+- **Make Terraform or a workflow do it.** A step someone must run by hand is a bug unless no
+  API can do it, or a person must decide it by design.
+- **If it cannot be automated, say so** in `docs/SETUP.md`, with who does it, when and how,
+  and fail early with a message naming that step (a check in `scripts/preflight.py` for
+  something in the workspace, a precondition in `terraform/checks.tf` for the
+  configuration) rather than half-way through an apply.
 - **Never depend on this repository's own setup:** not a CLI profile, a laptop, `dev/`, the
-  sandbox's names or IDs, or a person's account. Identities come from Terraform outputs and
-  repository variables.
+  sandbox's names or IDs, or a person's account.
 
 ## Rules
 
-1. **Changes reach a workspace only through a merged pull request.** The Plan workflow
-   plans every affected workspace on the PR; the Apply workflow applies on merge to
-   `main`. `scripts/tf.sh apply` and `destroy` refuse outside GitHub Actions
-   (`ALLOW_LOCAL_APPLY=1` is break-glass for a human, not for an agent). Never push to
-   `main` directly and never add a manual trigger to Apply.
+1. **Changes reach a workspace only through a merged pull request.** `scripts/tf.sh apply`
+   and `destroy` refuse outside GitHub Actions (`ALLOW_LOCAL_APPLY=1` is break-glass for a
+   human, not for an agent). Never push to `main` directly and never add a manual trigger
+   to Apply.
 2. **Never bypass git hooks** (`--no-verify`, `-n`, `core.hooksPath`). If a hook fails,
    fix the cause.
 3. **Do not handle secrets.** Never create, print or export tokens or client secrets;
@@ -72,59 +103,51 @@ request deploys everything with no further step. When you add something:
 5. **Leaving a setting alone releases it; it never destroys it.** `null` in YAML means
    "Terraform leaves this alone": `tf.sh` removes it from the state before apply, because
    destroying a Databricks setting resets it. Keep that property in anything you add.
-6. **Every change ships with tests** (below). A new option comes with a fixture and an
-   assertion; a new check with a fixture that fails it.
-7. **Keep it simple.** This was deliberately cut down (fewer workflows, fewer options,
-   plain YAML). Prefer removing a feature to adding a switch; prefer a short, readable
-   script to a framework.
+6. **Every change ships with tests.** A new option comes with a fixture and an assertion;
+   a new check with a fixture that fails it.
+7. **The plan guard** (`scripts/plan-guard.py`) fails a plan with hard-to-undo or
+   security-weakening changes until a person adds the label `allow-risky-changes`. Never
+   add that label yourself; say what the plan does and let a person decide.
 
-## Test and ship
+## Tests
 
 ```bash
-./scripts/test.sh                # everything, no workspace or credentials needed
+./scripts/test.sh                # everything
 ./scripts/test.sh terraform      # or one suite: terraform | python | node | scaffold
 ```
 
-- `terraform`: `terraform/tests/*.tftest.hcl` with mocked providers and fixture workspaces.
+- `terraform`: `terraform/tests/*.tftest.hcl`, mocked providers, fixture workspaces, and the
+  pinned baseline in `terraform/tests/defaults/` (never the organization's `config/defaults/`).
 - `python`: `scripts/tests/` (standard library only).
-- CI runs the same suites in the **Tests** check, then plans each affected workspace and
-  posts the plan, an AI review and the plan guard's findings on the PR.
-
-Before a PR: run the suites you touched and `terraform fmt -recursive terraform`. After a
-merge: watch the Apply run, and check the result in the workspace (read-only) if it
-changed something visible.
-
-**The plan guard** (`scripts/plan-guard.py`) fails a plan with hard-to-undo or
-security-weakening changes until a person adds the PR label `allow-risky-changes`. Do not
-add that label yourself; say what the plan does and let a person decide.
+- `node`: the plan comment (`.github/scripts/tests/`).
+- `scaffold`: `scripts/workspaces.py new` makes a folder that plans.
 
 ## Writing style
 
-- Plain words in code comments, error messages and docs. Say what
-  happens and why, for someone who has not read the code.
+- Plain words in comments, error messages and docs: say what happens and why, for someone
+  who has not read the code.
 - Comments explain why, not what. Match the comment density of the file you are in.
-- Error messages from checks name the setting, the file and what to do.
-- README-style docs: no em dashes; short sections; tables for options.
+- Error messages name the setting, the file and what to do.
+- Docs: no em dashes; short sections; tables for options.
 
 ## Gotchas learned the hard way
 
 - **State lock collisions.** Two CI runs on the same workspace (a PR plan and an Apply)
   collide on the state lock: "state blob is already locked". Re-run the failed one. Do
   not run local plans while CI plans or applies.
-- **A hook false positive** can block a command that has `git commit` together with
-  short flags such as `grep -n` or `sed -n`. Run the commit as its own command.
+- **A hook false positive** blocks a command that has `git commit` (or `git push`) together
+  with short flags such as `grep -n`, `sed -n` or `az ... -n`. Run git as its own command.
 - **Stacked PRs:** always target `main`. Deleting a merged base branch closes PRs stacked
   on it.
 - **Workspace-local groups** cannot be used in Unity Catalog grants or usage policies;
-  the persona groups must be account groups (synced from Entra ID).
+  persona groups must be account groups (synced from Entra ID).
 - **One service principal, two federated credentials.** CI signs in as `pull_request` (Plan)
-  or `ref:refs/heads/main` (Apply, Drift). Never put a job that signs in into a GitHub
-  Environment: its subject becomes `environment:<name>` and sign-in fails. `apply-approval`
-  is only the approval step (`scripts/tests/test_setup.py` checks this).
+  or `ref:refs/heads/main` (Apply, Drift). A job that signs in inside a GitHub Environment
+  signs in as `environment:<name>` and fails. `apply-approval` is only the approval step.
 - **Local plans as a person** can show permission drift that CI does not (different
   identity). Trust CI's plan and drift check.
 - **Run tests through `scripts/test.sh`.** Plain `terraform test` in `terraform/` fails on a
-  missing provider; `./scripts/test.sh terraform` sets the plugin directory (TF_DATA_DIR).
-- **GitHub's UI lags.** A job can show "in progress" after its steps finished, and Apply can sit
-  queued for minutes after a merge. Wait (`gh run watch`); re-running it collides on the state lock.
-- More provider-specific gotchas: `agents/terraform.md`.
+  missing provider; the script sets the plugin directory (TF_DATA_DIR).
+- **GitHub's UI lags.** A job can show "in progress" after its steps finished, and Apply can
+  sit queued for minutes after a merge. Wait (`gh run watch`).
+- Terraform and provider gotchas: `agents/terraform.md`.
