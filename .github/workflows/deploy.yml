@@ -97,7 +97,7 @@ jobs:
           tar -xzf "$dir/tf-summarize.tar.gz" -C "$dir" tf-summarize
           "$dir/tf-summarize" -md ".plans/$WORKSPACE.json" > ".plans/$WORKSPACE.summary.md"
 
-      # Advice only: on when config/setup.yaml names ai_review_workspace, whose model
+      # Advice only: on when config/setup.yaml sets ai_review_host, the workspace whose model
       # reviews every workspace's plan.
       - name: AI review settings
         id: ai

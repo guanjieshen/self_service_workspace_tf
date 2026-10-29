@@ -17,14 +17,15 @@ review = load("ai-plan-review")
 
 
 class Settings(unittest.TestCase):
-    """config/setup.yaml: ai_review_workspace turns the review on; its model reviews every plan."""
+    """config/setup.yaml: ai_review_host turns the review on; the model there reviews every plan."""
+
+    HOST = "https://adb-1234567890123456.7.azuredatabricks.net"
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.orig = review.ROOT
         review.ROOT = pathlib.Path(self.tmp.name)
-        (review.ROOT / "config/workspaces").mkdir(parents=True)
-        (review.ROOT / "config/workspaces/hub.yaml").write_text("host: https://adb-1.1.azuredatabricks.net   # hub\n")
+        (review.ROOT / "config").mkdir()
 
     def tearDown(self):
         review.ROOT = self.orig
@@ -33,26 +34,27 @@ class Settings(unittest.TestCase):
     def setup_yaml(self, text):
         (review.ROOT / "config/setup.yaml").write_text(text)
 
-    def test_off_without_a_review_workspace(self):
-        self.setup_yaml("ai_review_workspace: null   # none\nai_review_model: null\n")
+    def test_off_without_a_review_host(self):
+        self.setup_yaml("ai_review_host: null   # none\nai_review_model: null\n")
         self.assertFalse(review.load_settings()["enabled"])
         (review.ROOT / "config/setup.yaml").unlink()
         self.assertFalse(review.load_settings()["enabled"], "no setup file: no review")
 
-    def test_the_review_workspace_and_its_model(self):
-        self.setup_yaml("ai_review_workspace: hub      # the review workspace\nai_review_model: null\n")
+    def test_the_review_host_and_its_model(self):
+        self.setup_yaml(f"ai_review_host: {self.HOST}/   # the model's workspace\nai_review_model: null\n")
         s = review.load_settings()
-        self.assertEqual((s["enabled"], s["host"], s["endpoint"]), (True, "https://adb-1.1.azuredatabricks.net", "system.ai.claude-sonnet-5-5"))
-        self.setup_yaml("ai_review_workspace: hub\nai_review_model: \"system.ai.claude-haiku-5-5\"\n")
+        self.assertEqual((s["enabled"], s["host"], s["endpoint"]), (True, self.HOST, "system.ai.claude-sonnet-5-5"))
+        self.setup_yaml(f"ai_review_host: {self.HOST}\nai_review_model: \"system.ai.claude-haiku-5-5\"\n")
         self.assertEqual(review.load_settings()["label"], "system.ai.claude-haiku-5-5")
 
-    def test_a_review_workspace_that_is_not_a_folder_fails(self):
-        self.setup_yaml("ai_review_workspace: nowhere\n")
+    def test_a_custom_url_is_refused(self):
+        # A custom workspace URL serves the web page, not the API.
+        self.setup_yaml("ai_review_host: https://myorg.azuredatabricks.net\n")
         with self.assertRaises(ValueError):
             review.load_settings()
 
-    def test_a_wrong_review_workspace_turns_the_review_off_not_the_plan(self):
-        self.setup_yaml("ai_review_workspace: nowhere\n")
+    def test_a_wrong_review_host_turns_the_review_off_not_the_plan(self):
+        self.setup_yaml("ai_review_host: https://myorg.azuredatabricks.net\n")
         out, err = io.StringIO(), io.StringIO()
         with mock.patch.object(sys, "argv", ["ai-plan-review.py", "--settings"]), \
                 contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
@@ -65,7 +67,7 @@ class Settings(unittest.TestCase):
 
     def test_the_setup_file_names_both_values(self):
         text = (self.orig / "config/setup.yaml").read_text()
-        self.assertRegex(text, r"(?m)^ai_review_workspace:")
+        self.assertRegex(text, r"(?m)^ai_review_host:")
         self.assertRegex(text, r"(?m)^ai_review_model:")
 
 
