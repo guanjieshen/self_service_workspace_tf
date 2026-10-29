@@ -1,0 +1,210 @@
+{
+ "description": "The builder persona moves to a different Entra group.",
+ "expected_risk": [
+  "High"
+ ],
+ "must_mention": [
+  [
+   "ss1-cd-builders"
+  ],
+  [
+   "lose",
+   "loses",
+   "lost"
+  ]
+ ],
+ "must_not_mention": [],
+ "state": "update",
+ "changed_files": "- config/workspaces/self_service_1.yaml: this workspace's file",
+ "config_diff": " groups:\n-  builder: ss1-cd-builders\n+  builder: ss1-data-builders",
+ "workspace_file": "bu: ss1\nhost: https://adb-1234567890123456.7.azuredatabricks.net\ngroups:\n  users: ss1-cd-users\n  explorer: ss1-cd-explorers\n  builder: ss1-data-builders\n  publisher: null\ncatalog:\n  storage_root: abfss://catalogs@examplestorage.dfs.core.windows.net/self_service_1\nsql_warehouse:\n  size: X-Small\nshared_cluster:\n  enabled: false",
+ "plan": [
+  {
+   "address": "module.personas.databricks_permission_assignment.this[\"ss1-cd-builders\"]",
+   "mode": "managed",
+   "type": "databricks_permission_assignment",
+   "name": "this",
+   "change": {
+    "actions": [
+     "delete"
+    ],
+    "before": {
+     "principal_name": "ss1-cd-builders",
+     "permissions": [
+      "USER"
+     ]
+    },
+    "after": null
+   },
+   "index": "ss1-cd-builders"
+  },
+  {
+   "address": "module.personas.databricks_permission_assignment.this[\"ss1-data-builders\"]",
+   "mode": "managed",
+   "type": "databricks_permission_assignment",
+   "name": "this",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "principal_name": "ss1-data-builders",
+     "permissions": [
+      "USER"
+     ]
+    }
+   },
+   "index": "ss1-data-builders"
+  },
+  {
+   "address": "module.personas.databricks_entitlements.persona[\"ss1-cd-builders\"]",
+   "mode": "managed",
+   "type": "databricks_entitlements",
+   "name": "persona",
+   "change": {
+    "actions": [
+     "delete"
+    ],
+    "before": {
+     "workspace_access": true,
+     "databricks_sql_access": true
+    },
+    "after": null
+   },
+   "index": "ss1-cd-builders"
+  },
+  {
+   "address": "module.personas.databricks_entitlements.persona[\"ss1-data-builders\"]",
+   "mode": "managed",
+   "type": "databricks_entitlements",
+   "name": "persona",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "workspace_access": true,
+     "databricks_sql_access": true
+    }
+   },
+   "index": "ss1-data-builders"
+  },
+  {
+   "address": "module.compute.databricks_permissions.default_warehouse[0]",
+   "mode": "managed",
+   "type": "databricks_permissions",
+   "name": "default_warehouse",
+   "change": {
+    "actions": [
+     "update"
+    ],
+    "before": {
+     "access_control": [
+      {
+       "group_name": "ss1-cd-builders",
+       "permission_level": "CAN_USE"
+      },
+      {
+       "group_name": "ss1-cd-explorers",
+       "permission_level": "CAN_USE"
+      }
+     ]
+    },
+    "after": {
+     "access_control": [
+      {
+       "group_name": "ss1-data-builders",
+       "permission_level": "CAN_USE"
+      },
+      {
+       "group_name": "ss1-cd-explorers",
+       "permission_level": "CAN_USE"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "address": "module.compute.databricks_permissions.cluster_policy[\"builder\"]",
+   "mode": "managed",
+   "type": "databricks_permissions",
+   "name": "cluster_policy",
+   "change": {
+    "actions": [
+     "update"
+    ],
+    "before": {
+     "access_control": [
+      {
+       "group_name": "ss1-cd-builders",
+       "permission_level": "CAN_USE"
+      }
+     ]
+    },
+    "after": {
+     "access_control": [
+      {
+       "group_name": "ss1-data-builders",
+       "permission_level": "CAN_USE"
+      }
+     ]
+    }
+   },
+   "index": "builder"
+  },
+  {
+   "address": "module.catalog[0].databricks_grants.catalog[0]",
+   "mode": "managed",
+   "type": "databricks_grants",
+   "name": "catalog",
+   "change": {
+    "actions": [
+     "update"
+    ],
+    "before": {
+     "catalog": "ss1_citizen_dev",
+     "grant": [
+      {
+       "principal": "ss1-cd-builders",
+       "privileges": [
+        "USE_CATALOG",
+        "USE_SCHEMA"
+       ]
+      },
+      {
+       "principal": "ss1-cd-explorers",
+       "privileges": [
+        "USE_CATALOG",
+        "USE_SCHEMA"
+       ]
+      }
+     ]
+    },
+    "after": {
+     "catalog": "ss1_citizen_dev",
+     "grant": [
+      {
+       "principal": "ss1-data-builders",
+       "privileges": [
+        "USE_CATALOG",
+        "USE_SCHEMA"
+       ]
+      },
+      {
+       "principal": "ss1-cd-explorers",
+       "privileges": [
+        "USE_CATALOG",
+        "USE_SCHEMA"
+       ]
+      }
+     ]
+    }
+   }
+  }
+ ],
+ "preflight": "ok: signed in as the pipeline, a workspace admin\nok: metastore sandbox_canadacentral\nok: account group ss1-cd-users (users)\nok: account group ss1-cd-explorers (explorer)\nok: account group ss1-data-builders (builder)\nok: no publisher group: skipped (nobody gets it in this workspace)\nok: account group ss1_platform_admins (platform_admins)\nwarning: the Git allowlist (settings.git.allowed_urls in config/defaults/settings.yaml) still has the placeholder https://github.com/<org>/: replace it with your organization's URL\nok: nothing found that still uses legacy access (Hive metastore, DBFS mounts, legacy clusters)",
+ "plan_guard": "This plan contains changes that are hard or impossible to undo:\n\n  - DELETE group's access to the workspace\n      module.personas.databricks_permission_assignment.this[\"ss1-cd-builders\"]\n  - DELETE group entitlements\n      module.personas.databricks_entitlements.persona[\"ss1-cd-builders\"]",
+ "workspace": "self_service_1 (https://adb-1234567890123456.7.azuredatabricks.net)"
+}

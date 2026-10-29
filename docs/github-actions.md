@@ -87,6 +87,8 @@ Each affected workspace gets one comment on the pull request, updated on every p
 
 The AI review is one call to a model in **one review workspace** (`ai_review_host` in `config/setup.yaml`: any workspace the pipeline's service principal is in, whether or not this repository manages it), whatever workspace the plan is for, signed in as the pipeline. Only that workspace needs the model: `ai_review_model`, by default the Unity Gateway model service `system.ai.claude-sonnet-5-5` (the pipeline identity needs EXECUTE on it; account users have it on `system.ai` by default). It sees the pull request's configuration diff, the planned changes and the plan guard output, nothing else, and takes seconds. The instructions it follows are `.github/ai/plan-review-prompt.md`.
 
+The review also reads preflight's findings (what it found clean is evidence too), and judges the risk by what could break, who could lose access and whether it can be undone. To change the prompt, run the evaluation cases first and after: `python3 scripts/ai-review-eval.py` ([.github/ai/eval/README.md](../.github/ai/eval/README.md)).
+
 The review is advice only: it never fails the check, and if the model is unavailable the section is left out. With Enforce Unity Gateway on, the `databricks-` serving endpoints are switched off, so use a `system.ai` model service. A change to `config/setup.yaml` or the prompt re-plans every workspace on its pull request, so the comment shows the new review.
 
 ## Who can run code with the workspace credentials

@@ -1,0 +1,52 @@
+{
+ "description": "One workspace's default warehouse grows from X-Small to Small.",
+ "expected_risk": [
+  "Low"
+ ],
+ "must_mention": [
+  [
+   "SS1 Default Warehouse"
+  ]
+ ],
+ "must_not_mention": [
+  "break"
+ ],
+ "state": "update",
+ "changed_files": "- config/workspaces/self_service_1.yaml: this workspace's file",
+ "config_diff": " sql_warehouse:\n-  size: X-Small\n+  size: Small",
+ "workspace_file": "bu: ss1\nhost: https://adb-1234567890123456.7.azuredatabricks.net\ngroups:\n  users: ss1-cd-users\n  explorer: ss1-cd-explorers\n  builder: ss1-cd-builders\n  publisher: null\ncatalog:\n  storage_root: abfss://catalogs@examplestorage.dfs.core.windows.net/self_service_1\nsql_warehouse:\n  size: Small\nshared_cluster:\n  enabled: false",
+ "plan": [
+  {
+   "address": "module.compute.databricks_sql_endpoint.default",
+   "mode": "managed",
+   "type": "databricks_sql_endpoint",
+   "name": "default",
+   "change": {
+    "actions": [
+     "update"
+    ],
+    "before": {
+     "name": "SS1 Default Warehouse",
+     "cluster_size": "X-Small",
+     "warehouse_type": "PRO",
+     "enable_serverless_compute": true,
+     "min_num_clusters": 1,
+     "max_num_clusters": 5,
+     "auto_stop_mins": 5
+    },
+    "after": {
+     "name": "SS1 Default Warehouse",
+     "cluster_size": "Small",
+     "warehouse_type": "PRO",
+     "enable_serverless_compute": true,
+     "min_num_clusters": 1,
+     "max_num_clusters": 5,
+     "auto_stop_mins": 5
+    }
+   }
+  }
+ ],
+ "plan_guard": "",
+ "preflight": "ok: signed in as the pipeline, a workspace admin\nok: metastore sandbox_canadacentral\nok: account group ss1-cd-users (users)\nok: account group ss1-cd-explorers (explorer)\nok: account group ss1-cd-builders (builder)\nok: no publisher group: skipped (nobody gets it in this workspace)\nok: account group ss1_platform_admins (platform_admins)\nwarning: the Git allowlist (settings.git.allowed_urls in config/defaults/settings.yaml) still has the placeholder https://github.com/<org>/: replace it with your organization's URL\nok: nothing found that still uses legacy access (Hive metastore, DBFS mounts, legacy clusters)",
+ "workspace": "self_service_1 (https://adb-1234567890123456.7.azuredatabricks.net)"
+}

@@ -10,8 +10,8 @@ Gateway model service), with the pull request and the plan as its only inputs, s
 as the pipeline (or --profile, a Databricks CLI profile, locally). --endpoint overrides the
 model for a local test. --settings prints the settings as name=value lines for the workflow.
 
-Reads .plans/<workspace>.json (from `terraform show -json`) and
-.plans/<workspace>.guard.txt, plus the git diff of config/ against --base, and
+Reads .plans/<workspace>.json (from `terraform show -json`), .plans/<workspace>.guard.txt and
+.plans/<workspace>.preflight-all.txt, plus the git diff of config/ against --base, and
 prints a markdown assessment for the pull request comment.
 
 The result is advice only: it never fails the build. On any error it prints
@@ -245,27 +245,36 @@ def workspace_field(workspace, key):
                  if l.startswith(f"{key}:")), "")
 
 
-def build_request(workspace, base, settings):
+def gather(workspace, base):
+    """The review's inputs for this workspace, from the repository and .plans/ (the plan job)."""
     plans = ROOT / ".plans"
     plan = json.loads((plans / f"{workspace}.json").read_text())
-    guard_file = plans / f"{workspace}.guard.txt"
-    guard = guard_file.read_text().strip() if guard_file.exists() else ""
-    changes = json.dumps(planned_changes(plan), indent=1)
+    read = lambda name: (plans / f"{workspace}{name}").read_text().strip() if (plans / f"{workspace}{name}").exists() else ""
+    path = ws_file(workspace)
+    return {
+        "workspace": f"{workspace} ({workspace_field(workspace, 'host')})",
+        "state": state_note(plan),
+        "changed_files": changed_files(base, workspace),
+        "config_diff": config_diff(base),
+        "workspace_files": f"# {path.name}\n{without_comments(path)}",
+        "baseline": baseline(),
+        "planned_changes": planned_changes(plan),
+        "plan_guard": read(".guard.txt"),
+        "preflight": read(".preflight-all.txt"),
+    }
+
+
+SECTIONS = ["workspace", "state", "changed_files", "config_diff", "workspace_files", "baseline",
+            "planned_changes", "plan_guard", "preflight"]
+
+
+def build_request(inputs):
+    """The model request: the prompt, and the inputs as tagged sections (gather(), or an eval case)."""
+    changes = json.dumps(inputs["planned_changes"], indent=1)
     if len(changes) > MAX_CHANGES_CHARS:
         changes = changes[:MAX_CHANGES_CHARS] + "\n... (truncated)"
-    path = ws_file(workspace)
-    host = workspace_field(workspace, "host")
-    ws_files = f"# {path.name}\n{without_comments(path)}"
-    user = (
-        f"<workspace>\n{workspace} ({host})\n</workspace>\n\n"
-        f"<state>\n{state_note(plan)}\n</state>\n\n"
-        f"<changed_files>\n{changed_files(base, workspace)}\n</changed_files>\n\n"
-        f"<config_diff>\n{config_diff(base)}\n</config_diff>\n\n"
-        f"<workspace_files>\n{ws_files}\n</workspace_files>\n\n"
-        f"<baseline>\n{baseline()}\n</baseline>\n\n"
-        f"<planned_changes>\n{changes}\n</planned_changes>\n\n"
-        f"<plan_guard>\n{guard}\n</plan_guard>"
-    )
+    values = {**inputs, "planned_changes": changes}
+    user = "\n\n".join(f"<{k}>\n{values.get(k) or ''}\n</{k}>" for k in SECTIONS)
     return {
         "messages": [
             {"role": "system", "content": (ROOT / PROMPT).read_text()},
@@ -332,7 +341,7 @@ def main() -> int:
             print("AI review skipped: the plan has no changes.", file=sys.stderr)
             return 0
         settings = load_settings()
-        request = build_request(args.workspace, args.base, settings)
+        request = build_request(gather(args.workspace, args.base))
         if args.request_only:
             print(json.dumps(request, indent=1))
             return 0

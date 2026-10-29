@@ -201,6 +201,9 @@ def main(argv):
     if out_file:
         pathlib.Path(out_file).parent.mkdir(parents=True, exist_ok=True)
         pathlib.Path(out_file).write_text("".join(f"{l}: {redact(m)}\n" for l, m in results if l != "ok"))
+        # Everything it checked, for the AI review: what it found clean is evidence too.
+        everything = pathlib.Path(out_file).with_name(pathlib.Path(out_file).name.replace(".preflight.txt", ".preflight-all.txt"))
+        everything.write_text("".join(f"{l}: {redact(m)}\n" for l, m in results))
     errors = sum(1 for level, _ in results if level == "error")
     print(f"{ws}: {errors} error(s), {sum(1 for l, _ in results if l == 'warning')} warning(s).")
     return 1 if errors else 0
