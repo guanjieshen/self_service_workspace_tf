@@ -22,7 +22,8 @@ Each workspace gets:
 | --- | --- | --- |
 | 1 | Fill in `config/setup.yaml` | Platform team |
 | 2 | Push this repository to your GitHub | Platform team |
-| 3 to 6 | `python3 scripts/setup.py state`, `identity`, `github`, `databricks` (each prints what it will do; `--run` does it) | Cloud team, Entra admin, GitHub admin, Databricks account admin |
+| 3 to 5 | `python3 scripts/setup.py state`, `identity`, `github` (each prints what it will do; `--run` does it) | Cloud team, Entra admin, GitHub admin |
+| 6 | In the Databricks account console, by hand: add the service principal, make it workspace admin, let it create budget policies | Databricks account admin |
 | 7 | Create the Entra groups and sync them to the account | Identity team |
 | 8 | Decide the baseline in `config/defaults/` | Platform team, security |
 | 9 | Onboard a workspace: `scripts/workspaces.py new`, `scripts/preflight.py`, a pull request | Platform team |
@@ -58,10 +59,11 @@ Everything outside `config/` (and `.github/CODEOWNERS`) is the framework: you up
 
    ```bash
    python3 scripts/workspaces.py new fin-citizen-dev --bu fin --lob FIN \
-     --host https://adb-1234567890123456.7.azuredatabricks.net
+     --host https://adb-1234567890123456.7.azuredatabricks.net \
+     --account-id <databricks-account-id>
    ```
 
-2. Make the pipeline's service principal workspace admin there (a Databricks account admin): `python3 scripts/setup.py databricks fin-citizen-dev --run`.
+2. Make the pipeline's service principal workspace admin there (by hand, a Databricks account admin: [docs/SETUP.md](docs/SETUP.md), step 6).
 3. Review the files in `config/workspaces/fin-citizen-dev/`. Most are comments: keep only what this workspace changes from the baseline.
 4. Check it is ready: `python3 scripts/preflight.py fin-citizen-dev` (read-only; the plan runs it too).
 5. Open a pull request: its plan comment shows what the first apply does. Plan locally with `./scripts/tf.sh fin-citizen-dev plan`.

@@ -4,7 +4,6 @@
     scripts/setup.py state        the cloud team
     scripts/setup.py identity     an Entra admin
     scripts/setup.py github       a GitHub admin
-    scripts/setup.py databricks [<workspace> ...]    a Databricks account admin
 
 Every value comes from config/setup.yaml: the required values at the top, three optional ones
 with defaults below (docs/SETUP.md, step 1). A flag overrides one value for one run (for
@@ -24,8 +23,9 @@ step and in what order.
               credentials (pull requests; the main branch) and its role on the state container
   github      repository variables, the labels, the apply-approval environment (main only;
               apply_approvers adds required reviewers) and branch protection on main
-  databricks  adds the service principal to the Databricks account and makes it workspace admin
-              of each workspace given (default: every folder in config/workspaces/)
+
+The Databricks account step (the service principal in the account, workspace admin, the budget
+policy permission) is done by hand: docs/SETUP.md, step 6.
 """
 import argparse
 import json
@@ -116,6 +116,8 @@ SCOPE="$(az storage account show -n {q(a.storage_account)} -g {q(a.resource_grou
     --role "Storage Blob Data Contributor" --scope "$SCOPE" -o none
 echo "Service principal ready. For the next steps:"
 echo "  client ID (AZURE_CLIENT_ID): $APP_ID"
+echo "Step 6 (by hand, a Databricks account admin): add it to the Databricks account with this"
+echo "application ID, make it workspace admin, and let it create budget policies (docs/SETUP.md)."
 """)
     return "\n".join(lines)
 
@@ -159,34 +161,6 @@ echo "Repository {a.repo} is set up."
 """
 
 
-def databricks(a):
-    hosts = []
-    folders = a.workspaces or [d.name for d in sorted(wsf.WORKSPACES.glob("*")) if (d / "workspace.yaml").exists() and not d.name.startswith("_")]
-    for w in folders:
-        info = wsf.workspace_info(wsf.ws_dir(w))
-        if not info["id"]:
-            raise SystemExit(f"{w}: no workspace ID (an adb-<id> host, or id: in workspace.yaml)")
-        hosts.append((w, info["id"]))
-    profile = f" -p {q(a.account_profile)}" if a.account_profile else ""
-    signin = "" if a.account_profile else (
-        "# Signs in to the account with the Azure CLI (az login as a Databricks account admin).\n"
-        f"export DATABRICKS_HOST=https://accounts.azuredatabricks.net DATABRICKS_ACCOUNT_ID={q(a.account_id)} DATABRICKS_AUTH_TYPE=azure-cli\n")
-    lines = [f"""# The service principal in the Databricks account, and workspace admin where Terraform runs.
-# Needs a Databricks account admin.
-{signin}DBX_SP=$(databricks account service-principals list{profile} --filter 'applicationId eq "{a.client_id}"' -o json |
-  python3 -c 'import json, sys; r = json.load(sys.stdin); print(r[0]["id"] if r else "")')
-[ -n "$DBX_SP" ] || DBX_SP=$(databricks account service-principals create{profile} --application-id {q(a.client_id)} \\
-  --display-name {q(a.name)} -o json | python3 -c 'import json, sys; print(json.load(sys.stdin)["id"])')"""]
-    for w, wid in hosts:
-        lines.append(f"""databricks account workspace-assignment update{profile} {wid} "$DBX_SP" --json '{{"permissions": ["ADMIN"]}}' >/dev/null
-echo "{w}: the service principal is workspace admin."
-""")
-    lines.append("""echo "Still to do by hand, once: in the account console, give the service principal the permission to"
-echo "create budget policies (serverless usage policies), or set budget_policies.enabled: false in cost.yaml."
-""")
-    return "\n".join(lines)
-
-
 # Each value: (flag, key in config/setup.yaml, default, the steps it is required for).
 OPTIONS = [
     ("--tenant-id", "tenant_id", None, {"state", "identity", "github"}),
@@ -196,14 +170,12 @@ OPTIONS = [
     ("--storage-account", "state_storage_account", None, {"state", "identity"}),
     ("--container", "state_container", None, {"state", "identity"}),
     ("--repo", "github_repo", None, set()),          # default: this clone's GitHub origin
-    ("--account-id", "databricks_account_id", None, {"databricks"}),
     ("--name", "pipeline_name", "sp-citizen-dev-terraform", set()),
     ("--approvers", "apply_approvers", None, set()),
-    ("--account-profile", "databricks_account_profile", None, set()),
-    ("--client-id", "pipeline_client_id", None, {"github", "databricks"}),   # written by identity
+    ("--client-id", "pipeline_client_id", None, {"github"}),   # written by identity
 ]
 WRITTEN_BY_IDENTITY = {"pipeline_client_id"}
-STEPS = {"state": state, "identity": identity, "github": github, "databricks": databricks}
+STEPS = {"state": state, "identity": identity, "github": github}
 
 
 def shown(path):
@@ -256,8 +228,6 @@ def main(argv):
         p = sub.add_parser(step)
         for flag, key, _, _ in OPTIONS:
             p.add_argument(flag, help=f"overrides {key} in the setup file")
-        if step == "databricks":
-            p.add_argument("workspaces", nargs="*", help="workspace folders (default: all in config/workspaces/)")
         p.add_argument("--run", action="store_true", help="run the script here instead of printing it")
     a = ap.parse_args(argv)
 
