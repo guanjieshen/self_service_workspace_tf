@@ -55,12 +55,16 @@ def state(a):
     return f"""# Terraform state storage: one container, one state file per workspace.
 az account set --subscription {q(a.subscription)}
 az group show -n {rg} >/dev/null 2>&1 || az group create -n {rg} -l {q(a.location)} -o none
-az storage account show -n {sa} -g {rg} >/dev/null 2>&1 ||
+if az storage account show -n {sa} -g {rg} >/dev/null 2>&1; then
+  # Someone else's account: use it as it is (only the container below is added).
+  echo "Using the existing storage account {a.storage_account}; its settings are left as they are."
+else
   az storage account create -n {sa} -g {rg} -l {q(a.location)} --sku Standard_ZRS --kind StorageV2 \\
     --min-tls-version TLS1_2 --allow-blob-public-access false --allow-shared-key-access false -o none
-# Keep earlier versions of each state file, and deleted ones for 30 days.
-az storage account blob-service-properties update -n {sa} -g {rg} --enable-versioning true \\
-  --enable-delete-retention true --delete-retention-days 30 -o none
+  # Keep earlier versions of each state file, and deleted ones for 30 days.
+  az storage account blob-service-properties update -n {sa} -g {rg} --enable-versioning true \\
+    --enable-delete-retention true --delete-retention-days 30 -o none
+fi
 az storage container-rm show -n {q(a.container)} --storage-account {sa} -g {rg} >/dev/null 2>&1 ||
   az storage container-rm create -n {q(a.container)} --storage-account {sa} -g {rg} --public-access off -o none
 # config/backend.hcl tells Terraform where the state is. In the repository it is written;
@@ -182,7 +186,7 @@ OPTIONS = [
     ("--location", "state", "location", {"state"}),
     ("--storage-account", "state", "storage_account", {"state", "identity"}),
     ("--container", "state", "container", {"state", "identity"}),
-    ("--repo", "github", "repo", {"identity", "github"}),
+    ("--repo", "github", "repo", set()),   # null = this checkout's GitHub origin
     ("--approvers", "github", "approvers", set()),
     ("--name", "pipeline", "name", {"identity", "databricks"}),
     ("--client-id", "pipeline", "client_id", {"github", "databricks"}),
@@ -198,6 +202,13 @@ def shown(path):
         return str(path.relative_to(ROOT))
     except ValueError:
         return str(path)
+
+
+def origin_repo():
+    """<org>/<repo> of this checkout's GitHub origin, or None."""
+    url = subprocess.run(["git", "-C", str(ROOT), "remote", "get-url", "origin"], capture_output=True, text=True).stdout.strip()
+    m = re.search(r"github\.com[:/]([\w.-]+/[\w.-]+?)(?:\.git)?/?$", url)
+    return m.group(1) if m else None
 
 
 def setup_file():
@@ -254,6 +265,10 @@ def main(argv):
         missing.append("databricks.account_id (or databricks.account_profile)")
     if missing:
         raise SystemExit(f"Set {', '.join(missing)} in {shown(path)} first (docs/SETUP.md, step 1).")
+    if a.repo is None and a.step in ("identity", "github"):
+        a.repo = origin_repo()
+        if a.repo is None:
+            raise SystemExit(f"Set github.repo in {shown(path)} (this checkout has no GitHub origin to take it from).")
     if a.repo is not None and not re.fullmatch(r"[\w.-]+/[\w.-]+", a.repo):
         raise SystemExit(f"github.repo must be <org>/<repo>, not {a.repo!r}")
     if a.approvers and not re.fullmatch(r"[\w.-]+/[\w.-]+", a.approvers):
