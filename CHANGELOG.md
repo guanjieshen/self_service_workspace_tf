@@ -14,8 +14,9 @@ them for you: a setting missing from your baseline is left alone).
 - `scripts/preflight.py`: read-only checks that a workspace is ready (sign-in, admin rights,
   account groups, catalog storage, legacy access, baseline placeholders). The Plan workflow
   runs it and shows problems in the plan comment.
-- `docs/SETUP.md`: setting up an organization's instance, by team, starting from one file of
-  values, `config/setup.yaml`, which every `setup.py` step reads (no flags to retype).
+- `docs/SETUP.md`: setting up an organization's instance, by team, starting from one flat file of
+  values, `config/setup.yaml`: four required at the top, optional ones with defaults below, and
+  the two IDs `setup.py identity` writes. Every `setup.py` step reads it (no flags to retype).
 
 ## 1.0.0
 

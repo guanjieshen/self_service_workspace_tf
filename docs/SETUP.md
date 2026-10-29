@@ -27,41 +27,41 @@ Every setup command reads its values from `config/setup.yaml` and prints the scr
 
 ## 1. Fill in `config/setup.yaml`
 
-**This is the first file you edit.** It holds every value the setup needs, so the commands in steps 3 to 6 take no arguments. None of the values are secrets: the file is committed with the repository. Fill in what you know now and ask each team for the rest; a command that needs a missing value stops and names it.
+**This is the first file you edit.** It has four required values at the top; everything below them has a default, and the last two are written by step 4. None of them are secrets: the file is committed with the repository. A step that needs a value that is still empty stops and names it.
 
 ```yaml
-azure:
-  tenant_id: 00000000-0000-0000-0000-000000000000
-  subscription_id: 00000000-0000-0000-0000-000000000000
-state:
-  resource_group: rg-databricks-tfstate
-  location: canadacentral
-  storage_account: stdbxcitizendevstate
-  container: tfstate
-github:
-  repo: my-org/databricks-citizen-dev
-  approvers: my-org/databricks-platform
-pipeline:
-  name: sp-citizen-dev-terraform
-  client_id: null              # step 4 writes it
-databricks:
-  account_id: 00000000-0000-0000-0000-000000000000
-  account_profile: null
+# ---- REQUIRED ----
+subscription_id: 00000000-0000-0000-0000-000000000000
+state_resource_group: rg-databricks-tfstate
+state_storage_account: stdbxcitizendevstate
+databricks_account_id: 00000000-0000-0000-0000-000000000000
+
+# ---- OPTIONAL ----
+state_location: canadacentral
+state_container: null
+github_repo: null
+pipeline_name: null
+apply_approvers: my-org/databricks-platform
+databricks_account_profile: null
+
+# ---- WRITTEN BY SETUP ----
+tenant_id: null
+pipeline_client_id: null
 ```
 
-| Key | What it is | Who provides it | Used in step |
-| --- | --- | --- | --- |
-| `azure.tenant_id` | Your Entra (Azure AD) tenant ID. Step 4 fills it in if you leave it empty | Entra admin | 5 |
-| `azure.subscription_id` | The subscription that holds the Terraform state | Cloud team | 3, 4, 5 |
-| `state.resource_group`, `state.location` | Where the state storage goes (the resource group is created if missing) | Cloud team | 3, 4 |
-| `state.storage_account` | 3 to 24 lowercase letters and digits, unique across Azure | Cloud team | 3, 4 |
-| `state.container` | The blob container for state files; keep `tfstate` | | 3, 4 |
-| `github.repo` | This repository as `<org>/<repo>`, with its final name: the sign-in is tied to it | GitHub admin | 4, 5 |
-| `github.approvers` | `<org>/<team>` that must approve each apply, or `null` (merging approves) | Platform team | 5 |
-| `pipeline.name` | The service principal's display name | Entra admin | 4, 6 |
-| `pipeline.client_id` | Its application (client) ID. Step 4 creates it and writes it here | Entra admin | 5, 6 |
-| `databricks.account_id` | Account console, top right. `workspaces.py new` uses it too | Databricks account admin | 6, 9 |
-| `databricks.account_profile` | A Databricks CLI profile for the account, or `null` to sign in with the Azure CLI | Databricks account admin | 6 |
+| Value | What it is | Default | Who provides it | Used in step |
+| --- | --- | --- | --- | --- |
+| **`subscription_id`** | The Azure subscription that holds the Terraform state | Required | Cloud team | 3, 4, 5 |
+| **`state_resource_group`** | The resource group for the state storage (created if missing) | Required | Cloud team | 3, 4 |
+| **`state_storage_account`** | The storage account for the state: 3 to 24 lowercase letters and digits, unique across Azure (created if missing; an existing one is used as it is) | Required | Cloud team | 3, 4 |
+| **`databricks_account_id`** | Account console, top right. `workspaces.py new` writes it into each workspace too | Required | Databricks account admin | 6, 9 |
+| `state_location` | The region, used only to create the resource group or storage account | The resource group's | Cloud team | 3 |
+| `state_container` | The blob container for the state files | `tfstate` | | 3, 4 |
+| `github_repo` | This repository as `<org>/<repo>`; the pipeline's sign-in is tied to it | This checkout's GitHub origin | GitHub admin | 4, 5 |
+| `pipeline_name` | The display name of the service principal CI signs in as | `sp-citizen-dev-terraform` | Entra admin | 4, 6 |
+| `apply_approvers` | `<org>/<team>` that must approve each apply in GitHub | None: merging approves | Platform team | 5 |
+| `databricks_account_profile` | A Databricks CLI profile for the account | Sign in with the Azure CLI | Databricks account admin | 6 |
+| `tenant_id`, `pipeline_client_id` | The Entra tenant and the service principal's client ID | Written by step 4 | | 5, 6 |
 
 Two more things to know before you start; they live in their own files, not here:
 
@@ -86,13 +86,13 @@ Two more things to know before you start; they live in their own files, not here
 3. Replace the owners in `.github/CODEOWNERS` with your teams (for example `@my-org/databricks-platform` and `@my-org/security`), in a pull request once step 5 is done. Until then, push directly; afterwards branch protection requires pull requests.
 
 > [!NOTE]
-> The repository's GitHub OIDC subject includes its numeric IDs, so create the repository with its final name before step 4. Renaming it later means recreating the two federated credentials (update `github.repo` and run step 4 again).
+> The repository's GitHub OIDC subject includes its numeric IDs, so create the repository with its final name before step 4. Renaming it later means recreating the two federated credentials (update `github_repo` and run step 4 again).
 
 ## 3. Terraform state storage
 
 **Who:** the cloud team, with Contributor on the subscription (or the resource group).
 
-Uses `azure.subscription_id` and `state.*` from `config/setup.yaml`.
+Uses `subscription_id` and the `state_*` values from `config/setup.yaml`.
 
 ```bash
 python3 scripts/setup.py state          # prints the script: read it
@@ -105,14 +105,14 @@ It creates a storage account with no public blob access and no shared keys (Entr
 
 **Who:** an Entra admin who can create app registrations and assign roles on the storage account (Owner or User Access Administrator), signed in to `gh` with read access to the repository.
 
-Uses `azure.subscription_id`, `state.*`, `github.repo` and `pipeline.name`.
+Uses `subscription_id`, the `state_*` values, `github_repo` and `pipeline_name`.
 
 ```bash
 python3 scripts/setup.py identity          # read it
 python3 scripts/setup.py identity --run
 ```
 
-It creates the app registration and service principal `sp-citizen-dev-terraform`, two federated credentials for GitHub Actions, and gives the service principal **Storage Blob Data Contributor** on the state container only. It writes the client ID (`pipeline.client_id`) and, if empty, the tenant ID (`azure.tenant_id`) into `config/setup.yaml` for the next steps; commit the file.
+It creates the app registration and service principal (`pipeline_name`), two federated credentials for GitHub Actions, and gives the service principal **Storage Blob Data Contributor** on the state container only. It writes the tenant ID (`tenant_id`) and the client ID (`pipeline_client_id`) into `config/setup.yaml` for the next steps; commit the file.
 
 | Federated credential | Subject | Lets sign in |
 | --- | --- | --- |
@@ -125,14 +125,14 @@ No client secret is created: GitHub exchanges its own short-lived token for an E
 
 **Who:** a GitHub organization admin (or a repository admin), signed in to `gh`.
 
-Uses `azure.*`, `github.*` and `pipeline.client_id`.
+Uses `subscription_id`, `github_repo`, `apply_approvers`, and `tenant_id` and `pipeline_client_id` from step 4.
 
 ```bash
 python3 scripts/setup.py github          # read it
 python3 scripts/setup.py github --run
 ```
 
-It sets the repository variables `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID`, creates the labels `allow-risky-changes` and `drift`, the environment `apply-approval` (deployments from `main` only; with `github.approvers` set, that team must approve each apply), and protects `main`: pull requests only, the **Format and validate** and **Tests** checks must pass, and code owners must approve.
+It sets the repository variables `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID`, creates the labels `allow-risky-changes` and `drift`, the environment `apply-approval` (deployments from `main` only; with `apply_approvers` set, that team must approve each apply), and protects `main`: pull requests only, the **Format and validate** and **Tests** checks must pass, and code owners must approve.
 
 Then, if needed:
 
@@ -144,7 +144,7 @@ Then, if needed:
 
 ## 6. Databricks account
 
-**Who:** a Databricks account admin, signed in with the Azure CLI (or with the Databricks CLI profile in `databricks.account_profile`).
+**Who:** a Databricks account admin, signed in with the Azure CLI (or with the Databricks CLI profile in `databricks_account_profile`).
 
 1. Add the service principal to the account, and make it workspace admin of each workspace already in `config/workspaces/` (none yet on a fresh install; run it again per workspace in step 9):
 
@@ -238,7 +238,7 @@ More: [config/README.md](../config/README.md) (configuration tasks) and [docs/gi
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| `No matching federated identity record found for presented assertion` (an `AADSTS` error at sign-in) | The token's subject is not one of the two credentials: the repository was renamed or transferred, or a workflow ran from a branch other than `main` (Drift or Apply run by hand on a branch) | Update `github.repo` in `config/setup.yaml` and run step 4 again (it reads the current subject prefix); run Apply and Drift only from `main` |
+| `No matching federated identity record found for presented assertion` (an `AADSTS` error at sign-in) | The token's subject is not one of the two credentials: the repository was renamed or transferred, or a workflow ran from a branch other than `main` (Drift or Apply run by hand on a branch) | Update `github_repo` in `config/setup.yaml` and run step 4 again (it reads the current subject prefix); run Apply and Drift only from `main` |
 | `Source IP address ... is blocked by Databricks IP ACL`, or a timeout reaching the workspace | GitHub-hosted runners cannot reach the workspace | A runner inside the network and `TERRAFORM_RUNNER` (step 5) |
 | `AuthorizationPermissionMismatch` or `403` reading the state | The role on the state container is missing or still propagating | Wait a few minutes after step 4; check Storage Blob Data Contributor on the container |
 | `state blob is already locked` | Two runs on the same workspace at once (a pull request plan and an apply) | Wait for the other run, then re-run |
@@ -249,4 +249,4 @@ More: [config/README.md](../config/README.md) (configuration tasks) and [docs/gi
 | `Usage policy ID must not be empty` | Data classification runs on serverless and needs a usage policy | Turn on budget policies, or set `catalog.data_classification: null` |
 | A local plan shows permission changes that CI does not | Local plans run as you, not the pipeline: the owner entry differs | Trust the CI plan and the drift check |
 | The plan comment has no AI review | The model is unavailable to the pipeline in that workspace (region, Unity Gateway, missing EXECUTE) | Set a model in the workspace's `ai-review.yaml`, or `enabled: false`; the review is advice only |
-| Apply ran straight after the merge, without approval | `apply-approval` has no required reviewers (or the GitHub plan does not support them) | Add reviewers to the environment (`github.approvers`, then step 5 again) |
+| Apply ran straight after the merge, without approval | `apply-approval` has no required reviewers (or the GitHub plan does not support them) | Add reviewers to the environment (`apply_approvers`, then step 5 again) |

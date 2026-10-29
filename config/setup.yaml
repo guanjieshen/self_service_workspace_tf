@@ -1,32 +1,30 @@
 # =============================================================================
-# ONE-TIME SETUP VALUES: fill this in first (docs/SETUP.md, step 1).
+# SETUP: the values the one-time setup needs (docs/SETUP.md, step 1).
 #
-# scripts/setup.py reads every value from here, so its commands need no flags:
+# Fill in the four REQUIRED values. Everything below them has a default.
+# Then run, in order (each prints what it will do; add --run to do it):
 #   python3 scripts/setup.py state | identity | github | databricks
-# (A flag, for example --storage-account, overrides the value here for one run.)
 #
-# None of these are secrets: commit this file. null = not known yet. Each value
-# says who provides it; the steps that need it fail with its name until it is set.
+# None of these are secrets: commit this file.
 # =============================================================================
 
-azure:
-  tenant_id: bf465dc7-3bc8-4944-b018-092572b5c20d          # Entra admin. Your Entra (Azure AD) tenant ID
-  subscription_id: edd4cc45-85c7-4aec-8bf5-648062d519bf    # Cloud team. The subscription that holds the Terraform state
+# ---- REQUIRED ---------------------------------------------------------------
 
-state:                     # Cloud team. Where Terraform keeps its state (step 3)
-  resource_group: guanjie-rg     # for example rg-databricks-tfstate (created if missing)
-  location: canadacentral           # for example canadacentral
-  storage_account: guanjieadls2026    # 3 to 24 lowercase letters and digits, unique across Azure
-  container: tfstatetest
+subscription_id: edd4cc45-85c7-4aec-8bf5-648062d519bf   # Azure subscription for the Terraform state (cloud team)
+state_resource_group: guanjie-rg                        # resource group for the state; created if missing (cloud team)
+state_storage_account: guanjieadls2026                  # storage account for the state: 3 to 24 lowercase letters and digits; created if missing (cloud team)
+databricks_account_id: null                             # Databricks account ID: account console, top right (Databricks account admin)
 
-github:                    # GitHub admin (step 5)
-  repo: null               # <org>/<repo> of this repository; null = this checkout's GitHub origin
-  approvers: null          # <org>/<team> that must approve each apply; null = merging approves
+# ---- OPTIONAL: change only if the default does not suit you -----------------
 
-pipeline:                  # Entra admin (step 4). The identity GitHub Actions signs in as
-  name: sp-citizen-dev-terraform
-  client_id: null          # written here by `setup.py identity --run`
+state_location: canadacentral       # region, only to create the resource group or storage account. Default: the resource group's
+state_container: tfstatetest        # blob container for the state files. Default: tfstate
+github_repo: null                   # <org>/<repo>. Default: this checkout's GitHub origin
+pipeline_name: null                 # display name of the service principal CI signs in as. Default: sp-citizen-dev-terraform
+apply_approvers: null               # <org>/<team> that must approve each apply. Default: none (merging approves)
+databricks_account_profile: null    # Databricks CLI profile for the account. Default: sign in with the Azure CLI
 
-databricks:                # Databricks account admin (step 6)
-  account_id: null         # account console, top right; also used by `workspaces.py new`
-  account_profile: null    # a Databricks CLI profile for the account; null = sign in with the Azure CLI
+# ---- WRITTEN BY SETUP: leave empty -------------------------------------------
+
+tenant_id: bf465dc7-3bc8-4944-b018-092572b5c20d   # Entra tenant ID (`setup.py identity --run` writes it)
+pipeline_client_id: null                          # the service principal's client ID (`setup.py identity --run` writes it)
