@@ -74,6 +74,12 @@ test('credentials are never posted: tokens and token= values are redacted in eve
   assert.equal(redact('client_secret=abc password=x, plain'), 'client_secret=*** password=***, plain');
 });
 
+test('preflight warnings alone are a note, not a stop', () => {
+  const body = buildBody('ws', 'm', plans({ '.preflight.txt': 'warning: placeholder left\n', '.txt': 'Plan: 1 to add', '.changes': '1' }));
+  assert.match(body, /\[!NOTE\]/);
+  assert.doesNotMatch(body, /Errors stop the plan/);
+});
+
 test('a long plan is cut from the start to fit in a GitHub comment', () => {
   const plan = 'start\n' + 'x'.repeat(200000) + '\nend of plan';
   const body = buildBody('ws', 'm', plans({ '.txt': plan, '.changes': '9', '.ai.md': 'review' }));
