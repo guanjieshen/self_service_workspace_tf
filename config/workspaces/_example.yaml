@@ -1,0 +1,92 @@
+# =============================================================================
+# A WORKSPACE: copy this file to config/workspaces/<name>.yaml and fill it in.
+#
+# <name> is the workspace's name in this repository: lowercase letters, digits,
+# dashes and underscores (for example hr-citizen-dev). One file per workspace;
+# the files in this folder are the list of workspaces CI deploys.
+#
+# Required: bu, host, and the groups. Everything else comes from the baseline
+# (config/defaults/). To change a baseline setting for this workspace only, set
+# the same key here, with the same shape: maps merge key by key, anything else
+# replaces the baseline value, and null means "leave it alone". Give the reason
+# in a comment: every difference from the baseline is reviewed in the pull request.
+# =============================================================================
+
+# ---- REQUIRED ---------------------------------------------------------------
+
+bu: xyz                    # business unit code: <BU> Default Warehouse, <BU>-SHARED, {bu}_citizen_dev, {bu}_platform_admins
+host: https://adb-0000000000000000.0.azuredatabricks.net
+
+# One Entra ID account group per persona. null = nobody gets that persona here.
+# The platform admins group comes from the baseline ({bu}_platform_admins).
+groups:
+  users: null              # everyone who may use the workspace: consumer access (Databricks One)
+  explorer: null           # SQL, dashboards and Genie
+  builder: null            # the full workspace: notebooks, jobs, pipelines
+  publisher: null          # the same as builder here
+
+# ---- OPTIONAL: this workspace only --------------------------------------------
+
+# Tags with one value for the whole workspace, on every warehouse, cluster and policy.
+# A required tag (config/defaults/cost.yaml) set here is not asked of each team.
+# tags:
+#   BUSINESS_UNIT: XYZ
+
+# A label next to the workspace name in the top bar.
+# Colors: coral, lemon, lime, turquoise, indigo, purple, pink.
+# label:
+#   text: DEV
+#   color: lime
+
+# Teams: their tags become allowed values on the cluster policies; a team can have
+# its own warehouse (team_warehouses). Keys: lowercase letters, digits, dashes.
+# teams:
+#   integrity:
+#     group: xyz-integrity
+#     tags:
+#       DEPARTMENT: INTEGRITY
+#       TEAM: INTEGRITY
+# team_warehouses:
+#   integrity:
+#     name: XYZ Integrity Warehouse
+#     type: serverless       # serverless | pro | classic
+#     size: X-Small
+#     min_clusters: 1
+#     max_clusters: 1
+#     auto_stop_minutes: 5
+
+# Genie Code instructions for this workspace, after the baseline's (Markdown).
+# genie_code_instructions: |
+#   ## About this workspace
+#   - Our curated tables are in `xyz_citizen_dev.shared`.
+
+# ---- OPTIONAL: changes to the baseline, for this workspace only ---------------
+
+# settings:
+#   # Not ready for Unity Catalog only yet: leave legacy access alone.
+#   disable_legacy_access: null
+#   disable_dbfs_root_and_mounts: null
+
+# catalog:
+#   # Where managed tables go, if the metastore has no storage root:
+#   storage_root: abfss://<container>@<account>.dfs.core.windows.net/<path>
+
+# default_catalog: xyz_citizen_dev   # where unqualified table names resolve
+
+# personas:
+#   builder:
+#     can_create_tokens: true        # baseline: only platform admins
+
+# sql_warehouse:
+#   size: Medium
+
+# shared_cluster:
+#   enabled: false
+
+# budget_policies:
+#   enabled: false                   # leave budget policies alone here
+
+# Local runs only: Databricks CLI profiles from ~/.databrickscfg (CI ignores them).
+# auth:
+#   workspace_profile: null
+#   account_profile: null

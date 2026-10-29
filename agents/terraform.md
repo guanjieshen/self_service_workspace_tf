@@ -6,7 +6,7 @@ they edit `config/`. Everything here turns that YAML into one workspace's resour
 ## How a plan is built
 
 ```
-config/defaults/*.yaml  +  config/workspaces/<name>/*.yaml   (or dev/workspaces/<name>/)
+config/defaults/*.yaml  +  config/workspaces/<name>.yaml   (or dev/workspaces/<name>.yaml)
         │
         ▼
 config.tf      loads and merges them (maps merge, lists and values replace, null = leave alone)

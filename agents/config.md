@@ -6,19 +6,20 @@ them) change. The full guide is [config/README.md](../config/README.md); this is
 
 ## The rule
 
-A workspace changes a default by setting **the same key in its file of the same name**:
-`config/workspaces/<name>/settings.yaml` over `config/defaults/settings.yaml`, and so on for
-`access`, `compute`, `cost` and `catalog`.
+A workspace is one file, `config/workspaces/<name>.yaml`. It changes a default by setting
+**the same top-level key as the baseline** (every key is defined in exactly one file of
+`config/defaults/`), with the same shape.
 
 - Maps merge key by key; a list or a value replaces the default.
 - `null` means "Terraform leaves this alone". On a workspace that was already applied,
   the setting is released (it keeps its current value), never reset.
 - A key the baseline does not have fails the plan with its name, so a typo cannot
   silently do nothing.
-- Keys only a workspace has: `workspace.yaml` (identity: `bu`, `lob`, `host`,
-  `account_id`, ...), `teams` (access.yaml), `team_warehouses` (compute.yaml).
-- Each workspace names its persona groups (`groups:` in its access.yaml); a persona left
-  `null` is skipped. Only `groups.platform_admins` comes from the baseline.
+- Keys only a workspace has: `bu`, `host` (required), `tags`, `teams`, `team_warehouses`,
+  `genie_code_instructions`, `label`, and rarely `account_id`, `auth`, `id`
+  (`workspace_keys` in `terraform/config.tf`).
+- Each workspace names its persona groups (`groups:`); a persona left `null` is skipped.
+  Only `groups.platform_admins` comes from the baseline.
 - Open maps take new keys in a workspace file: `tags`, and `budget_policies.policies`
   (a new key adds a policy; repeating one replaces its whole block).
 
@@ -46,6 +47,6 @@ the framework and the next upgrade replaces them.
 | `defaults/catalog.yaml` | The workspace catalog and its grants |
 | `defaults/settings.yaml` | Workspace admin and security settings |
 | `defaults/genie-code/` | Genie Code instructions and skills for every workspace |
-| `workspaces/<name>/` | One folder per workspace (`_example/` is the template; create one with `scripts/workspaces.py new`) |
+| `workspaces/<name>.yaml` | One file per workspace (copy `_example.yaml`); the files are the list of workspaces CI deploys |
 | `backend.hcl` | Where Terraform keeps state (written by `scripts/setup.py state`) |
 | `setup.yaml` | The setup values (`docs/SETUP.md`, step 1) and the AI review's workspace and model; not read by Terraform |

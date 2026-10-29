@@ -4,15 +4,15 @@
     scripts/preflight.py <workspace> [--out <file>]     (--out: also write the problems found to a file)
 
 Signs in the way Terraform does (the Databricks CLI: in CI the pipeline's sign-in; locally
-auth.workspace_profile from workspace.yaml, or the CLI's default for the workspace's host)
+auth.workspace_profile from the workspace's file, or the CLI's default for the workspace's host)
 and checks what Terraform needs but cannot fix itself:
 
   - the identity can sign in, and is a workspace admin;
   - the workspace has a Unity Catalog metastore;
-  - every group set in access.yaml exists as an ACCOUNT group (Entra ID, synced to the account):
+  - every group the workspace names exists as an ACCOUNT group (Entra ID, synced to the account):
     Unity Catalog grants and usage policies cannot use workspace-local groups;
   - the workspace catalog has somewhere to keep its data (a metastore storage root, or
-    catalog.storage_root in catalog.yaml);
+    catalog.storage_root in the workspace's file);
   - before legacy access is disabled (one-way after 30 days): what still uses it;
   - placeholders in the baseline that must be replaced (the Git allowlist's <org>).
 
@@ -31,15 +31,6 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import workspaces as wsf  # noqa: E402  (the same YAML reading as the other scripts)
 
 GROUP_KEYS = ("users", "explorer", "builder", "publisher", "platform_admins")
-
-
-def lookup(d, file, section, key):
-    """section.key for workspace folder d: its own file if it sets the key (even to null),
-    else the baseline's. Returns the value, or None for null or missing."""
-    for path in (d / file, wsf.DEFAULTS / file):
-        if any(re.match(rf"^\s{{2}}{re.escape(key)}:", l) for l in wsf.block(path, section)):
-            return wsf.nested(path, section, key)
-    return None
 
 
 def cli_get(profile):
@@ -63,9 +54,9 @@ def cli_get(profile):
 
 
 def checks(ws, get):
-    """[(level, message)] for workspace folder ws; get(path) -> (json, error)."""
-    d = wsf.ws_dir(ws)
-    info = wsf.workspace_info(d)
+    """[(level, message)] for workspace ws; get(path) -> (json, error)."""
+    f = wsf.ws_file(ws)
+    info = wsf.workspace_info(f)
     bu = info["bu"]
     out = []
 
@@ -88,10 +79,10 @@ def checks(ws, get):
         metastore, err = get(f"/api/2.1/unity-catalog/metastores/{assignment['metastore_id']}")
         out.append(("ok", f"metastore {(metastore or {}).get('name', assignment['metastore_id'])}"))
 
-    # Groups: in this workspace's access.yaml, or the baseline's (platform admins). A
+    # Groups: in this workspace's file, or the baseline's (platform admins). A
     # persona without a group is skipped: nobody gets it here.
     for key in GROUP_KEYS:
-        name = lookup(d, "access.yaml", "groups", key)
+        name = wsf.setting(f, "groups", key)
         if not name:
             out.append(("ok", f"no {key} group: skipped (nobody gets it in this workspace)"))
             continue
@@ -107,29 +98,29 @@ def checks(ws, get):
             what = ("exists only in this workspace (a workspace-local group)" if (local or {}).get("totalResults", 0)
                     else "does not exist in the account")
             out.append(("error", f"group {name} ({key}) {what}: create it in Entra ID and sync it to the account, "
-                               f"or name another group under groups.{key} in access.yaml"))
+                               f"or name another group under groups.{key} in the workspace's file"))
 
     # The workspace catalog needs storage: the metastore's, or its own storage_root.
     if info["catalog"] and metastore is not None:
         existing, _ = get(f"/api/2.1/unity-catalog/catalogs/{info['catalog']}")
         if existing and existing.get("name"):
             out.append(("ok", f"catalog {info['catalog']} already exists"))
-        elif not metastore.get("storage_root") and not lookup(d, "catalog.yaml", "catalog", "storage_root"):
+        elif not metastore.get("storage_root") and not wsf.setting(f, "catalog", "storage_root"):
             out.append(("error", f"the metastore has no storage root, so catalog {info['catalog']} needs one: set "
                                  "catalog.storage_root in catalog.yaml to an external location's URL"))
 
     # The baseline ships with placeholders to replace: a Git allowlist of github.com/<org>/
     # allows nothing that exists.
-    for path in (d / "settings.yaml", wsf.DEFAULTS / "settings.yaml"):
+    for path in (f, wsf.DEFAULTS / "settings.yaml"):
         lines = wsf.block(path, "settings")
         if any("allowed_urls" in l for l in lines):
             if any("<org>" in l for l in lines):
-                out.append(("warning", f"the Git allowlist (settings.git.allowed_urls in {path.parent.name}/settings.yaml) "
+                out.append(("warning", f"the Git allowlist (settings.git.allowed_urls in {path.relative_to(wsf.ROOT) if path.is_relative_to(wsf.ROOT) else path.name}) "
                                        "still has the placeholder https://github.com/<org>/: replace it with your organization's URL"))
             break
 
     # Legacy access: once disabled for 30 days, the workspace is Unity Catalog only, for good.
-    if lookup(d, "settings.yaml", "settings", "disable_legacy_access") == "true":
+    if wsf.setting(f, "settings", "disable_legacy_access") == "true":
         current, _ = get("/api/2.1/settings/disable_legacy_access")
         if ((current or {}).get("disable_legacy_access") or (current or {}).get("effective_boolean_val") or {}).get("value"):
             out.append(("ok", "legacy access is already disabled"))
@@ -168,11 +159,11 @@ def main(argv):
         print(__doc__.split("\n\n")[1], file=sys.stderr)
         return 2
     ws = argv[0]
-    d = wsf.ws_dir(ws)
+    f = wsf.ws_file(ws)
     in_ci = os.environ.get("GITHUB_ACTIONS") == "true"
-    profile = None if in_ci else wsf.nested(d / "workspace.yaml", "auth", "workspace_profile")
+    profile = None if in_ci else wsf.nested(f, "auth", "workspace_profile")
     if not profile and not os.environ.get("DATABRICKS_HOST"):
-        os.environ["DATABRICKS_HOST"] = wsf.workspace_info(d)["host"]
+        os.environ["DATABRICKS_HOST"] = wsf.workspace_info(f)["host"]
     results = checks(ws, cli_get(profile))
     for level, message in results:
         if in_ci and level != "ok":

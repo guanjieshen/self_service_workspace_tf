@@ -16,8 +16,8 @@ run "compute" {
     source = "./modules/compute"
   }
   variables {
-    names = { BU = "TST", bu = "tst" }
-    lob   = "TESTLOB"
+    names          = { BU = "TST", bu = "tst" }
+    workspace_tags = { LOB = "TESTLOB" }
     sql_warehouse = {
       name         = "{BU} Default Warehouse", type = "serverless", size = "Small",
       min_clusters = 1, max_clusters = 2, auto_stop_minutes = 5, workspace_default = true, tags = { TEAM = "SHARED" }

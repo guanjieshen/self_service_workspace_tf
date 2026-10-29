@@ -1,5 +1,0 @@
-settings:
-  dashboard_embedding:
-    approved_domains: [contoso.sharepoint.com]
-  data_handling:
-    notebook_export: null                # leave this one alone; the rest keep the baseline

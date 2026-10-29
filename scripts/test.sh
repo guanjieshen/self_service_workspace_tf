@@ -29,7 +29,7 @@ if run node; then
   node --test "$root"/.github/scripts/tests/*.test.js
 fi
 if run scaffold; then
-  echo "== Scaffold: scripts/workspaces.py new"
+  echo "== Scaffold: a workspace file copied from _example.yaml"
   TERRAFORM="$tf" "$root/scripts/tests/test-scaffold.sh"
 fi
 echo "All tests passed."

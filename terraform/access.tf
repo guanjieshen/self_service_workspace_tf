@@ -9,7 +9,6 @@ locals {
   persona_groups  = { for p in keys(local.personas) : p => [local.group_names[p]] if contains(keys(local.group_names), p) }
   platform_admins = compact([try(local.group_names.platform_admins, "")])
   users_group     = try(local.group_names.users, null)
-  teams           = try({ for k, v in local.access_file.teams : k => v }, {})
 
   # Groups referenced only by teams still need to be assigned to the workspace.
   extra_groups = distinct(concat(
@@ -69,10 +68,9 @@ locals {
   default_catalog = try(replace(replace(local.config.default_catalog, "{BU}", local.bu_upper), "{bu}", local.bu), null)
 
   # ---- Genie Code: workspace instructions and skills ----
-  # Each lives in a genie-code/ folder: the default in config/defaults/,
-  # this workspace's additions in config/workspaces/<name>/.
-  genie_default_dir   = "${local.defaults_dir}/genie-code"
-  genie_workspace_dir = "${local.ws_dir}/genie-code"
+  # The baseline's (config/defaults/genie-code/), the same in every workspace, plus a
+  # workspace's own instructions as text (genie_code_instructions in its file).
+  genie_default_dir = "${local.defaults_dir}/genie-code"
   # settings.genie_code in settings.yaml: true = deploy, null = leave alone.
   manage_genie_instructions = try(local.settings.genie_code.instructions, null) == true
   manage_genie_skills       = try(local.settings.genie_code.skills, null) == true
@@ -83,37 +81,34 @@ locals {
   # Instructions: the default followed by this workspace's own, with <!-- comments -->
   # removed, each under a heading.
   genie_default_text   = try(trimspace(replace(file("${local.genie_default_dir}/instructions.md"), "/(?s)<!--.*?-->/", "")), "")
-  genie_workspace_text = try(trimspace(replace(file("${local.genie_workspace_dir}/instructions.md"), "/(?s)<!--.*?-->/", "")), "")
+  genie_workspace_text = trimspace(replace(try(tostring(local.ws_all.genie_code_instructions), ""), "/(?s)<!--.*?-->/", ""))
+  # {TAGS}: the required tags; {WORKSPACE_TAGS}: the ones this workspace sets for everything in it.
+  genie_tags           = join(", ", [for t in local.config.required_tags : "`${t}`"])
+  genie_workspace_tags = length(local.workspace_tags) == 0 ? "none" : join(", ", [for k, v in local.workspace_tags : "`${k}` = `${v}`"])
   genie_parts = compact([
     local.genie_default_text == "" ? "" : "# Default instructions\n\nShared by every citizen development workspace.\n\n${local.genie_default_text}",
     local.genie_workspace_text == "" ? "" : "# Workspace instructions\n\nFor this workspace only${local.genie_default_text == "" ? "" : ", in addition to the default instructions"}.\n\n${local.genie_workspace_text}",
   ])
-  genie_instructions = length(local.genie_parts) == 0 ? null : replace(replace(replace(replace(
+  genie_instructions = length(local.genie_parts) == 0 ? null : replace(replace(replace(replace(replace(
     join("\n\n", local.genie_parts),
     "{BU}", local.bu_upper),
-    "{LOB}", local.lob),
     "{CATALOG}", local.genie_catalog),
-  "{WAREHOUSE}", local.genie_warehouse)
+    "{WAREHOUSE}", local.genie_warehouse),
+    "{WORKSPACE_TAGS}", local.genie_workspace_tags),
+  "{TAGS}", local.genie_tags)
 
   # Skills: one folder per skill under genie-code/skills/, each with a SKILL.md.
-  # Every workspace gets the default skills plus its own.
-  genie_default_skill_files   = [for f in fileset("${local.genie_default_dir}/skills", "*/**") : f if !startswith(basename(f), ".")]
-  genie_workspace_skill_files = [for f in fileset("${local.genie_workspace_dir}/skills", "*/**") : f if !startswith(basename(f), ".")]
-  genie_default_skills        = distinct([for f in local.genie_default_skill_files : split("/", f)[0]])
-  genie_workspace_skills      = distinct([for f in local.genie_workspace_skill_files : split("/", f)[0]])
-  genie_skill_clashes         = setintersection(local.genie_default_skills, local.genie_workspace_skills)
-  genie_skill_sources = merge(
-    { for f in local.genie_default_skill_files : f => "${local.genie_default_dir}/skills/${f}" },
-    { for f in local.genie_workspace_skill_files : f => "${local.genie_workspace_dir}/skills/${f}" },
-  )
+  genie_skill_files   = [for f in fileset("${local.genie_default_dir}/skills", "*/**") : f if !startswith(basename(f), ".")]
+  genie_skill_sources = { for f in local.genie_skill_files : f => "${local.genie_default_dir}/skills/${f}" }
   # Markdown gets the same treatment as the instructions; other files are deployed as they are.
   genie_skill_text = {
-    for f, src in local.genie_skill_sources : f => replace(replace(replace(replace(
+    for f, src in local.genie_skill_sources : f => replace(replace(replace(replace(replace(
       trimspace(replace(file(src), "/(?s)<!--.*?-->/", "")),
       "{BU}", local.bu_upper),
-      "{LOB}", local.lob),
       "{CATALOG}", local.genie_catalog),
-    "{WAREHOUSE}", local.genie_warehouse) if endswith(f, ".md")
+      "{WAREHOUSE}", local.genie_warehouse),
+      "{WORKSPACE_TAGS}", local.genie_workspace_tags),
+    "{TAGS}", local.genie_tags) if endswith(f, ".md")
   }
   genie_skills = {
     for f, src in local.genie_skill_sources : f => (
@@ -121,10 +116,5 @@ locals {
       ? base64encode("${local.genie_skill_text[f]}\n")
       : filebase64(src)
     )
-  }
-  # The front matter (name, description) of each deployed skill, for checks.tf.
-  genie_skill_meta = {
-    for f, text in local.genie_skill_text : split("/", f)[0] => try(yamldecode(regex("^---\\r?\\n((?s).*?)\\r?\\n---", text)[0]), {})
-    if length(split("/", f)) == 2 && endswith(f, "/SKILL.md")
   }
 }

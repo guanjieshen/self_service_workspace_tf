@@ -1,6 +1,7 @@
 # On every pull request: formatting, validation, the cross-workspace checks and every test.
-# Required by branch protection on main ("Format and validate", "Tests"). Each workspace's
-# plan runs in its own workflow (workspace-<name>.yml).
+# Required by branch protection on main ("Format and validate", "Tests"). The workspaces' plans
+# run in deploy.yml. CHECKS_RUNNER (a repository variable, JSON runs-on value) picks the runner,
+# for organizations without GitHub-hosted runners.
 name: Checks
 
 on:
@@ -12,7 +13,7 @@ permissions:
 jobs:
   checks:
     name: Format and validate
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CHECKS_RUNNER || '"ubuntu-latest"') }}
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
@@ -20,14 +21,14 @@ jobs:
           sign-in: "false"
       - run: terraform fmt -check -recursive terraform
       # Across workspaces: unique hosts, ids and catalog names, budget policy names that do
-      # not collide on an account, and one workflow per workspace folder, as generated.
+      # not collide on an account, and file names safe for workflow commands.
       - run: python3 scripts/workspaces.py check
       - run: terraform -chdir=terraform init -backend=false -input=false
       - run: terraform -chdir=terraform validate
 
   tests:
     name: Tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CHECKS_RUNNER || '"ubuntu-latest"') }}
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup

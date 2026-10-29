@@ -1,14 +1,15 @@
 locals {
   wh = var.sql_warehouse
 
-  lob_tag = { LOB = var.lob }
+  # Tags with one value for the whole workspace (its file's tags:), under every resource's own.
+  ws_tags = var.workspace_tags
 
-  default_wh_tags = merge(local.lob_tag, try(local.wh.tags, {}))
+  default_wh_tags = merge(local.ws_tags, try(local.wh.tags, {}))
 
   team_wh = {
     for k, t in var.team_warehouses : k => {
       settings = t.warehouse
-      tags     = merge(local.lob_tag, t.tags)
+      tags     = merge(local.ws_tags, t.tags)
       group    = t.group
       name     = t.warehouse.name
     }
@@ -46,7 +47,7 @@ locals {
         "autoscale.max_workers" = { type = "range", maxValue = cp.template.max_workers }
         autotermination_minutes = { type = "range", minValue = 10, maxValue = cp.template.max_autotermination_minutes, defaultValue = cp.template.max_autotermination_minutes }
       },
-      { for k, v in merge(local.lob_tag, cp.tags) : "custom_tags.${k}" => { type = "fixed", value = tostring(v) } },
+      { for k, v in merge(local.ws_tags, cp.tags) : "custom_tags.${k}" => { type = "fixed", value = tostring(v) } },
       {
         for tag, values in var.allowed_tag_values : "custom_tags.${tag}" => [
           { type = "allowlist", values = values, isOptional = false },
@@ -118,7 +119,7 @@ resource "databricks_sql_endpoint" "classic" {
 
   tags {
     dynamic "custom_tags" {
-      for_each = merge(local.lob_tag, try(local.classic_wh.tags, {}))
+      for_each = merge(local.ws_tags, try(local.classic_wh.tags, {}))
       content {
         key   = custom_tags.key
         value = tostring(custom_tags.value)
@@ -191,7 +192,7 @@ resource "databricks_cluster" "shared" {
   num_workers             = var.shared_cluster.single_node ? 0 : var.shared_cluster.num_workers
   data_security_mode      = "DATA_SECURITY_MODE_STANDARD"
   autotermination_minutes = var.shared_cluster.autotermination_minutes
-  custom_tags             = merge({ for k, v in merge(local.lob_tag, try(var.shared_cluster.tags, {})) : k => tostring(v) }, local.single_node_tags)
+  custom_tags             = merge({ for k, v in merge(local.ws_tags, try(var.shared_cluster.tags, {})) : k => tostring(v) }, local.single_node_tags)
   spark_conf              = local.single_node_conf
   no_wait                 = true # do not wait for the cluster to start on create
 }

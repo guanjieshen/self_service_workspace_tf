@@ -25,13 +25,14 @@ Each workspace gets:
 | 6 | In the Databricks account console, by hand: add the service principal, make it workspace admin, let it create budget policies | Databricks account admin |
 | 7 | Create the Entra groups and sync them to the account | Identity team |
 | 8 | Decide the baseline in `config/defaults/` | Platform team, security |
-| 9 | Onboard a workspace: `scripts/workspaces.py new`, `scripts/preflight.py`, a pull request | Platform team |
+| 9 | Onboard a workspace: copy `config/workspaces/_example.yaml` to `<name>.yaml`, fill it in, open a pull request | Platform team |
 
 ## Documentation
 
 | Read | For |
 | --- | --- |
 | [docs/SETUP.md](docs/SETUP.md) | Setting it up, onboarding workspaces, day to day, upgrades, troubleshooting |
+| [docs/user-journeys.md](docs/user-journeys.md) | Step by step: add a workspace, change one or all, give access, retire one |
 | [config/README.md](config/README.md) | Changing the configuration: which key to set for what |
 | [docs/design.md](docs/design.md) | Why it works the way it does |
 | [docs/github-actions.md](docs/github-actions.md) | The plan, apply and drift workflows |
@@ -43,12 +44,12 @@ Each workspace gets:
 | Path | What it is |
 | --- | --- |
 | `config/defaults/` | The baseline every workspace gets: `access`, `compute`, `cost`, `catalog`, `settings` `.yaml`, `genie-code/` |
-| `config/workspaces/<name>/` | One folder per workspace: `workspace.yaml`, plus the same file names to change the baseline for that workspace |
+| `config/workspaces/<name>.yaml` | One file per workspace: `bu`, `host`, its groups, and any change to the baseline. The files are the list of workspaces |
 | `config/setup.yaml` | The setup values ([docs/SETUP.md](docs/SETUP.md), step 1), and which workspace's model reviews plans |
 | `config/backend.hcl`, `.github/CODEOWNERS` | Where state is kept (written by `setup.py state`), who approves what |
 | `terraform/` | The root module and modules. You do not edit these for normal operations |
 | `scripts/` | `setup.py` (one-time setup), `workspaces.py` (new workspace, which workspaces a change affects, checks), `preflight.py` (is a workspace ready?), `tf.sh` (run Terraform), `plan-guard.py`, `ai-plan-review.py`, `test.sh` |
-| `.github/` | One workflow per workspace (`workspace-<name>.yml`), the shared steps (`workspace.yml`) and the pull request checks ([docs/github-actions.md](docs/github-actions.md)) |
+| `.github/` | `deploy.yml` (plan, apply and drift, one job per workspace) and `checks.yml` (pull request checks) ([docs/github-actions.md](docs/github-actions.md)) |
 | `docs/` | Setup, design and CI documentation |
 | `dev/` | The framework's own test workspaces; not in a release |
 | `AGENTS.md`, `agents/` | Guidance for coding agents: `AGENTS.md` is the entry point (`CLAUDE.md` points Claude Code to it), `agents/` has one guide per area |

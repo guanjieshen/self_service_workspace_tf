@@ -20,8 +20,8 @@ class Settings(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.orig = review.ROOT
         review.ROOT = pathlib.Path(self.tmp.name)
-        (review.ROOT / "config/workspaces/hub").mkdir(parents=True)
-        (review.ROOT / "config/workspaces/hub/workspace.yaml").write_text("host: https://adb-1.1.azuredatabricks.net   # hub\n")
+        (review.ROOT / "config/workspaces").mkdir(parents=True)
+        (review.ROOT / "config/workspaces/hub.yaml").write_text("host: https://adb-1.1.azuredatabricks.net   # hub\n")
 
     def tearDown(self):
         review.ROOT = self.orig

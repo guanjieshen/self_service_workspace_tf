@@ -1,3 +1,0 @@
-# Test fixture: no platform admins group.
-groups:
-  platform_admins: null

@@ -34,34 +34,6 @@ run "catalog_unknown_field" {
   expect_failures = [terraform_data.config_checks]
 }
 
-# exist both in config/defaults and in this workspace
-run "skill_clash" {
-  command = plan
-  variables { workspace = "skill-clash" }
-  expect_failures = [terraform_data.config_checks]
-}
-
-# SKILL.md name must equal the folder name
-run "skill_name_mismatch" {
-  command = plan
-  variables { workspace = "skill-name-mismatch" }
-  expect_failures = [terraform_data.config_checks]
-}
-
-# SKILL.md needs a description
-run "skill_no_description" {
-  command = plan
-  variables { workspace = "skill-no-description" }
-  expect_failures = [terraform_data.config_checks]
-}
-
-# skill folders are lowercase letters, digits and hyphens
-run "skill_bad_folder" {
-  command = plan
-  variables { workspace = "skill-bad-folder" }
-  expect_failures = [terraform_data.config_checks]
-}
-
 # team warehouses have moved to compute.yaml
 run "team_warehouse_in_team" {
   command = plan

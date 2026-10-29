@@ -22,7 +22,7 @@ request: schemas, workspace folders (the self-service app).
 ```
  Entra ID groups (synced to the account)          config/  (YAML, reviewed in pull requests)
  one group per persona, per workspace              defaults/          one baseline for every workspace
-        │   membership: Entra                        workspaces/<name>/ one folder per workspace
+        │   membership: Entra                        workspaces/        one file per workspace
         │                                                 │
         ▼                                                 ▼
  ┌─────────────────────────── Terraform, one state per workspace ───────────────────────────┐
@@ -41,12 +41,12 @@ repository and no Terraform run.
 
 ## 3. Configuration model
 
-One rule: **a workspace changes a default by setting the same key in its file of the
-same name** (`config/workspaces/<name>/settings.yaml` over `config/defaults/settings.yaml`,
-and so on for `access`, `compute`, `cost`, `catalog`). Maps merge key by key, a list or
+One rule: **a workspace is one file, `config/workspaces/<name>.yaml`, and it changes a
+default by setting the same top-level key as the baseline** (every key is defined in exactly
+one file of `config/defaults/`). Maps merge key by key, a list or
 value replaces, and `null` means "Terraform leaves this alone". A key the baseline does
 not have fails the plan with its name, so a typo cannot silently do nothing. A few keys
-exist only in a workspace's files: `workspace.yaml` (identity), `teams`, `team_warehouses`.
+exist only in a workspace's file: `bu`, `host`, `tags`, `teams`, `team_warehouses`, `genie_code_instructions`.
 See config/README.md for the files and a task table.
 
 **Leaving a setting alone releases it.** On a workspace that was already applied, a
@@ -94,7 +94,7 @@ workspace. What keeps that safe:
 - The groups must be **account groups** (Entra ID groups synced to the account). Unity
   Catalog and usage policies cannot use groups that exist only in a workspace
   ([docs](https://learn.microsoft.com/en-us/azure/databricks/admin/users-groups/workspace-local-groups)).
-- Each workspace names its own persona groups (`groups:` in its `access.yaml`); only
+- Each workspace names its own persona groups (`groups:` in its file); only
   `{bu}_platform_admins` comes from the baseline. A persona without a group is skipped.
 
 **Requests.** Three paths, by volume and risk:
@@ -103,7 +103,7 @@ workspace. What keeps that safe:
 |---|---|
 | A persona (explorer, builder, publisher) | The person asks in Entra (for example an access package), which adds them to the group. No pull request |
 | A schema or a workspace folder | The self-service app, outside this repository |
-| A team warehouse | A person writes a file under `config/workspaces/<name>/` and opens a pull request: plan, AI review, approval, apply |
+| A team warehouse | A person edits the workspace's file and opens a pull request: plan, AI review, approval, apply |
 
 ## 5. The workspace catalog
 
@@ -156,7 +156,7 @@ them from the self-service app.
 | S4 | Interactive notebook results in the workspace's own storage? | Not managed |
 | P5 | Approved dashboard embedding domains? | None |
 | P7 | GitHub org URL for the Git allowlist? | Placeholder |
-| P8 | Required tag keys (LOB, DEPARTMENT, TEAM)? | As is |
+| P8 | Required tag keys, and which a workspace sets for everything in it (`tags:`)? | Placeholders: `LOB`, `DEPARTMENT`, `TEAM` |
 | P12 | Remove `users` from `/Workspace/Shared` so folder permissions mean something? | Organisation only |
 
 ## 8. Not built yet
@@ -171,7 +171,7 @@ Ideas that are not built. Each needs review and a decision before work starts; t
 
 ### Combined mode (F1)
 
-A second stack creates the workspace itself (Premium, VNet injection into an existing VNet, no public IP, front-end and back-end PrivateLink, private DNS) and passes the workspace URL to this stack. `workspace.yaml` would gain a `create: true` option and network settings; the onboarding steps stay the same.
+A second stack creates the workspace itself (Premium, VNet injection into an existing VNet, no public IP, front-end and back-end PrivateLink, private DNS) and passes the workspace URL to this stack. The workspace file would gain a `create: true` option and network settings; the onboarding steps stay the same.
 
 ### Unity Catalog stream (F2)
 
@@ -183,4 +183,4 @@ Schemas and workspace folders are requested through the self-service app, which 
 
 - **The workspace catalog** (`{bu}_citizen_dev`), owned by the platform admins group. Personas have only `USE CATALOG` and `USE SCHEMA` on it; the app grants on the schemas it creates.
 - **Catalog grants are authoritative:** a privilege granted on the catalog outside `catalog.yaml` is removed on the next apply. The app's service principal needs a privilege on the catalog (for example `CREATE SCHEMA`): add it to `catalog.yaml`, not by hand.
-- **The persona groups** each workspace names in its `access.yaml`.
+- **The persona groups** each workspace names in its file.

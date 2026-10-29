@@ -4,7 +4,7 @@
     scripts/ai-plan-review.py <workspace> [--base <git-ref>] [--endpoint <name>] [--profile <p>] [--request-only]
     scripts/ai-plan-review.py --settings
 
-Settings are in config/setup.yaml: ai_review_workspace, the workspace folder whose model
+Settings are in config/setup.yaml: ai_review_workspace, the workspace whose model
 reviews every plan (null = no review), and ai_review_model. One call to that model (a Unity
 Gateway model service), with the pull request and the plan as its only inputs, signed in
 as the pipeline (or --profile, a Databricks CLI profile, locally). --endpoint overrides the
@@ -154,21 +154,21 @@ def setup_value(key):
 
 
 def load_settings():
-    """The review's settings: on when ai_review_workspace names a workspace folder."""
+    """The review's settings: on when ai_review_workspace names a workspace."""
     workspace = setup_value("ai_review_workspace")
     model = setup_value("ai_review_model") or DEFAULT_MODEL
-    host = workspace_field(workspace, "host") if workspace and (ws_dir(workspace) / "workspace.yaml").exists() else ""
+    host = workspace_field(workspace, "host") if workspace and ws_file(workspace).exists() else ""
     if workspace and not host:
-        raise ValueError(f"ai_review_workspace {workspace!r} in {setup_file().name} is not a workspace folder with a host")
+        raise ValueError(f"ai_review_workspace {workspace!r} in {setup_file().name} is not a workspace file with a host")
     return {"enabled": bool(workspace), "workspace": workspace or "", "host": host, "endpoint": model, "label": model}
 
 
-def ws_dir(workspace):
-    """The workspace's folder: config/workspaces/<name>/, or dev/workspaces/<name>/ for the
-    workspaces that test the framework (the same rule as scripts/workspaces.py)."""
-    found = [d for d in (ROOT / "config/workspaces" / workspace, ROOT / "dev/workspaces" / workspace)
-             if (d / "workspace.yaml").exists()]
-    return found[0] if found else ROOT / "config/workspaces" / workspace
+def ws_file(workspace):
+    """The workspace's file: config/workspaces/<name>.yaml, or dev/workspaces/<name>.yaml for
+    the workspaces that test the framework (the same rule as scripts/workspaces.py)."""
+    found = [f for f in (ROOT / "config/workspaces" / f"{workspace}.yaml", ROOT / "dev/workspaces" / f"{workspace}.yaml")
+             if f.exists()]
+    return found[0] if found else ROOT / "config/workspaces" / f"{workspace}.yaml"
 
 
 def config_diff(base):
@@ -187,7 +187,7 @@ def changed_files(base, workspace):
     for path in git("diff", "--name-only", base).split():
         if path.startswith("config/defaults/"):
             kind = "baseline (affects every workspace)"
-        elif re.match(rf"(config|dev)/workspaces/{re.escape(workspace)}/", path):
+        elif re.match(rf"(config|dev)/workspaces/{re.escape(workspace)}\.yaml$", path):
             kind = "this workspace's file"
         elif re.match(r"(config|dev)/workspaces/", path):
             kind = "another workspace's file (not this plan)"
@@ -238,8 +238,8 @@ def state_note(plan):
 
 
 def workspace_field(workspace, key):
-    """A top-level value from the workspace's workspace.yaml."""
-    text = (ws_dir(workspace) / "workspace.yaml").read_text()
+    """A top-level value from the workspace's file."""
+    text = ws_file(workspace).read_text()
     return next((l.split(":", 1)[1].split("#")[0].strip().strip("\"'") for l in text.splitlines()
                  if l.startswith(f"{key}:")), "")
 
@@ -252,12 +252,9 @@ def build_request(workspace, base, settings):
     changes = json.dumps(planned_changes(plan), indent=1)
     if len(changes) > MAX_CHANGES_CHARS:
         changes = changes[:MAX_CHANGES_CHARS] + "\n... (truncated)"
-    folder = ws_dir(workspace)
+    path = ws_file(workspace)
     host = workspace_field(workspace, "host")
-    ws_files = "\n\n".join(
-        f"# {f.name}\n{without_comments(f)}"
-        for f in sorted([*folder.glob("*.yaml"), *folder.glob("*.md")])
-    )
+    ws_files = f"# {path.name}\n{without_comments(path)}"
     user = (
         f"<workspace>\n{workspace} ({host})\n</workspace>\n\n"
         f"<state>\n{state_note(plan)}\n</state>\n\n"

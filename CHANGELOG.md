@@ -6,11 +6,20 @@ them for you: a setting missing from your baseline is left alone).
 
 ## Unreleased
 
-- One workflow per workspace (`.github/workflows/workspace-<name>.yml`, written by
-  `scripts/workspaces.py new`), calling the shared `workspace.yml`: plan on pull requests,
-  apply on merge, drift every Monday. A change to `config/defaults/` runs every workspace's.
-  `checks.yml` runs Format and validate and Tests on every pull request. Replaces plan.yml,
-  apply.yml, drift.yml, `workspaces.py changed` and the `ci:` key in `workspace.yaml`.
+- **A workspace is one file**, `config/workspaces/<name>.yaml`: `bu`, `host`, `groups`, and any
+  baseline key it changes, at the top level. The files are the list of workspaces. Replaces the
+  workspace folders (`workspace.yaml`, `access.yaml`, ...). Add one by copying `_example.yaml`.
+- **One deploy workflow** (`deploy.yml`): it works out which workspaces a change concerns and
+  runs one job per workspace (plan on pull requests, apply on merge, drift on Mondays). A
+  deleted workspace file removes that workspace's state. Replaces the per-workspace workflows.
+  A plan with no changes gets no comment. `CHECKS_RUNNER` picks the runner for the checks.
+- `account_id` is set once, in `config/defaults/cost.yaml` (required while budget policies are on).
+- `tags:` in a workspace file replaces `lob` and the automatic `LOB` tag: any tags with one value
+  for the whole workspace. Genie Code text uses `{TAGS}` and `{WORKSPACE_TAGS}` instead of `{LOB}`.
+- Genie Code skills come from the baseline only; a workspace adds instructions as text
+  (`genie_code_instructions`). The skill format is checked by `scripts/tests/test_genie_skills.py`.
+- `workspaces.py new` is gone (copy `_example.yaml`); `docs/user-journeys.md` walks through the
+  everyday changes.
 
 - The AI plan review uses one review workspace's model for every plan
   (`ai_review_workspace` and `ai_review_model` in `config/setup.yaml`; off until set).

@@ -3,12 +3,12 @@
 GENIE CODE WORKSPACE INSTRUCTIONS: the default for every workspace.
 
 Deployed to /Workspace/.assistant_workspace_instructions.md in each workspace.
-A workspace can add its own instructions in
-config/workspaces/<name>/genie-code/instructions.md; they are appended below these.
+A workspace can add its own as text (genie_code_instructions in its
+config/workspaces/<name>.yaml); they are appended below these.
 Skills (for specific tasks) are in skills/ next to this file.
 
 - Write plain Markdown, as you would brief a new colleague.
-- Placeholders filled in per workspace: {BU}, {LOB}, {CATALOG}, {WAREHOUSE}.
+- Placeholders filled in per workspace: {BU}, {CATALOG}, {WAREHOUSE}, {TAGS} (the required tags), {WORKSPACE_TAGS} (the workspace's own).
 - Comments like this one are removed before deploying.
 - Deployed under the heading "Default instructions"; a workspace's own
   instructions follow under "Workspace instructions". Start sections here at ##.
@@ -35,7 +35,7 @@ This is a governed citizen development workspace for the {BU} business unit. Fol
 
 ## Cost attribution
 
-- Every workload is charged back with the tags `LOB` (`{LOB}`), `DEPARTMENT` and `TEAM`. Keep them on any cluster or job you define.
+- Every workload is charged back with the tags {TAGS}. This workspace sets {WORKSPACE_TAGS} on everything for you. Keep the tags on any cluster or job you define.
 - For serverless jobs, pipelines and notebooks, select the serverless usage policy `{BU}-SHARED` when one is offered.
 
 ## Sharing work

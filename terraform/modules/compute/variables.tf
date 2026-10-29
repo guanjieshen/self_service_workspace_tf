@@ -3,8 +3,10 @@ variable "names" {
   type        = map(string)
 }
 
-variable "lob" {
-  type = string
+variable "workspace_tags" {
+  description = "Tags with one value for the whole workspace (its file's tags:), added to every warehouse, cluster and cluster policy."
+  type        = map(string)
+  default     = {}
 }
 
 variable "sql_warehouse" {

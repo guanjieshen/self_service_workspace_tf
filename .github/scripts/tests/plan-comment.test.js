@@ -42,6 +42,27 @@ test('preflight problems are shown before the plan', () => {
   assert.doesNotMatch(buildBody('ws', 'm', plans({ '.preflight.txt': '' })), /Preflight/);
 });
 
+test('a workspace with no changes gets no new comment, but an existing one is updated', async () => {
+  const { post, worthPosting } = require('../plan-comment.js');
+  const quiet = plans({ '.changes': '0', '.txt': 'No changes.' });
+  assert.equal(worthPosting('ws', quiet), false);
+  assert.equal(worthPosting('ws', plans({ '.changes': '0', '.preflight.txt': 'error: x' })), true, 'preflight problems are shown');
+  assert.equal(worthPosting('ws', plans({ '.changes': '3' })), true);
+  assert.equal(worthPosting('ws', plans({})), true, 'a failed plan is shown');
+  const calls = [];
+  let existing = [];
+  const github = {
+    paginate: async () => existing,
+    rest: { issues: { listComments: 'list', createComment: async () => calls.push('create'), updateComment: async () => calls.push('update') } },
+  };
+  const context = { repo: { owner: 'o', repo: 'r' }, issue: { number: 1 } };
+  await post({ github, context }, 'ws', 'm', quiet);
+  assert.deepEqual(calls, [], 'nothing posted for a plan with no changes');
+  existing = [{ id: 9, body: '<!-- plan:ws -->\nold' }];
+  await post({ github, context }, 'ws', 'm', quiet);
+  assert.deepEqual(calls, ['update'], 'an earlier comment is brought up to date');
+});
+
 test('a long plan is cut from the start to fit in a GitHub comment', () => {
   const plan = 'start\n' + 'x'.repeat(200000) + '\nend of plan';
   const body = buildBody('ws', 'm', plans({ '.txt': plan, '.changes': '9', '.ai.md': 'review' }));

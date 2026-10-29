@@ -1,24 +1,14 @@
 # How a workspace changes the baseline.
 #
-# config/workspaces/<name>/<file>.yaml may set any key of config/defaults/<file>.yaml, with
-# the same name and shape (config.tf merges them). A key set to null means "Terraform leaves
+# config/workspaces/<name>.yaml may set any top-level key of config/defaults/, with the same
+# name and shape (config.tf merges them). A key set to null means "Terraform leaves
 # this alone": on a workspace that was already applied, scripts/tf.sh then removes what the
 # setting owns from the state ("release") instead of destroying it, because destroying a
 # setting resets it.
 
 locals {
-  # Keys only a workspace has (who and what is in it), besides the baseline's own keys.
-  workspace_only_keys = {
-    access  = ["teams"]
-    compute = ["team_warehouses"]
-  }
-
-  # Every baseline section a workspace file sets.
-  overrides = merge([
-    for f, sections in local.default_sections : {
-      for s in sections : s => local.ws_parts[f][s] if contains(keys(try(local.ws_parts[f], {})), s)
-    }
-  ]...)
+  # Every baseline section the workspace file sets.
+  overrides = { for s in local.defaults_sections : s => local.ws_all[s] if contains(keys(local.ws_all), s) }
 
   # Override paths the baseline does not have (usually a typo), two levels deep, and three
   # for map values. Open maps take any keys: tags, and maps that are empty in the
