@@ -36,7 +36,7 @@ One Entra service principal, for every workspace and for the Terraform state, th
 
 No job that signs in runs in a GitHub Environment, because that would change its subject to `environment:<name>`. The one environment, `apply-approval`, is the approval step before each workspace's apply: it holds nothing and signs in to nothing.
 
-Onboarding a workspace therefore needs nothing in GitHub or Entra: make the service principal workspace admin there (`scripts/setup.py databricks`), add the folder, merge.
+Onboarding a workspace therefore needs nothing in GitHub or Entra: make the service principal workspace admin there (by hand, docs/SETUP.md step 6), add the folder, merge.
 
 ## One-time setup
 
@@ -47,9 +47,9 @@ Onboarding a workspace therefore needs nothing in GitHub or Entra: make the serv
 | 1. Terraform state | `scripts/setup.py state` | A storage account (no public access, no shared keys, versioning and soft delete), the `tfstate` container, `config/backend.hcl`. Each workspace gets its own state file, `citizen-dev/<name>.tfstate` |
 | 2. The identity | `scripts/setup.py identity` | The Entra app and service principal, its two federated credentials, Storage Blob Data Contributor on the state container |
 | 3. The repository | `scripts/setup.py github` | Variables `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`; labels `allow-risky-changes` and `drift`; the `apply-approval` environment (deployments from `main` only; `apply_approvers` in `config/setup.yaml` adds required reviewers); branch protection on `main` (pull requests, the **Format and validate** and **Tests** checks, code owner review) |
-| 4. Databricks | `scripts/setup.py databricks` | The service principal in the Databricks account, workspace admin in each workspace. Needs a Databricks account admin |
+| 4. Databricks | By hand, in the account console (docs/SETUP.md, step 6) | The service principal in the Databricks account, workspace admin in each workspace, the budget policy permission. Needs a Databricks account admin |
 
-Then, by hand: give the service principal the permission to create budget policies in the account console (or set `budget_policies.enabled: false` in `config/defaults/cost.yaml`), and replace the owners in `.github/CODEOWNERS` with your teams.
+Then, by hand: replace the owners in `.github/CODEOWNERS` with your teams.
 
 Required reviewers on environments and branch protection need GitHub Team or Enterprise for private repositories. Without required reviewers, merging the pull request is the approval: the apply runs straight after the merge.
 
@@ -88,8 +88,8 @@ needs, need more than workspace admin, or are a person's decision by design:
 | State storage and `config/backend.hcl` (`setup.py state`) | Cloud team | Once | Terraform's own state lives there |
 | The Entra service principal, its federated credentials and role on the state (`setup.py identity`) | Entra admin | Once | It is the identity Actions signs in as |
 | Repository variables, labels, `apply-approval`, branch protection (`setup.py github`), CODEOWNERS | GitHub organization admin | Once | Repository administration, not deployment |
-| Add the service principal to the Databricks account (`setup.py databricks`), with the budget policy permission | Databricks account admin | Once | Needs account admin; giving CI account admin is too broad |
-| Make the service principal workspace admin (`setup.py databricks <workspace>`) | Databricks account admin | Per new workspace | It is how CI gets in |
+| Add the service principal to the Databricks account, with the budget policy permission (by hand) | Databricks account admin | Once | Needs account admin; giving CI account admin is too broad |
+| Make the service principal workspace admin (by hand) | Databricks account admin | Per new workspace | It is how CI gets in |
 | The workspace itself, with Unity Catalog | Your provisioning process | Per new workspace | This repository configures workspaces; it does not create them |
 | Entra groups synced to the account (`{bu}_users`, `{bu}_explorer`, `{bu}_builder`, `{bu}_publisher`, `{bu}_platform_admins`) | Identity team | Per business unit | Entra owns people and groups |
 | A runner inside the network, if workspaces use Private Link or IP access lists | Cloud team | Once | Infrastructure Actions runs on |
@@ -129,7 +129,7 @@ To try a different model or prompt on one pull request, change these files in th
 | --- | --- |
 | Change a workspace | PR editing files in `config/workspaces/<name>/`; review the plan comment; merge; approve the deployment (if `apply-approval` has reviewers) |
 | Change the baseline | PR editing `config/defaults/`; the PR shows a plan for every workspace |
-| Onboard a workspace | `scripts/workspaces.py new`, `scripts/setup.py databricks <name>` (account admin), `scripts/preflight.py <name>`, then a PR with the new folder (docs/SETUP.md, step 9) |
+| Onboard a workspace | `scripts/workspaces.py new`, the service principal as workspace admin (account admin, by hand), `scripts/preflight.py <name>`, then a PR with the new folder (docs/SETUP.md, step 9) |
 | Retry a failed apply | Re-run the latest Apply run (it refuses if `main` has moved on since); otherwise open a pull request |
 | Investigate drift | Open the `drift` issue; either update the configuration or re-apply |
 

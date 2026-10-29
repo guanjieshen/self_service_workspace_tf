@@ -3,7 +3,8 @@
 #
 # Fill in every REQUIRED value; the OPTIONAL ones have defaults.
 # Then run, in order (each prints what it will do; add --run to do it):
-#   python3 scripts/setup.py state | identity | github | databricks
+#   python3 scripts/setup.py state | identity | github
+# The Databricks account step (docs/SETUP.md, step 6) is done by hand.
 #
 # None of these are secrets: commit this file.
 # =============================================================================
@@ -16,14 +17,12 @@ state_location: canadacentral                           # region for the state s
 state_resource_group: guanjie-rg                        # resource group for the state; created if missing (cloud team)
 state_storage_account: guanjieadls2026                  # storage account: 3 to 24 lowercase letters and digits; created if missing (cloud team)
 state_container: tfstatetest                            # blob container for the state files, for example tfstate (cloud team)
-databricks_account_id: null                             # Databricks account ID: account console, top right (Databricks account admin)
 
 # ---- OPTIONAL: the default is fine unless you have a reason -----------------
 
 github_repo: null                   # <org>/<repo> that runs the pipeline (Entra trusts only it). Default: this clone's GitHub origin
 pipeline_name: null                 # display name of the service principal CI signs in as. Default: sp-citizen-dev-terraform
 apply_approvers: null               # <org>/<team> that must approve each apply. Default: none (merging approves)
-databricks_account_profile: null    # Databricks CLI profile for the account. Default: sign in with the Azure CLI
 
 # ---- WRITTEN BY SETUP: leave empty -------------------------------------------
 

@@ -11,7 +11,7 @@ This guide takes the repository from a zip file to its first governed workspace.
 | 3 | [Terraform state storage](#3-terraform-state-storage) | Cloud team | Once |
 | 4 | [The pipeline identity](#4-the-pipeline-identity) | Entra admin | Once |
 | 5 | [Repository settings](#5-repository-settings) | GitHub organization admin | Once |
-| 6 | [Databricks account](#6-databricks-account) | Databricks account admin | Once, then per workspace |
+| 6 | [Databricks account (by hand)](#6-databricks-account-by-hand) | Databricks account admin | Once, then per workspace |
 | 7 | [Groups](#7-groups) | Identity team | Per business unit |
 | 8 | [Decide the baseline](#8-decide-the-baseline) | Platform team, security | Once, before the first apply |
 | 9 | [Onboard a workspace](#9-onboard-a-workspace) | Platform team | Per workspace |
@@ -20,7 +20,7 @@ This guide takes the repository from a zip file to its first governed workspace.
 
 Steps 3 to 8 can run in parallel once step 2 is done, except that step 4 needs the storage account from step 3, and steps 5 and 6 need the client ID from step 4.
 
-Every setup command reads its values from `config/setup.yaml` and prints the script it would run, so you can read it first or send it to the team that owns the step; add `--run` to run it. Each one checks before it creates, so running it again is safe.
+Steps 3 to 5 are commands that read their values from `config/setup.yaml`; step 6 is done by hand in the Databricks account console. Each command prints the script it would run, so you can read it first or send it to the team that owns the step; add `--run` to run it. Each one checks before it creates, so running it again is safe.
 
 > [!TIP]
 > Run every command from the repository root. Tools: Terraform 1.9+, Python 3.9+, the Databricks CLI, the Azure CLI (`az`) and the GitHub CLI (`gh`), each signed in as the person running that step.
@@ -37,13 +37,11 @@ state_location: canadacentral
 state_resource_group: rg-databricks-tfstate
 state_storage_account: stdbxcitizendevstate
 state_container: tfstate
-databricks_account_id: 00000000-0000-0000-0000-000000000000
 
 # ---- OPTIONAL ----
 github_repo: null
 pipeline_name: null
 apply_approvers: my-org/databricks-platform
-databricks_account_profile: null
 
 # ---- WRITTEN BY SETUP ----
 pipeline_client_id: null
@@ -57,19 +55,17 @@ pipeline_client_id: null
 | **`state_resource_group`** | The resource group for the state storage (created if missing) | Cloud team | 3, 4 |
 | **`state_storage_account`** | 3 to 24 lowercase letters and digits, unique across Azure (created if missing; an existing one is used as it is) | Cloud team | 3, 4 |
 | **`state_container`** | The blob container for the state files, for example `tfstate` | Cloud team | 3, 4 |
-| **`databricks_account_id`** | Account console, top right. `workspaces.py new` writes it into each workspace too | Databricks account admin | 6, 9 |
 | `github_repo` | The repository that runs the pipeline, `<org>/<repo>`: Entra lets only its pull requests and `main` branch sign in, and step 5 configures it. Default: this clone's GitHub origin (steps 4 and 5 print which one they use). Set it only to run setup from a copy without that origin | GitHub admin | 4, 5 |
 | `pipeline_name` | Display name of the service principal CI signs in as. Default `sp-citizen-dev-terraform` | Entra admin | 4, 6 |
 | `apply_approvers` | `<org>/<team>` that must approve each apply in GitHub. Default: none, merging approves | Platform team | 5 |
-| `databricks_account_profile` | A Databricks CLI profile for the account. Default: sign in with the Azure CLI | Databricks account admin | 6 |
-| `pipeline_client_id` | The service principal's client ID: step 4 creates it and writes it here | | 5, 6 |
+| `pipeline_client_id` | The service principal's client ID: step 4 creates it and writes it here | | 5, 6 (by hand) |
 
 Two more things to know before you start; they live in their own files, not here:
 
 | What | Example | Who | Where it goes |
 | --- | --- | --- | --- |
 | The network path to the workspaces | Public, IP access list or Private Link | Cloud team | Step 5: a runner, if not public |
-| For each workspace: name, business unit code, LOB, URL | `fin-citizen-dev`, `fin`, `FIN`, `https://adb-....azuredatabricks.net` | Platform team | Step 9: `workspaces.py new` |
+| For each workspace: name, business unit code, LOB, URL, and the Databricks account ID | `fin-citizen-dev`, `fin`, `FIN`, `https://adb-....azuredatabricks.net` | Platform team | Step 9: `workspaces.py new` |
 | For each business unit: the five Entra groups | `fin_users`, `fin_explorer`, `fin_builder`, `fin_publisher`, `fin_platform_admins` | Identity team | Step 7; names in `config/defaults/access.yaml` |
 
 ## 2. Put the repository in your GitHub
@@ -143,20 +139,17 @@ Then, if needed:
 > [!WARNING]
 > Required reviewers and branch protection need GitHub Team or Enterprise for private repositories. Without them, merging is the only approval and nothing stops a merge before its plan finishes: wait for every check first.
 
-## 6. Databricks account
+## 6. Databricks account (by hand)
 
-**Who:** a Databricks account admin, signed in with the Azure CLI (or with the Databricks CLI profile in `databricks_account_profile`).
+**Who:** a Databricks account admin, in the account console (https://accounts.azuredatabricks.net). Once, before the first workspace; items 2 and 4 again for each new workspace. You need the service principal's client ID, `pipeline_client_id` in `config/setup.yaml` (step 4 writes it).
 
-1. Add the service principal to the account, and make it workspace admin of each workspace already in `config/workspaces/` (none yet on a fresh install; run it again per workspace in step 9):
+1. **Add the service principal to the account:** User management > Service principals > Add service principal > **Microsoft Entra ID managed**, with the application ID `pipeline_client_id` and the name `pipeline_name` (default `sp-citizen-dev-terraform`).
+2. **Make it workspace admin** of each workspace this repository manages: Workspaces > the workspace > Permissions > Add permissions > the service principal, **Admin**.
+3. **Let it create budget policies** (serverless usage policies), in the account console. If you will not grant this, set `budget_policies.enabled: false` in `config/defaults/cost.yaml` instead (and `catalog.data_classification: null`, which needs them).
+4. **Note the account ID** (account console, top right): `workspaces.py new --account-id` writes it into each workspace's `workspace.yaml` (step 9), because budget policies belong to the account.
+5. Check that each workspace's metastore can hold the workspace catalog: either the metastore has a storage root, or the workspace's `catalog.yaml` sets `catalog.storage_root` to an external location (the Unity Catalog team creates the storage credential and external location). Preflight checks this.
 
-   ```bash
-   python3 scripts/setup.py databricks --run [<workspace> ...]
-   ```
-
-2. In the account console, give the service principal the permission to create **budget policies** (serverless usage policies), or set `budget_policies.enabled: false` in `config/defaults/cost.yaml`.
-3. Check that each workspace's metastore can hold the workspace catalog: either the metastore has a storage root, or the workspace's `catalog.yaml` sets `catalog.storage_root` to an external location (the Unity Catalog team creates the storage credential and external location). Preflight checks this.
-
-The service principal is never account admin: it needs workspace admin in the workspaces it manages, plus the budget policy permission.
+The service principal is never account admin: it needs workspace admin in the workspaces it manages, plus the budget policy permission. `scripts/preflight.py` (step 9) confirms items 2 and 5 for each workspace.
 
 ## 7. Groups
 
@@ -201,10 +194,10 @@ What each setting does is in the comment beside it, and in [config/README.md](..
 
    ```bash
    python3 scripts/workspaces.py new fin-citizen-dev --bu fin --lob FIN \
-     --host https://adb-1234567890123456.7.azuredatabricks.net      # the account ID comes from config/setup.yaml
+     --host https://adb-1234567890123456.7.azuredatabricks.net --account-id <databricks-account-id>
    ```
 
-2. **Make the pipeline workspace admin there** (a Databricks account admin): `python3 scripts/setup.py databricks fin-citizen-dev --run`.
+2. **Make the pipeline workspace admin there** (a Databricks account admin): step 6, items 2 and 4, for this workspace.
 3. **Review the files** in `config/workspaces/fin-citizen-dev/`. Most are comments; set only what this workspace changes from the baseline (for example `catalog.storage_root`, or `settings.disable_legacy_access: null` for an existing workspace that is not ready).
 4. **Check it is ready** (read-only), signed in as yourself with the Azure or Databricks CLI:
 
@@ -243,7 +236,7 @@ More: [config/README.md](../config/README.md) (configuration tasks) and [docs/gi
 | `Source IP address ... is blocked by Databricks IP ACL`, or a timeout reaching the workspace | GitHub-hosted runners cannot reach the workspace | A runner inside the network and `TERRAFORM_RUNNER` (step 5) |
 | `AuthorizationPermissionMismatch` or `403` reading the state | The role on the state container is missing or still propagating | Wait a few minutes after step 4; check Storage Blob Data Contributor on the container |
 | `state blob is already locked` | Two runs on the same workspace at once (a pull request plan and an apply) | Wait for the other run, then re-run |
-| Preflight: `is not a workspace admin` | Step 6 not done for this workspace | `setup.py databricks <workspace> --run` |
+| Preflight: `is not a workspace admin` | Step 6 not done for this workspace | Step 6, item 2, for this workspace |
 | Preflight: group `does not exist in the account` or `exists only in this workspace` | The Entra group is missing, not synced, or a workspace-local group has the same name | Step 7; or name the right group under `groups:` in the workspace's `access.yaml` |
 | Preflight: `the metastore has no storage root` | New catalogs have nowhere to store data | Set `catalog.storage_root` in the workspace's `catalog.yaml` to an external location URL |
 | Apply fails creating a budget policy (permission denied) | The service principal lacks the account-level budget policy permission | Step 6, item 2, or `budget_policies.enabled: false` |

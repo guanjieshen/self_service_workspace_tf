@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Everything about workspace folders: create one, find which a change affects, check them all.
 
-    scripts/workspaces.py new <name> --bu <bu> --lob <LOB> --host <url> [--account-id <id>] [--catalog <catalog>]
+    scripts/workspaces.py new <name> --bu <bu> --lob <LOB> --host <url> --account-id <id> [--catalog <catalog>]
                                           a workspace folder from config/workspaces/_example/
     scripts/workspaces.py changed [--plan] <base-ref> <head-ref>
     scripts/workspaces.py changed --all   the workspaces a change affects, as a JSON list (CI)
@@ -242,23 +242,18 @@ def main(argv):
     if argv[:1] == ["new"]:
         ap = argparse.ArgumentParser(prog="workspaces.py new")
         ap.add_argument("name")
-        for a in ("--bu", "--lob", "--host"):
+        for a in ("--bu", "--lob", "--host", "--account-id"):
             ap.add_argument(a, required=True)
-        ap.add_argument("--account-id", help="default: databricks_account_id in config/setup.yaml")
         ap.add_argument("--catalog")
         a = ap.parse_args(argv[1:])
-        setup_file = next((f for f in (ROOT / "dev/setup.yaml", ROOT / "config/setup.yaml") if f.exists()), None)
-        a.account_id = a.account_id or (top_level(setup_file).get("databricks_account_id") if setup_file else None)
-        if not a.account_id:
-            raise SystemExit("Fill in databricks_account_id in config/setup.yaml, or pass --account-id.")
         new(a.name, a.bu, a.lob, a.host, a.account_id, a.catalog)
         print(f"""Created config/workspaces/{a.name}/.
 
 Next steps (docs/SETUP.md, step 9):
   1. The groups exist in Entra ID, synced to the Databricks account: {a.bu}_users, {a.bu}_explorer,
      {a.bu}_builder, {a.bu}_publisher, {a.bu}_platform_admins (or name others under groups: in access.yaml).
-  2. The pipeline's service principal is workspace admin (a Databricks account admin):
-     python3 scripts/setup.py databricks {a.name} --run
+  2. The pipeline's service principal is workspace admin there (by hand, a Databricks account
+     admin: docs/SETUP.md, step 6).
   3. Review the other files; keep only what this workspace changes from the baseline.
   4. python3 scripts/preflight.py {a.name}     (read-only: is the workspace ready?)
   5. Open a pull request: its plan shows what the first apply does. Merge to apply.""")

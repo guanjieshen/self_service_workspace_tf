@@ -10,7 +10,8 @@ them for you: a setting missing from your baseline is left alone).
   `main`) instead of two GitHub Environments and one credential per workspace. Onboarding a
   workspace needs nothing in GitHub or Entra. One `apply-approval` environment gates applies.
 - `scripts/setup.py`: the one-time setup as one command per team (state storage, the
-  identity, repository settings, the Databricks account), printed first, `--run` to run.
+  identity, repository settings), printed first, `--run` to run. The Databricks account step
+  (service principal, workspace admin, budget policy permission) is a checklist done by hand.
 - `scripts/preflight.py`: read-only checks that a workspace is ready (sign-in, admin rights,
   account groups, catalog storage, legacy access, baseline placeholders). The Plan workflow
   runs it and shows problems in the plan comment.

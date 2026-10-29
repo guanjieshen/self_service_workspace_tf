@@ -18,7 +18,6 @@ STEPS = {
     "identity": ["--tenant-id", "tenant", "--subscription", "sub", "--resource-group", "rg-tf", "--storage-account", "sttf",
                  "--container", "tfstate", "--repo", "org/repo"],
     "github": ["--repo", "org/repo", "--client-id", "app", "--tenant-id", "tenant", "--subscription", "sub"],
-    "databricks": ["--client-id", "app", "--account-id", "acct-1", "--account-profile", "acct"],
 }
 
 
@@ -48,7 +47,7 @@ class Scripts(unittest.TestCase):
 
     def test_every_create_is_checked_first(self):
         # Safe to run again: each create is the right side of "<exists> || <create>".
-        for step in ("state", "identity", "databricks"):
+        for step in ("state", "identity"):
             lines = render(step).splitlines()
             for n, line in enumerate(lines):
                 if re.search(r"(az [\w -]+|service-principals) create\b", line):
@@ -126,16 +125,6 @@ class Scripts(unittest.TestCase):
         self.assertIn("TEAM_ID=$(gh api orgs/org/teams/platform --jq .id)", script)
         self.assertIn('"reviewers": [{"type": "Team", "id": $TEAM_ID}]', script)
 
-    def test_databricks_makes_the_sp_admin_of_each_workspace(self):
-        load_ws = setup.wsf
-        original = load_ws.WORKSPACES
-        try:
-            load_ws.WORKSPACES = ROOT / "terraform/tests/fixtures"
-            script = render("databricks", "full")
-        finally:
-            load_ws.WORKSPACES = original
-        self.assertIn("workspace-assignment update -p acct 1111111111111111 \"$DBX_SP\" --json '{\"permissions\": [\"ADMIN\"]}'", script)
-
     def test_bad_names_are_refused(self):
         for args in (["github", "--repo", "org/repo;rm", "--client-id", "a", "--tenant-id", "t", "--subscription", "s"],
                      ["github", "--repo", "org/repo", "--client-id", "a", "--tenant-id", "t", "--subscription", "s", "--approvers", "x"]):
@@ -184,7 +173,7 @@ class SetupFile(unittest.TestCase):
         required = text[text.index("# ---- REQUIRED"):text.index("# ---- OPTIONAL")]
         self.assertEqual(re.findall(r"(?m)^(\w+):", required),
                          ["tenant_id", "subscription_id", "state_location", "state_resource_group", "state_storage_account",
-                          "state_container", "databricks_account_id"])
+                          "state_container"])
         # Required means no default: a required value is asked for, never guessed.
         for _, key, default, steps in setup.OPTIONS:
             if key in re.findall(r"(?m)^(\w+):", required):
@@ -210,13 +199,6 @@ class SetupFile(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(setup.run(script, self.path), 0)
         self.assertIn("pipeline_client_id: app-9", self.path.read_text())
-
-    def test_databricks_signs_in_with_the_azure_cli_without_a_profile(self):
-        self.fill("pipeline_client_id", "app-1")
-        self.fill("databricks_account_id", "acct-1")
-        with contextlib.redirect_stdout(io.StringIO()) as out:
-            setup.main(["databricks"])
-        self.assertIn("DATABRICKS_ACCOUNT_ID=acct-1 DATABRICKS_AUTH_TYPE=azure-cli", out.getvalue())
 
 
 if __name__ == "__main__":
