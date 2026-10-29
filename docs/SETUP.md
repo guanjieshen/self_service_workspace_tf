@@ -27,7 +27,7 @@ Every setup command reads its values from `config/setup.yaml` and prints the scr
 
 ## 1. Fill in `config/setup.yaml`
 
-**This is the first file you edit.** Every **required** value is a fact about your environment or a decision your organization makes, so nothing guesses it; the three **optional** values have defaults that suit most organizations; the last value is written by step 4. None of them are secrets: the file is committed with the repository. A step that needs a value that is still empty stops and names it.
+**This is the first file you edit.** Every **required** value is a fact about your environment or a decision your organization makes, so nothing guesses it; the **optional** values have defaults that suit most organizations; the last value is written by step 4. None of them are secrets: the file is committed with the repository. A step that needs a value that is still empty stops and names it.
 
 ```yaml
 # ---- REQUIRED ----
@@ -37,10 +37,10 @@ state_location: canadacentral
 state_resource_group: rg-databricks-tfstate
 state_storage_account: stdbxcitizendevstate
 state_container: tfstate
-github_repo: my-org/databricks-citizen-dev
 databricks_account_id: 00000000-0000-0000-0000-000000000000
 
 # ---- OPTIONAL ----
+github_repo: null
 pipeline_name: null
 apply_approvers: my-org/databricks-platform
 databricks_account_profile: null
@@ -57,8 +57,8 @@ pipeline_client_id: null
 | **`state_resource_group`** | The resource group for the state storage (created if missing) | Cloud team | 3, 4 |
 | **`state_storage_account`** | 3 to 24 lowercase letters and digits, unique across Azure (created if missing; an existing one is used as it is) | Cloud team | 3, 4 |
 | **`state_container`** | The blob container for the state files, for example `tfstate` | Cloud team | 3, 4 |
-| **`github_repo`** | This repository as `<org>/<repo>`, with its final name: the pipeline identity trusts this repository and no other | GitHub admin | 4, 5 |
 | **`databricks_account_id`** | Account console, top right. `workspaces.py new` writes it into each workspace too | Databricks account admin | 6, 9 |
+| `github_repo` | The repository that runs the pipeline, `<org>/<repo>`: Entra lets only its pull requests and `main` branch sign in, and step 5 configures it. Default: this clone's GitHub origin (steps 4 and 5 print which one they use). Set it only to run setup from a copy without that origin | GitHub admin | 4, 5 |
 | `pipeline_name` | Display name of the service principal CI signs in as. Default `sp-citizen-dev-terraform` | Entra admin | 4, 6 |
 | `apply_approvers` | `<org>/<team>` that must approve each apply in GitHub. Default: none, merging approves | Platform team | 5 |
 | `databricks_account_profile` | A Databricks CLI profile for the account. Default: sign in with the Azure CLI | Databricks account admin | 6 |

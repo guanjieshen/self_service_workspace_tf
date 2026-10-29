@@ -95,6 +95,7 @@ def identity(a):
     creds = [("github-pull-requests", "pull_request", "Plan workflow: every pull request"),
              ("github-main", "ref:refs/heads/main", "Apply and Drift workflows: the main branch")]
     lines = [f"""# The identity GitHub Actions signs in as (no secret: GitHub OIDC federated credentials).
+echo "Repository: {repo} (from {a.repo_source}). Entra will trust only its pull requests and main branch."
 {signed_in(a)}
 APP_ID=$(az ad app list --display-name {name} --query "[0].appId" -o tsv)
 [ -n "$APP_ID" ] || APP_ID=$(az ad app create --display-name {name} --sign-in-audience AzureADMyOrg --query appId -o tsv)
@@ -137,6 +138,7 @@ def github(a):
         "restrictions": None,
     })
     return f"""# Repository settings for the Plan, Apply and Drift workflows (docs/github-actions.md).
+echo "Repository: {a.repo} (from {a.repo_source})."
 gh variable set AZURE_CLIENT_ID -R {repo} -b {q(a.client_id)}
 gh variable set AZURE_TENANT_ID -R {repo} -b {q(a.tenant_id)}
 gh variable set AZURE_SUBSCRIPTION_ID -R {repo} -b {q(a.subscription)}
@@ -193,7 +195,7 @@ OPTIONS = [
     ("--resource-group", "state_resource_group", None, {"state", "identity"}),
     ("--storage-account", "state_storage_account", None, {"state", "identity"}),
     ("--container", "state_container", None, {"state", "identity"}),
-    ("--repo", "github_repo", None, {"identity", "github"}),
+    ("--repo", "github_repo", None, set()),          # default: this clone's GitHub origin
     ("--account-id", "databricks_account_id", None, {"databricks"}),
     ("--name", "pipeline_name", "sp-citizen-dev-terraform", set()),
     ("--approvers", "apply_approvers", None, set()),
@@ -210,6 +212,13 @@ def shown(path):
         return str(path.relative_to(ROOT))
     except ValueError:
         return str(path)
+
+
+def origin_repo():
+    """<org>/<repo> of this clone's GitHub origin, or None."""
+    url = subprocess.run(["git", "-C", str(ROOT), "remote", "get-url", "origin"], capture_output=True, text=True).stdout.strip()
+    m = re.search(r"github\.com[:/]([\w.-]+/[\w.-]+?)(?:\.git)?/?$", url)
+    return m.group(1) if m else None
 
 
 def setup_file():
@@ -266,6 +275,11 @@ def main(argv):
     if later:
         raise SystemExit(f"{', '.join(later)} not set yet in {shown(path)}: run `python3 scripts/setup.py identity --run` first "
                          "(it writes them), or ask the Entra admin who ran it.")
+    a.repo_source = "config/setup.yaml"
+    if a.repo is None and a.step in ("identity", "github"):
+        a.repo, a.repo_source = origin_repo(), "this clone's git origin"
+        if a.repo is None:
+            raise SystemExit(f"This clone has no GitHub origin: fill in github_repo in {shown(path)}.")
     if a.repo is not None and not re.fullmatch(r"[\w.-]+/[\w.-]+", a.repo):
         raise SystemExit(f"github_repo must be <org>/<repo>, not {a.repo!r}")
     if a.approvers and not re.fullmatch(r"[\w.-]+/[\w.-]+", a.approvers):

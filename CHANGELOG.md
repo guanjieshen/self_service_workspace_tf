@@ -16,7 +16,8 @@ them for you: a setting missing from your baseline is left alone).
   runs it and shows problems in the plan comment.
 - `docs/SETUP.md`: setting up an organization's instance, by team, starting from one flat file of
   values, `config/setup.yaml`: the values your organization decides at the top (required, never
-  guessed), three optional ones with defaults below, and the client ID `setup.py identity` writes.
+  guessed), optional ones with defaults below (`github_repo` defaults to the clone's GitHub
+  origin, and steps 4 and 5 print which repository they use), and the client ID `setup.py identity` writes.
   The Azure steps stop unless the Azure CLI is signed in to `tenant_id`. Every `setup.py` step reads it (no flags to retype).
 
 ## 1.0.0
