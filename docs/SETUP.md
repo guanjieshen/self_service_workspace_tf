@@ -42,6 +42,8 @@ state_container: tfstate
 github_repo: null
 pipeline_name: null
 apply_approvers: my-org/databricks-platform
+ai_review_workspace: null
+ai_review_model: null
 
 # ---- WRITTEN BY SETUP ----
 pipeline_client_id: null
@@ -58,6 +60,7 @@ pipeline_client_id: null
 | `github_repo` | The repository that runs the pipeline, `<org>/<repo>`: Entra lets only its pull requests and `main` branch sign in, and step 5 configures it. Default: this clone's GitHub origin (steps 4 and 5 print which one they use). Set it only to run setup from a copy without that origin | GitHub admin | 4, 5 |
 | `pipeline_name` | Display name of the service principal CI signs in as. Default `sp-citizen-dev-terraform` | Entra admin | 4, 6 |
 | `apply_approvers` | `<org>/<team>` that must approve each apply in GitHub. Default: none, merging approves | Platform team | 5 |
+| `ai_review_workspace`, `ai_review_model` | The workspace folder whose model reviews every plan, and the model. Default: no AI review; the model `system.ai.claude-sonnet-5-5` | Platform team | 9 (after the workspace is onboarded) |
 | `pipeline_client_id` | The service principal's client ID: step 4 creates it and writes it here | | 5, 6 (by hand) |
 
 Two more things to know before you start; they live in their own files, not here:
@@ -184,7 +187,7 @@ The baseline in `config/defaults/` is what every workspace gets. Most of it is a
 | Budget (usage) policies | `cost.yaml` `budget_policies.enabled` | `true` | Needs an account-level permission for the pipeline (step 6); set `false` if you will not grant it. Data classification needs them |
 | Catalog name and features | `catalog.yaml` `catalog` | `{bu}_citizen_dev`, predictive optimization, data classification and data quality monitoring on | `catalog.storage_root` is needed when the metastore has no storage root (preflight says so) |
 | Restrict workspace admins | `settings.yaml` `restrict_workspace_admins` | `false` | Needs account admin to change; leave `false` |
-| AI review of each plan | `config/ai-review.yaml` | On, `system.ai.claude-sonnet-5-5` | Advice in the plan comment only; set `enabled: false` if models are not available |
+| AI review of each plan | `config/setup.yaml` `ai_review_workspace`, `ai_review_model` | Off until a workspace is named; then `system.ai.claude-sonnet-5-5` there | Advice in the plan comment only. Name one managed workspace that has the model: it reviews every plan |
 
 What each setting does is in the comment beside it, and in [config/README.md](../config/README.md).
 
@@ -241,14 +244,14 @@ git restore --source=v1.3.0 --staged --worktree -- \
   README.md CHANGELOG.md AGENTS.md CLAUDE.md agents config/README.md config/AGENTS.md \
   config/workspaces/_example
 ```
-`git restore` also removes files the release dropped, and touches nothing else: not `config/defaults/`, your workspaces, `config/setup.yaml`, `config/ai-review.yaml` or `.github/CODEOWNERS`. A baseline setting that is new in the release is absent from your `config/defaults/` until you add it, which means "leave alone", so an upgrade never turns something on by itself; `CHANGELOG.md` lists new settings to add. Open a pull request: its plan shows what the new version changes in each workspace before anything is applied.
+`git restore` also removes files the release dropped, and touches nothing else: not `config/defaults/`, your workspaces, `config/setup.yaml` or `.github/CODEOWNERS`. A baseline setting that is new in the release is absent from your `config/defaults/` until you add it, which means "leave alone", so an upgrade never turns something on by itself; `CHANGELOG.md` lists new settings to add. Open a pull request: its plan shows what the new version changes in each workspace before anything is applied.
 
 > [!WARNING]
 > Do not edit framework files in your repository: the next upgrade replaces them. Send a fix to the framework maintainers so it is in the next release.
 
 ### State and teardown
 
-State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (copy `config/backend.hcl.example`); then each workspace has its own state file in Azure Storage, which CI requires.
+State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (step 3 writes it); then each workspace has its own state file in Azure Storage, which CI requires.
 
 `./scripts/tf.sh <name> destroy` removes what this project manages. It resets the workspace configuration keys it manages (`enable*`, `enforce*`) to `false`, which includes turning personal access tokens off; review the plan before confirming.
 
@@ -266,5 +269,5 @@ State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (cop
 | Apply fails creating a budget policy (permission denied) | The service principal lacks the account-level budget policy permission | Step 6, item 2, or `budget_policies.enabled: false` |
 | `Usage policy ID must not be empty` | Data classification runs on serverless and needs a usage policy | Turn on budget policies, or set `catalog.data_classification: null` |
 | A local plan shows permission changes that CI does not | Local plans run as you, not the pipeline: the owner entry differs | Trust the CI plan and the drift check |
-| The plan comment has no AI review | The model is unavailable to the pipeline in that workspace (region, Unity Gateway, missing EXECUTE) | Set a model in the workspace's `ai-review.yaml`, or `enabled: false`; the review is advice only |
+| The plan comment has no AI review | `ai_review_workspace` is not set, or the model is unavailable to the pipeline there (region, Unity Gateway, missing EXECUTE) | Name a workspace that has the model in `config/setup.yaml`, or change `ai_review_model`; the review is advice only |
 | Apply ran straight after the merge, without approval | `apply-approval` has no required reviewers (or the GitHub plan does not support them) | Add reviewers to the environment (`apply_approvers`, then step 5 again) |

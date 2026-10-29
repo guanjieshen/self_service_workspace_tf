@@ -72,7 +72,7 @@ class ChangedWorkspaces(unittest.TestCase):
                 self.assertEqual(self.after_changing(f), [])
 
     def test_ai_review_changes_plan_every_workspace_but_apply_none(self):
-        for f in ["scripts/ai-plan-review.py", ".github/ai/plan-review-prompt.md", "config/ai-review.yaml", "scripts/preflight.py"]:
+        for f in ["scripts/ai-plan-review.py", ".github/ai/plan-review-prompt.md", "config/setup.yaml", "scripts/preflight.py"]:
             with self.subTest(f=f):
                 self.assertEqual(sorted(self.after_changing(f, plan=True)), ["alpha", "beta"])
                 self.assertEqual(self.affected(plan=False), [], "the same change applies nothing")

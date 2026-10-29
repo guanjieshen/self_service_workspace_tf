@@ -110,12 +110,12 @@ jobs:
           "$dir/tf-summarize" -md ".plans/$WORKSPACE.json" > ".plans/$WORKSPACE.summary.md"
 
       # Advice only: a model in the workspace reads the PR and the plan and assesses the impact.
-      # Settings (on or off, model, prompt) are in config/ai-review.yaml; a workspace can
-      # override them in its own folder's ai-review.yaml.
+      # On when config/setup.yaml names ai_review_workspace: the model there reviews every
+      # workspace's plan (the pipeline is workspace admin there too).
       - name: AI review settings
         id: ai
         if: always()
-        run: ./scripts/ai-plan-review.py --settings "${{ matrix.workspace }}" >> "$GITHUB_OUTPUT"
+        run: ./scripts/ai-plan-review.py --settings >> "$GITHUB_OUTPUT"
       - name: AI impact review
         if: always() && steps.ai.outputs.enabled == 'true' && hashFiles(format('.plans/{0}.json', matrix.workspace)) != ''
         env:

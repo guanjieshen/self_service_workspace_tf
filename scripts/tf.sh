@@ -67,7 +67,7 @@ fi
 if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
   export TF_VAR_use_cli_profiles=false TF_IN_AUTOMATION=1
   [[ -f "$root/config/backend.hcl" ]] ||
-    { echo "CI needs shared state: create config/backend.hcl (see config/backend.hcl.example)."; exit 1; }
+    { echo "CI needs shared state: create config/backend.hcl with python3 scripts/setup.py state (docs/SETUP.md, step 3)."; exit 1; }
 fi
 
 # 1. Pick the backend: shared azurerm state if config/backend.hcl exists, else local files.

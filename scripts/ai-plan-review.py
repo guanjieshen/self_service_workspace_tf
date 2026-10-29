@@ -2,15 +2,13 @@
 """Ask a model to summarize a plan and assess its impact.
 
     scripts/ai-plan-review.py <workspace> [--base <git-ref>] [--endpoint <name>] [--profile <p>] [--request-only]
-    scripts/ai-plan-review.py --settings [<workspace>]
+    scripts/ai-plan-review.py --settings
 
-Settings are in config/ai-review.yaml; a workspace can override them in its own folder's
-ai-review.yaml (for example the endpoint, since the models available differ by region).
-One call to a model in the workspace being planned (a Unity Gateway model service or a
-serving endpoint), with the pull request and the plan as its only inputs.
---endpoint overrides the setting for a local test; --profile is the Databricks CLI profile
-of the planned workspace (local runs; CI signs in from the environment). --settings prints
-the settings as name=value lines for the workflow.
+Settings are in config/setup.yaml: ai_review_workspace, the workspace folder whose model
+reviews every plan (null = no review), and ai_review_model. One call to that model (a Unity
+Gateway model service), with the pull request and the plan as its only inputs, signed in
+as the pipeline (or --profile, a Databricks CLI profile, locally). --endpoint overrides the
+model for a local test. --settings prints the settings as name=value lines for the workflow.
 
 Reads .plans/<workspace>.json (from `terraform show -json`) and
 .plans/<workspace>.guard.txt, plus the git diff of config/ against --base, and
@@ -30,8 +28,9 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SETTINGS = ROOT / "config/ai-review.yaml"
-DEFAULTS = {"enabled": False, "endpoint": "", "max_tokens": 4000, "prompt": ".github/ai/plan-review-prompt.md"}
+DEFAULT_MODEL = "system.ai.claude-sonnet-5-5"
+MAX_TOKENS = 4000   # the model reasons before it writes; answers in testing used 300 to 600
+PROMPT = ".github/ai/plan-review-prompt.md"
 MAX_DIFF_CHARS = 30000
 MAX_CHANGES_CHARS = 60000
 SKIP_TYPES = {"terraform_data"}
@@ -137,38 +136,31 @@ def git(*args):
     return out.stdout if out.returncode == 0 else f"(git {args[0]} failed: {out.stderr.strip()})"
 
 
-# What a workspace may set in its own ai-review.yaml; the prompts stay shared.
-WORKSPACE_KEYS = ("enabled", "endpoint", "max_tokens")
+def setup_file():
+    """config/setup.yaml (dev/setup.yaml in the framework's own repository, when it exists)."""
+    dev = ROOT / "dev/setup.yaml"
+    return dev if dev.exists() else ROOT / "config/setup.yaml"
 
 
-def read_flat(path, allowed):
-    """The flat `key: value` lines of a settings file, typed like DEFAULTS."""
-    values = {}
-    for line in path.read_text().splitlines():
-        line = line.split("#", 1)[0].strip()
-        if ":" not in line:
-            continue
-        key, value = (part.strip() for part in line.split(":", 1))
-        if key not in allowed:
-            raise ValueError(f"{path.relative_to(ROOT)}: unknown setting {key!r} (allowed: {', '.join(allowed)})")
-        if isinstance(DEFAULTS[key], bool):
-            values[key] = value.lower() == "true"
-        elif isinstance(DEFAULTS[key], int):
-            values[key] = int(value)
-        else:
-            values[key] = value.strip("\"'")
-    return values
+def setup_value(key):
+    """A top-level value of the setup file, or None (null, empty or missing)."""
+    path = setup_file()
+    text = path.read_text() if path.exists() else ""
+    for line in text.splitlines():
+        if line.startswith(f"{key}:"):
+            value = line.split(":", 1)[1].split("#", 1)[0].strip().strip("\"'")
+            return None if value in ("", "null", "~") else value
+    return None
 
 
-def load_settings(workspace=None):
-    """config/ai-review.yaml, then the workspace's own ai-review.yaml over it."""
-    settings = dict(DEFAULTS)
-    if SETTINGS.exists():
-        settings.update(read_flat(SETTINGS, DEFAULTS))
-    if workspace and (ws_dir(workspace) / "ai-review.yaml").exists():
-        settings.update(read_flat(ws_dir(workspace) / "ai-review.yaml", WORKSPACE_KEYS))
-    settings["label"] = settings["endpoint"]
-    return settings
+def load_settings():
+    """The review's settings: on when ai_review_workspace names a workspace folder."""
+    workspace = setup_value("ai_review_workspace")
+    model = setup_value("ai_review_model") or DEFAULT_MODEL
+    host = workspace_field(workspace, "host") if workspace and (ws_dir(workspace) / "workspace.yaml").exists() else ""
+    if workspace and not host:
+        raise ValueError(f"ai_review_workspace {workspace!r} in {setup_file().name} is not a workspace folder with a host")
+    return {"enabled": bool(workspace), "workspace": workspace or "", "host": host, "endpoint": model, "label": model}
 
 
 def ws_dir(workspace):
@@ -264,7 +256,7 @@ def build_request(workspace, base, settings):
     host = workspace_field(workspace, "host")
     ws_files = "\n\n".join(
         f"# {f.name}\n{without_comments(f)}"
-        for f in sorted([*folder.glob("*.yaml"), *folder.glob("*.md")]) if f.name != "ai-review.yaml"
+        for f in sorted([*folder.glob("*.yaml"), *folder.glob("*.md")])
     )
     user = (
         f"<workspace>\n{workspace} ({host})\n</workspace>\n\n"
@@ -278,10 +270,10 @@ def build_request(workspace, base, settings):
     )
     return {
         "messages": [
-            {"role": "system", "content": (ROOT / settings["prompt"]).read_text()},
+            {"role": "system", "content": (ROOT / PROMPT).read_text()},
             {"role": "user", "content": user},
         ],
-        "max_tokens": settings["max_tokens"],
+        "max_tokens": MAX_TOKENS,
     }
 
 
@@ -325,7 +317,7 @@ def main() -> int:
     args = ap.parse_args()
 
     if args.settings:  # for the workflow: name=value lines, written to $GITHUB_OUTPUT
-        settings = load_settings(args.workspace)
+        settings = load_settings()
         for key, value in settings.items():
             print(f"{key}={str(value).lower() if isinstance(value, bool) else value}")
         return 0
@@ -337,13 +329,15 @@ def main() -> int:
         if not planned_changes(plan):
             print("AI review skipped: the plan has no changes.", file=sys.stderr)
             return 0
-        settings = load_settings(args.workspace)
+        settings = load_settings()
         request = build_request(args.workspace, args.base, settings)
         if args.request_only:
             print(json.dumps(request, indent=1))
             return 0
         if args.profile:
             os.environ["DATABRICKS_CONFIG_PROFILE"] = args.profile
+        else:  # the review workspace, whatever workspace this plan is for
+            os.environ["DATABRICKS_HOST"] = settings["host"]
         print(model_review(args.endpoint or settings["endpoint"], request))
     except Exception as e:  # advice only: never fail the build
         print(f"AI review skipped: {e}", file=sys.stderr)

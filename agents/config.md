@@ -47,6 +47,5 @@ the framework and the next upgrade replaces them.
 | `defaults/settings.yaml` | Workspace admin and security settings |
 | `defaults/genie-code/` | Genie Code instructions and skills for every workspace |
 | `workspaces/<name>/` | One folder per workspace (`_example/` is the template; create one with `scripts/workspaces.py new`) |
-| `ai-review.yaml` | The model the AI plan review uses |
 | `backend.hcl` | Where Terraform keeps state (written by `scripts/setup.py state`) |
-| `setup.yaml` | The one-time setup values (`docs/SETUP.md`, step 1); not read by Terraform |
+| `setup.yaml` | The setup values (`docs/SETUP.md`, step 1) and the AI review's workspace and model; not read by Terraform |

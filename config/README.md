@@ -1,6 +1,6 @@
 # Configuration
 
-Everything your organization edits is in this folder (plus `.github/CODEOWNERS`). An upgrade of the framework never changes these files ([docs/SETUP.md](../docs/SETUP.md), "Upgrade to a new release"); the exceptions are this README, `backend.hcl.example` and `workspaces/_example/`, which come with the framework.
+Everything your organization edits is in this folder (plus `.github/CODEOWNERS`). An upgrade of the framework never changes these files ([docs/SETUP.md](../docs/SETUP.md), "Upgrade to a new release"); the exceptions are this README and `workspaces/_example/`, which come with the framework.
 
 **People are not in this folder.** Everything is granted to groups (each workspace names its own in `access.yaml`); who is in a group is managed in Entra ID, for example through access packages or a ticketing system. Giving someone a persona never needs a change here.
 
@@ -18,10 +18,8 @@ config/
 │   ├── access.yaml           teams                    + changes to defaults/access.yaml
 │   ├── compute.yaml          team warehouses          + changes to defaults/compute.yaml
 │   ├── cost.yaml, catalog.yaml, settings.yaml   (optional) changes to the defaults file of the same name
-│   ├── genie-code/           (optional) this workspace's Genie Code instructions and skills
-│   └── ai-review.yaml        (optional) the AI review's model for this workspace
-├── setup.yaml                the one-time setup values (docs/SETUP.md, step 1)
-├── ai-review.yaml            the AI review in the plan comment, for every workspace
+│   └── genie-code/           (optional) this workspace's Genie Code instructions and skills
+├── setup.yaml                the setup values (docs/SETUP.md, step 1), and the AI review's workspace
 └── backend.hcl               where Terraform state is kept
 ```
 

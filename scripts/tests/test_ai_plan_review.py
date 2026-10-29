@@ -14,34 +14,47 @@ review = load("ai-plan-review")
 
 
 class Settings(unittest.TestCase):
-    def write(self, text):
-        f = pathlib.Path(tempfile.mkdtemp()) / "ai-review.yaml"
-        f.write_text(text)
-        return f
+    """config/setup.yaml: ai_review_workspace turns the review on; its model reviews every plan."""
 
-    def test_repository_settings_are_valid(self):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.orig = review.ROOT
+        review.ROOT = pathlib.Path(self.tmp.name)
+        (review.ROOT / "config/workspaces/hub").mkdir(parents=True)
+        (review.ROOT / "config/workspaces/hub/workspace.yaml").write_text("host: https://adb-1.1.azuredatabricks.net   # hub\n")
+
+    def tearDown(self):
+        review.ROOT = self.orig
+        self.tmp.cleanup()
+
+    def setup_yaml(self, text):
+        (review.ROOT / "config/setup.yaml").write_text(text)
+
+    def test_off_without_a_review_workspace(self):
+        self.setup_yaml("ai_review_workspace: null   # none\nai_review_model: null\n")
+        self.assertFalse(review.load_settings()["enabled"])
+        (review.ROOT / "config/setup.yaml").unlink()
+        self.assertFalse(review.load_settings()["enabled"], "no setup file: no review")
+
+    def test_the_review_workspace_and_its_model(self):
+        self.setup_yaml("ai_review_workspace: hub      # the review workspace\nai_review_model: null\n")
         s = review.load_settings()
-        self.assertIsInstance(s["enabled"], bool)
-        self.assertIsInstance(s["max_tokens"], int)
-        self.assertTrue((ROOT / s["prompt"]).exists(), "the prompt file in config/ai-review.yaml exists")
+        self.assertEqual((s["enabled"], s["host"], s["endpoint"]), (True, "https://adb-1.1.azuredatabricks.net", "system.ai.claude-sonnet-5-5"))
+        self.setup_yaml("ai_review_workspace: hub\nai_review_model: \"system.ai.claude-haiku-5-5\"\n")
+        self.assertEqual(review.load_settings()["label"], "system.ai.claude-haiku-5-5")
 
-    def test_types_and_comments(self):
-        orig = review.SETTINGS
-        try:
-            review.SETTINGS = self.write("enabled: true   # on\nmax_tokens: 123\nendpoint: \"system.ai.x\"\n# endpoint: other\n")
-            s = review.load_settings()
-        finally:
-            review.SETTINGS = orig
-        self.assertEqual((s["enabled"], s["max_tokens"], s["endpoint"]), (True, 123, "system.ai.x"))
+    def test_a_review_workspace_that_is_not_a_folder_fails(self):
+        self.setup_yaml("ai_review_workspace: nowhere\n")
+        with self.assertRaises(ValueError):
+            review.load_settings()
 
-    def test_unknown_setting_fails(self):
-        orig = review.SETTINGS
-        try:
-            review.SETTINGS = self.write("colour: blue\n")
-            with self.assertRaises(ValueError):
-                review.load_settings()
-        finally:
-            review.SETTINGS = orig
+    def test_the_shipped_prompt_exists(self):
+        self.assertTrue((self.orig / review.PROMPT).exists())
+
+    def test_the_setup_file_names_both_values(self):
+        text = (self.orig / "config/setup.yaml").read_text()
+        self.assertRegex(text, r"(?m)^ai_review_workspace:")
+        self.assertRegex(text, r"(?m)^ai_review_model:")
 
 
 class PlannedChanges(unittest.TestCase):
@@ -106,63 +119,6 @@ class Answer(unittest.TestCase):
         parts = [{"type": "reasoning", "summary": []}, {"type": "text", "text": "answer"}]
         self.assertEqual(review.response_text(resp(parts)), "answer")
         self.assertEqual(review.response_text(resp(json.dumps(parts))), "answer")
-
-
-
-class WorkspaceSettings(unittest.TestCase):
-    """A workspace's ai-review.yaml overrides the repository settings, but never the prompts."""
-
-    def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.orig = (review.ROOT, review.SETTINGS)
-        repo = pathlib.Path(self.tmp.name)
-        ws_dir = repo / "config/workspaces/wsx"
-        ws_dir.mkdir(parents=True)
-        repo_settings = repo / "settings.yml"
-        review.ROOT, review.SETTINGS = repo, repo_settings
-        self.ws_dir = ws_dir
-        self.repo_settings = repo_settings
-
-    def tearDown(self):
-        review.ROOT, review.SETTINGS = self.orig
-        self.tmp.cleanup()
-
-    def test_workspace_overrides_the_limits(self):
-        self.repo_settings.write_text("enabled: true\nendpoint: system.ai.x\nmax_tokens: 4000\n")
-        (self.ws_dir / "ai-review.yaml").write_text("max_tokens: 1200\n")
-        s = review.load_settings("wsx")
-        self.assertEqual(s["max_tokens"], 1200)
-        self.assertEqual(s["endpoint"], "system.ai.x", "keys the workspace does not set stay shared")
-
-    def test_model_override_sets_its_label(self):
-        self.repo_settings.write_text("enabled: true\nendpoint: system.ai.x\n")
-        (self.ws_dir / "ai-review.yaml").write_text("endpoint: system.ai.haiku\nmax_tokens: 2000\n")
-        s = review.load_settings("wsx")
-        self.assertEqual((s["label"], s["endpoint"], s["max_tokens"]), ("system.ai.haiku", "system.ai.haiku", 2000))
-
-    def test_without_a_file_the_repository_settings_hold(self):
-        self.repo_settings.write_text("enabled: true\nendpoint: system.ai.x\n")
-        s = review.load_settings("wsx")
-        self.assertEqual(s["endpoint"], "system.ai.x")
-
-    def test_dev_workspace_folder(self):
-        dev = pathlib.Path(self.tmp.name) / "dev/workspaces/devws"
-        dev.mkdir(parents=True)
-        (dev / "workspace.yaml").write_text("host: https://h\n")
-        (dev / "ai-review.yaml").write_text("endpoint: system.ai.dev\n")
-        self.repo_settings.write_text("enabled: true\n")
-        self.assertEqual(review.load_settings("devws")["endpoint"], "system.ai.dev")
-        self.assertEqual(review.workspace_field("devws", "host"), "https://h")
-
-    def test_unknown_key_and_shared_prompts_refused(self):
-        self.repo_settings.write_text("enabled: true\n")
-        (self.ws_dir / "ai-review.yaml").write_text("engine: genie-code\n")
-        with self.assertRaises(ValueError):
-            review.load_settings("wsx")
-        (self.ws_dir / "ai-review.yaml").write_text("prompt: my-prompt.md\n")
-        with self.assertRaises(ValueError):
-            review.load_settings("wsx")
-
 
 
 if __name__ == "__main__":

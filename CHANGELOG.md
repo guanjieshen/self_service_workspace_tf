@@ -6,6 +6,11 @@ them for you: a setting missing from your baseline is left alone).
 
 ## Unreleased
 
+- The AI plan review uses one review workspace's model for every plan
+  (`ai_review_workspace` and `ai_review_model` in `config/setup.yaml`; off until set).
+  Removed `config/ai-review.yaml` and the per-workspace `ai-review.yaml` files.
+- Removed `config/backend.hcl.example`: `setup.py state` writes `config/backend.hcl`.
+
 - Self-service is the app's: removed the team folder and personal schema jobs, their
   notebooks and the admin folder, `jobs.runners`, `personal_schemas`, shared schemas
   (`catalog.schemas`) and data quality monitoring (it watched those schemas).

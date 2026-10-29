@@ -63,7 +63,7 @@ Each topic has one home. Update that file; link to it from elsewhere instead of 
 | A Databricks setting | Map it in `terraform/overrides.tf` (`setting_addresses`) so `null` releases it | `scripts/tests/test_release.py` checks the mapping |
 | A check (a wrong value fails the plan) | `terraform/checks.tf`: the message names the key, the file and what to do | A fixture under `terraform/tests/fixtures/invalid/` and a run in `validation.tftest.hcl` |
 | A setup step or a manual step | `scripts/setup.py` if a command can do it, else the checklist in `docs/SETUP.md`; a `scripts/preflight.py` check if Terraform depends on it | `scripts/tests/test_setup.py`, `test_preflight.py` |
-| A value in `config/setup.yaml` | `docs/SETUP.md` step 1 table; `OPTIONS` in `scripts/setup.py` | `test_setup.py` checks every key in the file is read |
+| A value in `config/setup.yaml` | `docs/SETUP.md` step 1 table; `OPTIONS` in `scripts/setup.py` (or `scripts/ai-plan-review.py` for `ai_review_*`) | `test_setup.py` checks every key in the file is read |
 | A workflow | `docs/github-actions.md`; `scripts/workspaces.py` if it changes what a change plans or applies | `scripts/tests/test_changed_workspaces.py`; a job that signs in must not run in a GitHub Environment (`test_setup.py`) |
 | Something removed | Every doc that mentions it (search the repository), and its tests and fixtures | The suite still passes with nothing skipped |
 
