@@ -49,8 +49,8 @@ run "compute_options" {
     error_message = "sql_warehouse in a workspace's file overrides only the keys it sets."
   }
   assert {
-    condition     = local.config.cluster_policy.max_workers == 8 && local.config.cluster_policy.max_clusters_per_user == 1
-    error_message = "cluster_policy.max_workers overrides that limit only."
+    condition     = local.config.cluster_policy.max_workers == 8 && local.config.cluster_policy.jobs.max_clusters_per_user == 1 && local.config.cluster_policy.pipelines == null
+    error_message = "cluster_policy.max_workers overrides that limit only; pipelines: null drops that policy."
   }
 }
 

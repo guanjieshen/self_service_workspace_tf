@@ -1,6 +1,6 @@
 # =============================================================================
 # ADJUSTABLE: COMPUTE
-# The default SQL warehouse, and the one classic cluster policy.
+# The default SQL warehouse, and the classic cluster policies.
 #
 # Terraform creates what every workspace has and rarely changes. What a team or a
 # project requests (another warehouse, its own usage policy, access to classic
@@ -10,7 +10,7 @@
 # warehouse `type` may recreate it with a new ID (dashboards and jobs pointing at the
 # old ID then need updating); scripts/tf.sh warns before applying that.
 # A single workspace can change any key below in its file (config/workspaces/<name>.yaml).
-# Both carry the chargeback tags (tags: in config/defaults/cost.yaml).
+# All of them carry the chargeback tags (tags: in config/defaults/cost.yaml).
 # =============================================================================
 
 # ---- Default SQL warehouse --------------------------------------------------
@@ -26,16 +26,20 @@ sql_warehouse:
   # setting "Default warehouse"; users can still pick another). false = leave that setting alone.
   workspace_default: true
 
-# ---- Classic cluster policy -------------------------------------------------
-# Serverless first: classic compute is the exception. One generic policy per
-# workspace, for whoever the self-service app approves: Terraform creates the
-# policy but does not manage who may use it, so the app's grants stay. Workspace
-# admins can always use it.
-# On every cluster it creates, the chargeback tags are fixed, except the ones in
+# ---- Classic cluster policies -----------------------------------------------
+# Serverless first: classic compute is the exception. Three policies per workspace,
+# one per kind of cluster, so an approved person can have one interactive cluster and
+# one job cluster at the same time, but not two interactive ones. Each person's
+# clusters draw IP addresses from the workspace's subnets: at most
+# max_clusters_per_user x (1 + max_workers) nodes per policy, so keep these small.
+# For whoever the self-service app approves: Terraform creates the policies but does
+# not manage who may use them, so the app's grants stay. Workspace admins can always
+# use them. null for a kind (for example pipelines: null) means no such policy.
+# On every cluster, the chargeback tags are fixed, except the ones in
 # classic_user_tags (config/defaults/cost.yaml), which the user must fill in.
 cluster_policy:
-  name: "{BU} Classic Compute"
-  runtime: lts_only               # lts_only = long-term-support runtimes only | any
+  # Rules for all three.
+  runtime: lts_only               # lts_only = long-term-support runtimes only | any (pipelines pick their own)
   access_modes:                   # STANDARD (shared, Unity Catalog) and/or DEDICATED (single user)
     - STANDARD
   node_types:                     # VM sizes users may choose; the first is the default
@@ -43,5 +47,20 @@ cluster_policy:
     - Standard_E16_v3
     - Standard_E32_v3
   max_workers: 4
-  max_autotermination_minutes: 60 # clusters must stop after at most this many idle minutes
-  max_clusters_per_user: 1        # one cluster per person
+
+  # All-purpose clusters, for notebooks.
+  interactive:
+    name: "{BU} Classic Interactive"
+    max_clusters_per_user: 1
+    max_autotermination_minutes: 60   # must stop after at most this many idle minutes
+
+  # Job clusters: created for a run and stopped when it ends. "Per user" is whoever the
+  # job runs as, so jobs that run as one service principal share its limit.
+  jobs:
+    name: "{BU} Classic Jobs"
+    max_clusters_per_user: 1
+
+  # Pipeline (Lakeflow) clusters, for a pipeline that cannot run serverless.
+  pipelines:
+    name: "{BU} Classic Pipelines"
+    max_clusters_per_user: 1

@@ -11,7 +11,7 @@ account_id: null
 
 # ---- The chargeback tags ----------------------------------------------------
 # On everything Terraform creates: the serverless usage policy, the default SQL
-# warehouse and every cluster created with the classic cluster policy. Add, remove or
+# warehouse and every cluster created with a classic cluster policy. Add, remove or
 # rename a tag here; nothing else needs to change. A workspace changes a value (or
 # adds a tag) under tags: in its file; null there drops the tag in that workspace.
 tags:

@@ -65,7 +65,7 @@ groups:
 #   size: Medium
 
 # cluster_policy:
-#   max_workers: 8                   # the classic cluster policy's limit
+#   max_workers: 8                   # the classic cluster policies' limit
 
 # serverless_policy:
 #   enabled: false                   # leave the serverless usage policy alone here

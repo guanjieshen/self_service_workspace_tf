@@ -17,17 +17,19 @@ them for you: a setting missing from your baseline is left alone).
   - **One serverless usage policy** per workspace, `{BU}-0-SELF-SERVICE`, for every
     persona and the platform admins (`serverless_policy` replaces `budget_policies`: no
     `policies` blocks, `used_by` or `extra_managers`).
-  - **One classic cluster policy**, `{BU} Classic Compute`: the tags are fixed, except
-    `classic_user_tags`, which users must fill in (upper case, digits, `_`, `-`). Terraform
-    does not manage who may use it; the app grants it.
+  - **Three classic cluster policies**, one per kind of cluster: `{BU} Classic Interactive`,
+    `{BU} Classic Jobs` and `{BU} Classic Pipelines`, one cluster per person each, from one
+    set of rules (`cluster_policy`). The tags are fixed, except `classic_user_tags`, which
+    users must fill in (upper case, digits, `_`, `-`). Terraform does not manage who may use
+    them; the app grants them.
   - **Removed:** the per-persona cluster policies (and the persona keys `cluster_policy` and
     `shared_cluster`), the shared cluster, the classic warehouse, `teams` and
     `team_warehouses`. A workspace file that still has one of these keys fails the plan
     with the key's name.
   - **The first plan** on an applied workspace deletes the persona cluster policies, the
     shared cluster, the classic and team warehouses, and the `{BU}-SHARED` and
-    `{BU}-PLATFORM` usage policies; creates `{BU}-0-SELF-SERVICE` and `{BU} Classic
-    Compute`; and updates the tags on the default warehouse. The plan guard flags the
+    `{BU}-PLATFORM` usage policies; creates `{BU}-0-SELF-SERVICE` and the three classic
+    policies; and updates the tags on the default warehouse. The plan guard flags the
     deletes. Before merging, check what still uses them: jobs pinned to the old usage
     policies or the shared cluster, clusters created from the persona policies.
 

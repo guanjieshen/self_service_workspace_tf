@@ -44,7 +44,7 @@ users:
 # Every persona can use the workspace's serverless usage policy (config/defaults/cost.yaml)
 # and gets USE CATALOG and USE SCHEMA on the workspace catalog (config/defaults/catalog.yaml).
 # Classic compute is by request, through the self-service app: no persona can use the
-# classic cluster policy (config/defaults/compute.yaml) until the app grants it.
+# classic cluster policies (config/defaults/compute.yaml) until the app grants them.
 personas:
 
   # ---- Explorer: finds and analyzes trusted data (SQL, dashboards, Genie) ----

@@ -24,7 +24,7 @@ variable "sql_warehouse" {
 }
 
 variable "cluster_policy" {
-  description = "The classic cluster policy's rules (config/defaults/compute.yaml cluster_policy)."
+  description = "The classic cluster policies' shared rules, and interactive, jobs and pipelines (config/defaults/compute.yaml cluster_policy)."
   type        = any
 }
 

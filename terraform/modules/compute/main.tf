@@ -7,34 +7,45 @@ locals {
     DEDICATED = ["SINGLE_USER", "DATA_SECURITY_MODE_DEDICATED"]
   }
 
-  # The classic cluster policy. Optional elements use `{ for ... if cond }` so they
-  # can be merged in or left out without type conflicts.
-  policy_definition = merge(
-    { for k, v in {
-      spark_version = { type = "allowlist", values = ["auto:latest-lts", "auto:latest-lts-ml"], defaultValue = "auto:latest-lts" }
-    } : k => v if local.cp.runtime == "lts_only" },
-    {
-      data_security_mode = {
-        type         = "allowlist"
-        values       = flatten([for m in local.cp.access_modes : local.access_mode_values[m]])
-        defaultValue = local.access_mode_values[local.cp.access_modes[0]][0]
-      }
-      node_type_id            = { type = "allowlist", values = local.cp.node_types, defaultValue = local.cp.node_types[0] }
-      driver_node_type_id     = { type = "allowlist", values = local.cp.node_types, defaultValue = local.cp.node_types[0] }
-      num_workers             = { type = "range", maxValue = local.cp.max_workers }
-      "autoscale.max_workers" = { type = "range", maxValue = local.cp.max_workers }
-      autotermination_minutes = { type = "range", minValue = 10, maxValue = local.cp.max_autotermination_minutes, defaultValue = local.cp.max_autotermination_minutes }
-    },
-    # The chargeback tags are fixed on every cluster...
-    { for k, v in var.tags : "custom_tags.${k}" => { type = "fixed", value = v } if !contains(var.classic_user_tags, k) },
-    # ...except the ones the user fills in: required, one spelling, starting from the tag's value if it has one.
-    {
-      for k in var.classic_user_tags : "custom_tags.${k}" => merge(
-        { type = "regex", pattern = var.user_tag_pattern, isOptional = false },
-        { for d, v in { defaultValue = lookup(var.tags, k, null) } : d => v if v != null },
-      )
-    },
-  )
+  # The classic cluster policies, one per kind of cluster, from one set of rules.
+  # Pipelines choose their own runtime and stop by themselves, so their policy has no
+  # runtime or auto-termination rule (pipeline compute rejects them).
+  cluster_types = { interactive = "all-purpose", jobs = "job", pipelines = "dlt" }
+  policy_kinds  = { for k, v in local.cp : k => v if contains(keys(local.cluster_types), k) && v != null }
+
+  # Optional elements use `{ for ... if cond }` so they can be merged in or left out
+  # without type conflicts.
+  policy_definitions = {
+    for kind, p in local.policy_kinds : kind => merge(
+      { cluster_type = { type = "fixed", value = local.cluster_types[kind] } },
+      { for k, v in {
+        spark_version = { type = "allowlist", values = ["auto:latest-lts", "auto:latest-lts-ml"], defaultValue = "auto:latest-lts" }
+      } : k => v if local.cp.runtime == "lts_only" && kind != "pipelines" },
+      { for k, v in {
+        autotermination_minutes = { type = "range", minValue = 10, maxValue = try(p.max_autotermination_minutes, 0), defaultValue = try(p.max_autotermination_minutes, 0) }
+      } : k => v if try(p.max_autotermination_minutes, null) != null && kind == "interactive" },
+      {
+        data_security_mode = {
+          type         = "allowlist"
+          values       = flatten([for m in local.cp.access_modes : local.access_mode_values[m]])
+          defaultValue = local.access_mode_values[local.cp.access_modes[0]][0]
+        }
+        node_type_id            = { type = "allowlist", values = local.cp.node_types, defaultValue = local.cp.node_types[0] }
+        driver_node_type_id     = { type = "allowlist", values = local.cp.node_types, defaultValue = local.cp.node_types[0] }
+        num_workers             = { type = "range", maxValue = local.cp.max_workers }
+        "autoscale.max_workers" = { type = "range", maxValue = local.cp.max_workers }
+      },
+      # The chargeback tags are fixed on every cluster...
+      { for k, v in var.tags : "custom_tags.${k}" => { type = "fixed", value = v } if !contains(var.classic_user_tags, k) },
+      # ...except the ones the user fills in: required, one spelling, starting from the tag's value if it has one.
+      {
+        for k in var.classic_user_tags : "custom_tags.${k}" => merge(
+          { type = "regex", pattern = var.user_tag_pattern, isOptional = false },
+          { for d, v in { defaultValue = lookup(var.tags, k, null) } : d => v if v != null },
+        )
+      },
+    )
+  }
 }
 
 # ---- Default SQL warehouse ----
@@ -80,11 +91,12 @@ resource "databricks_permissions" "default_warehouse" {
   }
 }
 
-# ---- The classic cluster policy ----
-# Who may use it is not managed here: the self-service app grants it on request, and
-# managing its permissions would remove the app's grants. Workspace admins can always use it.
+# ---- The classic cluster policies ----
+# Who may use them is not managed here: the self-service app grants them on request, and
+# managing their permissions would remove the app's grants. Workspace admins can always use them.
 resource "databricks_cluster_policy" "classic" {
-  name                  = replace(replace(local.cp.name, "{BU}", var.names.BU), "{bu}", var.names.bu)
-  definition            = jsonencode(local.policy_definition)
-  max_clusters_per_user = local.cp.max_clusters_per_user
+  for_each              = local.policy_kinds
+  name                  = replace(replace(each.value.name, "{BU}", var.names.BU), "{bu}", var.names.bu)
+  definition            = jsonencode(local.policy_definitions[each.key])
+  max_clusters_per_user = each.value.max_clusters_per_user
 }

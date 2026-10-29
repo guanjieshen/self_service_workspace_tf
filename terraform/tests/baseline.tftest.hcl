@@ -44,8 +44,14 @@ run "names_and_tags" {
     error_message = "Users fill in APP_ID, TEAM and PROJECT on classic clusters. Got: ${jsonencode(local.all_tag_keys)}"
   }
   assert {
-    condition     = local.config.cluster_policy.name == "{BU} Classic Compute" && tolist(local.config.cluster_policy.access_modes) == tolist(["STANDARD"])
-    error_message = "One classic cluster policy, Standard access mode only."
+    condition = (
+      local.config.cluster_policy.interactive.name == "{BU} Classic Interactive" &&
+      local.config.cluster_policy.jobs.name == "{BU} Classic Jobs" &&
+      local.config.cluster_policy.pipelines.name == "{BU} Classic Pipelines" &&
+      alltrue([for k in ["interactive", "jobs", "pipelines"] : local.config.cluster_policy[k].max_clusters_per_user == 1]) &&
+      tolist(local.config.cluster_policy.access_modes) == tolist(["STANDARD"])
+    )
+    error_message = "Three classic cluster policies (interactive, jobs, pipelines), one cluster per person each, Standard access mode only."
   }
 }
 
