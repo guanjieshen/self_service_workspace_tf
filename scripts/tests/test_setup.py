@@ -13,8 +13,10 @@ from helpers import ROOT, load
 setup = load("setup")
 
 STEPS = {
-    "state": ["--subscription", "sub", "--resource-group", "rg-tf", "--location", "canadacentral", "--storage-account", "sttf"],
-    "identity": ["--subscription", "sub", "--resource-group", "rg-tf", "--storage-account", "sttf", "--repo", "org/repo"],
+    "state": ["--tenant-id", "tenant", "--subscription", "sub", "--resource-group", "rg-tf", "--location", "canadacentral",
+              "--storage-account", "sttf", "--container", "tfstate"],
+    "identity": ["--tenant-id", "tenant", "--subscription", "sub", "--resource-group", "rg-tf", "--storage-account", "sttf",
+                 "--container", "tfstate", "--repo", "org/repo"],
     "github": ["--repo", "org/repo", "--client-id", "app", "--tenant-id", "tenant", "--subscription", "sub"],
     "databricks": ["--client-id", "app", "--account-id", "acct-1", "--account-profile", "acct"],
 }
@@ -61,16 +63,13 @@ class Scripts(unittest.TestCase):
         self.assertLess(create, versioning, "versioning and soft delete only on an account this step created")
         self.assertLess(versioning, script.index("\nfi\n"))
 
-    def test_the_repository_defaults_to_the_origin(self):
-        with mock.patch.object(setup, "origin_repo", lambda: "acme/baseline"):
-            out = io.StringIO()
-            with contextlib.redirect_stdout(out):
-                setup.main(["github", "--client-id", "c", "--tenant-id", "t", "--subscription", "s"])
-        self.assertIn("gh variable set AZURE_CLIENT_ID -R acme/baseline", out.getvalue())
-        for url, repo in (("git@github.com:acme/baseline.git", "acme/baseline"), ("https://github.com/acme/base.line", "acme/base.line"),
-                          ("https://gitlab.com/acme/x.git", None)):
-            with mock.patch.object(setup.subprocess, "run", lambda *a, **k: mock.Mock(stdout=url)):
-                self.assertEqual(setup.origin_repo(), repo)
+    def test_the_azure_steps_stop_in_the_wrong_tenant(self):
+        for step in ("state", "identity"):
+            script = render(step)
+            with self.subTest(step=step):
+                check = script.index('[ "$(az account show --query tenantId -o tsv)" = tenant ] ||')
+                first_create = min(script.index(c) for c in ("az group create", "az ad app create") if c in script)
+                self.assertLess(check, first_create, "the tenant is checked before anything is created")
 
     def test_state_is_private(self):
         script = render("state")
@@ -98,7 +97,7 @@ class Scripts(unittest.TestCase):
         script = render("github")
         self.assertNotIn('"reviewers"', script)
         self.assertIn("environments/apply-approval >/dev/null 2>&1 ||\n  gh api -X PUT", script,
-                      "without --approvers, reviewers added in the UI are kept: create the environment only if missing")
+                      "without apply_approvers, reviewers added in the UI are kept: create the environment only if missing")
         script = render("github", "--approvers", "org/platform")
         self.assertIn("TEAM_ID=$(gh api orgs/org/teams/platform --jq .id)", script)
         self.assertIn('"reviewers": [{"type": "Team", "id": $TEAM_ID}]', script)
@@ -135,13 +134,17 @@ class SetupFile(unittest.TestCase):
     def fill(self, key, value):
         self.assertTrue(setup.remember(self.path, key, value))
 
+    STATE = (("tenant_id", "ten-1"), ("subscription_id", "sub-1"), ("state_location", "canadacentral"),
+             ("state_resource_group", "rg-1"), ("state_storage_account", "stfile"), ("state_container", "tfstate"))
+
     def test_missing_values_are_named(self):
         with self.assertRaises(SystemExit) as e:
             setup.main(["state"])
-        self.assertIn("Fill in subscription_id, state_resource_group, state_storage_account in", str(e.exception))
+        self.assertIn("Fill in tenant_id, subscription_id, state_location, state_resource_group, state_storage_account, "
+                      "state_container in", str(e.exception))
 
     def test_values_come_from_the_file(self):
-        for key, value in (("subscription_id", "sub-1"), ("state_resource_group", "rg-1"), ("state_storage_account", "stfile")):
+        for key, value in self.STATE:
             self.fill(key, value)
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
@@ -156,24 +159,21 @@ class SetupFile(unittest.TestCase):
         text = (ROOT / "config/setup.yaml").read_text()
         required = text[text.index("# ---- REQUIRED"):text.index("# ---- OPTIONAL")]
         self.assertEqual(re.findall(r"(?m)^(\w+):", required),
-                         ["subscription_id", "state_resource_group", "state_storage_account", "databricks_account_id"])
+                         ["tenant_id", "subscription_id", "state_location", "state_resource_group", "state_storage_account",
+                          "state_container", "github_repo", "databricks_account_id"])
+        # Required means no default: a required value is asked for, never guessed.
+        for _, key, default, steps in setup.OPTIONS:
+            if key in re.findall(r"(?m)^(\w+):", required):
+                self.assertTrue(steps and default is None, key)
         keys = re.findall(r"(?m)^(\w+):", text)
         self.assertEqual(sorted(keys), sorted(k for _, k, _, _ in setup.OPTIONS), "every value in the file is read, and only those")
 
-    def test_the_location_defaults_to_the_resource_groups(self):
-        for key, value in (("subscription_id", "sub-1"), ("state_resource_group", "rg-1"), ("state_storage_account", "st1")):
-            self.fill(key, value)
-        with contextlib.redirect_stdout(io.StringIO()) as out:
-            setup.main(["state"])
-        self.assertIn("LOCATION=$(az group show -n rg-1 --query location -o tsv", out.getvalue())
-        self.assertIn('-l "$LOCATION"', out.getvalue())
-
     def test_ids_from_identity_are_asked_for_by_name(self):
-        for key, value in (("subscription_id", "sub-1"),):
+        for key, value in (("tenant_id", "ten-1"), ("subscription_id", "sub-1"), ("github_repo", "o/r")):
             self.fill(key, value)
         with self.assertRaises(SystemExit) as e:
-            setup.main(["github", "--repo", "o/r"])
-        self.assertIn("tenant_id, pipeline_client_id not set yet", str(e.exception))
+            setup.main(["github"])
+        self.assertIn("pipeline_client_id not set yet", str(e.exception))
         self.assertIn("setup.py identity --run", str(e.exception))
 
     def test_remember_fills_only_a_null_value_and_keeps_comments(self):
@@ -182,12 +182,10 @@ class SetupFile(unittest.TestCase):
         self.assertRegex(self.path.read_text(), r"(?m)^pipeline_client_id: app-1 +# the service principal")
 
     def test_identity_ids_are_saved_when_it_runs(self):
-        script = 'echo "  client ID (AZURE_CLIENT_ID): app-9"; echo "  tenant ID (AZURE_TENANT_ID): ten-9"'
+        script = 'echo "  client ID (AZURE_CLIENT_ID): app-9"'
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(setup.run(script, self.path), 0)
-        text = self.path.read_text()
-        self.assertIn("pipeline_client_id: app-9", text)
-        self.assertIn("tenant_id: ten-9", text)
+        self.assertIn("pipeline_client_id: app-9", self.path.read_text())
 
     def test_databricks_signs_in_with_the_azure_cli_without_a_profile(self):
         self.fill("pipeline_client_id", "app-1")
