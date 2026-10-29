@@ -36,9 +36,3 @@ variable "platform_admins" {
   description = "Fallback token users when no persona may create tokens."
   type        = list(string)
 }
-
-variable "manage_token_permissions" {
-  description = "Manage who may create personal access tokens. false = leave the workspace's token permissions alone."
-  type        = bool
-  default     = true
-}

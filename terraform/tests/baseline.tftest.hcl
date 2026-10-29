@@ -52,10 +52,6 @@ run "names_and_tags" {
     error_message = "The shared cluster's runtime is a pinned version, not latest_lts: a new LTS would restart it on an unrelated apply."
   }
   assert {
-    condition     = local.folder_root == "/Workspace"
-    error_message = "Team folders go at the top of the workspace (/Workspace/<team>), which inherits only admins."
-  }
-  assert {
     condition     = tolist(local.config.required_tags) == tolist(["LOB", "DEPARTMENT", "TEAM"])
     error_message = "Required tags are LOB, DEPARTMENT and TEAM."
   }
@@ -164,10 +160,6 @@ run "workspace_settings" {
   assert {
     condition     = length(module.catalog) == 1 && local.catalog.name == "tst_citizen_dev" && local.catalog.owner == "tst-admins" && local.default_catalog == null
     error_message = "Every workspace gets one catalog, {bu}_citizen_dev, owned by the platform admins group; no default catalog until set."
-  }
-  assert {
-    condition     = local.manage_group_assignment && local.manage_token_permissions && local.manage_catalog_grants
-    error_message = "Everything is managed unless the workspace says otherwise."
   }
   assert {
     condition = alltrue([

@@ -10,6 +10,7 @@ from helpers import load
 pf = load("preflight")
 
 GIT = 'settings:\n  git:\n    allowed_urls:\n      - "https://github.com/fin/"\n'
+GROUPS = "groups:\n" + "".join(f"  {k}: fin_{k}\n" for k in ("users", "explorer", "builder", "publisher"))
 ADMIN = {"userName": "sp-terraform", "groups": [{"display": "admins"}, {"display": "users"}]}
 ACCOUNT_GROUPS = {"fin_users", "fin_explorer", "fin_builder", "fin_publisher", "fin_platform_admins"}
 
@@ -58,6 +59,7 @@ class Preflight(unittest.TestCase):
         (self.d / "workspace.yaml").write_text(
             "bu: fin\nlob: FIN\naccount_id: acct\nhost: https://adb-123.1.azuredatabricks.net\nci: true\n")
         (self.d / "settings.yaml").write_text(GIT)   # the baseline's Git allowlist is a placeholder
+        (self.d / "access.yaml").write_text(GROUPS)  # each workspace names its persona groups
         patches = [mock.patch.object(pf.wsf, "WORKSPACES", self.root), mock.patch.object(pf.wsf, "DEV_WORKSPACES", self.root / "none")]
         for p in patches:
             p.start()
@@ -103,11 +105,14 @@ class Preflight(unittest.TestCase):
         api = FakeApi(account_groups=(ACCOUNT_GROUPS - {"fin_builder"}) | {"data-builders"})
         self.assertEqual(self.levels(self.run_checks(api), "error"), [])
 
-    def test_unmanaged_groups_only_warn(self):
-        (self.d / "access.yaml").write_text("manage:\n  group_assignment: false\n  catalog_grants: false\n")
-        results = self.run_checks(FakeApi(account_groups=()))
+    def test_a_persona_without_a_group_is_skipped(self):
+        (self.d / "access.yaml").write_text("groups:\n  explorer: fin_explorer\n")
+        results = self.run_checks(FakeApi())
         self.assertEqual(self.levels(results, "error"), [])
-        self.assertEqual(len(self.levels(results, "warning")), 5)
+        oks = " ".join(self.levels(results, "ok"))
+        for key in ("users", "builder", "publisher"):
+            self.assertIn(f"no {key} group: skipped", oks)
+        self.assertIn("account group fin_platform_admins (platform_admins)", oks, "the baseline's platform admins group")
 
     def test_catalog_storage(self):
         self.assertIn("the metastore has no storage root", " ".join(self.levels(self.run_checks(FakeApi(storage_root=None)), "error")))

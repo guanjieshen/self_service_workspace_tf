@@ -22,7 +22,7 @@ locals {
 
   # Override paths the baseline does not have (usually a typo), two levels deep, and three
   # for map values. Open maps take any keys: tags, and maps that are empty in the
-  # baseline (such as catalog.schemas).
+  # baseline, and budget_policies.policies (a workspace may add policies).
   unknown_overrides = flatten([
     for s, o in local.overrides : can(keys(o)) && can(keys(local.defaults[s])) ? flatten([
       for k in keys(o) : !contains(keys(local.defaults[s]), k) ? ["${s}.${k}"] : (
@@ -70,12 +70,9 @@ locals {
     "settings.genie_code.instructions"                            = ["${local.ws}.databricks_workspace_file.genie_code_instructions"]
     "settings.genie_code.skills"                                  = ["${local.ws}.databricks_workspace_file.genie_code_skills"]
   }
-  # Released when false (or null): switches for what this project manages.
+  # Released when false (or null): budget_policies.enabled.
   switch_addresses = {
-    "budget_policies.enabled"  = ["module.budget_policies"]
-    "manage.group_assignment"  = ["module.personas.databricks_permission_assignment.this"]
-    "manage.token_permissions" = ["${local.ws}.databricks_permissions.tokens"]
-    "manage.catalog_grants"    = ["module.catalog[0].databricks_grants.catalog"]
+    "budget_policies.enabled" = ["module.budget_policies"]
   }
 
   setting_is_null = {
@@ -89,10 +86,6 @@ locals {
     for path in keys(local.switch_addresses) : path => try(local.config[split(".", path)[0]][split(".", path)[1]], null) == true
   }
 
-  manage_group_assignment  = local.switch_on["manage.group_assignment"]
-  manage_token_permissions = local.switch_on["manage.token_permissions"]
-  manage_catalog_grants    = local.switch_on["manage.catalog_grants"]
-
   released_addresses = sort(distinct(flatten(concat(
     [for path, addrs in local.setting_addresses : addrs if local.setting_is_null[path]],
     [for path, addrs in local.switch_addresses : addrs if !local.switch_on[path]],
@@ -101,6 +94,6 @@ locals {
   ))))
 
   # Sections a workspace may set to null as a whole; the others have keys to set to null instead.
-  nullable_sections = ["settings", "catalog", "default_catalog", "personal_schemas"]
+  nullable_sections = ["settings", "catalog", "default_catalog"]
   null_sections     = [for s, v in local.overrides : s if v == null && !contains(local.nullable_sections, s)]
 }

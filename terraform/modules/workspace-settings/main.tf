@@ -87,7 +87,7 @@ resource "databricks_workspace_conf" "key" {
 
 # Who may create personal access tokens (admins always can).
 resource "databricks_permissions" "tokens" {
-  count         = var.manage_token_permissions && local.tokens_enabled && length(local.token_groups) > 0 ? 1 : 0
+  count         = local.tokens_enabled && length(local.token_groups) > 0 ? 1 : 0
   authorization = "tokens"
 
   dynamic "access_control" {

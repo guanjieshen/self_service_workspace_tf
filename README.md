@@ -9,9 +9,8 @@ Each workspace gets:
 - **Secure admin settings:** legacy access and DBFS off, user isolation, token limits, downloads, Git allowlist, Unity Gateway, Microsoft Teams only, and more.
 - **Three personas granted to groups:** explorer (SQL), builder and publisher (full workspace); everyone else gets Consumer access (Databricks One). Who is in each group is managed in Entra ID, for example through access packages.
 - **Compute people can use straight away:** a default serverless SQL warehouse, a shared classic cluster, and a cluster policy for one personal cluster each.
-- **One Unity Catalog catalog** with predictive optimization, data classification and data quality monitoring, and **personal schemas** (`cd_<name>`) created on request by a job.
+- **One Unity Catalog catalog** with predictive optimization and data classification; its schemas come from the self-service app.
 - **Chargeback:** required tags, a shared serverless usage policy, and team warehouses.
-- **On-request jobs** for personal, project and team schemas and team folders, run by workspace admins or by a service principal you allow (a ticketing system, or a self-service app built on top: [docs/future.md](docs/future.md)).
 
 ## Get started
 
@@ -50,7 +49,7 @@ Everything outside `config/` (and `.github/CODEOWNERS`) is the framework: you up
 
 1. Terraform 1.9 or later, Python 3.9 or later, and the Databricks CLI (the Azure CLI and GitHub CLI for the one-time setup).
 2. The workspace exists and uses Unity Catalog.
-3. **The groups exist as account groups** (Entra ID groups synced to the Databricks account): `{bu}_users`, `{bu}_explorer`, `{bu}_builder`, `{bu}_publisher`, `{bu}_platform_admins`. Unity Catalog and usage policies cannot use groups that exist only in a workspace.
+3. **The groups exist as account groups** (Entra ID groups synced to the Databricks account): `{bu}_platform_admins`, and the persona groups each workspace names in its `access.yaml`. Unity Catalog and usage policies cannot use groups that exist only in a workspace.
 4. The one-time setup is done ([docs/SETUP.md](docs/SETUP.md)): state storage, the pipeline's service principal, the repository settings.
 
 ## Onboard a workspace

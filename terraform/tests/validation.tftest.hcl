@@ -181,31 +181,10 @@ run "classification_without_usage_policies" {
   expect_failures = [terraform_data.config_checks]
 }
 
-# The personal schema job keeps MANAGE on a group-owned catalog only through the managed grants
-run "personal_schemas_without_catalog_grants" {
-  command = plan
-  variables { workspace = "personal-schemas-without-catalog-grants" }
-  expect_failures = [terraform_data.config_checks]
-}
-
 # Only some sections can be null as a whole
 run "null_section" {
   command = plan
   variables { workspace = "null-section" }
-  expect_failures = [terraform_data.config_checks]
-}
-
-# The self-service notebooks must not live where users can change them
-run "admin_folder_under_shared" {
-  command = plan
-  variables { workspace = "admin-folder-under-shared" }
-  expect_failures = [terraform_data.config_checks]
-}
-
-# Job runners are service principals, given by application ID
-run "runner_not_an_id" {
-  command = plan
-  variables { workspace = "runner-not-an-id" }
   expect_failures = [terraform_data.config_checks]
 }
 

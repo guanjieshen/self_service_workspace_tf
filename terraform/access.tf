@@ -57,15 +57,10 @@ locals {
   ]))
 
   # ---- Unity Catalog: the workspace's catalog (catalog.yaml) ----
-  # A principal in a grant can be a key of groups (explorer, builder, users, ...) or a group name.
+  # The owner can be a key of groups (platform_admins, ...) or a group name.
   catalog = local.config.catalog == null ? null : merge(local.config.catalog, {
     name  = replace(replace(local.config.catalog.name, "{BU}", local.bu_upper), "{bu}", local.bu)
     owner = try(local.config.catalog.owner, null) == null ? null : lookup(local.group_names, local.config.catalog.owner, local.config.catalog.owner)
-    schemas = { for s in try(keys(local.config.catalog.schemas), []) : s => {
-      comment = try(local.config.catalog.schemas[s].comment, null)
-      grants = { for p in try(keys(local.config.catalog.schemas[s].grants), []) :
-      lookup(local.group_names, p, p) => local.config.catalog.schemas[s].grants[p] }
-    } }
   })
   catalog_grants = merge(
     { for g in distinct(flatten(values(local.persona_groups))) : g => sort(try(local.config.catalog.persona_privileges, [])) },

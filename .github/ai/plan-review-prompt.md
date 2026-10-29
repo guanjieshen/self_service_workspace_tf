@@ -11,23 +11,23 @@ People edit only YAML:
   - `workspace.yaml`: identity, set once (`bu`, `lob`, host). `bu` is part of every folder, warehouse and policy name, so changing it recreates them.
   - `access.yaml`: teams (a group and tags each; the tags become allowed values on the cluster policies, and a team key names its warehouse, so renaming it recreates the warehouse), and any change to the baseline's groups or personas. `groups.<persona>` renames the group that holds a persona. `manage.<key>: false` leaves group assignment, token permissions or catalog grants alone. Nobody is listed by name: people join personas through the groups, in Entra ID.
   - `compute.yaml`: team warehouses (each defined in full; the team's group gets Can use), and any change to the default warehouse, classic warehouse or shared cluster.
-  - `catalog.yaml`: changes to the workspace catalog (bound to this workspace only; personas get only USE CATALOG and USE SCHEMA on it), its shared schemas and their grants (a principal can be a persona name), `default_catalog`, and the personal schemas job. Changing `default_catalog` changes where unqualified table names resolve in every notebook, query and job. Personal schemas (`cd_<name>`, one per persona member) are created by a job, not by Terraform, so they never appear in the plan.
+  - `catalog.yaml`: changes to the workspace catalog (bound to this workspace only; personas get only USE CATALOG and USE SCHEMA on it) and `default_catalog`. Changing `default_catalog` changes where unqualified table names resolve in every notebook, query and job. Schemas are created by the self-service app, not by Terraform, so they never appear in the plan.
   - `settings.yaml`: changes to the baseline's admin settings (`settings:`), for example `disable_legacy_access: null` while a workspace still uses Hive.
   - `cost.yaml`: changes to chargeback tags or budget policies (`budget_policies.enabled: false` leaves them alone).
   - `genie-code/instructions.md` (optional): Genie Code instructions appended after the default ones in `config/defaults/genie-code/instructions.md`. They shape what Genie Code suggests to every user of the workspace; review changes to them like guidance to all users.
   - `genie-code/skills/` (optional): Genie Code skills for this workspace, one folder per skill with a `SKILL.md`, deployed next to the default ones in `config/defaults/genie-code/skills/`. Every user can use them; review them like the instructions, and check that each description says plainly when the skill applies.
-- **Setting a key to `null` (or a `manage` switch to `false`) means Terraform stops managing it**; the current value stays. **Removing such a line means Terraform starts enforcing the baseline value**, usually for every user of the workspace.
+- **Setting a key to `null` means Terraform stops managing it**; the current value stays. **Removing such a line means Terraform starts enforcing the baseline value**, usually for every user of the workspace.
 
 Personas, as defined in the baseline:
 
 | Group | Entitlement | SQL warehouse | Shared cluster | Cluster policy | Workspace catalog |
 |---|---|---|---|---|---|
 | users (everyone) | Consumer access (Databricks One only) | none | none | none | none |
-| explorer | SQL access | Can use | none | none | USE CATALOG, USE SCHEMA; own personal schema |
+| explorer | SQL access | Can use | none | none | USE CATALOG, USE SCHEMA |
 | builder | Workspace and SQL access | Can use | Can attach to | one cluster | the same |
 | publisher | Workspace and SQL access | Can use | Can attach to | one cluster | the same |
 
-Platform admins own the workspace catalog, have all privileges on it, and are the only workspace admins. Only platform admins may create personal access tokens. Data access is granted per schema, never on the whole catalog: a change that grants a data privilege (SELECT, MODIFY, CREATE_SCHEMA, ...) at catalog level to a persona exposes every personal schema, so flag it as High.
+Platform admins own the workspace catalog, have all privileges on it, and are the only workspace admins. Only platform admins may create personal access tokens. Data access is granted per schema, never on the whole catalog: a change that grants a data privilege (SELECT, MODIFY, CREATE_SCHEMA, ...) at catalog level to a persona exposes every schema in the catalog, so flag it as High.
 
 Facts to use in your assessment:
 

@@ -148,13 +148,12 @@ run "workspace_settings" {
       enforce_unity_gateway        = true
       compliance_security_profile  = null
     }
-    default_catalog          = "tst_cat"
-    workspace_label          = { text = "DEV", color = "lime" }
-    genie_code_instructions  = "# Default instructions"
-    genie_code_skills        = { "a/SKILL.md" = "eA==" }
-    token_groups             = ["tst-publishers"]
-    platform_admins          = ["tst-admins"]
-    manage_token_permissions = true
+    default_catalog         = "tst_cat"
+    workspace_label         = { text = "DEV", color = "lime" }
+    genie_code_instructions = "# Default instructions"
+    genie_code_skills       = { "a/SKILL.md" = "eA==" }
+    token_groups            = ["tst-publishers"]
+    platform_admins         = ["tst-admins"]
   }
 
   assert {
@@ -219,97 +218,6 @@ run "workspace_settings" {
   }
 }
 
-run "folders" {
-  command = plan
-  module {
-    source = "./modules/folders"
-  }
-  variables {
-    root_path  = "/Workspace"
-    admin_path = "/Admin/self-service"
-    job_name   = "TST team folder"
-    runners    = ["11111111-2222-3333-4444-555555555555"]
-  }
-
-  assert {
-    condition     = databricks_job.team_folder.name == "TST team folder" && length(databricks_job.team_folder.schedule) == 0
-    error_message = "Team folders come from an on-request job (no schedule), not from Terraform resources."
-  }
-  assert {
-    condition     = sort([for p in databricks_job.team_folder.parameter : p.name]) == tolist(["folder", "owner_group", "reason", "request_id", "requested_by"])
-    error_message = "A request sets the folder name, the requester, optionally an owning group, and its ID."
-  }
-  assert {
-    condition     = jsonencode(databricks_job.team_folder.tags) == jsonencode({ cd_root = "/Workspace", cd_self_service = "team_folder" })
-    error_message = "The job is tagged so automation (a ticketing system, an app) can find it."
-  }
-  assert {
-    condition     = databricks_notebook.team_folder.path == "/Admin/self-service/team_folder" && databricks_job.team_folder.task[0].notebook_task[0].notebook_path == "/Admin/self-service/team_folder"
-    error_message = "The job runs a notebook in the admin folder, which only workspace admins can see."
-  }
-  assert {
-    condition     = strcontains(base64decode(databricks_notebook.team_folder.content_base64), "root = \"/Workspace\"\n")
-    error_message = "The root folder from access.yaml is written into the notebook, where a run cannot change it."
-  }
-  assert {
-    condition     = [for a in databricks_permissions.team_folder_job[0].access_control : a.service_principal_name] == ["11111111-2222-3333-4444-555555555555"]
-    error_message = "Runners (service principals) can run the job; nobody else is granted, so only workspace admins see it."
-  }
-}
-
-run "folders_admins_only" {
-  command = plan
-  module {
-    source = "./modules/folders"
-  }
-  variables {
-    root_path  = "/Workspace"
-    admin_path = "/Admin/self-service"
-    job_name   = "TST team folder"
-  }
-
-  assert {
-    condition     = length(databricks_permissions.team_folder_job) == 0
-    error_message = "Without runners the job has no grants: only its owner and workspace admins can see and run it."
-  }
-}
-
-run "personal_schema" {
-  command = plan
-  module {
-    source = "./modules/catalog"
-  }
-  variables {
-    catalog                  = { name = "tst_citizen_dev", owner = "tst_platform_admins", schemas = {} }
-    grants                   = { tst_platform_admins = ["ALL_PRIVILEGES"] }
-    personal_schemas_enabled = true
-    personal_schemas         = { prefix = "cd_", privileges = ["ALL_PRIVILEGES"], job_name = "TST personal schema" }
-    admin_path               = "/Admin/self-service"
-  }
-
-  assert {
-    condition     = databricks_job.personal_schemas[0].name == "TST personal schema" && length(databricks_job.personal_schemas[0].schedule) == 0
-    error_message = "Personal schemas come from an on-request job (no schedule)."
-  }
-  assert {
-    condition     = alltrue([for p in databricks_job.personal_schemas[0].parameter : p.default == ""]) && [for p in databricks_job.personal_schemas[0].parameter : p.name] == ["catalog", "owner_group", "reason", "request_id", "schema", "user"]
-    error_message = "A request sets user and catalog, and optionally schema, owner_group (a team schema) and request_id; none has a default (each run sets them)."
-  }
-  assert {
-    condition     = jsonencode(databricks_job.personal_schemas[0].tags) == jsonencode({ cd_catalog = "tst_citizen_dev", cd_prefix = "cd_", cd_self_service = "personal_schema" })
-    error_message = "The job is tagged so automation can find it, with the catalog it creates schemas in."
-  }
-  assert {
-    condition = strcontains(base64decode(databricks_notebook.personal_schema[0].content_base64),
-    "prefix = \"cd_\"\nprivileges = [\"ALL_PRIVILEGES\"]\nowner = \"tst_platform_admins\"\nallowed_catalogs = [\"tst_citizen_dev\"]\n")
-    error_message = "Prefix, privileges, owner and the allowed catalog from catalog.yaml are written into the notebook, where a run cannot change them."
-  }
-  assert {
-    condition     = databricks_notebook.personal_schema[0].path == "/Admin/self-service/personal_schema" && length(databricks_permissions.personal_schemas_job) == 0
-    error_message = "The notebook is in the admin folder, and without runners only workspace admins can see and run the job."
-  }
-}
-
 run "personas" {
   command = plan
   module {
@@ -326,7 +234,6 @@ run "personas" {
     platform_admins          = ["tst-admins"]
     platform_admin_role      = "ADMIN"
     extra_groups             = []
-    manage_assignment        = true
     users_group_entitlements = { workspace_access = false, workspace_consume = false, databricks_sql_access = false, allow_cluster_create = false }
   }
 

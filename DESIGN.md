@@ -9,40 +9,36 @@ the configuration) is [config/README.md](config/README.md); CI setup is
 
 Every citizen development workspace gets the same governed baseline: secure admin
 settings, three personas with fixed rights, compute people can use straight away, one
-Unity Catalog catalog with personal schemas on request, and chargeback tags. The
+Unity Catalog catalog, and chargeback tags. The
 platform team runs it from Git: YAML only, reviewed in pull requests, applied by CI.
 
 **In scope:** the configuration of an existing workspace (settings, personas, compute,
-the workspace catalog, budget policies, Genie Code), the jobs that create per-person
-and per-team objects on request (personal schemas, team folders), run by workspace admins
-or the service principals in `jobs.runners` (a ticketing system, or a self-service app
-built on top). The jobs are the interface for anything that automates requests.
+the workspace catalog, budget policies, Genie Code).
 **Out of scope:** creating workspaces and networking (combined mode, future), the
-metastore and shared catalogs, who is in which group (Entra ID), and a request portal.
+metastore and shared catalogs, who is in which group (Entra ID), and everything people
+request: schemas, workspace folders (the self-service app).
 
 ## 2. How it works
 
 ```
  Entra ID groups (synced to the account)          config/  (YAML, reviewed in pull requests)
- {bu}_users  {bu}_explorer  {bu}_builder  ...        defaults/          one baseline for every workspace
+ one group per persona, per workspace              defaults/          one baseline for every workspace
         │   membership: Entra                        workspaces/<name>/ one folder per workspace
         │                                                 │
         ▼                                                 ▼
  ┌─────────────────────────── Terraform, one state per workspace ───────────────────────────┐
  │ settings │ entitlements │ warehouse, cluster, policies │ catalog + grants │ budget policies │
- │ Genie Code │ the on-request jobs: personal schemas, team folders                            │
+ │ Genie Code                                                                                │
  └───────────────────────────────────────────────────────────────────────────────────────────┘
-        │                                                 │
-        ▼                                                 ▼
- the jobs, run by admins or jobs.runners          CI: plan on every pull request (plan guard,
- (cd_<name> schemas, team folders)              AI review), apply on merge, weekly drift check
+                                                          │
+                                                          ▼
+                                                  CI: plan on every pull request (plan guard,
+                                                  AI review), apply on merge, weekly drift check
 ```
 
-Everything is granted to **groups**, never to people. Adding someone to `{bu}_builder` in
-Entra ID gives them everything a builder gets, with no change to this repository and no
-Terraform run. The only per-person objects, personal schemas, and team folders come
-from jobs that this repository deploys and admins (or the service principals in
-`jobs.runners`) run.
+Everything is granted to **groups**, never to people. Adding someone to a workspace's
+builder group in Entra ID gives them everything a builder gets, with no change to this
+repository and no Terraform run.
 
 ## 3. Configuration model
 
@@ -78,13 +74,13 @@ workspace. What keeps that safe:
 **Groups.** One account group per role, named from a pattern in
 `config/defaults/access.yaml` (a workspace can rename one):
 
-| Group | Entitlement | Default warehouse | Shared cluster | Cluster policy | Usage policy | Catalog |
+| Persona (its group) | Entitlement | Default warehouse | Shared cluster | Cluster policy | Usage policy | Catalog |
 |---|---|---|---|---|---|---|
-| `{bu}_users` (everyone) | Consumer (Databricks One) | | | | | |
-| `{bu}_explorer` | SQL access | Can use | | | User | USE CATALOG, USE SCHEMA; own schema |
-| `{bu}_builder` | Workspace and SQL access | Can use | Can attach to | One cluster per person | User | same |
-| `{bu}_publisher` | Workspace and SQL access | Can use | Can attach to | One cluster per person | User | same |
-| `{bu}_platform_admins` | Workspace admin | Manage | Manage | Manage | Manager | Owner; all privileges |
+| users (`groups.users`): everyone | Consumer (Databricks One) | | | | | |
+| explorer (`groups.explorer`) | SQL access | Can use | | | User | USE CATALOG, USE SCHEMA |
+| builder (`groups.builder`) | Workspace and SQL access | Can use | Can attach to | One cluster per person | User | same |
+| publisher (`groups.publisher`) | Workspace and SQL access | Can use | Can attach to | One cluster per person | User | same |
+| platform admins (`{bu}_platform_admins`) | Workspace admin | Manage | Manage | Manage | Manager | Owner; all privileges |
 
 - Entitlements are tiers, each including the one before: Consumer access (Databricks One
   only) < SQL access (plus the SQL editor, queries, dashboards and Genie) < workspace
@@ -99,55 +95,29 @@ workspace. What keeps that safe:
 - The groups must be **account groups** (Entra ID groups synced to the account). Unity
   Catalog and usage policies cannot use groups that exist only in a workspace
   ([docs](https://learn.microsoft.com/en-us/azure/databricks/admin/users-groups/workspace-local-groups)).
-  The test workspaces use workspace-local groups, so they leave group assignment,
-  catalog grants and budget policies alone.
+- Each workspace names its own persona groups (`groups:` in its `access.yaml`); only
+  `{bu}_platform_admins` comes from the baseline. A persona without a group is skipped.
 
-**Requests.** Two paths, by volume and risk:
+**Requests.** Three paths, by volume and risk:
 
 | Request | Path |
 |---|---|
 | A persona (explorer, builder, publisher) | The person asks in Entra (for example an access package), which adds them to the group. No pull request |
-| A personal schema (one per person), a project schema (a name they choose) or a team schema (a name and one of their groups) | An admin or a runner runs the `<BU> personal schema` job (Terraform deploys it) with the user, catalog and, for a custom one, the name. No pull request |
-| A workspace folder | An admin or a runner runs the `<BU> team folder` job (Terraform deploys it) with the folder name, the requester and, optionally, a group of theirs that owns it too. No pull request |
-| A team warehouse, shared schema or extra grant | A person writes a file under `config/workspaces/<name>/` and opens a pull request: plan, AI review, approval, apply |
+| A schema or a workspace folder | The self-service app, outside this repository |
+| A team warehouse | A person writes a file under `config/workspaces/<name>/` and opens a pull request: plan, AI review, approval, apply |
 
-## 5. The workspace catalog and personal schemas
+## 5. The workspace catalog
 
 Each workspace gets one catalog, `{bu}_citizen_dev` (`config/defaults/catalog.yaml`),
 bound to the workspace and owned by the platform admins group, with predictive
-optimization, data classification and data quality monitoring on.
+optimization and data classification on. Its schemas are not Terraform's: people get
+them from the self-service app.
 
 - **Catalog-level grants are minimal.** Personas get `USE CATALOG` and `USE SCHEMA`:
   enough to reach a schema and use what was shared with them, never data catalog-wide,
-  and no `CREATE SCHEMA`. Data access is per schema.
-- **Shared schemas** are listed in `catalog.yaml` with their grants (a grant's principal
-  can be a persona name); Terraform creates them and turns on data quality monitoring.
-- **Personal schemas** come from the job `<BU> personal schema`, a short notebook
-  (`terraform/modules/catalog/personal_schema.py`) that Terraform deploys. An admin,
-  or a runner in `jobs.runners`, runs it when a user asks; there is no schedule.
-  - **Parameters:** `user` and `catalog` (both required; the catalog must be an allowed
-    one), `schema` (default `cd_` plus the email before the `@`, everything but letters
-    and digits replaced by `_`: `jane.doe@…` → `cd_jane_doe`) and `request_id`.
-    No parameter has a default: each run sets them.
-    Prefix, privileges, owner and the allowed catalogs come from `catalog.yaml`: Terraform
-    writes them into the notebook, so a run cannot change them (a run can pass any
-    parameter, even ones the job does not define, so they cannot be parameters).
-  - **Steps:** create the schema if it does not exist, tag it (`cd_managed_by =
-    self_service`, `cd_user`, `cd_created`, `cd_request_id`), grant the user
-    `ALL_PRIVILEGES` and `MANAGE` (so they can share it themselves), and give it to the
-    platform admins group.
-  - **Checks:** only workspace admins, and the service principals in `jobs.runners`
-    (for example a ticketing system's), can see and run the job, and the notebook checks
-    each request. An existing schema must already be
-    tagged with the same `cd_user`, so a request never gets another person's schema or
-    a shared one.
-  - **State:** the tags on each schema, which callers (and audits) can query in
-    `information_schema.schema_tags`. Running it again for the same user is safe.
-  - **Notebook location:** the admin folder (`folders.admin`, `/Admin/self-service`), at
-    the top of the workspace, which grants only workspace admins: the job runs with the
-    rights to manage the catalog, so only admins may change the notebook. The team folder
-    job's notebook is there too.
-  - A catalog holds 10,000 schemas by default (it can be raised); enough for a BU.
+  and no `CREATE SCHEMA`. Data access is per schema. Platform admins get all privileges.
+- The grants are authoritative: anything else granted on the catalog by hand is removed
+  on the next apply, so the self-service app works with schemas, not catalog grants.
 
 ## 6. Caveats
 
@@ -163,10 +133,8 @@ optimization, data classification and data quality monitoring on.
 4. **The SQL statement timeout** manages the workspace-wide SQL configuration as a whole.
 5. **Enforce Unity Gateway** switches off the `databricks-` pay-per-token endpoints;
    model calls must use `system.ai` model services.
-6. **Team folders are private to their team; `/Workspace/Shared` is open to all.** Team
-   folders sit at the top of the workspace (`/Workspace/<team>`), which inherits only
-   admins, so only the team's group (and admins) can reach one. `/Workspace/Shared`
-   grants `users` Can manage. Data access is still decided by Unity Catalog.
+6. **`/Workspace/Shared` is open to all:** it grants `users` Can manage. Data access is
+   still decided by Unity Catalog.
 7. **Data classification needs a usage policy.** It runs on serverless; the identity
    running Terraform must be able to use a serverless usage policy, or turning it on fails
    with "Usage policy ID must not be empty". Workspaces without usage policies set
@@ -201,8 +169,7 @@ Releases are git tags; install and upgrade with git (README.md).
 `./scripts/test.sh` runs every suite without a workspace or credentials, as the **Tests**
 check on every pull request does: Terraform tests against mocked providers (baseline,
 options, modules, Genie Code, and one fixture per validation check), Python unit tests
-(plan guard, release, workspaces, the AI review, the personal schema and team folder
-jobs), the plan comment (Node), and a scaffolded workspace. A new option comes with a fixture and an
+(plan guard, release, workspaces, preflight, setup, the AI review), the plan comment (Node), and a scaffolded workspace. A new option comes with a fixture and an
 assertion; a new check with a fixture that fails it. Before a change merges, its plan on
 the test workspaces in `dev/` shows what it does.
 
@@ -223,4 +190,3 @@ the test workspaces in `dev/` shows what it does.
 | P7 | GitHub org URL for the Git allowlist? | Placeholder |
 | P8 | Required tag keys (LOB, DEPARTMENT, TEAM)? | As is |
 | P12 | Remove `users` from `/Workspace/Shared` so folder permissions mean something? | Organisation only |
-| R1 | Who removes the personal schemas of people who left, and after how long? | Out of scope |

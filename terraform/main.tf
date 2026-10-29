@@ -13,8 +13,6 @@ locals {
       "{BU}", local.bu_upper), "{bu}", local.bu), "{PERSONA}", title(p))
     } if try(def.cluster_policy, false) == true && length(try(local.persona_groups[p], [])) > 0
   }
-  folder_root = replace(replace(local.config.folders.root, "{BU}", local.bu_upper), "{bu}", local.bu)
-  job_runners = try(tolist(local.config.jobs.runners), [])
 
   # Group names as the personas module returns them once assigned. Granting through
   # these makes each grant wait for its group's assignment, without a module-level
@@ -32,7 +30,6 @@ module "personas" {
   platform_admin_role      = "ADMIN"
   extra_groups             = local.extra_groups
   users_group_entitlements = local.settings.users_group_entitlements
-  manage_assignment        = local.manage_group_assignment
 
   # Invalid input stops at the plain-language checks in checks.tf, not a crash inside a
   # module. Harmless for the plan: config_checks has no inputs, so it only has changes
@@ -43,14 +40,13 @@ module "personas" {
 module "workspace_settings" {
   source = "./modules/workspace-settings"
 
-  settings                 = local.settings
-  default_catalog          = local.default_catalog
-  workspace_label          = try(local.workspace.label, null)
-  genie_code_instructions  = local.manage_genie_instructions ? local.genie_instructions : null
-  genie_code_skills        = local.manage_genie_skills ? local.genie_skills : {}
-  token_groups             = [for g in local.token_groups : lookup(local.group, g, g)]
-  manage_token_permissions = local.manage_token_permissions
-  platform_admins          = [for g in local.platform_admins : lookup(local.group, g, g)]
+  settings                = local.settings
+  default_catalog         = local.default_catalog
+  workspace_label         = try(local.workspace.label, null)
+  genie_code_instructions = local.manage_genie_instructions ? local.genie_instructions : null
+  genie_code_skills       = local.manage_genie_skills ? local.genie_skills : {}
+  token_groups            = [for g in local.token_groups : lookup(local.group, g, g)]
+  platform_admins         = [for g in local.platform_admins : lookup(local.group, g, g)]
 
   # Invalid input stops at the plain-language checks in checks.tf, not a crash inside a
   # module. Harmless for the plan: config_checks has no inputs, so it only has changes
@@ -98,34 +94,13 @@ module "budget_policies" {
   depends_on = [terraform_data.config_checks]
 }
 
-module "folders" {
-  source = "./modules/folders"
-
-  root_path  = local.folder_root
-  admin_path = local.config.folders.admin
-  job_name   = "${local.bu_upper} team folder"
-  runners    = local.job_runners
-
-  # Invalid input stops at the plain-language checks in checks.tf, not a crash inside a
-  # module. Harmless for the plan: config_checks has no inputs, so it only has changes
-  # (and only defers this module's data sources) on a workspace's first apply.
-  depends_on = [terraform_data.config_checks]
-}
-
-# The workspace's Unity Catalog catalog, its shared schemas and grants, and the personal
-# schema job (catalog.yaml).
+# The workspace's Unity Catalog catalog and its grants (catalog.yaml).
 module "catalog" {
   source = "./modules/catalog"
   count  = local.catalog != null ? 1 : 0
 
-  catalog                  = local.catalog
-  grants                   = local.manage_catalog_grants ? { for g, privs in local.catalog_grants : lookup(local.group, g, g) => privs if length(privs) > 0 } : {}
-  personal_schemas_enabled = try(local.config.personal_schemas.enabled, false) == true
-  personal_schemas = try(local.config.personal_schemas.enabled, false) != true ? null : merge(local.config.personal_schemas, {
-    job_name = "${local.bu_upper} personal schema"
-  })
-  admin_path = module.folders.admin_path # the folder, created by the folders module
-  runners    = local.job_runners
+  catalog = local.catalog
+  grants  = { for g, privs in local.catalog_grants : lookup(local.group, g, g) => privs if length(privs) > 0 }
 
   # Invalid input stops at the plain-language checks in checks.tf, not a crash inside a
   # module. Harmless for the plan: config_checks has no inputs, so it only has changes

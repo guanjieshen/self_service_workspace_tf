@@ -8,7 +8,7 @@ resource "terraform_data" "config_checks" {
     }
     precondition {
       condition     = length(local.null_sections) == 0
-      error_message = "These sections cannot be null as a whole: ${join(", ", local.null_sections)}. Set the keys inside them to null to leave those alone (only settings, catalog, default_catalog and personal_schemas can be null)."
+      error_message = "These sections cannot be null as a whole: ${join(", ", local.null_sections)}. Set the keys inside them to null to leave those alone (only settings, catalog and default_catalog can be null)."
     }
     precondition {
       condition     = length(local.unknown_overrides) == 0
@@ -19,11 +19,8 @@ resource "terraform_data" "config_checks" {
       error_message = "A workspace file has a setting it does not take. Allowed: ${join("; ", [for f, allowed in local.ws_file_keys : "${f}.yaml: ${join(", ", allowed)}"])}."
     }
     precondition {
-      condition = local.catalog == null || (
-        can(regex("^[a-z0-9_]+$", try(local.catalog.name, ""))) &&
-        alltrue([for k in keys(local.catalog.schemas) : can(regex("^[a-z0-9_]+$", k)) && alltrue([for f in try(keys(local.config.catalog.schemas[k]), []) : contains(["comment", "grants"], f)])])
-      )
-      error_message = "catalog.yaml catalog: the name and every schema name must be lowercase letters, digits and underscores; a schema may only set comment and grants."
+      condition     = local.catalog == null || can(regex("^[a-z0-9_]+$", try(local.catalog.name, "")))
+      error_message = "catalog.yaml catalog: the name must be lowercase letters, digits and underscores."
     }
     precondition {
       condition     = local.genie_instructions == null || length(coalesce(local.genie_instructions, "")) <= 19800
@@ -59,18 +56,6 @@ resource "terraform_data" "config_checks" {
     precondition {
       condition     = contains(["classic", "pro"], try(local.config.classic_warehouse.type, "classic"))
       error_message = "classic_warehouse.type must be classic or pro (the serverless one is sql_warehouse)."
-    }
-    precondition {
-      condition     = can(regex("^(/Workspace)?/[^/]+(/[^/]+)*$", local.config.folders.admin)) && !can(regex("^(/Workspace)?/(Shared|Users|Repos)(/|$)", local.config.folders.admin)) && local.config.folders.admin != "/Workspace"
-      error_message = "folders.admin in access.yaml must be a folder at the top of the workspace, for example /Admin/self-service: not under /Shared, /Users or /Repos, which other users can reach. The self-service jobs run with admin rights, so only admins may change their notebooks."
-    }
-    precondition {
-      condition     = alltrue([for r in local.job_runners : can(regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", r))])
-      error_message = "jobs.runners in access.yaml lists service principals by application ID (a GUID), for example a ticketing system's."
-    }
-    precondition {
-      condition     = local.catalog == null || try(local.config.personal_schemas.enabled, false) != true || try(local.catalog.owner, null) == null || local.manage_catalog_grants
-      error_message = "The personal schema job needs to keep MANAGE on the catalog once catalog.owner is a group: that comes from the catalog grants this project manages. Keep manage.catalog_grants on, set catalog.owner: null, or turn off personal_schemas."
     }
     precondition {
       condition = alltrue([for k, p in try(local.config.budget_policies.policies, {}) : p == null || (

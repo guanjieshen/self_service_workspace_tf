@@ -79,7 +79,7 @@ Only the jobs that reach Databricks use `TERRAFORM_RUNNER`; format checks and wo
 
 With the setup above done and the configuration right, a merged pull request deploys
 everything else: workspace settings, groups and entitlements, catalogs, schemas and grants,
-the on-request jobs and their notebooks, and compute.
+and compute.
 These steps stay outside it, because they create the identity or the storage Actions itself
 needs, need more than workspace admin, or are a person's decision by design:
 
@@ -91,7 +91,7 @@ needs, need more than workspace admin, or are a person's decision by design:
 | Add the service principal to the Databricks account, with the budget policy permission (by hand) | Databricks account admin | Once | Needs account admin; giving CI account admin is too broad |
 | Make the service principal workspace admin (by hand) | Databricks account admin | Per new workspace | It is how CI gets in |
 | The workspace itself, with Unity Catalog | Your provisioning process | Per new workspace | This repository configures workspaces; it does not create them |
-| Entra groups synced to the account (`{bu}_users`, `{bu}_explorer`, `{bu}_builder`, `{bu}_publisher`, `{bu}_platform_admins`) | Identity team | Per business unit | Entra owns people and groups |
+| Entra groups synced to the account (`{bu}_platform_admins`, and each workspace's persona groups) | Identity team | Per business unit | Entra owns people and groups |
 | A runner inside the network, if workspaces use Private Link or IP access lists | Cloud team | Once | Infrastructure Actions runs on |
 | `restrict_workspace_admins: true` | Only with an account admin running Terraform | If wanted | Needs account admin; leave it `false` otherwise |
 | Approve a deployment, add `allow-risky-changes`, act on a `drift` issue | Reviewers | Per change | A person decides, by design |

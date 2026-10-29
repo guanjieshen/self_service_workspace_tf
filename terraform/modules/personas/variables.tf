@@ -27,9 +27,3 @@ variable "users_group_entitlements" {
   description = "Entitlements for the built-in users group, or null to leave it unmanaged."
   type        = any
 }
-
-variable "manage_assignment" {
-  description = "Assign groups to the workspace. false = they are already in the workspace (assigned elsewhere, or workspace-local groups)."
-  type        = bool
-  default     = true
-}
