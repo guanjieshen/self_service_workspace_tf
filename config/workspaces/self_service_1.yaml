@@ -8,6 +8,17 @@ groups:
   builder: ss1-cd-builders
   publisher: null          # nobody gets this persona here
 
-# No workspace catalog yet: this metastore has no storage root, and no external location
-# is set up for it (set catalog.storage_root to one to create the catalog).
-catalog: null
+# ---- Changes to the baseline, for this workspace only ----------------------
+
+# The metastore has no storage root, so the catalog keeps its data under our own
+# external location (guanjie-cd-catalogs-2026), in a folder of its own.
+catalog:
+  storage_root: abfss://catalogs@guanjieadls2026.dfs.core.windows.net/self_service_1
+
+# A small team for now: a smaller default warehouse that stops sooner, and no shared
+# classic cluster (builders use serverless, or their own cluster from the policy).
+sql_warehouse:
+  size: X-Small
+  auto_stop_minutes: 10
+shared_cluster:
+  enabled: false
