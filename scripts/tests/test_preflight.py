@@ -97,6 +97,17 @@ class Preflight(unittest.TestCase):
         self.assertTrue(short.startswith("cannot sign in to https://adb-1.1.azuredatabricks.net"))
         self.assertEqual(pf.redact("x token=abc, client_secret=d e"), "x token=***, client_secret=*** e")
 
+    def test_in_ci_without_the_setup_it_says_which_step(self):
+        with mock.patch.dict(pf.os.environ, {"GITHUB_ACTIONS": "true", "ARM_CLIENT_ID": "", "ARM_TENANT_ID": "t"}):
+            api = FakeApi()
+            results = self.run_checks(api)
+        self.assertEqual(len(results), 1)
+        self.assertIn("AZURE_CLIENT_ID are not set", results[0][1])
+        self.assertIn("docs/SETUP.md, steps 4 and 5", results[0][1])
+        self.assertEqual(api.paths, [], "nothing is called without an identity")
+        with mock.patch.dict(pf.os.environ, {"GITHUB_ACTIONS": "true", "ARM_CLIENT_ID": "c", "ARM_TENANT_ID": "t"}):
+            self.assertEqual(self.levels(self.run_checks(FakeApi()), "error"), [], "with the variables set, the checks run")
+
     def test_no_sign_in_stops_at_once(self):
         results = self.run_checks(FakeApi(me=None))
         self.assertEqual(len(results), 1)

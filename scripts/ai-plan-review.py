@@ -314,7 +314,11 @@ def main() -> int:
     args = ap.parse_args()
 
     if args.settings:  # for the workflow: name=value lines, written to $GITHUB_OUTPUT
-        settings = load_settings()
+        try:
+            settings = load_settings()
+        except ValueError as e:  # advice only: a wrong setting switches the review off, never the plan
+            print(f"::warning::AI review off: {e}", file=sys.stderr)
+            settings = {"enabled": False, "workspace": "", "host": "", "endpoint": "", "label": ""}
         for key, value in settings.items():
             print(f"{key}={str(value).lower() if isinstance(value, bool) else value}")
         return 0
