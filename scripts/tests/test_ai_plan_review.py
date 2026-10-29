@@ -108,14 +108,16 @@ class Request(unittest.TestCase):
             orig = review.ROOT
             review.ROOT = root
             try:
-                req = review.build_request(ws, None, review.load_settings())
+                (root / ".plans" / f"{ws}.preflight-all.txt").write_text("ok: nothing found that still uses legacy access\n")
+                req = review.build_request(review.gather(ws, None))
             finally:
                 review.ROOT = orig
         system, user = req["messages"][0]["content"], req["messages"][1]["content"]
         self.assertEqual(system, (ROOT / ".github/ai/plan-review-prompt.md").read_text())
-        for tag in ("workspace", "state", "changed_files", "config_diff", "workspace_files", "baseline", "planned_changes", "plan_guard"):
+        for tag in ("workspace", "state", "changed_files", "config_diff", "workspace_files", "baseline", "planned_changes", "plan_guard", "preflight"):
             self.assertIn(f"<{tag}>", user)
         self.assertIn("First apply", user)
+        self.assertIn("nothing found that still uses legacy access", user, "preflight's findings reach the reviewer")
         self.assertNotIn("#", user.split("<baseline>")[1].split("</baseline>")[0].replace("# config/", ""), "YAML comments are removed")
 
 

@@ -7,3 +7,4 @@
 terraform/backend_override.tf
 dist/
 __pycache__/
+.ai-eval/

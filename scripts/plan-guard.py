@@ -172,7 +172,7 @@ def main() -> int:
     print("  This plan contains changes that are hard or impossible to undo:\n")
     for w in warnings:
         print(f"  - {w}")
-    print("\n  If this is not intended, check for a renamed bu, team or project key,")
+    print("\n  If this is not intended, check for a renamed bu or policy name,")
     print("  a changed security setting in config/defaults/settings.yaml, or one")
     print("  being turned off or loosened (TURN OFF, LOOSEN, OPEN, GRANT, WIDEN, GIVE).")
     print("!" * 78 + "\n")
