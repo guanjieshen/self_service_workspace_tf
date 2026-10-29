@@ -1,0 +1,6 @@
+# Test fixture: a policy for a persona that does not exist.
+budget_policies:
+  policies:
+    extra:
+      name: "{BU}-EXTRA"
+      used_by: [analysts]

@@ -6,6 +6,7 @@ mock_provider "databricks" {
 }
 
 variables {
+  defaults_dir     = "tests/defaults"
   workspaces_dir   = "tests/fixtures"
   use_cli_profiles = false
 }

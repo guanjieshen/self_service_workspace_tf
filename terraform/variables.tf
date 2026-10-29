@@ -8,6 +8,12 @@ variable "workspace" {
   }
 }
 
+variable "defaults_dir" {
+  description = "Folder holding the baseline. Empty = config/defaults/. The tests point it at terraform/tests/defaults/, a copy of the baseline as released, so an organization's own baseline never breaks them."
+  type        = string
+  default     = ""
+}
+
 variable "workspaces_dir" {
   description = "Folder holding the workspace folders. Empty = config/workspaces/. The tests (terraform/tests/) point it at their fixtures."
   type        = string

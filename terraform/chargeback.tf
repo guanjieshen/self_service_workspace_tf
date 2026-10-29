@@ -4,25 +4,22 @@ locals {
   # ---- Budget policies ----
   bp       = local.config.budget_policies
   lob_tags = { LOB = local.lob }
-  # Name templates with {BU} and {bu} filled in.
-  policy_names = {
-    for k in ["shared_name", "platform_name"] :
-    k => replace(replace(local.bp[k], "{BU}", local.bu_upper), "{bu}", local.bu) if contains(keys(local.bp), k)
-  }
-  budget_policies = merge(
-    {
-      shared = {
-        name   = local.policy_names.shared_name
-        tags   = merge(local.lob_tags, local.bp.shared_tags)
-        groups = distinct(flatten(values(local.persona_groups))) # every persona
-      }
-      platform = {
-        name   = local.policy_names.platform_name
-        tags   = merge(local.lob_tags, local.bp.platform_tags)
-        groups = local.platform_admins
-      }
-    },
+  # The groups behind each value of used_by: everyone, platform_admins, or a persona.
+  policy_audiences = merge(
+    { everyone = distinct(flatten(values(local.persona_groups))), platform_admins = local.platform_admins },
+    local.persona_groups,
   )
+  # used_by as a list (one value or several), per policy.
+  policy_used_by = {
+    for k, p in try(local.bp.policies, {}) : k => try(tolist(p.used_by), [tostring(p.used_by)], []) if p != null
+  }
+  budget_policies = {
+    for k, p in try(local.bp.policies, {}) : k => {
+      name   = replace(replace(tostring(p.name), "{BU}", local.bu_upper), "{bu}", local.bu)
+      tags   = merge(local.lob_tags, try(p.tags, {}))
+      groups = distinct(flatten([for u in local.policy_used_by[k] : try(local.policy_audiences[u], [])]))
+    } if p != null
+  }
   budget_policy_managers = distinct(concat(
     [for g in local.platform_admins : "groups/${g}"],
     try(tolist(local.bp.extra_managers), []),

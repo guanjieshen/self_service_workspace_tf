@@ -73,6 +73,13 @@ resource "terraform_data" "config_checks" {
       error_message = "The personal schema job needs to keep MANAGE on the catalog once catalog.owner is a group: that comes from the catalog grants this project manages. Keep manage.catalog_grants on, set catalog.owner: null, or turn off personal_schemas."
     }
     precondition {
+      condition = alltrue([for k, p in try(local.config.budget_policies.policies, {}) : p == null || (
+        can(tostring(p.name)) && length(local.policy_used_by[k]) > 0 &&
+        alltrue([for u in local.policy_used_by[k] : contains(keys(local.policy_audiences), u)])
+      )])
+      error_message = "Each block under budget_policies.policies in cost.yaml needs a name and used_by: everyone, platform_admins, or personas (${join(", ", keys(local.persona_groups))})."
+    }
+    precondition {
       condition     = try(local.catalog.data_classification, null) != true || local.config.budget_policies.enabled == true
       error_message = "catalog.data_classification needs serverless usage policies (budget_policies.enabled in cost.yaml): data classification runs on serverless and fails without one (\"Usage policy ID must not be empty\"). Turn on budget policies, or set catalog.data_classification: null in this workspace's catalog.yaml."
     }
