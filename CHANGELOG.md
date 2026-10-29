@@ -22,7 +22,8 @@ them for you: a setting missing from your baseline is left alone).
   everyday changes.
 
 - The AI plan review uses one review workspace's model for every plan
-  (`ai_review_workspace` and `ai_review_model` in `config/setup.yaml`; off until set).
+  (`ai_review_host`, any workspace the pipeline can sign in to, and `ai_review_model` in
+  `config/setup.yaml`; off until set).
   Removed `config/ai-review.yaml` and the per-workspace `ai-review.yaml` files.
 - Removed `config/backend.hcl.example`: `setup.py state` writes `config/backend.hcl`.
 

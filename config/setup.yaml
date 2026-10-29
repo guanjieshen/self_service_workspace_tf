@@ -23,7 +23,7 @@ state_container: tfstatetest                            # blob container for the
 github_repo: null                   # <org>/<repo> that runs the pipeline (Entra trusts only it). Default: this clone's GitHub origin
 pipeline_name: null                 # display name of the service principal CI signs in as. Default: sp-citizen-dev-terraform
 apply_approvers: null               # <org>/<team> that must approve each apply. Default: none (merging approves)
-ai_review_workspace: null           # the workspace (its file name) whose model reviews every plan (advice in the plan comment). Default: no AI review
+ai_review_host: null                # URL (https://adb-<id>.<n>.azuredatabricks.net) of the workspace whose model reviews every plan; any workspace the pipeline can sign in to. Default: no AI review
 ai_review_model: null               # the model there, a Unity Gateway model service. Default: system.ai.claude-sonnet-5-5
 
 # ---- WRITTEN BY SETUP: leave empty -------------------------------------------

@@ -4,8 +4,8 @@
     scripts/ai-plan-review.py <workspace> [--base <git-ref>] [--endpoint <name>] [--profile <p>] [--request-only]
     scripts/ai-plan-review.py --settings
 
-Settings are in config/setup.yaml: ai_review_workspace, the workspace whose model
-reviews every plan (null = no review), and ai_review_model. One call to that model (a Unity
+Settings are in config/setup.yaml: ai_review_host, the workspace whose model
+reviews every plan (its adb- URL; null = no review), and ai_review_model. One call to that model (a Unity
 Gateway model service), with the pull request and the plan as its only inputs, signed in
 as the pipeline (or --profile, a Databricks CLI profile, locally). --endpoint overrides the
 model for a local test. --settings prints the settings as name=value lines for the workflow.
@@ -154,13 +154,14 @@ def setup_value(key):
 
 
 def load_settings():
-    """The review's settings: on when ai_review_workspace names a workspace."""
-    workspace = setup_value("ai_review_workspace")
+    """The review's settings: on when ai_review_host names the workspace that has the model.
+    Any workspace the pipeline can sign in to; it need not be one this repository manages."""
+    host = (setup_value("ai_review_host") or "").rstrip("/")
     model = setup_value("ai_review_model") or DEFAULT_MODEL
-    host = workspace_field(workspace, "host") if workspace and ws_file(workspace).exists() else ""
-    if workspace and not host:
-        raise ValueError(f"ai_review_workspace {workspace!r} in {setup_file().name} is not a workspace file with a host")
-    return {"enabled": bool(workspace), "workspace": workspace or "", "host": host, "endpoint": model, "label": model}
+    if host and not re.fullmatch(r"https://adb-[0-9]+\.[0-9]+\.azuredatabricks\.net", host):
+        raise ValueError(f"ai_review_host in {setup_file().name} must be a workspace URL like https://adb-<id>.<n>.azuredatabricks.net "
+                         f"(a custom URL does not serve the API), not {host!r}")
+    return {"enabled": bool(host), "host": host, "endpoint": model, "label": model}
 
 
 def ws_file(workspace):
