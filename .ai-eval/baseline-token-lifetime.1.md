@@ -1,10 +1,12 @@
-**Risk:** 🟡 **Medium**: baseline change tightens the token lifetime control in every workspace; only new tokens are affected.
+**Risk:** 🟡 **Medium**: Baseline change shortens new token lifetime in every workspace; reversible, existing tokens unaffected.
 
 #### What changes
+
 | | Change | Details | Affects |
 |---|---|---|---|
-| ✏️ | Maximum personal access token lifetime | 90 → 30 days, for new tokens only; existing tokens keep their expiry | Platform admins (ss1_platform_admins), the only token creators |
+| ✏️ | Maximum personal access token lifetime | 90 → 30 days, new tokens only | Platform admins (ss1_platform_admins), the only token creators |
 
 #### Check before merging
-- Decide whether platform admins can rotate tokens every 30 days. Any integration they run on a token will need a new token sooner.
-- This is a baseline change, so every workspace gets its own plan. Approve each plan, not only this one.
+
+- Find integrations or scripts that use platform-admin personal access tokens. Tokens created after merge expire within 30 days, so they need rotating three times as often.
+- This change applies to every workspace. Confirm each workspace's plan shows only this setting change.

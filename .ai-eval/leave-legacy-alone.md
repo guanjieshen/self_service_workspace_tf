@@ -1,13 +1,11 @@
-**Risk:** 🟡 **Medium**: a security-relevant deviation (legacy access left unmanaged) with a reason; the workspace itself does not change.
+**Risk:** 🟡 **Medium**: Legacy access is no longer enforced by the baseline, with a reason given. Nothing changes in the workspace now.
 
 #### What changes
-
 | | Change | Details | Affects |
 |---|---|---|---|
-| ✏️ | Disable legacy access: Terraform stops managing it | managed (disabled) → unmanaged; stays disabled, nothing changes in the workspace | all users |
+| ✏️ | Disable legacy access setting | Managed (disabled) → left unmanaged; workspace keeps current value (disabled) | Nobody now; future enforcement for all users |
 
 #### Check before merging
-
-- Deviation: disable legacy access `true` → `null` (unmanaged). The reason is given: Hive is still in use until the Q3 migration.
-- This does not meet that intent. Preflight shows legacy access is already disabled, and `null` does not re-enable it. To keep Hive working, someone must re-enable it by hand.
-- Disabling becomes permanent 30 days after it was set. The inputs do not show when that was, so check promptly if Hive is still needed.
+- Deviation: disable legacy access `true` → `null` (unmanaged). A reason is given: the workspace is "still on Hive until the Q3 migration".
+- Preflight says legacy access is **already disabled**, so Hive tables stay blocked after merging, because `null` doesn't re-enable access. If the team needs Hive, an admin must re-enable it by hand. That's only possible within 30 days of disabling, and the inputs don't show that date.
+- Decide whether to merge at all. If Hive isn't actually needed, close this pull request and keep the baseline enforced. Otherwise, remove the line after the Q3 migration to restore enforcement.

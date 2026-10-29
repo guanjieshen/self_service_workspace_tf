@@ -50,7 +50,11 @@ run "compute_options" {
   }
   assert {
     condition     = local.config.cluster_policy.max_workers == 8 && local.config.cluster_policy.jobs.max_clusters_per_user == 1 && local.config.cluster_policy.pipelines == null
-    error_message = "cluster_policy.max_workers overrides that limit only; pipelines: null drops that policy."
+    error_message = "cluster_policy.max_workers overrides that limit only; pipelines: null means no pipelines policy."
+  }
+  assert {
+    condition     = contains(output.released_addresses, "module.compute.databricks_cluster_policy.classic[\"pipelines\"]") && !contains(output.released_addresses, "module.compute.databricks_cluster_policy.classic[\"jobs\"]")
+    error_message = "A policy kind set to null is released (left in the workspace), never deleted, like any setting."
   }
 }
 

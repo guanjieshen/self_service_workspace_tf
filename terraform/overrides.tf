@@ -59,6 +59,9 @@ locals {
     "settings.genie_code"                                         = ["${local.ws}.databricks_workspace_file.genie_code_instructions", "${local.ws}.databricks_workspace_file.genie_code_skills"]
     "settings.genie_code.instructions"                            = ["${local.ws}.databricks_workspace_file.genie_code_instructions"]
     "settings.genie_code.skills"                                  = ["${local.ws}.databricks_workspace_file.genie_code_skills"]
+    "cluster_policy.interactive"                                  = ["module.compute.databricks_cluster_policy.classic[\"interactive\"]"]
+    "cluster_policy.jobs"                                         = ["module.compute.databricks_cluster_policy.classic[\"jobs\"]"]
+    "cluster_policy.pipelines"                                    = ["module.compute.databricks_cluster_policy.classic[\"pipelines\"]"]
   }
   # Released when false (or null): serverless_policy.enabled.
   switch_addresses = {

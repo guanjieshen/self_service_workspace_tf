@@ -1,21 +1,21 @@
-**Risk:** 🔴 **High**: first apply disables legacy access and DBFS mounts while preflight finds Hive schemas and mounts still in use.
+**Risk:** 🔴 **High**: one-way disabling of legacy access, while preflight finds Hive schemas and DBFS mounts still in use.
 
 > [!WARNING]
-> Notebooks, queries and jobs that use Hive schemas `finance_raw`, `hr_staging`, `sales` or mounts `/mnt/landing`, `/mnt/archive` will stop working. After 30 days, legacy access cannot be turned back on.
+> Hive schemas finance_raw, hr_staging and sales and DBFS mounts /mnt/landing and /mnt/archive stop working, permanently after 30 days.
 
 #### What changes
 | | Change | Details | Affects |
 |---|---|---|---|
-| ➕ | Personas | users Databricks One, explorers SQL, builders workspace; no publishers | ss1-cd-users, ss1-cd-explorers, ss1-cd-builders |
-| ➕ | Catalog `ss1_citizen_dev` | This workspace only; personas get USE CATALOG, USE SCHEMA | explorers, builders |
-| ➕ | SS1 Default Warehouse | Serverless, X-Small (baseline Small), workspace default | explorers, builders |
-| ➕ | SS1 Builder Compute policy | No shared cluster (baseline has one) | builders |
-| ➕ | Usage policies | SS1-SHARED, SS1-PLATFORM | all users |
-| ➕ | Legacy access, DBFS root and mounts | Disabled; legacy access permanent after 30 days | all users |
-| ➕ | Security settings | User isolation; tokens admins only, 90 days; Git allowlist | all users |
-| ➕ | Genie Code | Default instructions and tagging skill | all users |
+| ➕ | Personas | Users consumer-only; explorers SQL; builders workspace and SQL; no publishers | ss1-cd-users, ss1-cd-explorers, ss1-cd-builders |
+| ➕ | Catalog ss1_citizen_dev | Workspace-only; personas get USE CATALOG, USE SCHEMA | explorers, builders |
+| ➕ | SS1 Default Warehouse | Serverless X-Small, 1–2 clusters, 5 min auto-stop | explorers, builders |
+| ➕ | Usage policy SS1-0-SELF-SERVICE | Chargeback tags, APP_ID NONE | explorers, builders |
+| ➕ | Classic cluster policies (Interactive, Jobs, Pipelines) | LTS only, max 4 workers, one cluster per person | users granted by the app |
+| ➕ | Legacy access, DBFS root and mounts off; user isolation on | Hive and mounts blocked; permanent after 30 days | all users |
+| ➕ | Workspace settings | Tokens admins-only, 90 days; Git allowlist; downloads allowed | all users |
+| ➕ | Genie Code instructions and skill | Defaults plus build-tagged-assets skill | all users |
 
 #### Check before merging
-- Before merging, migrate the Hive schemas and mounts, or set `disable_legacy_access: null` and `disable_dbfs_root_and_mounts: null` under `settings:` in this workspace's file.
-- The Git allowlist is still the placeholder `https://github.com/<org>/`. Git folders cannot reach your real repositories until it is replaced in the baseline.
-- Confirm these choices: no publishers, and no shared cluster, so builders get only policy clusters.
+- Decide: migrate finance_raw, hr_staging, sales, /mnt/landing and /mnt/archive first, or set the three legacy settings to `null` in this file.
+- The Git allowlist is still the placeholder `https://github.com/<org>/`, so Git folders cannot reach your real repositories until the baseline is fixed.
+- Deviation: warehouse size Small → X-Small. The diff gives no reason. This means less capacity per cluster.
