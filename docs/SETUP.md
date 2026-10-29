@@ -225,9 +225,32 @@ What each setting does is in the comment beside it, and in [config/README.md](..
 | A plan is flagged as risky | Review the warning in the plan comment; if intended, a person adds the label `allow-risky-changes` |
 | A `drift` issue opens | Someone changed a setting by hand: update the configuration to match, or re-apply to restore it |
 | Retry a failed apply | Fix the cause, then re-run the latest Apply run (it refuses if `main` has moved on) |
-| Upgrade to a new release | [README.md](../README.md), "Installing and upgrading": the pull request's plan shows what the new version changes in each workspace |
+| Upgrade to a new release | Below: the pull request's plan shows what the new version changes in each workspace |
 
-More: [config/README.md](../config/README.md) (configuration tasks) and [docs/github-actions.md](github-actions.md) (the workflows).
+More: [config/README.md](../config/README.md) (configuration tasks) and [github-actions.md](github-actions.md) (the workflows).
+
+### Upgrade to a new release
+
+Releases are git tags (`v1.2.0`), with what changed in `CHANGELOG.md`.
+
+Replace the framework files, keep your configuration:
+```bash
+git fetch <framework repo> 'refs/tags/*:refs/tags/*'
+git restore --source=v1.3.0 --staged --worktree -- \
+  terraform scripts .github/workflows .github/actions .github/scripts .github/ai docs \
+  README.md CHANGELOG.md AGENTS.md CLAUDE.md agents config/README.md config/AGENTS.md \
+  config/workspaces/_example
+```
+`git restore` also removes files the release dropped, and touches nothing else: not `config/defaults/`, your workspaces, `config/setup.yaml`, `config/ai-review.yaml` or `.github/CODEOWNERS`. A baseline setting that is new in the release is absent from your `config/defaults/` until you add it, which means "leave alone", so an upgrade never turns something on by itself; `CHANGELOG.md` lists new settings to add. Open a pull request: its plan shows what the new version changes in each workspace before anything is applied.
+
+> [!WARNING]
+> Do not edit framework files in your repository: the next upgrade replaces them. Send a fix to the framework maintainers so it is in the next release.
+
+### State and teardown
+
+State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (copy `config/backend.hcl.example`); then each workspace has its own state file in Azure Storage, which CI requires.
+
+`./scripts/tf.sh <name> destroy` removes what this project manages. It resets the workspace configuration keys it manages (`enable*`, `enforce*`) to `false`, which includes turning personal access tokens off; review the plan before confirming.
 
 ## 11. Troubleshooting
 
