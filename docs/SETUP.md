@@ -145,7 +145,7 @@ Then, if needed:
 
 ## 6. Databricks account (by hand)
 
-**Who:** a Databricks account admin, in the account console (https://accounts.azuredatabricks.net). Once, before the first workspace; items 2 and 4 again for each new workspace. You need the service principal's client ID, `pipeline_client_id` in `config/setup.yaml` (step 4 writes it).
+**Who:** a Databricks account admin, in the account console (https://accounts.azuredatabricks.net). Once, before the first workspace; items 2 and 5 again for each new workspace. You need the service principal's client ID, `pipeline_client_id` in `config/setup.yaml` (step 4 writes it).
 
 1. **Add the service principal to the account:** User management > Service principals > Add service principal > **Microsoft Entra ID managed**, with the application ID `pipeline_client_id` and the name `pipeline_name` (default `sp-citizen-dev-terraform`).
 2. **Make it workspace admin** of each workspace this repository manages: Workspaces > the workspace > Permissions > Add permissions > the service principal, **Admin**.
@@ -176,19 +176,19 @@ The baseline in `config/defaults/` is what every workspace gets. Most of it is a
 
 | Decision | File and key | Shipped value | Notes |
 | --- | --- | --- | --- |
-| **Disable legacy access** (Hive metastore, DBFS root and mounts, No-isolation clusters) | `settings.yaml` `disable_legacy_access`, `disable_dbfs_root_and_mounts` | `true` | **One-way after 30 days.** Fine for new workspaces. For an existing one, `preflight.py` lists what still uses legacy access; set both to `null` in that workspace's `settings.yaml` until it is migrated |
-| Git URLs allowed in Git folders | `settings.yaml` `git.allowed_urls` | `https://github.com/<org>/` | **Replace the placeholder**; preflight warns until you do |
-| Compliance security profile | `settings.yaml` `compliance_security_profile` | `null` (leave alone) | **One-way**, and billed. Only if your compliance team requires it |
-| Unity Gateway enforced | `settings.yaml` `enforce_unity_gateway` | `true` | Switches off the `databricks-` pay-per-token endpoints; model calls must use `system.ai` models |
-| Collaboration platforms | `settings.yaml` `collaboration_platforms.allowed` | `ALLOW_TEAMS` | `ALLOW_ALL`, `ALLOW_SLACK`, `ALLOW_TEAMS` or `DENY_ALL` |
-| Dashboard embedding domains | `settings.yaml` `dashboard_embedding.approved_domains` | none | For example your SharePoint domain |
-| Personal access tokens | `settings.yaml` `personal_access_tokens`, `access.yaml` `personas.<persona>.can_create_tokens` | On, 90 days, no persona may create them | Only admins create tokens unless a persona is allowed |
-| Platform admins group name | `access.yaml` `groups.platform_admins` | `{bu}_platform_admins` | Match your Entra naming convention; `{bu}` is the workspace's business unit code. Persona groups are named per workspace |
-| Databricks account | `cost.yaml` `account_id` | none | Required while budget policies are on (account console, top right) |
-| Required tags | `cost.yaml` `required_tags` | `LOB`, `DEPARTMENT`, `TEAM` (placeholders) | A tag a workspace sets for everything (`tags:` in its file) is not asked of each team. Changing them later affects new workloads only |
-| Budget (usage) policies | `cost.yaml` `budget_policies.enabled` | `true` | Needs an account-level permission for the pipeline (step 6); set `false` if you will not grant it. Data classification needs them |
-| Catalog name and features | `catalog.yaml` `catalog` | `{bu}_citizen_dev`, predictive optimization, data classification and data quality monitoring on | `catalog.storage_root` is needed when the metastore has no storage root (preflight says so) |
-| Restrict workspace admins | `settings.yaml` `restrict_workspace_admins` | `false` | Needs account admin to change; leave `false` |
+| **Disable legacy access** (Hive metastore, DBFS root and mounts, No-isolation clusters) | `defaults/settings.yaml` `disable_legacy_access`, `disable_dbfs_root_and_mounts`, `enforce_user_isolation` | `true` | **One-way after 30 days.** Fine for new workspaces. For an existing one, `preflight.py` lists what still uses legacy access; set them to `null` under `settings:` in that workspace's file until it is migrated |
+| Git URLs allowed in Git folders | `defaults/settings.yaml` `git.allowed_urls` | `https://github.com/<org>/` | **Replace the placeholder**; preflight warns until you do |
+| Compliance security profile | `defaults/settings.yaml` `compliance_security_profile` | `null` (leave alone) | **One-way**, and billed. Only if your compliance team requires it |
+| Unity Gateway enforced | `defaults/settings.yaml` `enforce_unity_gateway` | `true` | Switches off the `databricks-` pay-per-token endpoints; model calls must use `system.ai` models |
+| Collaboration platforms | `defaults/settings.yaml` `collaboration_platforms.allowed` | `ALLOW_TEAMS` | `ALLOW_ALL`, `ALLOW_SLACK`, `ALLOW_TEAMS` or `DENY_ALL` |
+| Dashboard embedding domains | `defaults/settings.yaml` `dashboard_embedding.approved_domains` | none | For example your SharePoint domain |
+| Personal access tokens | `defaults/settings.yaml` `personal_access_tokens`, `defaults/access.yaml` `personas.<persona>.can_create_tokens` | On, 90 days, no persona may create them | Only admins create tokens unless a persona is allowed |
+| Platform admins group name | `defaults/access.yaml` `groups.platform_admins` | `{bu}_platform_admins` | Match your Entra naming convention; `{bu}` is the workspace's business unit code. Persona groups are named per workspace |
+| Databricks account | `defaults/cost.yaml` `account_id` | none | Required while budget policies are on (account console, top right) |
+| Required tags | `defaults/cost.yaml` `required_tags` | `BUSINESS_UNIT`, `DEPARTMENT`, `TEAM`, `COST_CENTER`, `PROJECT`, `ENVIRONMENT` (placeholders) | A tag a workspace sets for everything (`tags:` in its file) is not asked of each team. Changing them later affects new workloads only |
+| Budget (usage) policies | `defaults/cost.yaml` `budget_policies.enabled` | `true` | Needs an account-level permission for the pipeline (step 6); set `false` if you will not grant it. Data classification needs them |
+| Catalog name and features | `defaults/catalog.yaml` `catalog` | `{bu}_citizen_dev`, predictive optimization, data classification and data quality monitoring on | `catalog.storage_root` is needed when the metastore has no storage root (preflight says so) |
+| Restrict workspace admins | `defaults/settings.yaml` `restrict_workspace_admins` | `false` | Needs account admin to change; leave `false` |
 | AI review of each plan | `config/setup.yaml` `ai_review_host`, `ai_review_model` | Off until a host is set; then `system.ai.claude-sonnet-5-5` there | Advice in the plan comment only. One workspace that has the model reviews every plan; the pipeline's service principal needs to be in it, with `EXECUTE` on the model (account users have it on `system.ai` by default) |
 
 What each setting does is in the comment beside it, and in [config/README.md](../config/README.md).
@@ -200,7 +200,7 @@ What each setting does is in the comment beside it, and in [config/README.md](..
 Before you start: the workspace exists and the runners can reach it (its private endpoint and DNS), the pipeline's service principal is workspace admin there (step 6, item 2), and its persona groups exist in Entra ID (step 7).
 
 1. **Create its file:** copy `config/workspaces/_example.yaml` to `config/workspaces/fin-citizen-dev.yaml` and fill in `bu`, `host` and `groups`. The file name is the workspace's name in this repository.
-2. **Set anything that differs from the baseline**, in the same file (for example `catalog.storage_root`, or `settings.disable_legacy_access: null` for an existing workspace that is not ready). Leave the rest out.
+2. **Set anything that differs from the baseline**, in the same file (for example `catalog.storage_root`, or `null` for `settings.disable_legacy_access`, `disable_dbfs_root_and_mounts` and `enforce_user_isolation` for an existing workspace that is not ready). Leave the rest out.
 3. **Check it is ready** (optional; the pull request runs it too), signed in with the Azure or Databricks CLI:
 
    ```bash
@@ -240,7 +240,7 @@ git fetch <framework repo> 'refs/tags/*:refs/tags/*'
 git restore --source=v1.3.0 --staged --worktree -- \
   terraform scripts .github/workflows .github/actions .github/scripts .github/ai docs \
   README.md CHANGELOG.md AGENTS.md CLAUDE.md agents config/README.md config/AGENTS.md \
-  config/workspaces/_example
+  config/workspaces/_example.yaml
 ```
 `git restore` also removes files the release dropped, and touches nothing else: not `config/defaults/`, your workspaces, `config/setup.yaml` or `.github/CODEOWNERS`. A baseline setting that is new in the release is absent from your `config/defaults/` until you add it, which means "leave alone", so an upgrade never turns something on by itself; `CHANGELOG.md` lists new settings to add. Open a pull request: its plan shows what the new version changes in each workspace before anything is applied.
 
@@ -264,7 +264,7 @@ State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (ste
 | Preflight: `is not a workspace admin` | Step 6 not done for this workspace | Step 6, item 2, for this workspace |
 | Preflight: group `does not exist in the account` or `exists only in this workspace` | The Entra group is missing, not synced, or a workspace-local group has the same name | Step 7; or name the right group under `groups:` in the workspace's file |
 | Preflight: `the metastore has no storage root` | New catalogs have nowhere to store data | Set `catalog.storage_root` in the workspace's file to an external location URL |
-| Apply fails creating a budget policy (permission denied) | The service principal lacks the account-level budget policy permission | Step 6, item 2, or `budget_policies.enabled: false` |
+| Apply fails creating a budget policy (permission denied) | The service principal lacks the account-level budget policy permission | Step 6, item 3, or `budget_policies.enabled: false` |
 | `Usage policy ID must not be empty` | Data classification runs on serverless and needs a usage policy | Turn on budget policies, or set `catalog.data_classification: null` |
 | A local plan shows permission changes that CI does not | Local plans run as you, not the pipeline: the owner entry differs | Trust the CI plan and the drift check |
 | The plan comment has no AI review | `ai_review_host` is not set, the service principal is not in that workspace, or the model is unavailable to it there (region, Unity Gateway, missing EXECUTE) | Set `ai_review_host` to a workspace that has the model, add the service principal to it, or change `ai_review_model`; the review is advice only |

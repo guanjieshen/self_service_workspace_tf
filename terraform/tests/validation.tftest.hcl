@@ -20,21 +20,21 @@ run "unknown_key" {
   expect_failures = [terraform_data.config_checks]
 }
 
-# catalog.yaml catalog: needs a name of lowercase letters
+# catalog: needs a name of lowercase letters
 run "bad_catalog_name" {
   command = plan
   variables { workspace = "bad-catalog-name" }
   expect_failures = [terraform_data.config_checks]
 }
 
-# catalog.yaml catalog: may only set
+# catalog: may only set
 run "catalog_unknown_field" {
   command = plan
   variables { workspace = "catalog-unknown-field" }
   expect_failures = [terraform_data.config_checks]
 }
 
-# team warehouses have moved to compute.yaml
+# team warehouses are team_warehouses:, not under teams:
 run "team_warehouse_in_team" {
   command = plan
   variables { workspace = "team-warehouse-in-team" }
@@ -55,7 +55,7 @@ run "team_warehouse_fields" {
   expect_failures = [terraform_data.config_checks]
 }
 
-# compute.yaml sql_warehouse may only set keys the baseline has
+# sql_warehouse may only set keys the baseline has
 run "warehouse_unknown_key" {
   command = plan
   variables { workspace = "warehouse-unknown-key" }
@@ -69,14 +69,14 @@ run "override_unknown_persona" {
   expect_failures = [terraform_data.config_checks]
 }
 
-# workspace.yaml must give the host
+# a workspace file must give the host
 run "workspace_missing_host" {
   command = plan
   variables { workspace = "workspace-missing-host" }
   expect_failures = [terraform_data.config_checks]
 }
 
-# access.yaml personas may only use defined personas
+# personas may only use defined personas
 run "unknown_persona" {
   command = plan
   variables { workspace = "unknown-persona" }
@@ -104,7 +104,7 @@ run "team_no_group" {
   expect_failures = [terraform_data.config_checks]
 }
 
-# access.yaml groups must name the platform admins group
+# groups must name the platform admins group
 run "no_platform_admins" {
   command = plan
   variables { workspace = "no-platform-admins" }
@@ -125,7 +125,7 @@ run "team_no_tags" {
   expect_failures = [terraform_data.config_checks]
 }
 
-# workspace.yaml label needs text and one of the allowed colors
+# a workspace file's label needs text and one of the allowed colors
 run "bad_label" {
   command = plan
   variables { workspace = "bad-label" }

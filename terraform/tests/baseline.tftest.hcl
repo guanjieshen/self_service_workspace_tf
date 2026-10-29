@@ -62,7 +62,7 @@ run "personas" {
 
   assert {
     condition     = jsonencode(local.persona_groups) == jsonencode({ builder = ["tst-builders"], explorer = ["tst-explorers"], publisher = ["tst-publishers"] }) && jsonencode(local.platform_admins) == jsonencode(["tst-admins"])
-    error_message = "One group per persona, from groups in access.yaml."
+    error_message = "One group per persona, from groups (baseline and the workspace's file)."
   }
   assert {
     condition     = sort(keys(local.cluster_policies)) == tolist(["builder", "publisher"])

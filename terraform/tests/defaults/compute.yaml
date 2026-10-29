@@ -9,8 +9,8 @@
 # need updating); scripts/tf.sh warns before applying that.
 #
 # A single workspace can resize its default warehouse, turn on the classic
-# warehouse, or change or turn off its shared cluster, in its compute.yaml.
-# Team warehouses are defined only in the workspace's compute.yaml.
+# warehouse, or change or turn off its shared cluster, in its file (config/workspaces/<name>.yaml).
+# Team warehouses (team_warehouses:) are defined only in the workspace's file.
 # =============================================================================
 
 # ---- Default SQL warehouse --------------------------------------------------
@@ -33,7 +33,7 @@ sql_warehouse:
 # A second SQL warehouse on classic compute, next to the serverless default, for
 # work that needs it. Same access as the default warehouse (default_warehouse in
 # config/defaults/access.yaml). Off unless a workspace turns it on with
-# `classic_warehouse: enabled: true` in its compute.yaml. Classic compute runs in the
+# `classic_warehouse: enabled: true` in its file. Classic compute runs in the
 # workspace's own Azure subscription and takes a few minutes to start.
 classic_warehouse:
   enabled: false

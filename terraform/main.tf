@@ -94,7 +94,7 @@ module "budget_policies" {
   depends_on = [terraform_data.config_checks]
 }
 
-# The workspace's Unity Catalog catalog and its grants (catalog.yaml).
+# The workspace's Unity Catalog catalog and its grants (config/defaults/catalog.yaml).
 module "catalog" {
   source = "./modules/catalog"
   count  = local.catalog != null ? 1 : 0

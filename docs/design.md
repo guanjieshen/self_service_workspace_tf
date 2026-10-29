@@ -122,7 +122,8 @@ them from the self-service app.
 
 1. **Disabling legacy access can become permanent** after 30 days. Before applying to an
    existing workspace, check nothing uses Hive tables, DBFS mounts or No-isolation
-   clusters; until then set `disable_legacy_access: null` in its `settings.yaml`.
+   clusters; until then set `disable_legacy_access`, `disable_dbfs_root_and_mounts` and
+   `enforce_user_isolation` to `null` under `settings:` in its file.
 2. **Terraform owns what it manages.** Entitlements, permissions, grants and budget
    policy access are authoritative: changes made by hand are reverted on the next apply
    (the drift check reports them first).
@@ -156,7 +157,7 @@ them from the self-service app.
 | S4 | Interactive notebook results in the workspace's own storage? | Not managed |
 | P5 | Approved dashboard embedding domains? | None |
 | P7 | GitHub org URL for the Git allowlist? | Placeholder |
-| P8 | Required tag keys, and which a workspace sets for everything in it (`tags:`)? | Placeholders: `LOB`, `DEPARTMENT`, `TEAM` |
+| P8 | Required tag keys, and which a workspace sets for everything in it (`tags:`)? | Placeholders: `BUSINESS_UNIT`, `DEPARTMENT`, `TEAM`, `COST_CENTER`, `PROJECT`, `ENVIRONMENT` |
 | P12 | Remove `users` from `/Workspace/Shared` so folder permissions mean something? | Organisation only |
 
 ## 8. Not built yet
@@ -175,12 +176,12 @@ A second stack creates the workspace itself (Premium, VNet injection into an exi
 
 ### Unity Catalog stream (F2)
 
-Catalogs shared between workspaces, storage credentials and external locations stay with the Unity Catalog team. This project manages only a workspace's own catalog (`catalog.yaml`) and expects the metastore and the rest to exist.
+Catalogs shared between workspaces, storage credentials and external locations stay with the Unity Catalog team. This project manages only a workspace's own catalog (`config/defaults/catalog.yaml`) and expects the metastore and the rest to exist.
 
 ### The self-service app (F3)
 
 Schemas and workspace folders are requested through the self-service app, which lives in its own repository and deploys its own jobs. What it relies on here:
 
 - **The workspace catalog** (`{bu}_citizen_dev`), owned by the platform admins group. Personas have only `USE CATALOG` and `USE SCHEMA` on it; the app grants on the schemas it creates.
-- **Catalog grants are authoritative:** a privilege granted on the catalog outside `catalog.yaml` is removed on the next apply. The app's service principal needs a privilege on the catalog (for example `CREATE SCHEMA`): add it to `catalog.yaml`, not by hand.
+- **Catalog grants are authoritative:** a privilege granted on the catalog outside this repository is removed on the next apply. The app's service principal needs a privilege on the catalog (for example `CREATE SCHEMA`): add it to the catalog grants in `config/defaults/catalog.yaml`, not by hand.
 - **The persona groups** each workspace names in its file.

@@ -87,7 +87,7 @@ The workspace keys (not in the baseline):
 | Tag everything in a workspace | | `tags` in its file |
 | Resize the default warehouse | `sql_warehouse` in `defaults/compute.yaml` | `sql_warehouse.size` (etc.) in its file |
 | Change an admin setting | `settings.<key>` in `defaults/settings.yaml` | the same key in its file |
-| Not ready to switch off legacy access and DBFS | | `settings.disable_legacy_access: null` and `disable_dbfs_root_and_mounts: null` in its file |
+| Not ready to switch off legacy access and DBFS | | `settings.disable_legacy_access`, `disable_dbfs_root_and_mounts` and `enforce_user_isolation`: `null` in its file |
 | Leave a setting alone (something else manages it) | the key set to `null` in `defaults/` | the key set to `null` in its file |
 | Leave budget policies alone | `budget_policies.enabled: false` in `defaults/cost.yaml` | the same in its file |
 | Change Genie Code instructions | `defaults/genie-code/instructions.md` | `genie_code_instructions` in its file (appended after the default) |

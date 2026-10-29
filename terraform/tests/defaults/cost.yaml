@@ -32,8 +32,8 @@ budget_policies:
   #             of personas, for example [builder, publisher].
   #   tags:     the chargeback tags on its usage (required_tags above).
   # The key (shared, platform) is how Terraform tracks the policy: a new key adds a
-  # policy, a removed key deletes it (the plan flags that). A workspace's cost.yaml
-  # can add a block, or change one by repeating the whole block.
+  # policy, a removed key deletes it (the plan flags that). A workspace's file
+  # (config/workspaces/<name>.yaml) can add a block, or change one by repeating the whole block.
   policies:
     shared:
       name: "{BU}-SHARED"

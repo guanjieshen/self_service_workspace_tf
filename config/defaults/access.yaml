@@ -4,7 +4,7 @@
 # Everything is granted to groups, never to people. Who is in a group is managed
 # in Entra ID (synced to the Databricks account), for example through access
 # packages or a ticketing system: adding someone to a workspace's builder group gives them everything a builder gets, with
-# no change here. A workspace's access.yaml can change any key below for that
+# no change here. A workspace's file (config/workspaces/<name>.yaml) can change any key below for that
 # workspace only (same name and shape).
 #
 # Permission values (as shown in the Databricks UI):
@@ -19,7 +19,7 @@
 # and serverless usage policies cannot use groups that exist only in a workspace.
 # Only the platform admins are named the same way everywhere ({bu} = the workspace's
 # business unit code, lower case). Each workspace names its own persona groups in its
-# access.yaml; a persona without a group is skipped: nobody gets it, and nothing fails.
+# file (groups:); a persona without a group is skipped: nobody gets it, and nothing fails.
 groups:
   platform_admins: "{bu}_platform_admins"   # workspace admins; own the workspace catalog
   users: null                               # everyone who may use the workspace (consumer access)
@@ -42,7 +42,7 @@ users:
 # Nobody gets "Allow unrestricted cluster creation", and no persona is workspace
 # admin: persona groups join the workspace as users; only platform_admins are admins.
 # Every persona can use the shared serverless usage policy, gets USE CATALOG and
-# USE SCHEMA on the workspace catalog (catalog.yaml).
+# USE SCHEMA on the workspace catalog (config/defaults/catalog.yaml).
 personas:
 
   # ---- Explorer: finds and analyzes trusted data (SQL, dashboards, Genie) ----

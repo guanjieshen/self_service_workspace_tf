@@ -198,7 +198,7 @@ run "workspace_settings" {
   }
   assert {
     condition     = databricks_workspace_setting_v2.workspace_label[0].name == "workspace_label" && databricks_workspace_setting_v2.workspace_label[0].workspace_label.label == "DEV" && databricks_workspace_setting_v2.workspace_label[0].workspace_label.color == "lime"
-    error_message = "workspace.yaml label sets the workspace_label setting (text and color)."
+    error_message = "label in the workspace's file sets the workspace_label setting (text and color)."
   }
   assert {
     condition     = databricks_workspace_setting_v2.workspace_label[0].effective_workspace_label == databricks_workspace_setting_v2.workspace_label[0].workspace_label

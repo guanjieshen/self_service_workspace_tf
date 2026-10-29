@@ -2,7 +2,7 @@
 # Everything is granted to groups; who is in them is managed in Entra ID.
 
 locals {
-  # ---- The groups (access.yaml groups:), with {bu} / {BU} filled in ----
+  # ---- The groups (groups: in the baseline and the workspace's file), with {bu} / {BU} filled in ----
   group_names = {
     for k, g in local.config.groups : k => replace(replace(g, "{BU}", local.bu_upper), "{bu}", local.bu) if g != null
   }
@@ -55,7 +55,7 @@ locals {
     for p, gs in local.persona_groups : gs if try(local.personas[p].can_create_tokens, false) == true
   ]))
 
-  # ---- Unity Catalog: the workspace's catalog (catalog.yaml) ----
+  # ---- Unity Catalog: the workspace's catalog (config/defaults/catalog.yaml) ----
   # The owner can be a key of groups (platform_admins, ...) or a group name.
   catalog = local.config.catalog == null ? null : merge(local.config.catalog, {
     name  = replace(replace(local.config.catalog.name, "{BU}", local.bu_upper), "{bu}", local.bu)
@@ -71,7 +71,7 @@ locals {
   # The baseline's (config/defaults/genie-code/), the same in every workspace, plus a
   # workspace's own instructions as text (genie_code_instructions in its file).
   genie_default_dir = "${local.defaults_dir}/genie-code"
-  # settings.genie_code in settings.yaml: true = deploy, null = leave alone.
+  # settings.genie_code in config/defaults/settings.yaml: true = deploy, null = leave alone.
   manage_genie_instructions = try(local.settings.genie_code.instructions, null) == true
   manage_genie_skills       = try(local.settings.genie_code.skills, null) == true
 

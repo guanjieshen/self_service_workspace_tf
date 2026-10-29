@@ -83,7 +83,7 @@ locals {
   # The workspace ID: id in the workspace file, or the number in an Azure workspace URL (adb-<id>.<n>).
   workspace_id = try(tostring(local.workspace.id), regex("adb-([0-9]+)\\.", local.workspace.host)[0], null)
 
-  # The Databricks account: the baseline's (cost.yaml), or the workspace file's.
+  # The Databricks account: the baseline's (config/defaults/cost.yaml), or the workspace file's.
   account_id = try(tostring(local.config.account_id), null)
   bu         = lower(try(local.workspace.bu, ""))
   bu_upper   = upper(try(local.workspace.bu, ""))

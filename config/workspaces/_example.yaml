@@ -66,6 +66,7 @@ groups:
 #   # Not ready for Unity Catalog only yet: leave legacy access alone.
 #   disable_legacy_access: null
 #   disable_dbfs_root_and_mounts: null
+#   enforce_user_isolation: null
 
 # catalog:
 #   # Where managed tables go, if the metastore has no storage root:

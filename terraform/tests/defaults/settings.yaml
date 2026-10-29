@@ -8,8 +8,8 @@ settings:
   # ---- Decide at onboarding ------------------------------------------------
   # Switching these later on a busy workspace is disruptive, and
   # disable_legacy_access becomes permanent. For a workspace that is not ready
-  # (for example still using Hive tables), set them to null in its settings.yaml
-  # until it has migrated.
+  # (for example still using Hive tables), set them to null under settings: in its
+  # file (config/workspaces/<name>.yaml) until it has migrated.
 
   # true = turn OFF the Hive metastore and other legacy data access.
   # ONE-WAY: after 30 days disabled, the workspace becomes Unity Catalog only, permanently.
@@ -123,9 +123,9 @@ settings:
     statement_timeout_seconds: 14400
 
   # ---- Genie Code ----------------------------------------------------------
-  # The default instructions and skills in config/defaults/genie-code/, plus each
-  # workspace's own genie-code/ folder (its instructions are appended, its skills
-  # added). true = deploy, null = leave alone (Genie Code is managed elsewhere).
+  # The instructions and skills in config/defaults/genie-code/, for every workspace.
+  # A workspace's file can add instructions (genie_code_instructions, appended after
+  # the default ones); skills are the baseline's only. true = deploy, null = leave alone (Genie Code is managed elsewhere).
 
   genie_code:
     instructions: true

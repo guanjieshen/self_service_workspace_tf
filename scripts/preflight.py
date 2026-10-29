@@ -175,7 +175,8 @@ def legacy_uses(get):
         return [("ok", "nothing found that still uses legacy access (Hive metastore, DBFS mounts, legacy clusters)")]
     return [("warning", "the baseline disables legacy access, which becomes permanent after 30 days, and this "
                         "workspace still has " + "; ".join(found) + ". Migrate them first, or set "
-                        "disable_legacy_access: null and disable_dbfs_root_and_mounts: null under settings: in its settings.yaml")]
+                        "disable_legacy_access, disable_dbfs_root_and_mounts and enforce_user_isolation to null under settings: "
+                        "in its file (config/workspaces/<name>.yaml)")]
 
 
 def main(argv):

@@ -18,7 +18,7 @@ run "access" {
 
   assert {
     condition     = jsonencode(local.token_groups) == jsonencode(["tst-builders"])
-    error_message = "personas.<persona>.can_create_tokens in access.yaml changes who may create tokens (here builders only)."
+    error_message = "personas.<persona>.can_create_tokens changes who may create tokens (here builders only)."
   }
   assert {
     condition     = contains(local.extra_groups, "tst-data-eng") && contains(local.extra_groups, "tst_users")
@@ -30,11 +30,11 @@ run "access" {
   }
   assert {
     condition     = sort(keys(local.budget_policies)) == tolist(["builders", "platform", "shared"])
-    error_message = "A workspace's cost.yaml adds policy blocks to the baseline's."
+    error_message = "A workspace's file adds policy blocks to the baseline's."
   }
   assert {
     condition     = local.budget_policies.platform.name == "TST-ADMIN" && local.budget_policies.platform.tags == { LOB = "TESTLOB", DEPARTMENT = "IT", TEAM = "PLATFORM" }
-    error_message = "A block repeated in a workspace's cost.yaml replaces the baseline's (name and tags)."
+    error_message = "A block repeated in a workspace's file replaces the baseline's (name and tags)."
   }
   assert {
     condition     = sort(local.budget_policies.builders.groups) == tolist(["tst-builders", "tst-publishers"]) && local.budget_policies.builders.name == "TST-BUILDERS"
@@ -48,7 +48,7 @@ run "teams" {
 
   assert {
     condition     = !contains(keys(local.budget_policies), "data-eng")
-    error_message = "Teams get no usage policy of their own: only the blocks in cost.yaml are policies."
+    error_message = "Teams get no usage policy of their own: only the budget_policies blocks are policies."
   }
   assert {
     condition     = contains(local.allowed_tag_values.TEAM, "DATA-ENG") && contains(local.allowed_tag_values.TEAM, "SHARED") && contains(local.allowed_tag_values.DEPARTMENT, "FINANCE")
@@ -56,7 +56,7 @@ run "teams" {
   }
   assert {
     condition     = local.team_warehouse_inputs["data-eng"].group == "tst-data-eng" && local.team_warehouse_inputs["data-eng"].warehouse.size == "X-Small"
-    error_message = "A team warehouse is defined in full in compute.yaml and granted to the team's group."
+    error_message = "A team warehouse is defined in full in the workspace's file and granted to the team's group."
   }
 }
 
@@ -92,7 +92,7 @@ run "catalog_and_settings" {
   }
   assert {
     condition     = tolist(local.settings.dashboard_embedding.approved_domains) == tolist(["contoso.sharepoint.com"])
-    error_message = "settings.dashboard_embedding.approved_domains in settings.yaml sets the approved embedding domains."
+    error_message = "settings.dashboard_embedding.approved_domains sets the approved embedding domains."
   }
   assert {
     condition     = local.settings.disable_legacy_access == true
@@ -129,7 +129,7 @@ run "settings_left_alone" {
       "compliance_security_profile", "enhanced_security_monitoring", "automatic_cluster_update", "verbose_audit_logs",
       "enforce_unity_gateway", "collaboration_platforms",
     ] : local.settings[k] == null])
-    error_message = "Every setting set to null in settings.yaml is left alone."
+    error_message = "Every setting set to null is left alone."
   }
   assert {
     condition     = local.config.catalog == null && local.catalog == null && length(module.catalog) == 0 && contains(output.released_addresses, "module.catalog")
@@ -137,7 +137,7 @@ run "settings_left_alone" {
   }
   assert {
     condition     = length(module.budget_policies) == 0
-    error_message = "budget_policies.enabled: false in cost.yaml stops managing usage policies."
+    error_message = "budget_policies.enabled: false stops managing usage policies."
   }
   assert {
     condition     = !local.manage_genie_instructions && !local.manage_genie_skills

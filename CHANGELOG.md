@@ -32,7 +32,7 @@ them for you: a setting missing from your baseline is left alone).
   (`catalog.schemas`) and data quality monitoring (it watched those schemas).
 - Removed the `manage` switches: group assignment, token permissions and catalog grants
   are always managed.
-- Persona groups are named per workspace (`groups:` in its `access.yaml`); the baseline
+- Persona groups are named per workspace (`groups:` in its file); the baseline
   names only `{bu}_platform_admins`. A persona without a group is skipped.
 
 - CI signs in with one service principal and two federated credentials (pull requests;
