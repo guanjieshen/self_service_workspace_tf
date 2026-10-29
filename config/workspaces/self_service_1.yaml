@@ -15,10 +15,10 @@ groups:
 catalog:
   storage_root: abfss://catalogs@guanjieadls2026.dfs.core.windows.net/self_service_1
 
-# A small team for now: a smaller default warehouse that stops sooner, and no shared
-# classic cluster (builders use serverless, or their own cluster from the policy).
+# A small team for now: a smaller default warehouse (the baseline's auto-stop, 5 minutes,
+# stays), and no shared classic cluster (builders use serverless, or their own cluster
+# from the policy).
 sql_warehouse:
   size: X-Small
-  auto_stop_minutes: 10
 shared_cluster:
   enabled: false
