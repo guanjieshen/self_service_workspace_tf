@@ -1,0 +1,40 @@
+# On every pull request: formatting, validation, the cross-workspace checks and every test.
+# Required by branch protection on main ("Format and validate", "Tests"). Each workspace's
+# plan runs in its own workflow (workspace-<name>.yml).
+name: Checks
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Format and validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          sign-in: "false"
+      - run: terraform fmt -check -recursive terraform
+      # Across workspaces: unique hosts, ids and catalog names, budget policy names that do
+      # not collide on an account, and one workflow per workspace folder, as generated.
+      - run: python3 scripts/workspaces.py check
+      - run: terraform -chdir=terraform init -backend=false -input=false
+      - run: terraform -chdir=terraform validate
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          sign-in: "false"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      # Mocked providers: no workspace, credentials or network. Same as ./scripts/test.sh locally.
+      - run: ./scripts/test.sh

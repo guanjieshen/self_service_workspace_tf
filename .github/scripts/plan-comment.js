@@ -1,5 +1,5 @@
 // Builds and posts the plan comment for one workspace on a pull request.
-// Used by .github/workflows/plan.yml through actions/github-script.
+// Used by .github/workflows/workspace.yml through actions/github-script.
 //
 // Reads the files scripts/tf.sh and the plan workflow write to .plans/:
 //   <ws>.txt         full plan            <ws>.changes     number of changes

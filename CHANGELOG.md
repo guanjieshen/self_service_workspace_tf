@@ -6,6 +6,12 @@ them for you: a setting missing from your baseline is left alone).
 
 ## Unreleased
 
+- One workflow per workspace (`.github/workflows/workspace-<name>.yml`, written by
+  `scripts/workspaces.py new`), calling the shared `workspace.yml`: plan on pull requests,
+  apply on merge, drift every Monday. A change to `config/defaults/` runs every workspace's.
+  `checks.yml` runs Format and validate and Tests on every pull request. Replaces plan.yml,
+  apply.yml, drift.yml, `workspaces.py changed` and the `ci:` key in `workspace.yaml`.
+
 - The AI plan review uses one review workspace's model for every plan
   (`ai_review_workspace` and `ai_review_model` in `config/setup.yaml`; off until set).
   Removed `config/ai-review.yaml` and the per-workspace `ai-review.yaml` files.

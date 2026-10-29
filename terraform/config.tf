@@ -40,7 +40,7 @@ locals {
   # name (overrides), plus the workspace-only keys in overrides.tf.
   default_sections = { for i, f in local.defaults_files : trimsuffix(f, ".yaml") => keys(local.defaults_parts[i]) }
   ws_file_keys = {
-    workspace = ["bu", "lob", "account_id", "host", "id", "ci", "label", "auth"]
+    workspace = ["bu", "lob", "account_id", "host", "id", "label", "auth"]
     access    = concat(try(local.default_sections.access, []), local.workspace_only_keys.access)
     compute   = concat(try(local.default_sections.compute, []), local.workspace_only_keys.compute)
     cost      = try(local.default_sections.cost, [])

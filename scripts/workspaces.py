@@ -1,24 +1,19 @@
 #!/usr/bin/env python3
-"""Everything about workspace folders: create one, find which a change affects, check them all.
+"""Everything about workspace folders: create one, keep its workflow, check them all.
 
     scripts/workspaces.py new <name> --bu <bu> --lob <LOB> --host <url> --account-id <id> [--catalog <catalog>]
-                                          a workspace folder from config/workspaces/_example/
-    scripts/workspaces.py changed [--plan] <base-ref> <head-ref>
-    scripts/workspaces.py changed --all   the workspaces a change affects, as a JSON list (CI)
+                                          a workspace folder from config/workspaces/_example/,
+                                          and its workflow, .github/workflows/workspace-<name>.yml
+    scripts/workspaces.py workflows       (re)write every workspace's workflow from the template here
     scripts/workspaces.py check           checks across every workspace folder (CI)
     scripts/workspaces.py dir <ws>        the workspace's folder, relative to the repository
     scripts/workspaces.py field <ws> <key>  a top-level value of the workspace's workspace.yaml
-    scripts/workspaces.py names '<json list>'  checks every name is a workspace folder (the Apply workflow)
 
-Which workspaces a change affects:
-  - a change to what Terraform does affects every workspace: config/defaults/, terraform/
-    (not terraform/tests/), scripts/tf.sh and scripts/plan-guard.py;
-  - with --plan (pull requests), so does a change to the AI review (scripts/ai-*.py,
-    .github/ai/, config/setup.yaml) or to scripts/preflight.py, so the pull request shows
-    the new review or checks;
-  - otherwise, only the workspaces whose folder changed;
-  - folders starting with "_" and workspaces with ci: false are never included.
-Tests, docs and other scripts affect no workspace, so they never re-apply one.
+Each workspace has its own workflow, which calls the shared one (.github/workflows/workspace.yml).
+Its paths decide what plans and applies it: its own folder, and everything that changes what
+Terraform does to every workspace (config/defaults/, terraform/ but not its tests, scripts/tf.sh,
+scripts/plan-guard.py). A pull request also plans it for a change to what the plan comment
+shows (scripts/preflight.py, the AI review). Tests, docs and other scripts plan nothing.
 
 Workspace folders are in config/workspaces/ (the organization's workspaces) and, in the
 framework's own repository, dev/workspaces/ (the workspaces that test the framework; never
@@ -30,7 +25,9 @@ because what they create is shared by the whole account or metastore:
   - two workspaces creating a catalog with the same name (catalogs are per metastore);
   - two workspaces with the same bu on the same account, both managing budget policies:
     the policies are account-wide and named from bu ({BU}-SHARED, ...), so they collide;
-  - a folder name that is not safe to use in workflow commands and environment names.
+  - a folder name that is not safe to use in workflow commands and file names;
+  - a workspace folder without its workflow, a workflow without its folder, or a workflow
+    that differs from the template (run `workflows` to rewrite them).
 Standard library only: reads the simple YAML these files use (no anchors or flow maps).
 """
 import argparse
@@ -44,6 +41,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DEFAULTS = ROOT / "config/defaults"
 WORKSPACES = ROOT / "config/workspaces"
+WORKFLOWS = ROOT / ".github/workflows"
 DEV_WORKSPACES = ROOT / "dev/workspaces"
 NAME = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 
@@ -137,14 +135,63 @@ def workspace_info(d):
             "id": workspace_id, "catalog": catalog, "budget_policies": enabled == "true"}
 
 
-def names(listed, root=None):
-    """The listed workspaces, each checked to be a workspace folder."""
-    for n in listed:
-        if not NAME.match(n):
-            raise SystemExit(f"not a workspace folder name: {n!r}")
-        if not root:
-            ws_dir(n)
-    return listed
+def workflow_text(name, folder):
+    """The workflow of workspace `name`, whose folder is `folder` (relative to the repository)."""
+    return f"""# The pipeline of workspace {name}: written by scripts/workspaces.py (`new`, or `workflows`
+# to rewrite every workspace's). Edit the template there, not this file.
+# A change to the workspace's folder, or to anything every workspace shares, plans it on the
+# pull request and applies it on merge; the drift check runs every Monday.
+name: "Workspace: {name}"
+
+on:
+  pull_request:
+    paths:
+      - "{folder}/**"
+      - "config/defaults/**"
+      - "terraform/**"
+      - "!terraform/tests/**"
+      - "scripts/tf.sh"
+      - "scripts/plan-guard.py"
+      - "scripts/preflight.py"
+      - "scripts/ai-plan-review.py"
+      - "config/setup.yaml"
+      - ".github/ai/**"
+      - ".github/actions/**"
+      - ".github/scripts/plan-comment.js"
+      - ".github/workflows/workspace.yml"
+      - ".github/workflows/workspace-{name}.yml"
+  push:
+    branches: [main]
+    paths:
+      - "{folder}/**"
+      - "config/defaults/**"
+      - "terraform/**"
+      - "!terraform/tests/**"
+      - "scripts/tf.sh"
+      - "scripts/plan-guard.py"
+  schedule:
+    - cron: "0 13 * * 1"     # drift check, Mondays 13:00 UTC
+  workflow_dispatch:         # drift check, by hand
+
+permissions:
+  contents: read
+  pull-requests: write       # the plan comment
+  issues: write              # the drift issue
+  id-token: write            # GitHub OIDC sign-in (Azure and Databricks)
+
+jobs:
+  workspace:
+    uses: ./.github/workflows/workspace.yml
+    with:
+      workspace: {name}
+"""
+
+
+def write_workflow(d):
+    path = WORKFLOWS / f"workspace-{d.name}.yml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(workflow_text(d.name, d.relative_to(ROOT).as_posix()))
+    return path
 
 
 def check(*dirs):
@@ -156,7 +203,7 @@ def check(*dirs):
     for d in folders:
         if not NAME.match(d.name):
             problems.append(f"{d.name}: folder names must be lowercase letters, digits, dashes and underscores "
-                            "(they are used in workflow commands and environment names)")
+                            "(they are used in workflow commands and file names)")
             continue
         other = seen.setdefault(("name", d.name), d)
         if other != d:
@@ -177,39 +224,18 @@ def check(*dirs):
                 problems.append(f"{d.name} and {other} both have bu {info['bu']} on account {info['account']} and manage "
                                 f"budget policies, which are account-wide and named from bu ({info['bu'].upper()}-SHARED, ...): "
                                 "give one a different bu, or set budget_policies: enabled: false in one's cost.yaml")
+    if not dirs:   # the workflows: one per workspace folder, as the template writes it
+        names = {d.name: d for d in folders}
+        for d in folders:
+            wf = WORKFLOWS / f"workspace-{d.name}.yml"
+            if not wf.exists():
+                problems.append(f"{d.name} has no workflow: run python3 scripts/workspaces.py workflows")
+            elif wf.read_text() != workflow_text(d.name, d.relative_to(ROOT).as_posix()):
+                problems.append(f"{wf.relative_to(ROOT)} differs from the template: run python3 scripts/workspaces.py workflows")
+        for wf in sorted(WORKFLOWS.glob("workspace-*.yml")):
+            if wf.stem[len("workspace-"):] not in names:
+                problems.append(f"{wf.relative_to(ROOT)} has no workspace folder: delete it, or restore the folder")
     return folders, problems
-
-
-# ---- Which workspaces a change affects ----
-
-EVERYTHING = r"^(config/defaults/|terraform/(?!tests/)|scripts/tf\.sh$|scripts/plan-guard\.py$)"
-EVERYTHING_FOR_PLAN = EVERYTHING[:-1] + r"|scripts/ai-[^/]*\.py$|scripts/preflight\.py$|\.github/ai/|config/setup\.yaml$)"
-
-
-def ci_workspaces():
-    """Workspaces CI plans and applies: every folder but templates (_*) and ci: false."""
-    out = []
-    for root in roots():
-        for d in sorted(root.glob("*/workspace.yaml")) if root.is_dir() else []:
-            name = d.parent.name
-            if not name.startswith("_") and (top_level(d).get("ci") or "true").lower() != "false":
-                out.append(name)
-    return sorted(out)
-
-
-def changed(base, head, plan=False):
-    def git(*args):
-        return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True)
-    if git("rev-parse", "--quiet", "--verify", f"{base}^{{commit}}").returncode != 0:
-        return ci_workspaces()   # no usable base (first push, force push): everything
-    prefix = git("rev-parse", "--show-prefix").stdout.strip()
-    paths = [p[len(prefix):] if prefix and p.startswith(prefix) else p
-             for p in git("diff", "--name-only", base, head, "--", ".").stdout.split("\n") if p]
-    if any(re.match(EVERYTHING_FOR_PLAN if plan else EVERYTHING, p) for p in paths):
-        return ci_workspaces()
-    eligible = set(ci_workspaces())
-    return sorted({m.group(2) for p in paths for m in [re.match(r"^(config|dev)/workspaces/([^/]+)/", p)]
-                   if m and m.group(2) in eligible})
 
 
 # ---- A new workspace folder ----
@@ -246,8 +272,9 @@ def main(argv):
             ap.add_argument(a, required=True)
         ap.add_argument("--catalog")
         a = ap.parse_args(argv[1:])
-        new(a.name, a.bu, a.lob, a.host, a.account_id, a.catalog)
-        print(f"""Created config/workspaces/{a.name}/.
+        d = new(a.name, a.bu, a.lob, a.host, a.account_id, a.catalog)
+        write_workflow(d)
+        print(f"""Created config/workspaces/{a.name}/ and .github/workflows/workspace-{a.name}.yml.
 
 Next steps (docs/SETUP.md, step 9):
   1. The groups exist in Entra ID, synced to the Databricks account: {a.bu}_users, {a.bu}_explorer,
@@ -256,20 +283,16 @@ Next steps (docs/SETUP.md, step 9):
      admin: docs/SETUP.md, step 6).
   3. Review the other files; keep only what this workspace changes from the baseline.
   4. python3 scripts/preflight.py {a.name}     (read-only: is the workspace ready?)
-  5. Open a pull request: its plan shows what the first apply does. Merge to apply.""")
+  5. Open a pull request with both: its plan shows what the first apply does. Merge to apply.""")
 
         return 0
-    if argv[:1] == ["changed"]:
-        rest = argv[1:]
-        if rest == ["--all"]:
-            print(json.dumps(ci_workspaces()))
-            return 0
-        plan = rest[:1] == ["--plan"]
-        rest = rest[1:] if plan else rest
-        if len(rest) != 2:
-            print(__doc__.split("\n\n")[1], file=sys.stderr)
-            return 2
-        print(json.dumps(changed(rest[0], rest[1], plan)))
+    if argv == ["workflows"]:
+        folders, _ = check()
+        for d in folders:
+            print(write_workflow(d).relative_to(ROOT))
+        for wf in sorted(WORKFLOWS.glob("workspace-*.yml")):
+            if wf.stem[len("workspace-"):] not in {d.name for d in folders}:
+                print(f"{wf.relative_to(ROOT)} has no workspace folder: delete it, or restore the folder")
         return 0
     if argv[:1] == ["check"]:
         folders, problems = check()
@@ -282,9 +305,6 @@ Next steps (docs/SETUP.md, step 9):
         return 0
     if argv[:1] == ["field"] and len(argv) == 3:
         print(field(argv[1], argv[2]))
-        return 0
-    if argv[:1] == ["names"] and len(argv) == 2:
-        print(" ".join(names(json.loads(argv[1]))))
         return 0
     print(__doc__.split("\n\n")[1], file=sys.stderr)
     return 2

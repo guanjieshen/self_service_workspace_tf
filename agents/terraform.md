@@ -21,7 +21,7 @@ modules/  workspace-settings  personas  compute  budget-policies  catalog
 ```
 
 One state per workspace. `scripts/tf.sh <workspace> plan` runs it (and the plan guard);
-`apply` runs only in the Apply workflow.
+`apply` runs only in CI, in the workspace's workflow, after a merge.
 
 ## Adding or changing an option
 

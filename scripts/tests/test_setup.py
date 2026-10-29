@@ -111,7 +111,7 @@ class Scripts(unittest.TestCase):
         self.assertEqual(re.findall(r"environment: (.+)", workflows), ["apply-approval"])
 
     def test_required_checks_are_jobs_of_the_plan_workflow(self):
-        names = re.findall(r"^    name: (.+)$", (ROOT / ".github/workflows/plan.yml").read_text(), re.M)
+        names = re.findall(r"^    name: (.+)$", (ROOT / ".github/workflows/checks.yml").read_text(), re.M)
         for check in setup.REQUIRED_CHECKS:
             self.assertIn(check, names)
         self.assertIn('"contexts": ["Format and validate", "Tests"]', render("github"))

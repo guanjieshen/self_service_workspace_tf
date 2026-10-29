@@ -57,7 +57,7 @@ class Preflight(unittest.TestCase):
         self.d = self.root / "fin-dev"
         self.d.mkdir()
         (self.d / "workspace.yaml").write_text(
-            "bu: fin\nlob: FIN\naccount_id: acct\nhost: https://adb-123.1.azuredatabricks.net\nci: true\n")
+            "bu: fin\nlob: FIN\naccount_id: acct\nhost: https://adb-123.1.azuredatabricks.net\n")
         (self.d / "settings.yaml").write_text(GIT)   # the baseline's Git allowlist is a placeholder
         (self.d / "access.yaml").write_text(GROUPS)  # each workspace names its persona groups
         patches = [mock.patch.object(pf.wsf, "WORKSPACES", self.root), mock.patch.object(pf.wsf, "DEV_WORKSPACES", self.root / "none")]

