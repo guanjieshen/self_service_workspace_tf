@@ -59,7 +59,9 @@ class Preflight(unittest.TestCase):
                       "settings": GIT,       # the baseline's Git allowlist is a placeholder
                       "access": GROUPS}      # each workspace names its persona groups
         self.write()
-        patches = [mock.patch.object(pf.wsf, "WORKSPACES", self.root), mock.patch.object(pf.wsf, "DEV_WORKSPACES", self.root / "none")]
+        # Outside CI by default (the runner sets GITHUB_ACTIONS); the CI test sets it itself.
+        patches = [mock.patch.object(pf.wsf, "WORKSPACES", self.root), mock.patch.object(pf.wsf, "DEV_WORKSPACES", self.root / "none"),
+                   mock.patch.dict(pf.os.environ, {"GITHUB_ACTIONS": ""})]
         for p in patches:
             p.start()
             self.addCleanup(p.stop)
