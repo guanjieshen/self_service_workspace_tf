@@ -7,3 +7,7 @@ groups:
   explorer: ss1-cd-explorers
   builder: ss1-cd-builders
   publisher: null          # nobody gets this persona here
+
+# No workspace catalog yet: this metastore has no storage root, and no external location
+# is set up for it (set catalog.storage_root to one to create the catalog).
+catalog: null
