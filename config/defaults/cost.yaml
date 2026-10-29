@@ -20,7 +20,7 @@ required_tags:
 
 # The Databricks account (account console, top right). Budget policies are account-level, so
 # they need it; every workspace in one Entra tenant is in the same account.
-account_id: null
+account_id: ccb842e7-2376-4152-b0b0-29fa952379b8
 
 budget_policies:
   enabled: true                # false = do not manage budget policies at all
