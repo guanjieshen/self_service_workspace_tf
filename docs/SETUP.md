@@ -27,41 +27,42 @@ Every setup command reads its values from `config/setup.yaml` and prints the scr
 
 ## 1. Fill in `config/setup.yaml`
 
-**This is the first file you edit.** It has four required values at the top; everything below them has a default, and the last two are written by step 4. None of them are secrets: the file is committed with the repository. A step that needs a value that is still empty stops and names it.
+**This is the first file you edit.** Every **required** value is a fact about your environment or a decision your organization makes, so nothing guesses it; the three **optional** values have defaults that suit most organizations; the last value is written by step 4. None of them are secrets: the file is committed with the repository. A step that needs a value that is still empty stops and names it.
 
 ```yaml
 # ---- REQUIRED ----
+tenant_id: 00000000-0000-0000-0000-000000000000
 subscription_id: 00000000-0000-0000-0000-000000000000
+state_location: canadacentral
 state_resource_group: rg-databricks-tfstate
 state_storage_account: stdbxcitizendevstate
+state_container: tfstate
+github_repo: my-org/databricks-citizen-dev
 databricks_account_id: 00000000-0000-0000-0000-000000000000
 
 # ---- OPTIONAL ----
-state_location: canadacentral
-state_container: null
-github_repo: null
 pipeline_name: null
 apply_approvers: my-org/databricks-platform
 databricks_account_profile: null
 
 # ---- WRITTEN BY SETUP ----
-tenant_id: null
 pipeline_client_id: null
 ```
 
-| Value | What it is | Default | Who provides it | Used in step |
-| --- | --- | --- | --- | --- |
-| **`subscription_id`** | The Azure subscription that holds the Terraform state | Required | Cloud team | 3, 4, 5 |
-| **`state_resource_group`** | The resource group for the state storage (created if missing) | Required | Cloud team | 3, 4 |
-| **`state_storage_account`** | The storage account for the state: 3 to 24 lowercase letters and digits, unique across Azure (created if missing; an existing one is used as it is) | Required | Cloud team | 3, 4 |
-| **`databricks_account_id`** | Account console, top right. `workspaces.py new` writes it into each workspace too | Required | Databricks account admin | 6, 9 |
-| `state_location` | The region, used only to create the resource group or storage account | The resource group's | Cloud team | 3 |
-| `state_container` | The blob container for the state files | `tfstate` | | 3, 4 |
-| `github_repo` | This repository as `<org>/<repo>`; the pipeline's sign-in is tied to it | This checkout's GitHub origin | GitHub admin | 4, 5 |
-| `pipeline_name` | The display name of the service principal CI signs in as | `sp-citizen-dev-terraform` | Entra admin | 4, 6 |
-| `apply_approvers` | `<org>/<team>` that must approve each apply in GitHub | None: merging approves | Platform team | 5 |
-| `databricks_account_profile` | A Databricks CLI profile for the account | Sign in with the Azure CLI | Databricks account admin | 6 |
-| `tenant_id`, `pipeline_client_id` | The Entra tenant and the service principal's client ID | Written by step 4 | | 5, 6 |
+| Value | What it is | Who provides it | Used in step |
+| --- | --- | --- | --- |
+| **`tenant_id`** | Your Entra tenant. CI signs in to it, and the Azure steps stop unless your Azure CLI is signed in to it | Entra admin | 3, 4, 5 |
+| **`subscription_id`** | The Azure subscription that holds the Terraform state | Cloud team | 3, 4, 5 |
+| **`state_location`** | The region of the state storage (a data residency decision) | Cloud team | 3 |
+| **`state_resource_group`** | The resource group for the state storage (created if missing) | Cloud team | 3, 4 |
+| **`state_storage_account`** | 3 to 24 lowercase letters and digits, unique across Azure (created if missing; an existing one is used as it is) | Cloud team | 3, 4 |
+| **`state_container`** | The blob container for the state files, for example `tfstate` | Cloud team | 3, 4 |
+| **`github_repo`** | This repository as `<org>/<repo>`, with its final name: the pipeline identity trusts this repository and no other | GitHub admin | 4, 5 |
+| **`databricks_account_id`** | Account console, top right. `workspaces.py new` writes it into each workspace too | Databricks account admin | 6, 9 |
+| `pipeline_name` | Display name of the service principal CI signs in as. Default `sp-citizen-dev-terraform` | Entra admin | 4, 6 |
+| `apply_approvers` | `<org>/<team>` that must approve each apply in GitHub. Default: none, merging approves | Platform team | 5 |
+| `databricks_account_profile` | A Databricks CLI profile for the account. Default: sign in with the Azure CLI | Databricks account admin | 6 |
+| `pipeline_client_id` | The service principal's client ID: step 4 creates it and writes it here | | 5, 6 |
 
 Two more things to know before you start; they live in their own files, not here:
 
@@ -92,7 +93,7 @@ Two more things to know before you start; they live in their own files, not here
 
 **Who:** the cloud team, with Contributor on the subscription (or the resource group).
 
-Uses `subscription_id` and the `state_*` values from `config/setup.yaml`.
+Uses `tenant_id`, `subscription_id` and the `state_*` values from `config/setup.yaml`.
 
 ```bash
 python3 scripts/setup.py state          # prints the script: read it
@@ -105,14 +106,14 @@ It creates a storage account with no public blob access and no shared keys (Entr
 
 **Who:** an Entra admin who can create app registrations and assign roles on the storage account (Owner or User Access Administrator), signed in to `gh` with read access to the repository.
 
-Uses `subscription_id`, the `state_*` values, `github_repo` and `pipeline_name`.
+Uses `tenant_id`, `subscription_id`, the `state_*` values, `github_repo` and `pipeline_name`.
 
 ```bash
 python3 scripts/setup.py identity          # read it
 python3 scripts/setup.py identity --run
 ```
 
-It creates the app registration and service principal (`pipeline_name`), two federated credentials for GitHub Actions, and gives the service principal **Storage Blob Data Contributor** on the state container only. It writes the tenant ID (`tenant_id`) and the client ID (`pipeline_client_id`) into `config/setup.yaml` for the next steps; commit the file.
+It creates the app registration and service principal (`pipeline_name`), two federated credentials for GitHub Actions, and gives the service principal **Storage Blob Data Contributor** on the state container only. It writes the client ID (`pipeline_client_id`) into `config/setup.yaml` for the next steps; commit the file.
 
 | Federated credential | Subject | Lets sign in |
 | --- | --- | --- |
@@ -125,7 +126,7 @@ No client secret is created: GitHub exchanges its own short-lived token for an E
 
 **Who:** a GitHub organization admin (or a repository admin), signed in to `gh`.
 
-Uses `subscription_id`, `github_repo`, `apply_approvers`, and `tenant_id` and `pipeline_client_id` from step 4.
+Uses `tenant_id`, `subscription_id`, `github_repo`, `apply_approvers`, and `pipeline_client_id` from step 4.
 
 ```bash
 python3 scripts/setup.py github          # read it

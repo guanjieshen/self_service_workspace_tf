@@ -6,10 +6,10 @@
     scripts/setup.py github       a GitHub admin
     scripts/setup.py databricks [<workspace> ...]    a Databricks account admin
 
-Every value comes from config/setup.yaml: four required values at the top, optional ones
+Every value comes from config/setup.yaml: the required values at the top, three optional ones
 with defaults below (docs/SETUP.md, step 1). A flag overrides one value for one run (for
-example --storage-account x). `identity --run` writes the tenant and client IDs it creates
-into the file, for the steps after it. In the
+example --storage-account x). `identity --run` writes the client ID it creates into the
+file, for the steps after it. The Azure steps stop unless the Azure CLI is signed in to tenant_id. In the
 framework's own repository, dev/setup.yaml is read instead when it exists, so a release keeps
 a blank config/setup.yaml.
 
@@ -45,6 +45,13 @@ REQUIRED_CHECKS = ["Format and validate", "Tests"]
 q = shlex.quote
 
 
+def signed_in(a):
+    """Select the subscription, and stop unless the Azure CLI is signed in to the right tenant."""
+    return f"""az account set --subscription {q(a.subscription)}
+[ "$(az account show --query tenantId -o tsv)" = {q(a.tenant_id)} ] ||
+  {{ echo "The Azure CLI is signed in to another tenant: az login --tenant {a.tenant_id}"; exit 1; }}"""
+
+
 def state(a):
     backend = (f'# Shared Terraform state in Azure Storage (Entra sign-in only; shared keys are disabled).\n'
                f'# scripts/tf.sh adds key=citizen-dev/<workspace>.tfstate for each workspace.\n'
@@ -53,15 +60,10 @@ def state(a):
                f'container_name       = "{a.container}"\n'
                f'use_azuread_auth     = true\n')
     rg, sa = q(a.resource_group), q(a.storage_account)
-    if a.location:
-        group = f"""LOCATION={q(a.location)}
-az group show -n {rg} >/dev/null 2>&1 || az group create -n {rg} -l "$LOCATION" -o none"""
-    else:
-        group = f"""LOCATION=$(az group show -n {rg} --query location -o tsv 2>/dev/null || true)
-[ -n "$LOCATION" ] || {{ echo "Resource group {a.resource_group} does not exist: set state_location in config/setup.yaml to create it."; exit 1; }}"""
     return f"""# Terraform state storage: one container, one state file per workspace.
-az account set --subscription {q(a.subscription)}
-{group}
+{signed_in(a)}
+LOCATION={q(a.location)}
+az group show -n {rg} >/dev/null 2>&1 || az group create -n {rg} -l "$LOCATION" -o none
 if az storage account show -n {sa} -g {rg} >/dev/null 2>&1; then
   # Someone else's account: use it as it is (only the container below is added).
   echo "Using the existing storage account {a.storage_account}; its settings are left as they are."
@@ -93,7 +95,7 @@ def identity(a):
     creds = [("github-pull-requests", "pull_request", "Plan workflow: every pull request"),
              ("github-main", "ref:refs/heads/main", "Apply and Drift workflows: the main branch")]
     lines = [f"""# The identity GitHub Actions signs in as (no secret: GitHub OIDC federated credentials).
-az account set --subscription {q(a.subscription)}
+{signed_in(a)}
 APP_ID=$(az ad app list --display-name {name} --query "[0].appId" -o tsv)
 [ -n "$APP_ID" ] || APP_ID=$(az ad app create --display-name {name} --sign-in-audience AzureADMyOrg --query appId -o tsv)
 SP_ID=$(az ad sp list --filter "appId eq '$APP_ID'" --query "[0].id" -o tsv)
@@ -113,8 +115,6 @@ SCOPE="$(az storage account show -n {q(a.storage_account)} -g {q(a.resource_grou
     --role "Storage Blob Data Contributor" --scope "$SCOPE" -o none
 echo "Service principal ready. For the next steps:"
 echo "  client ID (AZURE_CLIENT_ID): $APP_ID"
-echo "  tenant ID (AZURE_TENANT_ID): $(az account show --query tenantId -o tsv)"
-echo "  subscription (AZURE_SUBSCRIPTION_ID): $(az account show --query id -o tsv)"
 """)
     return "\n".join(lines)
 
@@ -187,20 +187,20 @@ echo "create budget policies (serverless usage policies), or set budget_policies
 
 # Each value: (flag, key in config/setup.yaml, default, the steps it is required for).
 OPTIONS = [
+    ("--tenant-id", "tenant_id", None, {"state", "identity", "github"}),
     ("--subscription", "subscription_id", None, {"state", "identity", "github"}),
+    ("--location", "state_location", None, {"state"}),
     ("--resource-group", "state_resource_group", None, {"state", "identity"}),
     ("--storage-account", "state_storage_account", None, {"state", "identity"}),
+    ("--container", "state_container", None, {"state", "identity"}),
+    ("--repo", "github_repo", None, {"identity", "github"}),
     ("--account-id", "databricks_account_id", None, {"databricks"}),
-    ("--location", "state_location", None, set()),            # default: the resource group's
-    ("--container", "state_container", "tfstate", set()),
-    ("--repo", "github_repo", None, set()),                   # default: this checkout's GitHub origin
     ("--name", "pipeline_name", "sp-citizen-dev-terraform", set()),
     ("--approvers", "apply_approvers", None, set()),
     ("--account-profile", "databricks_account_profile", None, set()),
-    ("--tenant-id", "tenant_id", None, {"github"}),            # written by identity
     ("--client-id", "pipeline_client_id", None, {"github", "databricks"}),   # written by identity
 ]
-WRITTEN_BY_IDENTITY = {"tenant_id", "pipeline_client_id"}
+WRITTEN_BY_IDENTITY = {"pipeline_client_id"}
 STEPS = {"state": state, "identity": identity, "github": github, "databricks": databricks}
 
 
@@ -210,13 +210,6 @@ def shown(path):
         return str(path.relative_to(ROOT))
     except ValueError:
         return str(path)
-
-
-def origin_repo():
-    """<org>/<repo> of this checkout's GitHub origin, or None."""
-    url = subprocess.run(["git", "-C", str(ROOT), "remote", "get-url", "origin"], capture_output=True, text=True).stdout.strip()
-    m = re.search(r"github\.com[:/]([\w.-]+/[\w.-]+?)(?:\.git)?/?$", url)
-    return m.group(1) if m else None
 
 
 def setup_file():
@@ -240,7 +233,7 @@ def run(script, path):
     proc = subprocess.Popen(["bash", "-euo", "pipefail", "-c", script], cwd=ROOT, stdout=subprocess.PIPE, text=True)
     for line in proc.stdout:
         print(line, end="", flush=True)
-        for label, key in (("AZURE_CLIENT_ID", "pipeline_client_id"), ("AZURE_TENANT_ID", "tenant_id")):
+        for label, key in (("AZURE_CLIENT_ID", "pipeline_client_id"),):
             m = re.search(rf"\({label}\): (\S+)", line)
             if m and remember(path, key, m.group(1)):
                 print(f"  (saved as {key} in {shown(path)})")
@@ -273,10 +266,6 @@ def main(argv):
     if later:
         raise SystemExit(f"{', '.join(later)} not set yet in {shown(path)}: run `python3 scripts/setup.py identity --run` first "
                          "(it writes them), or ask the Entra admin who ran it.")
-    if a.repo is None and a.step in ("identity", "github"):
-        a.repo = origin_repo()
-        if a.repo is None:
-            raise SystemExit(f"Fill in github_repo in {shown(path)} (this checkout has no GitHub origin to take it from).")
     if a.repo is not None and not re.fullmatch(r"[\w.-]+/[\w.-]+", a.repo):
         raise SystemExit(f"github_repo must be <org>/<repo>, not {a.repo!r}")
     if a.approvers and not re.fullmatch(r"[\w.-]+/[\w.-]+", a.approvers):
