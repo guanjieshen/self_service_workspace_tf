@@ -10,14 +10,14 @@
 # =============================================================================
 
 azure:
-  tenant_id: null          # Entra admin. Your Entra (Azure AD) tenant ID
-  subscription_id: null    # Cloud team. The subscription that holds the Terraform state
+  tenant_id: bf465dc7-3bc8-4944-b018-092572b5c20d          # Entra admin. Your Entra (Azure AD) tenant ID
+  subscription_id: edd4cc45-85c7-4aec-8bf5-648062d519bf    # Cloud team. The subscription that holds the Terraform state
 
 state:                     # Cloud team. Where Terraform keeps its state (step 3)
-  resource_group: null     # for example rg-databricks-tfstate (created if missing)
-  location: null           # for example canadacentral
-  storage_account: null    # 3 to 24 lowercase letters and digits, unique across Azure
-  container: tfstate
+  resource_group: guanjie-rg     # for example rg-databricks-tfstate (created if missing)
+  location: canadacentral           # for example canadacentral
+  storage_account: guanjieadls2026    # 3 to 24 lowercase letters and digits, unique across Azure
+  container: tfstatetest
 
 github:                    # GitHub admin (step 5)
   repo: null               # <org>/<repo>: this repository, with its final name
