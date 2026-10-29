@@ -51,7 +51,26 @@ class Scripts(unittest.TestCase):
             for n, line in enumerate(lines):
                 if re.search(r"(az [\w -]+|service-principals) create\b", line):
                     with self.subTest(step=step, line=line):
-                        self.assertIn("||", line + lines[n - 1])
+                        self.assertTrue("||" in line + lines[n - 1] or lines[n - 1].strip() == "else", line)
+
+    def test_an_existing_storage_account_is_left_as_it_is(self):
+        script = render("state")
+        exists, create = script.index("then\n  # Someone else's account"), script.index("az storage account create")
+        versioning = script.index("--enable-versioning true")
+        self.assertLess(exists, create)
+        self.assertLess(create, versioning, "versioning and soft delete only on an account this step created")
+        self.assertLess(versioning, script.index("\nfi\n"))
+
+    def test_the_repository_defaults_to_the_origin(self):
+        with mock.patch.object(setup, "origin_repo", lambda: "acme/baseline"):
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                setup.main(["github", "--client-id", "c", "--tenant-id", "t", "--subscription", "s"])
+        self.assertIn("gh variable set AZURE_CLIENT_ID -R acme/baseline", out.getvalue())
+        for url, repo in (("git@github.com:acme/baseline.git", "acme/baseline"), ("https://github.com/acme/base.line", "acme/base.line"),
+                          ("https://gitlab.com/acme/x.git", None)):
+            with mock.patch.object(setup.subprocess, "run", lambda *a, **k: mock.Mock(stdout=url)):
+                self.assertEqual(setup.origin_repo(), repo)
 
     def test_state_is_private(self):
         script = render("state")
@@ -106,18 +125,15 @@ class SetupFile(unittest.TestCase):
 
     def setUp(self):
         self.path = pathlib.Path(tempfile.mkdtemp()) / "setup.yaml"
-        self.path.write_text((ROOT / "config/setup.yaml").read_text())
+        # The repository's own file, with every value emptied (it may be filled in here).
+        blank = re.sub(r"(?m)^(  (?!container|name)\w+:)[ \t]*[^\s#]+", r"\1 null", (ROOT / "config/setup.yaml").read_text())
+        self.path.write_text(blank)
         patcher = mock.patch.object(setup, "setup_file", lambda: self.path)
         patcher.start()
         self.addCleanup(patcher.stop)
 
     def fill(self, section, key, value):
         self.assertTrue(setup.remember(self.path, section, key, value))
-
-    def test_the_shipped_file_is_blank(self):
-        text = (ROOT / "config/setup.yaml").read_text()
-        for key in ("tenant_id", "subscription_id", "resource_group", "storage_account", "repo", "client_id", "account_id"):
-            self.assertRegex(text, rf"(?m)^  {key}: null\b", "a release ships config/setup.yaml blank")
 
     def test_missing_values_are_named(self):
         with self.assertRaises(SystemExit) as e:

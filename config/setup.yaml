@@ -20,7 +20,7 @@ state:                     # Cloud team. Where Terraform keeps its state (step 3
   container: tfstatetest
 
 github:                    # GitHub admin (step 5)
-  repo: null               # <org>/<repo>: this repository, with its final name
+  repo: null               # <org>/<repo> of this repository; null = this checkout's GitHub origin
   approvers: null          # <org>/<team> that must approve each apply; null = merging approves
 
 pipeline:                  # Entra admin (step 4). The identity GitHub Actions signs in as
