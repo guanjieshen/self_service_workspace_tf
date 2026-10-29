@@ -14,7 +14,7 @@ Which workspaces a change affects:
   - a change to what Terraform does affects every workspace: config/defaults/, terraform/
     (not terraform/tests/), scripts/tf.sh and scripts/plan-guard.py;
   - with --plan (pull requests), so does a change to the AI review (scripts/ai-*.py,
-    .github/ai/, config/ai-review.yaml) or to scripts/preflight.py, so the pull request shows
+    .github/ai/, config/setup.yaml) or to scripts/preflight.py, so the pull request shows
     the new review or checks;
   - otherwise, only the workspaces whose folder changed;
   - folders starting with "_" and workspaces with ci: false are never included.
@@ -183,7 +183,7 @@ def check(*dirs):
 # ---- Which workspaces a change affects ----
 
 EVERYTHING = r"^(config/defaults/|terraform/(?!tests/)|scripts/tf\.sh$|scripts/plan-guard\.py$)"
-EVERYTHING_FOR_PLAN = EVERYTHING[:-1] + r"|scripts/ai-[^/]*\.py$|scripts/preflight\.py$|\.github/ai/|config/ai-review\.yaml$)"
+EVERYTHING_FOR_PLAN = EVERYTHING[:-1] + r"|scripts/ai-[^/]*\.py$|scripts/preflight\.py$|\.github/ai/|config/setup\.yaml$)"
 
 
 def ci_workspaces():

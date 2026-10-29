@@ -44,8 +44,8 @@ Each workspace gets:
 | --- | --- |
 | `config/defaults/` | The baseline every workspace gets: `access`, `compute`, `cost`, `catalog`, `settings` `.yaml`, `genie-code/` |
 | `config/workspaces/<name>/` | One folder per workspace: `workspace.yaml`, plus the same file names to change the baseline for that workspace |
-| `config/setup.yaml` | The one-time setup values ([docs/SETUP.md](docs/SETUP.md), step 1) |
-| `config/ai-review.yaml`, `config/backend.hcl`, `.github/CODEOWNERS` | The AI review's model, where state is kept, who approves what |
+| `config/setup.yaml` | The setup values ([docs/SETUP.md](docs/SETUP.md), step 1), and which workspace's model reviews plans |
+| `config/backend.hcl`, `.github/CODEOWNERS` | Where state is kept (written by `setup.py state`), who approves what |
 | `terraform/` | The root module and modules. You do not edit these for normal operations |
 | `scripts/` | `setup.py` (one-time setup), `workspaces.py` (new workspace, which workspaces a change affects, checks), `preflight.py` (is a workspace ready?), `tf.sh` (run Terraform), `plan-guard.py`, `ai-plan-review.py`, `test.sh` |
 | `.github/` | Plan, apply and drift workflows ([docs/github-actions.md](docs/github-actions.md)) |

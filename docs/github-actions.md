@@ -75,21 +75,13 @@ Each affected workspace gets one comment on the pull request, updated on every p
 | Title | Plan | Number of resource changes |
 | Preflight | `scripts/preflight.py` | Only when it found a problem: what is missing, and what to do |
 | Warning | `scripts/plan-guard.py` | Only when the plan has hard-to-undo changes |
-| AI impact review | `scripts/ai-plan-review.py` | When enabled in `config/ai-review.yaml` (or the workspace's `ai-review.yaml`). Risk level, a plain-language table of changes and who they affect, and up to three things to check |
+| AI impact review | `scripts/ai-plan-review.py` | When `ai_review_workspace` is set in `config/setup.yaml`. Risk level, a plain-language table of changes and who they affect, and up to three things to check |
 | Changed resources | [tf-summarize](https://github.com/dineshba/tf-summarize) | Table of every resource added, changed or removed (collapsed) |
 | Full Terraform plan | Plan | Collapsed; the start is cut if the comment would exceed GitHub's size limit |
 
-The AI review is one call to a model in the workspace being planned (by default the Unity Gateway model service `system.ai.claude-sonnet-5-5`), with the same sign-in as Terraform. It sees the pull request's configuration diff, the planned changes and the plan guard output, nothing else, and takes seconds. The pipeline identity needs EXECUTE on the model service (account users have it on `system.ai` by default), or Can query on a serving endpoint.
+The AI review is one call to a model in **one review workspace** (`ai_review_workspace` in `config/setup.yaml`, a workspace folder this repository manages), whatever workspace the plan is for, signed in as the pipeline. Only that workspace needs the model: `ai_review_model`, by default the Unity Gateway model service `system.ai.claude-sonnet-5-5` (the pipeline identity needs EXECUTE on it; account users have it on `system.ai` by default). It sees the pull request's configuration diff, the planned changes and the plan guard output, nothing else, and takes seconds. The instructions it follows are `.github/ai/plan-review-prompt.md`.
 
-These files control it, so changes go through a pull request:
-
-| File | Controls |
-| --- | --- |
-| `config/ai-review.yaml` | The default for every workspace: on or off, the model, the answer limit, and the prompt file |
-| `config/workspaces/<name>/ai-review.yaml` | Optional overrides for one workspace (`enabled`, `endpoint`, `max_tokens`), because the models available differ by workspace and region. Template in `config/workspaces/_example/`. Not read by Terraform |
-| `.github/ai/plan-review-prompt.md` | What the reviewer knows about the repository, what it looks for, and how it formats the answer |
-
-To try a different model or prompt on one pull request, change these files in that pull request: its plan comment uses them. The review is advice only: it never fails the check, and if the model is unavailable the section is left out. With Enforce Unity Gateway on, the `databricks-` serving endpoints are switched off, so use a `system.ai` model service.
+The review is advice only: it never fails the check, and if the model is unavailable the section is left out. With Enforce Unity Gateway on, the `databricks-` serving endpoints are switched off, so use a `system.ai` model service. A change to `config/setup.yaml` or the prompt re-plans every workspace on its pull request, so the comment shows the new review.
 
 ## Who can run code with the workspace credentials
 

@@ -179,7 +179,9 @@ class SetupFile(unittest.TestCase):
             if key in re.findall(r"(?m)^(\w+):", required):
                 self.assertTrue(steps and default is None, key)
         keys = re.findall(r"(?m)^(\w+):", text)
-        self.assertEqual(sorted(keys), sorted(k for _, k, _, _ in setup.OPTIONS), "every value in the file is read, and only those")
+        # The ai_review_* values are read by scripts/ai-plan-review.py, every other one by setup.py.
+        self.assertEqual(sorted(keys), sorted([k for _, k, _, _ in setup.OPTIONS] + ["ai_review_model", "ai_review_workspace"]),
+                         "every value in the file is read, and only those")
 
     def test_ids_from_identity_are_asked_for_by_name(self):
         for key, value in (("tenant_id", "ten-1"), ("subscription_id", "sub-1")):
