@@ -175,6 +175,7 @@ jobs:
           workspace: ${{ matrix.workspace }}
       - name: Apply
         run: ./scripts/tf.sh "$WORKSPACE" apply -no-color -input=false
+      # The summary is shown on the run's page, which GitHub does not mask: redacted like comments.
       - name: Summary
         if: always()
         run: |
@@ -184,7 +185,7 @@ jobs:
             echo "<details><summary>Plan that was applied</summary>"; echo; echo '```'
             tail -c 60000 ".plans/$WORKSPACE.txt" 2>/dev/null || echo "(no plan)"
             echo '```'; echo "</details>"
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | node -e 'const { redact } = require("./.github/scripts/plan-comment.js"); let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => process.stdout.write(redact(s)));' >> "$GITHUB_STEP_SUMMARY"
 
   # A workspace whose file was deleted: Terraform stops managing it. Its state file goes, so a
   # workspace added later under the same name starts clean. Nothing in Databricks changes.
@@ -239,9 +240,10 @@ jobs:
         with:
           script: |
             const fs = require('fs');
+            const { redact } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/plan-comment.js`);
             const ws = process.env.WORKSPACE;
             const changes = Number(fs.readFileSync(`.plans/${ws}.changes`, 'utf8').trim());
-            const plan = fs.readFileSync(`.plans/${ws}.txt`, 'utf8');
+            const plan = redact(fs.readFileSync(`.plans/${ws}.txt`, 'utf8'));
             const title = `Drift: ${ws}`;
             const { owner, repo } = context.repo;
             const open = (await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', labels: 'drift' }))

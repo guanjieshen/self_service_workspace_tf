@@ -63,6 +63,17 @@ test('a workspace with no changes gets no new comment, but an existing one is up
   assert.deepEqual(calls, ['update'], 'an earlier comment is brought up to date');
 });
 
+test('credentials are never posted: tokens and token= values are redacted in every section', () => {
+  const leak = 'cannot sign in to https://adb-1.1.azuredatabricks.net: failed during request visitor: github-oidc-azure auth: not configured. Config: host=https://adb-1.1.azuredatabricks.net, account_id=acct, actions_id_token_request_url=https://x/idtoken?api-version=2.0, actions_id_token_request_token=eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJyZXBvIn0.c2lnbmF0dXJl. Env: DATABRICKS_HOST';
+  const body = buildBody('ws', 'm', plans({ '.preflight.txt': 'error: ' + leak, '.txt': 'Error: ' + leak, '.changes': '1' }));
+  assert.ok(!body.includes('eyJhbGci'), 'no JSON web token');
+  assert.ok(!body.includes('c2lnbmF0dXJl'), 'no part of it');
+  assert.match(body, /actions_id_token_request_token=\*\*\*/);
+  assert.match(body, /cannot sign in to https:\/\/adb-1\.1\.azuredatabricks\.net/, 'the useful part stays');
+  const { redact } = require('../plan-comment.js');
+  assert.equal(redact('client_secret=abc password=x, plain'), 'client_secret=*** password=***, plain');
+});
+
 test('a long plan is cut from the start to fit in a GitHub comment', () => {
   const plan = 'start\n' + 'x'.repeat(200000) + '\nend of plan';
   const body = buildBody('ws', 'm', plans({ '.txt': plan, '.changes': '9', '.ai.md': 'review' }));

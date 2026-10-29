@@ -89,6 +89,14 @@ class Preflight(unittest.TestCase):
         self.assertEqual(len(warnings), 1)
         self.assertIn("still has the placeholder https://github.com/<org>/", warnings[0])
 
+    def test_errors_keep_the_reason_and_drop_credentials(self):
+        leak = 'cannot sign in to https://adb-1.1.azuredatabricks.net: failed during request visitor: github-oidc-azure auth: not configured. Config: host=https://adb-1.1.azuredatabricks.net, account_id=acct, actions_id_token_request_url=https://x/idtoken?api-version=2.0, actions_id_token_request_token=eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJyZXBvIn0.c2lnbmF0dXJl. Env: DATABRICKS_HOST'
+        short = pf.short_error(leak)
+        self.assertNotIn("eyJ", short)
+        self.assertNotIn("Config:", short, "the configuration dump is dropped")
+        self.assertTrue(short.startswith("cannot sign in to https://adb-1.1.azuredatabricks.net"))
+        self.assertEqual(pf.redact("x token=abc, client_secret=d e"), "x token=***, client_secret=*** e")
+
     def test_no_sign_in_stops_at_once(self):
         results = self.run_checks(FakeApi(me=None))
         self.assertEqual(len(results), 1)

@@ -15,10 +15,19 @@ function marker(ws) {
   return `<!-- plan:${ws} -->`;
 }
 
+// Values that must never be posted: JSON web tokens, and token=, secret= or password= values.
+// A failed sign-in (preflight, or the Terraform provider) can print its configuration,
+// including the GitHub OIDC request token; logs mask it, comments and issues do not.
+function redact(text) {
+  return String(text)
+    .replace(/eyJ[\w-]+\.[\w-]+\.[\w-]+/g, '***')
+    .replace(/\b([\w-]*(?:token|secret|password)[\w-]*)=[^,\s]+/gi, '$1=***');
+}
+
 function buildBody(ws, endpoint, dir = '.plans') {
   const read = (name) => {
     const f = `${dir}/${ws}${name}`;
-    return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
+    return fs.existsSync(f) ? redact(fs.readFileSync(f, 'utf8')) : '';
   };
   const plan = read('.txt');
   const guard = read('.guard.txt').trim();
@@ -64,4 +73,4 @@ async function post({ github, context }, ws, endpoint, dir = '.plans') {
   else if (worthPosting(ws, dir)) await github.rest.issues.createComment({ owner, repo, issue_number, body });
 }
 
-module.exports = { buildBody, post, worthPosting };
+module.exports = { buildBody, post, worthPosting, redact };

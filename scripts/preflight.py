@@ -33,6 +33,24 @@ import workspaces as wsf  # noqa: E402  (the same YAML reading as the other scri
 GROUP_KEYS = ("users", "explorer", "builder", "publisher", "platform_admins")
 
 
+# Values that must never reach a pull request comment or a file: JSON web tokens, and
+# token=, secret= or password= values (the Databricks SDK lists its configuration,
+# including the GitHub OIDC request token, in sign-in errors).
+SECRETS = [re.compile(r"eyJ[\w-]+\.[\w-]+\.[\w-]+"), re.compile(r"(?i)\b([\w-]*(?:token|secret|password)[\w-]*)=[^,\s]+")]
+
+
+def redact(text):
+    """text without anything that looks like a credential."""
+    text = SECRETS[0].sub("***", text)
+    return SECRETS[1].sub(lambda m: f"{m.group(1)}=***", text)
+
+
+def short_error(text):
+    """The CLI's error, first sentence only: what went wrong, without the configuration dump."""
+    text = text.split(" Config: ", 1)[0].split(" Env: ", 1)[0]
+    return redact(text.strip())[:300]
+
+
 def cli_get(profile):
     """GET a workspace API path with the Databricks CLI; returns (json, None) or (None, error)."""
     def get(path):
@@ -45,7 +63,7 @@ def cli_get(profile):
             return None, "timed out"
         if r.returncode != 0:
             lines = [l for l in (r.stderr or r.stdout).splitlines() if l.startswith("Error")]
-            return None, (lines[-1] if lines else (r.stderr or r.stdout).strip()[-300:]).removeprefix("Error: ")
+            return None, short_error((lines[-1] if lines else (r.stderr or r.stdout).strip()[-300:]).removeprefix("Error: "))
         try:
             return json.loads(r.stdout or "{}"), None
         except ValueError:
@@ -107,7 +125,7 @@ def checks(ws, get):
             out.append(("ok", f"catalog {info['catalog']} already exists"))
         elif not metastore.get("storage_root") and not wsf.setting(f, "catalog", "storage_root"):
             out.append(("error", f"the metastore has no storage root, so catalog {info['catalog']} needs one: set "
-                                 "catalog.storage_root in catalog.yaml to an external location's URL"))
+                                 "catalog.storage_root in the workspace's file to an external location's URL"))
 
     # The baseline ships with placeholders to replace: a Git allowlist of github.com/<org>/
     # allows nothing that exists.
@@ -172,7 +190,7 @@ def main(argv):
             print(f"{level:8} {message}")
     if out_file:
         pathlib.Path(out_file).parent.mkdir(parents=True, exist_ok=True)
-        pathlib.Path(out_file).write_text("".join(f"{l}: {m}\n" for l, m in results if l != "ok"))
+        pathlib.Path(out_file).write_text("".join(f"{l}: {redact(m)}\n" for l, m in results if l != "ok"))
     errors = sum(1 for level, _ in results if level == "error")
     print(f"{ws}: {errors} error(s), {sum(1 for l, _ in results if l == 'warning')} warning(s).")
     return 1 if errors else 0
