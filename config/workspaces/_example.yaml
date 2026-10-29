@@ -14,7 +14,7 @@
 
 # ---- REQUIRED ---------------------------------------------------------------
 
-bu: xyz                    # business unit code: <BU> Default Warehouse, <BU>-SHARED, {bu}_citizen_dev, {bu}_platform_admins
+bu: xyz                    # business unit code: BUSINESS_UNIT tag, <BU> Default Warehouse, {bu}_citizen_dev, {bu}_platform_admins
 host: https://adb-0000000000000000.0.azuredatabricks.net
 
 # One Entra ID account group per persona. null = nobody gets that persona here.
@@ -27,33 +27,16 @@ groups:
 
 # ---- OPTIONAL: this workspace only --------------------------------------------
 
-# Tags with one value for the whole workspace, on every warehouse, cluster and policy.
-# A required tag (config/defaults/cost.yaml) set here is not asked of each team.
+# Chargeback tags (tags: in config/defaults/cost.yaml): change a value, add a tag, or
+# null to drop one, for this workspace. On the usage policy, the warehouse and classic clusters.
 # tags:
-#   BUSINESS_UNIT: XYZ
+#   APP_ID: APP-1234                 # the BU's default self-service application ID
 
 # A label next to the workspace name in the top bar.
 # Colors: coral, lemon, lime, turquoise, indigo, purple, pink.
 # label:
 #   text: DEV
 #   color: lime
-
-# Teams: their tags become allowed values on the cluster policies; a team can have
-# its own warehouse (team_warehouses). Keys: lowercase letters, digits, dashes.
-# teams:
-#   integrity:
-#     group: xyz-integrity
-#     tags:
-#       DEPARTMENT: INTEGRITY
-#       TEAM: INTEGRITY
-# team_warehouses:
-#   integrity:
-#     name: XYZ Integrity Warehouse
-#     type: serverless       # serverless | pro | classic
-#     size: X-Small
-#     min_clusters: 1
-#     max_clusters: 1
-#     auto_stop_minutes: 5
 
 # Genie Code instructions for this workspace, after the baseline's (Markdown).
 # genie_code_instructions: |
@@ -66,6 +49,7 @@ groups:
 #   # Not ready for Unity Catalog only yet: leave legacy access alone.
 #   disable_legacy_access: null
 #   disable_dbfs_root_and_mounts: null
+#   enforce_user_isolation: null
 
 # catalog:
 #   # Where managed tables go, if the metastore has no storage root:
@@ -80,11 +64,11 @@ groups:
 # sql_warehouse:
 #   size: Medium
 
-# shared_cluster:
-#   enabled: false
+# cluster_policy:
+#   max_workers: 8                   # the classic cluster policy's limit
 
-# budget_policies:
-#   enabled: false                   # leave budget policies alone here
+# serverless_policy:
+#   enabled: false                   # leave the serverless usage policy alone here
 
 # Local runs only: Databricks CLI profiles from ~/.databrickscfg (CI ignores them).
 # auth:

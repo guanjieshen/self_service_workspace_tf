@@ -1,16 +1,16 @@
 # =============================================================================
 # ADJUSTABLE: COMPUTE
-# The default SQL warehouse, team warehouses, the shared cluster, and the
-# cluster policy templates personas use to create their own classic compute.
+# The default SQL warehouse, and the one classic cluster policy.
 #
-# Sizes, scaling, timeouts, node types and names are updated in place.
-# Changing a warehouse `type`, or the shared cluster's single_node, may
-# recreate it with a new ID (dashboards and jobs pointing at the old ID then
-# need updating); scripts/tf.sh warns before applying that.
+# Terraform creates what every workspace has and rarely changes. What a team or a
+# project requests (another warehouse, its own usage policy, access to classic
+# compute) comes from the self-service app.
 #
-# A single workspace can resize its default warehouse, turn on the classic
-# warehouse, or change or turn off its shared cluster, in its compute.yaml.
-# Team warehouses are defined only in the workspace's compute.yaml.
+# Sizes, scaling, timeouts, node types and names are updated in place. Changing the
+# warehouse `type` may recreate it with a new ID (dashboards and jobs pointing at the
+# old ID then need updating); scripts/tf.sh warns before applying that.
+# A single workspace can change any key below in its file (config/workspaces/<name>.yaml).
+# Both carry the chargeback tags (tags: in config/defaults/cost.yaml).
 # =============================================================================
 
 # ---- Default SQL warehouse --------------------------------------------------
@@ -25,54 +25,16 @@ sql_warehouse:
   # true = this warehouse is selected by default for every user in SQL (the admin
   # setting "Default warehouse"; users can still pick another). false = leave that setting alone.
   workspace_default: true
-  tags:                        # the workspace's own tags (tags: in its file) are added too
-    DEPARTMENT: SHARED
-    TEAM: SHARED
 
-# ---- Classic warehouse (optional) -------------------------------------------
-# A second SQL warehouse on classic compute, next to the serverless default, for
-# work that needs it. Same access as the default warehouse (default_warehouse in
-# config/defaults/access.yaml). Off unless a workspace turns it on with
-# `classic_warehouse: enabled: true` in its compute.yaml. Classic compute runs in the
-# workspace's own Azure subscription and takes a few minutes to start.
-classic_warehouse:
-  enabled: false
-  name: "{BU} Classic Warehouse"
-  type: classic                # classic | pro (the serverless one is sql_warehouse)
-  size: Small
-  auto_stop_minutes: 10        # classic starts slowly, so stop a little later
-  min_clusters: 1
-  max_clusters: 1
-  tags:
-    DEPARTMENT: SHARED
-    TEAM: SHARED
-
-# ---- Shared cluster ---------------------------------------------------------
-# One classic cluster for work that serverless cannot do yet (for example JARs).
-# Who can use it is set by shared_cluster in config/defaults/access.yaml.
-shared_cluster:
-  enabled: true
-  name: "{BU} Shared Single Node"
-  # A pinned version: changing the runtime of a running cluster restarts it, so it changes
-  # only through a pull request (whose plan shows it), never on an unrelated apply.
-  # latest_lts follows each new LTS release instead, restarting the cluster on the next apply.
-  # List versions: databricks clusters spark-versions
-  runtime: 18.x-scala2.13      # 18 LTS (Spark 4.1), the latest LTS in October 2026
-  node_type: Standard_E32_v3
-  single_node: true
-  num_workers: 0               # used only when single_node is false
-  autotermination_minutes: 60
-  tags:
-    DEPARTMENT: SHARED
-    TEAM: SHARED
-
-# ---- Cluster policy ---------------------------------------------------------
-# Each persona with cluster_policy: true (config/defaults/access.yaml) gets its own
-# cluster policy from these rules, named for example "FIN Builder Compute" and
-# tagged PERSONA=BUILDER. Users must pick allowed values for the required tags
-# (config/defaults/cost.yaml).
+# ---- Classic cluster policy -------------------------------------------------
+# Serverless first: classic compute is the exception. One generic policy per
+# workspace, for whoever the self-service app approves: Terraform creates the
+# policy but does not manage who may use it, so the app's grants stay. Workspace
+# admins can always use it.
+# On every cluster it creates, the chargeback tags are fixed, except the ones in
+# classic_user_tags (config/defaults/cost.yaml), which the user must fill in.
 cluster_policy:
-  name: "{BU} {PERSONA} Compute"
+  name: "{BU} Classic Compute"
   runtime: lts_only               # lts_only = long-term-support runtimes only | any
   access_modes:                   # STANDARD (shared, Unity Catalog) and/or DEDICATED (single user)
     - STANDARD

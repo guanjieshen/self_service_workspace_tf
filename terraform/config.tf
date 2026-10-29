@@ -3,7 +3,7 @@
 #   config.tf      loading and merging
 #   overrides.tf   what a workspace file may set, and what "leave alone" releases
 #   access.tf      persona groups and the permission each group gets
-#   chargeback.tf  serverless usage (budget) policies and allowed tag values
+#   chargeback.tf  the chargeback tags and the serverless usage policy
 #   checks.tf      validation with plain-language error messages
 
 locals {
@@ -39,12 +39,8 @@ locals {
   ws_file = "${coalesce(var.workspaces_dir, "${local.project_root}/config/workspaces")}/${var.workspace}.yaml"
   ws_all  = try({ for k, v in yamldecode(file(local.ws_file)) : k => v }, {})
   # Keys only a workspace has, besides the baseline's own sections.
-  workspace_keys  = ["bu", "host", "id", "label", "auth", "tags", "teams", "team_warehouses", "genie_code_instructions"]
-  workspace       = { for k in ["bu", "host", "id", "label", "auth"] : k => local.ws_all[k] if contains(keys(local.ws_all), k) }
-  teams           = try({ for k, v in local.ws_all.teams : k => v }, {})
-  team_warehouses = try({ for k, v in local.ws_all.team_warehouses : k => v }, {})
-  # Tags with one value for the whole workspace, on every warehouse, cluster and policy.
-  workspace_tags = try({ for k, v in local.ws_all.tags : k => tostring(v) }, {})
+  workspace_keys = ["bu", "host", "id", "label", "auth", "genie_code_instructions"]
+  workspace      = { for k in ["bu", "host", "id", "label", "auth"] : k => local.ws_all[k] if contains(keys(local.ws_all), k) }
   # Keys that are neither a baseline section nor a workspace key (usually a typo).
   unknown_keys = [for k in keys(local.ws_all) : k if !contains(concat(local.defaults_sections, local.workspace_keys), k)]
 
@@ -83,7 +79,7 @@ locals {
   # The workspace ID: id in the workspace file, or the number in an Azure workspace URL (adb-<id>.<n>).
   workspace_id = try(tostring(local.workspace.id), regex("adb-([0-9]+)\\.", local.workspace.host)[0], null)
 
-  # The Databricks account: the baseline's (cost.yaml), or the workspace file's.
+  # The Databricks account: the baseline's (config/defaults/cost.yaml), or the workspace file's.
   account_id = try(tostring(local.config.account_id), null)
   bu         = lower(try(local.workspace.bu, ""))
   bu_upper   = upper(try(local.workspace.bu, ""))

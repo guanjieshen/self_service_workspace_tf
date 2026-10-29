@@ -3,10 +3,19 @@ variable "names" {
   type        = map(string)
 }
 
-variable "workspace_tags" {
-  description = "Tags with one value for the whole workspace (its file's tags:), added to every warehouse, cluster and cluster policy."
+variable "tags" {
+  description = "The chargeback tags (key => value), on the warehouse and fixed on every cluster the policy creates."
   type        = map(string)
-  default     = {}
+}
+
+variable "classic_user_tags" {
+  description = "Tags the user fills in on a classic cluster, required and matching user_tag_pattern."
+  type        = list(string)
+}
+
+variable "user_tag_pattern" {
+  description = "Regular expression a classic_user_tags value must match."
+  type        = string
 }
 
 variable "sql_warehouse" {
@@ -14,36 +23,16 @@ variable "sql_warehouse" {
   type        = any
 }
 
-variable "classic_warehouse" {
-  description = "Optional second, classic (non-serverless) warehouse; created when enabled is true."
+variable "cluster_policy" {
+  description = "The classic cluster policy's rules (config/defaults/compute.yaml cluster_policy)."
   type        = any
 }
 
-variable "team_warehouses" {
-  description = "Team key => { group, tags, warehouse } for teams with their own warehouse; warehouse is defined in full (name, type, size, scaling, auto-stop)."
-  type        = any
-}
-
-variable "shared_cluster" {
-  type = any
-}
-
-variable "cluster_policies" {
-  description = "Persona => { template, tags, groups } for personas with a cluster policy."
-  type        = any
-}
-
-variable "allowed_tag_values" {
-  description = "Required tag => allowed values on cluster policies."
-  type        = map(list(string))
-}
-
-variable "acl" {
-  description = "Resolved group => permission maps for sql_warehouse and shared_cluster."
-  type        = map(map(string))
+variable "warehouse_acl" {
+  description = "Resolved group => permission on the default warehouse."
+  type        = map(string)
 }
 
 variable "platform_admins" {
   type = list(string)
 }
-

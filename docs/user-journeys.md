@@ -69,7 +69,8 @@ Any baseline key can be set this way, with the same name and shape as in `config
 
 *For example: personal access tokens last at most 30 days everywhere.*
 
-1. Edit `config/defaults/settings.yaml`: `max_lifetime_days: 30`.
+1. Edit `config/defaults/settings.yaml`: under `settings:`, set
+   `personal_access_tokens.max_lifetime_days: 30`.
 2. Open a pull request. Every workspace is planned, each in its own job, with a comment for
    each one it changes.
 3. Merge. Every workspace is deployed, each in its own job; one that fails does not stop the

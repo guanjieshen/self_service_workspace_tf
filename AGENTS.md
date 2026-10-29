@@ -68,7 +68,7 @@ Each topic has one home. Update that file; link to it from elsewhere instead of 
 | A workflow step | `.github/workflows/deploy.yml`; `docs/github-actions.md` | A job that signs in must not run in a GitHub Environment (`test_setup.py`) |
 | What a change plans or applies | `EVERYTHING` and `PLAN_ONLY` in `scripts/workspaces.py`; `docs/github-actions.md` | `scripts/tests/test_workspaces.py` (`Affected`) |
 | A new workspace key (in a workspace file, not the baseline) | `workspace_keys` in `terraform/config.tf`; `config/workspaces/_example.yaml`; the workspace keys table in `config/README.md` | A fixture and an assertion |
-| Something removed | Every doc that mentions it (search the repository), and its tests and fixtures | The suite still passes with nothing skipped |
+| Something removed or renamed | Every doc that mentions it (search the repository), and its tests and fixtures | The suite still passes with nothing skipped; `scripts/tests/test_docs.py` fails on a path in the docs or comments that no longer exists |
 
 ### Keep it simple
 

@@ -10,23 +10,11 @@ output "default_warehouse_id" {
   value = module.compute.default_warehouse_id
 }
 
-output "classic_warehouse_id" {
-  value = module.compute.classic_warehouse_id
+output "cluster_policy_id" {
+  value = module.compute.cluster_policy_id
 }
 
-output "team_warehouse_ids" {
-  value = module.compute.team_warehouse_ids
-}
-
-output "shared_cluster_id" {
-  value = module.compute.shared_cluster_id
-}
-
-output "cluster_policy_ids" {
-  value = module.compute.cluster_policy_ids
-}
-
-output "budget_policy_ids" {
+output "serverless_policy_ids" {
   value = try(module.budget_policies[0].policy_ids, {})
 }
 
@@ -35,7 +23,7 @@ output "catalog" {
 }
 
 # Addresses of what this workspace leaves alone (settings set to null,
-# budget_policies.enabled false, genie-code managed: false; terraform/overrides.tf). scripts/tf.sh removes any of them still in the state
+# serverless_policy.enabled false, genie-code managed: false; terraform/overrides.tf). scripts/tf.sh removes any of them still in the state
 # before apply, and scripts/plan-guard.py reports their planned deletion as a release.
 output "released_addresses" {
   value = local.released_addresses

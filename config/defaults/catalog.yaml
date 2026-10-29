@@ -4,7 +4,7 @@
 # Each workspace gets one catalog, bound to it only. The schemas in it come from the
 # self-service app, not from Terraform: Terraform manages the catalog, its data
 # features and who may use it.
-# A workspace's catalog.yaml can change any key below (same name and shape).
+# A workspace's file (config/workspaces/<name>.yaml) can change any key below (same name and shape).
 # =============================================================================
 
 catalog:
@@ -15,7 +15,7 @@ catalog:
   # abfss://catalogs@<storage account>.dfs.core.windows.net/<catalog>
   storage_root: null
   workspace_only: true               # true = only this workspace can use the catalog
-  # Owner of the catalog: a key of groups in access.yaml (or a group name).
+  # Owner of the catalog: a key of groups (config/defaults/access.yaml, or the workspace's groups:), or a group name.
   # null = leave the owner alone.
   owner: platform_admins
 
@@ -26,7 +26,7 @@ catalog:
   # Data classification: scans every schema (new ones too) and finds sensitive data
   # (names, emails, card numbers, ...) so it can be tagged and governed. It runs on
   # serverless, so the identity running Terraform needs a serverless usage policy
-  # (budget_policies in cost.yaml); without one, turning it on fails with "Usage
+  # (serverless_policy in config/defaults/cost.yaml); without one, turning it on fails with "Usage
   # policy ID must not be empty".
   data_classification: true
 

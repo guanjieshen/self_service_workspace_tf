@@ -1,19 +1,5 @@
 # Module inputs built from the configuration (named here so terraform/tests/ can check them).
 locals {
-  team_warehouse_inputs = {
-    for k, w in local.team_warehouses : k => { warehouse = w, group = try(local.teams[k].group, null), tags = try(local.teams[k].tags, {}) } if contains(keys(local.teams), k)
-  }
-  # One cluster policy per persona with cluster_policy: true and a group, tagged with its name.
-  cluster_policies = {
-    for p, def in local.personas : p => {
-      template = local.config.cluster_policy
-      tags     = { PERSONA = upper(p) }
-      groups   = local.persona_groups[p]
-      name = replace(replace(replace(local.config.cluster_policy.name,
-      "{BU}", local.bu_upper), "{bu}", local.bu), "{PERSONA}", title(p))
-    } if try(def.cluster_policy, false) == true && length(try(local.persona_groups[p], [])) > 0
-  }
-
   # Group names as the personas module returns them once assigned. Granting through
   # these makes each grant wait for its group's assignment, without a module-level
   # depends_on: that would defer every data source in the module until apply whenever
@@ -57,20 +43,14 @@ module "workspace_settings" {
 module "compute" {
   source = "./modules/compute"
 
-  names              = { BU = local.bu_upper, bu = local.bu }
-  workspace_tags     = local.workspace_tags
-  sql_warehouse      = local.config.sql_warehouse
-  classic_warehouse  = local.config.classic_warehouse
-  team_warehouses    = { for k, w in local.team_warehouse_inputs : k => merge(w, { group = lookup(local.group, w.group, w.group) }) }
-  shared_cluster     = local.config.shared_cluster
-  allowed_tag_values = local.allowed_tag_values
-  acl = {
-    sql_warehouse  = { for g, l in local.persona_acl.default_warehouse : lookup(local.group, g, g) => l }
-    shared_cluster = { for g, l in local.persona_acl.shared_cluster : lookup(local.group, g, g) => l }
-  }
-  platform_admins = [for g in local.platform_admins : lookup(local.group, g, g)]
-
-  cluster_policies = { for p, cp in local.cluster_policies : p => merge(cp, { groups = [for g in cp.groups : lookup(local.group, g, g)] }) }
+  names             = { BU = local.bu_upper, bu = local.bu }
+  tags              = local.chargeback_tags
+  classic_user_tags = local.classic_user_tags
+  user_tag_pattern  = local.user_tag_pattern
+  sql_warehouse     = local.config.sql_warehouse
+  cluster_policy    = local.config.cluster_policy
+  warehouse_acl     = { for g, l in local.persona_acl.default_warehouse : lookup(local.group, g, g) => l }
+  platform_admins   = [for g in local.platform_admins : lookup(local.group, g, g)]
 
   # Invalid input stops at the plain-language checks in checks.tf, not a crash inside a
   # module. Harmless for the plan: config_checks has no inputs, so it only has changes
@@ -80,13 +60,13 @@ module "compute" {
 
 module "budget_policies" {
   source    = "./modules/budget-policies"
-  count     = local.config.budget_policies.enabled ? 1 : 0
+  count     = local.sp.enabled ? 1 : 0
   providers = { databricks = databricks.account }
 
   account_id   = local.account_id
   workspace_id = local.workspace_id
-  policies     = local.budget_policies
-  managers     = local.budget_policy_managers
+  policies     = local.serverless_policies
+  managers     = [for g in local.platform_admins : "groups/${g}"]
 
   # Invalid input stops at the plain-language checks in checks.tf, not a crash inside a
   # module. Harmless for the plan: config_checks has no inputs, so it only has changes
@@ -94,7 +74,7 @@ module "budget_policies" {
   depends_on = [terraform_data.config_checks]
 }
 
-# The workspace's Unity Catalog catalog and its grants (catalog.yaml).
+# The workspace's Unity Catalog catalog and its grants (config/defaults/catalog.yaml).
 module "catalog" {
   source = "./modules/catalog"
   count  = local.catalog != null ? 1 : 0

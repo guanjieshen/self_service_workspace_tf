@@ -18,45 +18,25 @@ run "access" {
 
   assert {
     condition     = jsonencode(local.token_groups) == jsonencode(["tst-builders"])
-    error_message = "personas.<persona>.can_create_tokens in access.yaml changes who may create tokens (here builders only)."
+    error_message = "personas.<persona>.can_create_tokens changes who may create tokens (here builders only)."
   }
   assert {
-    condition     = contains(local.extra_groups, "tst-data-eng") && contains(local.extra_groups, "tst_users")
-    error_message = "Team groups and the users group are assigned to the workspace."
-  }
-  assert {
-    condition     = contains(local.budget_policy_managers, "users/owner@example.com")
-    error_message = "budget_policies.extra_managers in a workspace cost.yaml adds managers next to the platform admins."
-  }
-  assert {
-    condition     = sort(keys(local.budget_policies)) == tolist(["builders", "platform", "shared"])
-    error_message = "A workspace's cost.yaml adds policy blocks to the baseline's."
-  }
-  assert {
-    condition     = local.budget_policies.platform.name == "TST-ADMIN" && local.budget_policies.platform.tags == { LOB = "TESTLOB", DEPARTMENT = "IT", TEAM = "PLATFORM" }
-    error_message = "A block repeated in a workspace's cost.yaml replaces the baseline's (name and tags)."
-  }
-  assert {
-    condition     = sort(local.budget_policies.builders.groups) == tolist(["tst-builders", "tst-publishers"]) && local.budget_policies.builders.name == "TST-BUILDERS"
-    error_message = "used_by can list personas: the policy goes to their groups."
+    condition     = local.extra_groups == tolist(["tst_users"])
+    error_message = "The users group is assigned to the workspace."
   }
 }
 
-run "teams" {
+run "tags" {
   command = plan
   variables { workspace = "full" }
 
   assert {
-    condition     = !contains(keys(local.budget_policies), "data-eng")
-    error_message = "Teams get no usage policy of their own: only the blocks in cost.yaml are policies."
+    condition     = local.chargeback_tags == { BUSINESS_UNIT = "TST", APP_ID = "TST-APP", COST_CENTER = "CC-42" }
+    error_message = "A workspace's tags: change a value, add a tag, and null drops one (COST_CATEGORY). Got: ${jsonencode(local.chargeback_tags)}"
   }
   assert {
-    condition     = contains(local.allowed_tag_values.TEAM, "DATA-ENG") && contains(local.allowed_tag_values.TEAM, "SHARED") && contains(local.allowed_tag_values.DEPARTMENT, "FINANCE")
-    error_message = "Cluster policies allow the tag values of shared compute and teams."
-  }
-  assert {
-    condition     = local.team_warehouse_inputs["data-eng"].group == "tst-data-eng" && local.team_warehouse_inputs["data-eng"].warehouse.size == "X-Small"
-    error_message = "A team warehouse is defined in full in compute.yaml and granted to the team's group."
+    condition     = local.serverless_policies.self_service.tags == local.chargeback_tags
+    error_message = "The usage policy carries the workspace's tags."
   }
 }
 
@@ -66,15 +46,11 @@ run "compute_options" {
 
   assert {
     condition     = local.config.sql_warehouse.size == "Medium" && local.config.sql_warehouse.max_clusters == 4 && local.config.sql_warehouse.min_clusters == 1
-    error_message = "compute.yaml warehouse overrides only the keys it sets."
+    error_message = "sql_warehouse in a workspace's file overrides only the keys it sets."
   }
   assert {
-    condition     = local.config.classic_warehouse.enabled == true && local.config.classic_warehouse.size == "Small"
-    error_message = "classic_warehouse.enabled turns on the classic warehouse with the baseline size."
-  }
-  assert {
-    condition     = local.config.shared_cluster.node_type == "Standard_E16_v3" && local.config.shared_cluster.single_node == true
-    error_message = "shared_cluster.node_type overrides the node type only."
+    condition     = local.config.cluster_policy.max_workers == 8 && local.config.cluster_policy.max_clusters_per_user == 1
+    error_message = "cluster_policy.max_workers overrides that limit only."
   }
 }
 
@@ -92,7 +68,7 @@ run "catalog_and_settings" {
   }
   assert {
     condition     = tolist(local.settings.dashboard_embedding.approved_domains) == tolist(["contoso.sharepoint.com"])
-    error_message = "settings.dashboard_embedding.approved_domains in settings.yaml sets the approved embedding domains."
+    error_message = "settings.dashboard_embedding.approved_domains sets the approved embedding domains."
   }
   assert {
     condition     = local.settings.disable_legacy_access == true
@@ -109,7 +85,7 @@ run "genie_code_workspace_parts" {
     error_message = "Default and workspace instructions each get their heading, default first."
   }
   assert {
-    condition     = strcontains(local.genie_instructions, "Use the TST warehouse TST Default Warehouse and the catalog tst_citizen_dev; tags `LOB` = `TESTLOB`.")
+    condition     = strcontains(local.genie_instructions, "Use the TST warehouse TST Default Warehouse and the catalog tst_citizen_dev; tags `APP_ID` = `TST-APP`, `BUSINESS_UNIT` = `TST`, `COST_CENTER` = `CC-42`.")
     error_message = "Placeholders in the workspace instructions are filled ({BU}, {WAREHOUSE}, {CATALOG}, {WORKSPACE_TAGS})."
   }
   assert {
@@ -129,7 +105,7 @@ run "settings_left_alone" {
       "compliance_security_profile", "enhanced_security_monitoring", "automatic_cluster_update", "verbose_audit_logs",
       "enforce_unity_gateway", "collaboration_platforms",
     ] : local.settings[k] == null])
-    error_message = "Every setting set to null in settings.yaml is left alone."
+    error_message = "Every setting set to null is left alone."
   }
   assert {
     condition     = local.config.catalog == null && local.catalog == null && length(module.catalog) == 0 && contains(output.released_addresses, "module.catalog")
@@ -137,7 +113,7 @@ run "settings_left_alone" {
   }
   assert {
     condition     = length(module.budget_policies) == 0
-    error_message = "budget_policies.enabled: false in cost.yaml stops managing usage policies."
+    error_message = "serverless_policy.enabled: false stops managing the usage policy."
   }
   assert {
     condition     = !local.manage_genie_instructions && !local.manage_genie_skills
@@ -199,8 +175,8 @@ run "some_groups" {
     error_message = "The platform admins group comes from the baseline: {bu}_platform_admins."
   }
   assert {
-    condition     = length(local.cluster_policies) == 0 && local.budget_policies.shared.groups == tolist(["tst-explorers"])
-    error_message = "No builder or publisher group: no cluster policies; the shared usage policy goes to the explorers only."
+    condition     = local.serverless_policies.self_service.groups == tolist(["tst-explorers", "tst_platform_admins"])
+    error_message = "The usage policy goes to the personas that have a group, and the platform admins."
   }
 }
 

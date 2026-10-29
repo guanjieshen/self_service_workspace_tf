@@ -26,8 +26,8 @@ Terraform validates one workspace at a time; some mistakes only show across work
 because what they create is shared by the whole account or metastore:
   - two workspaces with the same host or id;
   - two workspaces creating a catalog with the same name (catalogs are per metastore);
-  - two workspaces with the same bu on the same account, both managing budget policies:
-    the policies are account-wide and named from bu ({BU}-SHARED, ...), so they collide;
+  - two workspaces with the same bu on the same account, both managing the serverless usage policy:
+    the policies are account-wide and named from bu ({BU}-0-SELF-SERVICE), so they collide;
   - a file name that is not safe to use in workflow commands and state file names.
 Standard library only: reads the simple YAML these files use (no anchors or flow maps).
 """
@@ -153,11 +153,11 @@ def workspace_info(f):
     else:
         catalog = setting(f, "catalog", "name")
         catalog = catalog.replace("{bu}", bu).replace("{BU}", bu.upper()) if catalog else None
-    enabled = setting(f, "budget_policies", "enabled") or "true"
+    enabled = setting(f, "serverless_policy", "enabled") or "true"
     workspace_id = ws.get("id") or next(iter(re.findall(r"adb-([0-9]+)\.", host)), None)
     account = ws.get("account_id") or top_level(defaults_file("account_id") or f).get("account_id")
     return {"bu": bu, "account": account, "host": host,
-            "id": workspace_id, "catalog": catalog, "budget_policies": enabled == "true"}
+            "id": workspace_id, "catalog": catalog, "serverless_policy": enabled == "true"}
 
 
 def check(*dirs):
@@ -182,12 +182,12 @@ def check(*dirs):
                 if other != f.stem:
                     problems.append(f"{f.stem} and {other} use the same {what} ({value})"
                                     + (": catalogs are shared by the metastore, so only one can create it" if key == "catalog" else ""))
-        if info["budget_policies"] and info["bu"]:
+        if info["serverless_policy"] and info["bu"]:
             other = seen.setdefault(("bu", info["account"], info["bu"]), f.stem)
             if other != f.stem:
                 problems.append(f"{f.stem} and {other} both have bu {info['bu']} on account {info['account']} and manage "
-                                f"budget policies, which are account-wide and named from bu ({info['bu'].upper()}-SHARED, ...): "
-                                "give one a different bu, or set budget_policies: enabled: false in one's file")
+                                f"a serverless usage policy, which is account-wide and named from bu ({info['bu'].upper()}-0-SELF-SERVICE): "
+                                "give one a different bu, or set serverless_policy: enabled: false in one's file")
     return found, problems
 
 

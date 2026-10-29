@@ -6,6 +6,31 @@ them for you: a setting missing from your baseline is left alone).
 
 ## Unreleased
 
+- **Compute and chargeback: serverless first, Terraform holds only what rarely changes.**
+  What a team or project requests (warehouses, usage policies, classic compute access) is
+  the self-service app's.
+  - **One tag list:** `tags:` and `classic_user_tags` in `config/defaults/cost.yaml`, on
+    the usage policy, the default warehouse and every classic cluster. `tags:` is now a
+    baseline key: a workspace file changes a value (its `APP_ID`), adds a tag, or drops one
+    with `null`. Replaces `required_tags`, the warehouses' and cluster's own `tags`, and the
+    automatic `PERSONA` tag.
+  - **One serverless usage policy** per workspace, `{BU}-0-SELF-SERVICE`, for every
+    persona and the platform admins (`serverless_policy` replaces `budget_policies`: no
+    `policies` blocks, `used_by` or `extra_managers`).
+  - **One classic cluster policy**, `{BU} Classic Compute`: the tags are fixed, except
+    `classic_user_tags`, which users must fill in (upper case, digits, `_`, `-`). Terraform
+    does not manage who may use it; the app grants it.
+  - **Removed:** the per-persona cluster policies (and the persona keys `cluster_policy` and
+    `shared_cluster`), the shared cluster, the classic warehouse, `teams` and
+    `team_warehouses`. A workspace file that still has one of these keys fails the plan
+    with the key's name.
+  - **The first plan** on an applied workspace deletes the persona cluster policies, the
+    shared cluster, the classic and team warehouses, and the `{BU}-SHARED` and
+    `{BU}-PLATFORM` usage policies; creates `{BU}-0-SELF-SERVICE` and `{BU} Classic
+    Compute`; and updates the tags on the default warehouse. The plan guard flags the
+    deletes. Before merging, check what still uses them: jobs pinned to the old usage
+    policies or the shared cluster, clusters created from the persona policies.
+
 - **A workspace is one file**, `config/workspaces/<name>.yaml`: `bu`, `host`, `groups`, and any
   baseline key it changes, at the top level. The files are the list of workspaces. Replaces the
   workspace folders (`workspace.yaml`, `access.yaml`, ...). Add one by copying `_example.yaml`.
@@ -32,7 +57,7 @@ them for you: a setting missing from your baseline is left alone).
   (`catalog.schemas`) and data quality monitoring (it watched those schemas).
 - Removed the `manage` switches: group assignment, token permissions and catalog grants
   are always managed.
-- Persona groups are named per workspace (`groups:` in its `access.yaml`); the baseline
+- Persona groups are named per workspace (`groups:` in its file); the baseline
   names only `{bu}_platform_admins`. A persona without a group is skipped.
 
 - CI signs in with one service principal and two federated credentials (pull requests;

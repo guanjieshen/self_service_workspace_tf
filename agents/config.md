@@ -15,13 +15,15 @@ A workspace is one file, `config/workspaces/<name>.yaml`. It changes a default b
   the setting is released (it keeps its current value), never reset.
 - A key the baseline does not have fails the plan with its name, so a typo cannot
   silently do nothing.
-- Keys only a workspace has: `bu`, `host` (required), `tags`, `teams`, `team_warehouses`,
-  `genie_code_instructions`, `label`, and rarely `account_id`, `auth`, `id`
+- Keys only a workspace has: `bu`, `host` (required), `genie_code_instructions`, `label`, and rarely `account_id`, `auth`, `id`
   (`workspace_keys` in `terraform/config.tf`).
 - Each workspace names its persona groups (`groups:`); a persona left `null` is skipped.
   Only `groups.platform_admins` comes from the baseline.
-- Open maps take new keys in a workspace file: `tags`, and `budget_policies.policies`
-  (a new key adds a policy; repeating one replaces its whole block).
+- `tags` is an open map: a workspace file may change a value, add a tag, or set one to
+  `null` to drop it.
+- Terraform holds only what every workspace has and rarely changes. What a team or a
+  project requests (another warehouse, its own usage policy, access to classic compute)
+  belongs to the self-service app: do not add a key for it here.
 
 ## Helping someone change the configuration
 
@@ -42,8 +44,8 @@ the framework and the next upgrade replaces them.
 | File | What it holds |
 | --- | --- |
 | `defaults/access.yaml` | Personas and their rights; the platform admins group (each workspace names its persona groups) |
-| `defaults/compute.yaml` | SQL warehouse, shared cluster, cluster policies |
-| `defaults/cost.yaml` | Usage (budget) policies and tags |
+| `defaults/compute.yaml` | The default SQL warehouse and the classic cluster policy |
+| `defaults/cost.yaml` | The chargeback tags and the serverless usage policy |
 | `defaults/catalog.yaml` | The workspace catalog and its grants |
 | `defaults/settings.yaml` | Workspace admin and security settings |
 | `defaults/genie-code/` | Genie Code instructions and skills for every workspace |

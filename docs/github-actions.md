@@ -27,7 +27,7 @@ A change to every workspace applies them all, each in its own job: one that fail
 stop the others. Fix it in a pull request; or, if a missing prerequisite was fixed, re-run
 that job (it refuses if `main` has moved on). Each workspace's applies run one at a time.
 Tests and docs never re-apply a workspace: re-applying is not free (a newer runtime, for
-example, restarts the shared cluster).
+example, can restart running clusters).
 
 ## How CI signs in
 

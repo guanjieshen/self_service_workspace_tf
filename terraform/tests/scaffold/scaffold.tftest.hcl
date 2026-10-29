@@ -23,8 +23,8 @@ run "scaffolded_workspace" {
     error_message = "Only the personas the file names a group for are granted; the platform admins group comes from the baseline."
   }
   assert {
-    condition     = local.catalog.name == "scf_citizen_dev" && length(local.workspace_tags) == 0
-    error_message = "The catalog is named from bu; no tags unless the file sets some."
+    condition     = local.catalog.name == "scf_citizen_dev" && local.chargeback_tags.BUSINESS_UNIT == "SCF"
+    error_message = "The catalog is named from bu, and so is the BUSINESS_UNIT tag."
   }
 }
 

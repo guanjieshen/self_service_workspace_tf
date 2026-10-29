@@ -11,12 +11,12 @@ locals {
   overrides = { for s in local.defaults_sections : s => local.ws_all[s] if contains(keys(local.ws_all), s) }
 
   # Override paths the baseline does not have (usually a typo), two levels deep, and three
-  # for map values. Open maps take any keys: tags, and maps that are empty in the
-  # baseline, and budget_policies.policies (a workspace may add policies).
+  # for map values. Open maps take any keys: tags (a workspace may add a tag), and maps
+  # that are empty in the baseline.
   unknown_overrides = flatten([
-    for s, o in local.overrides : can(keys(o)) && can(keys(local.defaults[s])) ? flatten([
+    for s, o in local.overrides : can(keys(o)) && can(keys(local.defaults[s])) && s != "tags" ? flatten([
       for k in keys(o) : !contains(keys(local.defaults[s]), k) ? ["${s}.${k}"] : (
-        can(keys(o[k])) && can(keys(local.defaults[s][k])) && !endswith(k, "tags") && k != "policies" && length(try(keys(local.defaults[s][k]), [])) > 0 ?
+        can(keys(o[k])) && can(keys(local.defaults[s][k])) && length(try(keys(local.defaults[s][k]), [])) > 0 ?
         [for k2 in keys(o[k]) : "${s}.${k}.${k2}" if !contains(keys(local.defaults[s][k]), k2)] : []
       )
     ]) : []
@@ -60,9 +60,9 @@ locals {
     "settings.genie_code.instructions"                            = ["${local.ws}.databricks_workspace_file.genie_code_instructions"]
     "settings.genie_code.skills"                                  = ["${local.ws}.databricks_workspace_file.genie_code_skills"]
   }
-  # Released when false (or null): budget_policies.enabled.
+  # Released when false (or null): serverless_policy.enabled.
   switch_addresses = {
-    "budget_policies.enabled" = ["module.budget_policies"]
+    "serverless_policy.enabled" = ["module.budget_policies"]
   }
 
   setting_is_null = {
