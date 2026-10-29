@@ -4,11 +4,20 @@
 Reads `terraform show -json <plan>` on stdin. Prints a warning for each risky
 change and exits 2 if there is any, 0 otherwise.
 
+    scripts/plan-guard.py [--preflight .plans/<workspace>.preflight-all.txt] < plan.json
+
+Disabling legacy access is one-way, but on a workspace where it is not managed yet (a
+first apply) it is not flagged when preflight found nothing that still uses legacy
+access: that is the case for every new workspace. Without that finding (preflight found
+something, or did not run) it is flagged as usual.
+
 A planned deletion of something the workspace now leaves unmanaged (the
 released_addresses output) is not risky: scripts/tf.sh removes it from the state
 before apply, so the workspace keeps its current value. It is listed as a release.
 """
+import argparse
 import json
+import pathlib
 import re
 import sys
 
@@ -55,6 +64,8 @@ SECURE_CONF = {
     "mlflowRunArtifactDownloadEnabled": "false", "enableUploadDataUis": "false",
 }
 EVERYONE = {"account users", "users"}
+# The line scripts/preflight.py writes when nothing uses legacy access (scripts/tests/ checks they match).
+NOTHING_USES_LEGACY = "ok: nothing found that still uses legacy access"
 
 
 def one(values, block):
@@ -119,9 +130,21 @@ def is_released(addr, prefixes):
     return any(addr == p or addr.startswith(p + ".") or addr.startswith(p + "[") for p in prefixes)
 
 
-def main() -> int:
+def nothing_uses_legacy(preflight_file):
+    """Whether preflight found nothing that still uses legacy access."""
+    try:
+        return any(l.startswith(NOTHING_USES_LEGACY) for l in pathlib.Path(preflight_file).read_text().splitlines())
+    except (OSError, TypeError):
+        return False
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(description="Flag hard-to-undo or security-weakening changes in a plan (JSON on stdin).")
+    ap.add_argument("--preflight", help="preflight's findings (.plans/<workspace>.preflight-all.txt)")
+    args = ap.parse_args(argv if argv is not None else sys.argv[1:])
     plan = json.load(sys.stdin)
     warnings: list[str] = []
+    notes: list[str] = []
     releases: list[str] = []
     prefixes = released(plan)
 
@@ -153,7 +176,13 @@ def main() -> int:
 
         if rtype == "databricks_disable_legacy_access_setting" and ("create" in actions or "update" in actions):
             after = (rc["change"].get("after") or {}).get("disable_legacy_access") or [{}]
-            if after[0].get("value") is True:
+            if after[0].get("value") is True and actions == ["create"] and nothing_uses_legacy(args.preflight):
+                notes.append(
+                    "DISABLE legacy access (Hive metastore), on a workspace where it is not managed yet. "
+                    "Preflight found nothing that still uses it (Hive metastore, DBFS mounts, legacy "
+                    f"clusters), so it is not flagged. ONE-WAY after 30 days.\n      {addr}"
+                )
+            elif after[0].get("value") is True:
                 warnings.append(
                     "DISABLE legacy access (Hive metastore). ONE-WAY: after 30 days the workspace "
                     f"is Unity Catalog only, permanently.\n      {addr}"
@@ -164,6 +193,11 @@ def main() -> int:
         print("keeps its current values, nothing is deleted or reset):")
         for a in releases:
             print(f"  - RELEASE {a}")
+        print()
+    if notes:
+        print("\nNot flagged, with the evidence:")
+        for n in notes:
+            print(f"  - {n}")
         print()
     if not warnings:
         return 0
