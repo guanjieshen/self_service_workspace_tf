@@ -71,6 +71,30 @@ class Scripts(unittest.TestCase):
                 first_create = min(script.index(c) for c in ("az group create", "az ad app create") if c in script)
                 self.assertLess(check, first_create, "the tenant is checked before anything is created")
 
+    def test_the_repository_defaults_to_the_origin_and_is_shown(self):
+        args = ["github", "--client-id", "c", "--tenant-id", "t", "--subscription", "s"]
+        with mock.patch.object(setup, "origin_repo", lambda: "acme/baseline"), \
+                mock.patch.object(setup.wsf, "top_level", lambda path: {}):
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                setup.main(args)
+            self.assertIn('echo "Repository: acme/baseline (from this clone\'s git origin)."', out.getvalue())
+            self.assertIn("gh variable set AZURE_CLIENT_ID -R acme/baseline", out.getvalue())
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                setup.main([*args, "--repo", "acme/other"])
+            self.assertIn("Repository: acme/other (from config/setup.yaml)", out.getvalue(), "a set value wins")
+        with mock.patch.object(setup, "origin_repo", lambda: None), \
+                mock.patch.object(setup.wsf, "top_level", lambda path: {}), self.assertRaises(SystemExit) as e:
+            setup.main(args)
+        self.assertIn("no GitHub origin: fill in github_repo", str(e.exception))
+        for url, repo in (("git@github.com:acme/baseline.git", "acme/baseline"), ("https://github.com/acme/base.line", "acme/base.line"),
+                          ("https://gitlab.com/acme/x.git", None)):
+            with mock.patch.object(setup.subprocess, "run", lambda *a, **k: mock.Mock(stdout=url)):
+                self.assertEqual(setup.origin_repo(), repo)
+
+    def test_identity_says_which_repository_it_will_trust(self):
+        self.assertIn('echo "Repository: org/repo (from config/setup.yaml). Entra will trust only its pull requests and main branch."',
+                      render("identity"))
+
     def test_state_is_private(self):
         script = render("state")
         for flag in ("--allow-blob-public-access false", "--allow-shared-key-access false", "--public-access off",
@@ -160,7 +184,7 @@ class SetupFile(unittest.TestCase):
         required = text[text.index("# ---- REQUIRED"):text.index("# ---- OPTIONAL")]
         self.assertEqual(re.findall(r"(?m)^(\w+):", required),
                          ["tenant_id", "subscription_id", "state_location", "state_resource_group", "state_storage_account",
-                          "state_container", "github_repo", "databricks_account_id"])
+                          "state_container", "databricks_account_id"])
         # Required means no default: a required value is asked for, never guessed.
         for _, key, default, steps in setup.OPTIONS:
             if key in re.findall(r"(?m)^(\w+):", required):
@@ -169,7 +193,7 @@ class SetupFile(unittest.TestCase):
         self.assertEqual(sorted(keys), sorted(k for _, k, _, _ in setup.OPTIONS), "every value in the file is read, and only those")
 
     def test_ids_from_identity_are_asked_for_by_name(self):
-        for key, value in (("tenant_id", "ten-1"), ("subscription_id", "sub-1"), ("github_repo", "o/r")):
+        for key, value in (("tenant_id", "ten-1"), ("subscription_id", "sub-1")):
             self.fill(key, value)
         with self.assertRaises(SystemExit) as e:
             setup.main(["github"])
