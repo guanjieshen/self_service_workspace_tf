@@ -6,6 +6,9 @@ them for you: a setting missing from your baseline is left alone).
 
 ## Unreleased
 
+- A new workspace's first apply no longer needs `allow-risky-changes` for disabling legacy
+  access: the plan guard reads preflight's findings and lets it through when nothing still
+  uses legacy access. An existing workspace that still uses Hive or DBFS mounts is flagged as before.
 - **Compute and chargeback: serverless first, Terraform holds only what rarely changes.**
   What a team or project requests (warehouses, usage policies, classic compute access) is
   the self-service app's.

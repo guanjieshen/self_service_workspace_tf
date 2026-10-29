@@ -3,15 +3,16 @@ import contextlib
 import io
 import json
 import sys
+import tempfile
 import unittest
 
-from helpers import change, load
+from helpers import SCRIPTS, change, load
 
 guard = load("plan-guard")
 
 
-def run(*changes, released=None):
-    """(exit code, printed text) for a plan with these resource changes."""
+def run(*changes, released=None, preflight=None):
+    """(exit code, printed text) for a plan with these resource changes (and preflight's findings)."""
     stdin, out = sys.stdin, io.StringIO()
     plan = {"resource_changes": list(changes)}
     if released is not None:
@@ -19,7 +20,13 @@ def run(*changes, released=None):
     sys.stdin = io.StringIO(json.dumps(plan))
     try:
         with contextlib.redirect_stdout(out):
-            code = guard.main()
+            argv = []
+            if preflight is not None:
+                f = tempfile.NamedTemporaryFile("w", suffix=".preflight-all.txt", delete=False)
+                f.write(preflight)
+                f.close()
+                argv = ["--preflight", f.name]
+            code = guard.main(argv)
     finally:
         sys.stdin = stdin
     return code, out.getvalue()
@@ -61,6 +68,26 @@ class PlanGuard(unittest.TestCase):
         self.assertEqual(run(change("databricks_disable_legacy_access_setting", ["create"], after=on))[0], 2)
         self.assertEqual(run(change("databricks_disable_legacy_access_setting", ["update"], after=on))[0], 2)
         self.assertEqual(run(change("databricks_disable_legacy_access_setting", ["create"], after=off))[0], 0)
+
+    def test_disable_legacy_access_on_a_new_workspace_with_preflight_evidence(self):
+        on = {"disable_legacy_access": [{"value": True}]}
+        clean = "ok: signed in\nok: nothing found that still uses legacy access (Hive metastore, DBFS mounts, legacy clusters)\n"
+        busy = "warning: the baseline disables legacy access, ... this workspace still has Hive metastore schemas: sales\n"
+        code, out = run(change("databricks_disable_legacy_access_setting", ["create"], after=on), preflight=clean)
+        self.assertEqual(code, 0, "a first apply where preflight found nothing using legacy access is not flagged")
+        self.assertIn("Not flagged", out)
+        self.assertIn("Preflight found nothing that still uses it", out)
+        self.assertEqual(run(change("databricks_disable_legacy_access_setting", ["create"], after=on), preflight=busy)[0], 2,
+                         "flagged when preflight found something that uses legacy access")
+        self.assertEqual(run(change("databricks_disable_legacy_access_setting", ["update"], after=on), preflight=clean)[0], 2,
+                         "flagged when it was managed and turned on later (an update), whatever preflight says")
+        self.assertEqual(run(change("databricks_disable_legacy_access_setting", ["create"], after=on), preflight="")[0], 2,
+                         "flagged when preflight did not report its finding")
+
+    def test_the_guard_matches_preflights_wording(self):
+        src = (SCRIPTS / "preflight.py").read_text()
+        self.assertIn(f'("ok", "{guard.NOTHING_USES_LEGACY[len("ok: "):]}', src,
+                      "scripts/preflight.py must write the line the guard looks for")
 
     def test_all_warnings_are_listed(self):
         code, out = run(change("databricks_directory", ["delete"], name="a"), change("databricks_catalog", ["delete"], name="b"))

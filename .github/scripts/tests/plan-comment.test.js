@@ -31,6 +31,15 @@ test('optional sections are left out', () => {
   assert.ok(body.includes('Full Terraform plan'));
 });
 
+test('guard output is a warning only when the guard flagged something', () => {
+  const flagged = buildBody('ws', 'm', plans({ '.txt': 'p', '.guard.txt': 'DELETE folder', '.guard': '2\n' }));
+  assert.match(flagged, /\[!WARNING\][^]*allow-risky-changes/);
+  const noted = buildBody('ws', 'm', plans({ '.txt': 'p', '.guard.txt': 'Not flagged, with the evidence: DISABLE legacy access', '.guard': '0\n' }));
+  assert.ok(!noted.includes('[!WARNING]') && /\[!NOTE\][^]*No label is needed/.test(noted), 'a note, not a warning');
+  assert.ok(noted.includes('DISABLE legacy access'), 'the note is shown');
+  assert.match(buildBody('ws', 'm', plans({ '.txt': 'p', '.guard.txt': 'DELETE folder' })), /\[!WARNING\]/, 'no status: a warning, to be safe');
+});
+
 test('a failed plan says so', () => {
   assert.match(buildBody('ws', 'm', plans({})), /_Plan failed; see the job log._/);
 });

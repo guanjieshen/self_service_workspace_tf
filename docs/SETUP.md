@@ -223,7 +223,7 @@ Before you start: the workspace exists and the runners can reach it (its private
 | Change one workspace | Pull request editing `config/workspaces/<name>.yaml`: only that workspace is planned and applied |
 | Change every workspace | Pull request editing `config/defaults/`: every workspace is planned, and applied, each in its own job (one that fails does not stop the others) |
 | Retire a workspace | Delete its file in a pull request: its Terraform state is removed on merge; the workspace itself is unchanged |
-| A plan is flagged as risky | Review the warning in the plan comment; if intended, a person adds the label `allow-risky-changes` |
+| A plan is flagged as risky | Review the warning in the plan comment; if intended, a person adds the label `allow-risky-changes`. A new workspace's first apply is not flagged for disabling legacy access when preflight found nothing that still uses it |
 | A `drift` issue opens | Someone changed a setting by hand: update the configuration to match, or re-apply to restore it |
 | Retry a failed apply | Fix the cause, then re-run the latest Apply run (it refuses if `main` has moved on) |
 | Upgrade to a new release | Below: the pull request's plan shows what the new version changes in each workspace |

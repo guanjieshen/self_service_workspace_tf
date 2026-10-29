@@ -99,7 +99,11 @@ plan_and_guard() {
   "$terraform_bin" -chdir="$tf_dir" show -json "$plan_file" > "$base.json"
   "$terraform_bin" -chdir="$tf_dir" show -no-color "$plan_file" > "$base.txt"
   guard_status=0
-  python3 "$root/scripts/plan-guard.py" < "$base.json" | tee "$base.guard.txt" || guard_status=${PIPESTATUS[0]}
+  # In CI, preflight ran just before (deploy.yml): its findings let the guard tell a new
+  # workspace from one that still uses legacy access. Locally, without them, it flags as usual.
+  local evidence=()
+  [[ "${GITHUB_ACTIONS:-}" == "true" && -f "$base.preflight-all.txt" ]] && evidence=(--preflight "$base.preflight-all.txt")
+  python3 "$root/scripts/plan-guard.py" "${evidence[@]}" < "$base.json" | tee "$base.guard.txt" || guard_status=${PIPESTATUS[0]}
   echo "$guard_status" > "$base.guard"
   python3 -c 'import json,sys; p=json.load(open(sys.argv[1])); print(sum(1 for r in p.get("resource_changes",[]) if r["change"]["actions"] not in (["no-op"],["read"])))' "$base.json" > "$base.changes"
 }
