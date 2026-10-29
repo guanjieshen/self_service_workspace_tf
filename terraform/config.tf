@@ -86,7 +86,7 @@ locals {
   # The Databricks account: the baseline's (cost.yaml), or the workspace file's.
   account_id = try(tostring(local.config.account_id), null)
   bu         = lower(try(local.workspace.bu, ""))
-  bu_upper = upper(try(local.workspace.bu, ""))
+  bu_upper   = upper(try(local.workspace.bu, ""))
   auth = {
     workspace_profile = try(local.workspace.auth.workspace_profile, null)
     account_profile   = try(local.workspace.auth.account_profile, null)
