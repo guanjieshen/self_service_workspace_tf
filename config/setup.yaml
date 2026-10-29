@@ -24,7 +24,7 @@ github_repo: null                   # <org>/<repo> that runs the pipeline (Entra
 pipeline_name: null                 # display name of the service principal CI signs in as. Default: sp-citizen-dev-terraform
 apply_approvers: null               # <org>/<team> that must approve each apply. Default: none (merging approves)
 ai_review_host: https://adb-7405612439356111.11.azuredatabricks.net   # URL (https://adb-<id>.<n>.azuredatabricks.net) of the workspace whose model reviews every plan; any workspace the pipeline can sign in to. Default: no AI review
-ai_review_model: null               # the model there, a Unity Gateway model service. Default: system.ai.claude-sonnet-5-5
+ai_review_model: system.ai.claude-opus-5-5   # the model there, a Unity Gateway model service. Default: system.ai.claude-sonnet-5-5
 
 # ---- WRITTEN BY SETUP: leave empty -------------------------------------------
 
