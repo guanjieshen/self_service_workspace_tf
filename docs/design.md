@@ -1,8 +1,10 @@
-# Citizen Development Workspace Baseline: Design
+# Design
 
 Why the project works the way it does. How to set it up is [SETUP.md](SETUP.md); how to
 change the configuration is [config/README.md](../config/README.md); the workflows are
 [github-actions.md](github-actions.md).
+
+> **Reading this to change the framework?** Read it with [AGENTS.md](../AGENTS.md), which says what to change together and how to test it.
 
 ## 1. Purpose
 
@@ -62,8 +64,8 @@ platform default. `terraform/overrides.tf` maps each setting to what it owns.
 **Governance is in the pull request, not the code.** Any default can be changed for one
 workspace. What keeps that safe:
 - **Plan guard** (`scripts/plan-guard.py`) fails the check when a plan deletes or
-  replaces something people depend on (folders, warehouses, clusters, policies, budget
-  policies, permissions, grants, catalogs), or weakens security (a setting turned off,
+  replaces something people depend on (warehouses, cluster policies, usage policies,
+  permissions, grants, catalogs), or weakens security (a setting turned off,
   deleted or loosened, a catalog opened to every workspace, a grant to everyone, more
   token creators), until someone adds the label `allow-risky-changes`.
 - **The AI review** in the plan comment lists every deviation from the baseline, old and
@@ -152,7 +154,7 @@ them from the self-service app.
 |---|---|---|
 | A1 | Restrict serverless egress (account network policy)? | Not managed |
 | A2 | Private endpoints from serverless to the organization's storage? | Not managed |
-| A3 | Budget alerts per BU (account-level)? | Not managed |
+| A3 | Budget alerts per business unit (account-level)? | Not managed |
 | A4 | Audit log delivery to the SIEM? | Not managed |
 | A5 | Personal Compute account setting: Delegate? (With On, every user can create personal clusters outside the classic cluster policies) | Not managed |
 | S1 | Compliance security profile (one-way) or enhanced security monitoring? | Neither |

@@ -41,5 +41,5 @@ This is a governed citizen development workspace ({PREFIX}). Follow these conven
 ## Sharing work
 
 - Keep work in progress in your own folder.
-- Put finished work that your team should use in your team's folder (`/Workspace/<team>`), if it has one.
+- Put finished work that your team should use in your team's folder (`/Workspace/<team>`), if the self-service app created one.
 - Name notebooks, jobs and dashboards after what they do, and add a short description of their purpose and owner.

@@ -16,7 +16,7 @@ account_id: null
 # adds a tag) under tags: in its file; null there drops the tag in that workspace.
 tags:
   BUSINESS_UNIT: "{PREFIX}"                 # the workspace's prefix, upper case
-  APPID: NONE                          # the BU's default self-service application ID, if it has one
+  APPID: NONE                          # the workspace's default self-service application ID, if it has one
   COST_CATEGORY: CITIZEN_SELF_SERVICE
 
 # Tags a user must fill in when creating a classic cluster: upper case letters, digits,

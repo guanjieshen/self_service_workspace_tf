@@ -75,7 +75,7 @@ them for you: a setting missing from your baseline is left alone).
   undone, using preflight's findings as evidence (a plan guard warning means a person must
   approve; it is not High on its own). Releases (`null`) are described as "Terraform stops
   managing it". Evaluation cases in `.github/ai/eval/` and `scripts/ai-review-eval.py` check the
-  review on eight realistic pull requests.
+  review on twelve realistic pull requests.
 
 - **A workspace is one file**, `config/workspaces/<name>.yaml`: `bu`, `host`, `groups`, and any
   baseline key it changes, at the top level. The files are the list of workspaces. Replaces the
