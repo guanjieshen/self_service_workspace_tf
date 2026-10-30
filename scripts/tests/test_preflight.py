@@ -19,8 +19,10 @@ class FakeApi:
     """GET paths -> (json, error). Everything is ready unless a test changes it."""
 
     def __init__(self, me=ADMIN, account_groups=ACCOUNT_GROUPS, local_groups=(), storage_root="abfss://ms@x/",
-                 catalog_exists=False, legacy_disabled=False, hive=(), mounts=(), clusters=()):
+                 catalog_exists=False, legacy_disabled=False, hive=(), mounts=(), clusters=(),
+                 empty_groups=(), billing_admins=("users/sp-terraform",), rule_set_error=None):
         self.me, self.account_groups, self.local_groups = me, set(account_groups), set(local_groups)
+        self.empty_groups, self.billing_admins, self.rule_set_error = set(empty_groups), list(billing_admins), rule_set_error
         self.storage_root, self.catalog_exists, self.legacy_disabled = storage_root, catalog_exists, legacy_disabled
         self.hive, self.mounts, self.clusters = hive, mounts, clusters
         self.paths = []
@@ -33,11 +35,16 @@ class FakeApi:
             return {"metastore_id": "ms-1"}, None
         if path == "/api/2.1/unity-catalog/metastores/ms-1":
             return {"name": "ms", "storage_root": self.storage_root}, None
+        if path.startswith("/api/2.0/preview/accounts/access-control/rule-sets"):
+            if self.rule_set_error:
+                return None, self.rule_set_error
+            return {"grant_rules": [{"role": "roles/billing.admin", "principals": self.billing_admins}]}, None
         for prefix, groups in (("/api/2.0/account/scim/v2/Groups", self.account_groups),
                                ("/api/2.0/preview/scim/v2/Groups", self.local_groups)):
             if path.startswith(prefix):
                 hit = [g for g in groups if f"%22{g}%22" in path]
-                return {"totalResults": len(hit)}, None
+                return {"totalResults": len(hit), "Resources": [
+                    {"displayName": g, "members": [] if g in self.empty_groups else [{"value": "1"}]} for g in hit]}, None
         if path.startswith("/api/2.1/unity-catalog/catalogs/"):
             return ({"name": path.rsplit("/", 1)[1]}, None) if self.catalog_exists else (None, "does not exist")
         if path == "/api/2.1/settings/disable_legacy_access":
@@ -168,3 +175,44 @@ class Preflight(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Guardrails(Preflight):
+    """The platform admins group has members; the identity may create usage policies."""
+
+    def setUp(self):
+        super().setUp()
+        # The baseline's account and usage policy, whatever the repository's own config/defaults/ says.
+        real = pf.wsf.workspace_info
+        p = mock.patch.object(pf.wsf, "workspace_info", lambda f: {**real(f), "account": "acct-1", "serverless_policy": True})
+        p.start()
+        self.addCleanup(p.stop)
+
+    def messages(self, api, level):
+        return [m for l, m in self.run_checks(api) if l == level]
+
+    def test_an_empty_platform_admins_group_is_a_warning(self):
+        warnings = self.messages(FakeApi(empty_groups={"fin_platform_admins"}), "warning")
+        self.assertTrue(any("fin_platform_admins (platform_admins) has no members" in w for w in warnings), warnings)
+        self.assertFalse(any("has no members" in w for w in self.messages(FakeApi(), "warning")))
+        self.assertFalse(any("has no members" in w for w in self.messages(FakeApi(empty_groups={"fin_builder"}), "warning")),
+                         "only the platform admins group must have members")
+
+    def test_creating_usage_policies_needs_billing_admin(self):
+        self.assertTrue(any("may create usage policies" in m for m in self.messages(FakeApi(), "ok")))
+        warnings = self.messages(FakeApi(billing_admins=["users/someone-else"]), "warning")
+        self.assertTrue(any("Billing admin" in w and "step 6" in w for w in warnings), "locally, a warning: " + str(warnings))
+        with mock.patch.dict(pf.os.environ, {"GITHUB_ACTIONS": "true", "ARM_CLIENT_ID": "x", "ARM_TENANT_ID": "y"}):
+            errors = self.messages(FakeApi(billing_admins=["users/someone-else"]), "error")
+        self.assertTrue(any("Billing admin" in e for e in errors), "in CI, an error before the plan: " + str(errors))
+        via_group = FakeApi(billing_admins=["groups/admins"])
+        self.assertTrue(any("may create usage policies" in m for m in self.messages(via_group, "ok")), "a group it is in counts")
+        self.assertTrue(any("could not check" in w for w in self.messages(FakeApi(rule_set_error="forbidden"), "warning")),
+                        "a rule set it cannot read is a warning, not an error")
+
+    def test_no_check_without_a_usage_policy(self):
+        with mock.patch.object(pf.wsf, "workspace_info", lambda f: {"bu": "fin", "host": "h", "catalog": None,
+                                                                     "account": "acct-1", "serverless_policy": False}):
+            api = FakeApi(billing_admins=[])
+            self.run_checks(api)
+            self.assertFalse(any("rule-sets" in p for p in api.paths))

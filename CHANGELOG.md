@@ -6,6 +6,9 @@ them for you: a setting missing from your baseline is left alone).
 
 ## Unreleased
 
+- Preflight checks that the pipeline may create usage policies (the account's **Billing admin**
+  role; an error, before the plan) and warns when the platform admins group is empty. A plan with
+  `catalog.data_classification: true` fails with why (the provider cannot send its usage policy yet).
 - Data classification is left alone by default (`catalog.data_classification: null`): the API
   now requires a `usage_policy_id` the Terraform provider cannot send yet (up to 1.140.0), so
   turning it on failed every apply. Turn it on in Catalog Explorer, with the workspace's usage policy.

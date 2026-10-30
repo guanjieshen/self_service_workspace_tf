@@ -125,3 +125,10 @@ run "bad_tag_key" {
   variables { workspace = "bad-tag-key" }
   expect_failures = [terraform_data.config_checks]
 }
+
+# Data classification cannot be turned on by Terraform yet (the provider cannot send its usage policy)
+run "classification_on" {
+  command = plan
+  variables { workspace = "classification-on" }
+  expect_failures = [terraform_data.config_checks]
+}
