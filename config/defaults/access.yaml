@@ -7,11 +7,8 @@
 # no change here. A workspace's file (config/workspaces/<name>.yaml) can change any key below for that
 # workspace only (same name and shape).
 #
-# Permission values (as shown in the Databricks UI):
-#   Warehouse:  CAN_VIEW | CAN_MONITOR | CAN_USE | CAN_MANAGE
-#   Cluster:    CAN_ATTACH_TO | CAN_RESTART | CAN_MANAGE
-#   Folder:     CAN_READ | CAN_RUN | CAN_EDIT | CAN_MANAGE
-#   null = no access
+# Warehouse permission values (as shown in the Databricks UI):
+#   CAN_VIEW | CAN_MONITOR | CAN_USE | CAN_MANAGE; null = no access
 # =============================================================================
 
 # ---- The groups --------------------------------------------------------------

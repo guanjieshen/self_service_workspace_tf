@@ -234,7 +234,7 @@ def main(argv):
     if argv == ["check"]:
         found, problems = check()
         for p in problems:
-            print(f"::error::{p}" if "GITHUB_ACTIONS" in os.environ else f"error: {p}")
+            print(f"::error::{p}" if os.environ.get("GITHUB_ACTIONS") == "true" else f"error: {p}")
         print(f"{len(found)} workspace files checked, {len(problems)} problem(s).")
         return 1 if problems else 0
     if argv[:1] == ["field"] and len(argv) == 3:

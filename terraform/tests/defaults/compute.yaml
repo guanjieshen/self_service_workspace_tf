@@ -21,7 +21,7 @@ sql_warehouse:
   size: Small                  # 2X-Small | X-Small | Small | Medium | Large | X-Large | ...
   auto_stop_minutes: 5         # stop after this many idle minutes
   min_clusters: 1              # scaling range
-  max_clusters: 2
+  max_clusters: 5
   # true = this warehouse is selected by default for every user in SQL (the admin
   # setting "Default warehouse"; users can still pick another). false = leave that setting alone.
   workspace_default: true

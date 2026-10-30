@@ -22,9 +22,10 @@ output "catalog" {
   value = try(module.catalog[0].name, null)
 }
 
-# Addresses of what this workspace leaves alone (settings set to null,
-# serverless_policy.enabled false, genie-code managed: false; terraform/overrides.tf). scripts/tf.sh removes any of them still in the state
-# before apply, and scripts/plan-guard.py reports their planned deletion as a release.
+# Addresses of what this workspace leaves alone (settings set to null, serverless_policy.enabled
+# false; terraform/overrides.tf). scripts/tf.sh removes any of them still in the state before
+# apply, and scripts/plan-guard.py reports their planned deletion as a release. The other
+# outputs are for people: ./scripts/tf.sh <workspace> output.
 output "released_addresses" {
   value = local.released_addresses
 }

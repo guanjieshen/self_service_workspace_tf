@@ -76,7 +76,7 @@ resource "databricks_aibi_dashboard_embedding_approved_domains_setting" "this" {
   depends_on = [databricks_aibi_dashboard_embedding_access_policy_setting.this]
 }
 
-# One resource per workspace configuration key, so a key can stop being managed
+# One instance per workspace configuration key (for_each), so a key can stop being managed
 # (set to null) by removing just its resource from the state. The provider erases
 # a key that disappears from a resource: removing or destroying one resets that key
 # (enable*/enforce* to "false"), which is why scripts/tf.sh releases instead.

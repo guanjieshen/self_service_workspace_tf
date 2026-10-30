@@ -23,9 +23,3 @@ def change(rtype, actions, before=None, after=None, name="this", index=None):
         rc["index"] = index
     return rc
 
-
-def render_notebook(template, values):
-    """Fill in a job notebook the way Terraform's templatefile does: ${jsonencode(name)}."""
-    import json
-    import re
-    return re.sub(r"\$\{jsonencode\((\w+)\)\}", lambda m: json.dumps(values[m.group(1)]), template)

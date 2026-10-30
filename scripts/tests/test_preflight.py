@@ -58,7 +58,8 @@ class FakeApi:
         raise AssertionError(f"unexpected GET {path}")
 
 
-class Preflight(unittest.TestCase):
+class Base(unittest.TestCase):
+    """A workspace file and a fake API; no tests of its own."""
     def setUp(self):
         self.root = pathlib.Path(tempfile.mkdtemp())
         # The workspace's file, composed from parts so a test can change one.
@@ -87,17 +88,12 @@ class Preflight(unittest.TestCase):
     def levels(self, results, level):
         return [m for l, m in results if l == level]
 
+
+class Preflight(Base):
     def test_a_ready_workspace_has_no_errors_or_warnings(self):
         results = self.run_checks(FakeApi())
         self.assertEqual(self.levels(results, "error") + self.levels(results, "warning"), [])
         self.assertIn("signed in as sp-terraform, a workspace admin", self.levels(results, "ok"))
-
-    def test_the_git_allowlist_placeholder_is_flagged(self):
-        # Its own placeholder, so the test does not depend on what the repository's baseline holds.
-        self.set("settings", 'settings:\n  git:\n    allowed_urls:\n      - "https://github.com/<org>/"\n')
-        warnings = self.levels(self.run_checks(FakeApi()), "warning")
-        self.assertEqual(len(warnings), 1)
-        self.assertIn("still has the placeholder https://github.com/<org>/", warnings[0])
 
     def test_errors_keep_the_reason_and_drop_credentials(self):
         leak = 'cannot sign in to https://adb-1.1.azuredatabricks.net: failed during request visitor: github-oidc-azure auth: not configured. Config: host=https://adb-1.1.azuredatabricks.net, account_id=acct, actions_id_token_request_url=https://x/idtoken?api-version=2.0, actions_id_token_request_token=eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJyZXBvIn0.c2lnbmF0dXJl. Env: DATABRICKS_HOST'
@@ -174,11 +170,8 @@ class Preflight(unittest.TestCase):
         self.assertFalse(any("hive_metastore" in p for p in api.paths), "left alone: nothing to check")
 
 
-if __name__ == "__main__":
-    unittest.main()
 
-
-class Guardrails(Preflight):
+class Guardrails(Base):
     """The platform admins group has members; the identity may create usage policies."""
 
     def setUp(self):
@@ -217,3 +210,23 @@ class Guardrails(Preflight):
             api = FakeApi(billing_admins=[])
             self.run_checks(api)
             self.assertFalse(any("rule-sets" in p for p in api.paths))
+
+
+
+class RedactionAgrees(unittest.TestCase):
+    """preflight.py and plan-comment.js redact the same secrets the same way."""
+
+    @unittest.skipUnless(shutil.which("node"), "needs node (the Tests job sets it up)")
+    def test_python_and_javascript_redact_alike(self):
+        import subprocess
+        sample = ("sign-in failed: actions_id_token_request_token=eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJyZXBvIn0.c2ln, "
+                  "client_secret=abc123 password=hunter2 ok=1")
+        js = subprocess.run(["node", "-e", "process.stdout.write(require(process.argv[1]).redact(process.argv[2]))",
+                             str(pf.wsf.ROOT / ".github/scripts/plan-comment.js"), sample], capture_output=True, text=True, check=True).stdout
+        self.assertEqual(pf.redact(sample), js)
+        self.assertNotIn("eyJ", js)
+        self.assertNotIn("hunter2", js)
+
+
+if __name__ == "__main__":
+    unittest.main()

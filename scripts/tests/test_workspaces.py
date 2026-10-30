@@ -1,4 +1,7 @@
 """scripts/workspaces.py: checks across the workspace files, and which workspaces a change concerns."""
+import contextlib
+import hashlib
+import io
 import json
 import pathlib
 import shutil
@@ -21,8 +24,9 @@ class Fleet(unittest.TestCase):
 
     def add(self, name, prefix="fin", account="acct-1", host=None, id_=None, catalog=None, serverless_policy=True, extra=""):
         f = self.root / f"{name}.yaml"
-        host = host or f"https://adb-{abs(hash(name)) % 10**6}.1.azuredatabricks.net"
-        id_ = id_ or str(abs(hash(name + "id")) % 10**9)
+        digits = int(hashlib.sha256(name.encode()).hexdigest(), 16)   # stable across runs, unlike hash()
+        host = host or f"https://adb-{digits % 10**6}.1.azuredatabricks.net"
+        id_ = id_ or str(digits % 10**9)
         text = f"prefix: {prefix}          # starts every name\naccount_id: \"{account}\"\nhost: {host}   # url\nid: {id_}\n"
         if catalog:
             text += f"default_catalog: null\ncatalog:\n  name: {catalog}   # metastore-wide\n"
@@ -217,6 +221,32 @@ class Affected(unittest.TestCase):
         self.change("config/workspaces/alpha.yaml")
         out = subprocess.run(["python3", str(ROOT / "scripts/workspaces.py"), "list"], capture_output=True, text=True)
         self.assertIsInstance(json.loads(out.stdout), list)
+
+
+
+class Commands(unittest.TestCase):
+    """The command line the workflow and the docs use: what each command prints and returns."""
+
+    def run_main(self, *argv):
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = ws.main(list(argv))
+        return code, out.getvalue(), err.getvalue()
+
+    def test_list_check_and_field(self):
+        code, out, _ = self.run_main("list")
+        self.assertEqual(code, 0)
+        self.assertIsInstance(json.loads(out), list)
+        code, out, _ = self.run_main("check")
+        self.assertIn(code, (0, 1))
+        self.assertRegex(out, r"\d+ workspace files checked, \d+ problem")
+
+    def test_wrong_usage_prints_how_to_use_it_and_returns_2(self):
+        for argv in ([], ["bogus"], ["affected", "only-one-ref"], ["field", "ws"]):
+            with self.subTest(argv=argv):
+                code, out, err = self.run_main(*argv)
+                self.assertEqual((code, out), (2, ""))
+                self.assertIn("workspaces.py", err)
 
 
 if __name__ == "__main__":

@@ -59,11 +59,11 @@ resource "terraform_data" "config_checks" {
     }
     precondition {
       condition     = alltrue([for p, d in merge(local.personas, { users = local.config.users }) : contains(keys(local.access_tiers), try(d.access, ""))])
-      error_message = "access.yaml: every persona's access (and users.access) must be consumer, sql or workspace."
+      error_message = "personas.<persona>.access and users.access (config/defaults/access.yaml, or the workspace's file) must be consumer, sql or workspace."
     }
     precondition {
       condition     = alltrue([for k, g in local.config.groups : g == null || can(regex("^[^\\s]", g))]) && length(local.platform_admins) > 0
-      error_message = "access.yaml groups: each must be a group name (or null for none), and platform_admins must be set."
+      error_message = "groups (config/defaults/access.yaml, or the workspace's file): each must be a group name (or null for none), and platform_admins must be set."
     }
     precondition {
       condition     = try(local.settings.compliance_security_profile, null) == null || can(tolist(local.settings.compliance_security_profile))

@@ -125,3 +125,31 @@ run "old_bu_key" {
   variables { workspace = "old-bu-key" }
   expect_failures = [terraform_data.config_checks]
 }
+
+# The serverless usage policy needs a GUID account ID
+run "bad_account_id" {
+  command = plan
+  variables { workspace = "bad-account-id" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# Collaboration_platforms.allowed is one of four values
+run "bad_collaboration_platform" {
+  command = plan
+  variables { workspace = "bad-collaboration-platform" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# Compliance_security_profile is null or a list
+run "bad_compliance_profile" {
+  command = plan
+  variables { workspace = "bad-compliance-profile" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# A persona's access is consumer, sql or workspace
+run "bad_access_tier" {
+  command = plan
+  variables { workspace = "bad-access-tier" }
+  expect_failures = [terraform_data.config_checks]
+}
