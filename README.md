@@ -86,6 +86,7 @@ Changes to the Terraform modules, scripts, or workflows are **framework changes*
 - **[Configuration reference](config/README.md)** — Which YAML file and setting to change.
 - **[Design](docs/design.md)** — The architecture and the reasoning behind it.
 - **[GitHub Actions](docs/github-actions.md)** — How checks, plans, deployments, and drift detection work.
+- **[Installing in your organization's GitHub](docs/github-enterprise.md)** — Moving the project into your own GitHub, including GitHub Enterprise.
 - **[Changelog](CHANGELOG.md)** — Changes between releases.
 - **[Contributor guidance](AGENTS.md)** — How to work on the framework itself.
 

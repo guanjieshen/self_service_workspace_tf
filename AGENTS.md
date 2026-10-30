@@ -37,6 +37,7 @@ Each topic has one home. Update that file; link to it from elsewhere instead of 
 | `docs/user-journeys.md` | Everyone | The everyday journeys, step by step: add a workspace, change one or all, give access, retire one |
 | `docs/design.md` | Maintainers, reviewers | Why it works the way it does: config model, access model, catalog, caveats, open questions, what is not built |
 | `docs/github-actions.md` | Maintainers | The workflows: how CI signs in, which workspaces a change plans and applies, runners, the plan comment, who can run code with the credentials |
+| `docs/github-enterprise.md` | Whoever installs it in their own GitHub | The from-scratch flow in a new organization, what differs per GitHub plan (issuer, subjects), self-hosted runners |
 | `CHANGELOG.md` | Everyone upgrading | What changed in each release, and what the first plan after an upgrade shows |
 | `AGENTS.md`, `agents/*.md` | Coding agents | How to change the project (this file), and one guide per folder |
 | `config/defaults/*.yaml`, `config/setup.yaml` | Whoever edits them | The comment beside each key is its documentation |

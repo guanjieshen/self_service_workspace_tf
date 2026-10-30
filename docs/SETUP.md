@@ -74,6 +74,8 @@ Two more things to know before you start; they live in their own files, not here
 
 ## 2. Put the repository in your GitHub
 
+> **On GitHub Enterprise?** Read [github-enterprise.md](github-enterprise.md) first: it covers the issuer and subject differences, self-hosted runners, and what to check.
+
 1. Create an **empty private repository** in your GitHub organization (no README, no license).
 2. Unzip the release and push it:
 
