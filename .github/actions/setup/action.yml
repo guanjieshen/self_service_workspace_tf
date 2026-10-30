@@ -13,12 +13,12 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: hashicorp/setup-terraform@v4
+    - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
       with:
         terraform_version: 1.16.5
         terraform_wrapper: false
     # The Databricks CLI calls the model for the AI review (scripts/ai-plan-review.py).
-    - uses: databricks/setup-cli@v1.21.0
+    - uses: databricks/setup-cli@2bf4520fd10723ed5a22eca62a8c8a63714a7ba9 # v1.21.0
       if: inputs.sign-in == 'true'
     - name: Sign-in settings
       if: inputs.sign-in == 'true'

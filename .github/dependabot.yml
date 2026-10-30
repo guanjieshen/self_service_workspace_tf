@@ -1,0 +1,11 @@
+# Keeps the pinned GitHub Actions (commit SHAs in .github/) up to date: one pull request a
+# month, grouped, each planned and reviewed like any other change.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directories: ["/", "/.github/actions/setup"]
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]

@@ -6,6 +6,10 @@ them for you: a setting missing from your baseline is left alone).
 
 ## Unreleased
 
+- CI hardening, no change in what it deploys: permissions per job, actions pinned to commit
+  SHAs (with Dependabot), no token kept in checkouts, time limits on every job. Less noise:
+  plans do not take the state lock (no more collisions with applies), a newer push cancels
+  older plans, fork pull requests are not planned, and an unchanged drift is not re-reported.
 - Preflight checks that the pipeline may create usage policies (the account's **Billing admin**
   role; an error, before the plan) and warns when the platform admins group is empty. A plan with
   `catalog.data_classification: true` fails with why (the provider cannot send its usage policy yet).
