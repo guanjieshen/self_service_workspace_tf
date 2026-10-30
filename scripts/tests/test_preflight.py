@@ -62,7 +62,7 @@ class Preflight(unittest.TestCase):
     def setUp(self):
         self.root = pathlib.Path(tempfile.mkdtemp())
         # The workspace's file, composed from parts so a test can change one.
-        self.parts = {"workspace": "bu: fin\nhost: https://adb-123.1.azuredatabricks.net\n",
+        self.parts = {"workspace": "prefix: fin\nhost: https://adb-123.1.azuredatabricks.net\n",
                       "settings": GIT,       # the baseline's Git allowlist is a placeholder
                       "access": GROUPS}      # each workspace names its persona groups
         self.write()
@@ -212,7 +212,7 @@ class Guardrails(Preflight):
                         "a rule set it cannot read is a warning, not an error")
 
     def test_no_check_without_a_usage_policy(self):
-        with mock.patch.object(pf.wsf, "workspace_info", lambda f: {"bu": "fin", "host": "h", "catalog": None,
+        with mock.patch.object(pf.wsf, "workspace_info", lambda f: {"prefix": "fin", "host": "h", "catalog": None,
                                                                      "account": "acct-1", "serverless_policy": False}):
             api = FakeApi(billing_admins=[])
             self.run_checks(api)

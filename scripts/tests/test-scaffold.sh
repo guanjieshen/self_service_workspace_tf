@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A workspace made the documented way (copy config/workspaces/_example.yaml, fill in bu,
+# A workspace made the documented way (copy config/workspaces/_example.yaml, fill in prefix,
 # host and groups) plans without errors, with the account ID from the baseline.
 # Works on a copy of the repository, so config/ is never touched.
 #   scripts/tests/test-scaffold.sh        (needs terraform; TERRAFORM=<path> to choose one)
@@ -10,7 +10,7 @@ tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 
 tar -C "$root" --exclude .git --exclude .terraform --exclude .state --exclude .plans \
     --exclude config/backend.hcl --exclude terraform/backend_override.tf -cf - config scripts terraform | tar -C "$tmp" -xf -
-sed -e 's/^bu: xyz /bu: scf /' \
+sed -e 's/^prefix: xyz /prefix: scf /' \
     -e 's#^host: .*#host: https://adb-2222222222222222.2.azuredatabricks.net#' \
     -e 's/^  explorer: null /  explorer: scf-explorers /' \
     "$tmp/config/workspaces/_example.yaml" > "$tmp/config/workspaces/scaffolded.yaml"

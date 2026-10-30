@@ -2,7 +2,7 @@
 # COST: the chargeback tags, and the workspace's serverless usage policy.
 #
 # Tags end up in billing records: changing a tag's value affects new usage only,
-# and renaming a key splits spend history. {BU} = business unit (upper case).
+# and renaming a key splits spend history. {PREFIX} = the workspace's prefix (upper case).
 # =============================================================================
 
 # The Databricks account (account console, top right). Usage policies are account-level, so
@@ -15,7 +15,7 @@ account_id: null
 # rename a tag here; nothing else needs to change. A workspace changes a value (or
 # adds a tag) under tags: in its file; null there drops the tag in that workspace.
 tags:
-  BUSINESS_UNIT: "{BU}"                 # the workspace's bu, upper case
+  BUSINESS_UNIT: "{PREFIX}"                 # the workspace's prefix, upper case
   APP_ID: NONE                          # the BU's default self-service application ID, if it has one
   COST_CATEGORY: CITIZEN_SELF_SERVICE
 
@@ -37,4 +37,4 @@ serverless_policy:
   # When someone may use several policies and does not pick one, Databricks uses the
   # first name alphabetically: the "0" makes this one the fallback, so usage is
   # charged to a project only when someone picks that project's policy.
-  name: "{BU}-0-SELF-SERVICE"
+  name: "{PREFIX}-0-SELF-SERVICE"

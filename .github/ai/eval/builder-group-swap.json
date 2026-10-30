@@ -17,7 +17,7 @@
  "state": "update",
  "changed_files": "- config/workspaces/self_service_1.yaml: this workspace's file",
  "config_diff": " groups:\n-  builder: ss1-cd-builders\n+  builder: ss1-data-builders",
- "workspace_file": "bu: ss1\nhost: https://adb-1234567890123456.7.azuredatabricks.net\ngroups:\n  users: ss1-cd-users\n  explorer: ss1-cd-explorers\n  builder: ss1-data-builders\n  publisher: null\ncatalog:\n  storage_root: abfss://catalogs@examplestorage.dfs.core.windows.net/self_service_1\nsql_warehouse:\n  size: X-Small",
+ "workspace_file": "prefix: ss1\nhost: https://adb-1234567890123456.7.azuredatabricks.net\ngroups:\n  users: ss1-cd-users\n  explorer: ss1-cd-explorers\n  builder: ss1-data-builders\n  publisher: null\ncatalog:\n  storage_root: abfss://catalogs@examplestorage.dfs.core.windows.net/self_service_1\nsql_warehouse:\n  size: X-Small",
  "plan": [
   {
    "address": "module.personas.databricks_permission_assignment.this[\"ss1-cd-builders\"]",

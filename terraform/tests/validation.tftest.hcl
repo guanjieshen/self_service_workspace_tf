@@ -118,3 +118,10 @@ run "bad_tag_key" {
   variables { workspace = "bad-tag-key" }
   expect_failures = [terraform_data.config_checks]
 }
+
+# The old key bu (renamed to prefix) fails with its name, instead of being ignored
+run "old_bu_key" {
+  command = plan
+  variables { workspace = "old-bu-key" }
+  expect_failures = [terraform_data.config_checks]
+}

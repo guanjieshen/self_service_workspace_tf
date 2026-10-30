@@ -39,8 +39,8 @@ locals {
   ws_file = "${coalesce(var.workspaces_dir, "${local.project_root}/config/workspaces")}/${var.workspace}.yaml"
   ws_all  = try({ for k, v in yamldecode(file(local.ws_file)) : k => v }, {})
   # Keys only a workspace has, besides the baseline's own sections.
-  workspace_keys = ["bu", "host", "id", "label", "auth", "genie_code_instructions"]
-  workspace      = { for k in ["bu", "host", "id", "label", "auth"] : k => local.ws_all[k] if contains(keys(local.ws_all), k) }
+  workspace_keys = ["prefix", "host", "id", "label", "auth", "genie_code_instructions"]
+  workspace      = { for k in ["prefix", "host", "id", "label", "auth"] : k => local.ws_all[k] if contains(keys(local.ws_all), k) }
   # Keys that are neither a baseline section nor a workspace key (usually a typo).
   unknown_keys = [for k in keys(local.ws_all) : k if !contains(concat(local.defaults_sections, local.workspace_keys), k)]
 
@@ -80,9 +80,9 @@ locals {
   workspace_id = try(tostring(local.workspace.id), regex("adb-([0-9]+)\\.", local.workspace.host)[0], null)
 
   # The Databricks account: the baseline's (config/defaults/cost.yaml), or the workspace file's.
-  account_id = try(tostring(local.config.account_id), null)
-  bu         = lower(try(local.workspace.bu, ""))
-  bu_upper   = upper(try(local.workspace.bu, ""))
+  account_id   = try(tostring(local.config.account_id), null)
+  prefix       = lower(try(local.workspace.prefix, ""))
+  prefix_upper = upper(try(local.workspace.prefix, ""))
   auth = {
     workspace_profile = try(local.workspace.auth.workspace_profile, null)
     account_profile   = try(local.workspace.auth.account_profile, null)

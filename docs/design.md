@@ -48,7 +48,7 @@ default by setting the same top-level key as the baseline** (every key is define
 one file of `config/defaults/`). Maps merge key by key, a list or
 value replaces, and `null` means "Terraform leaves this alone". A key the baseline does
 not have fails the plan with its name, so a typo cannot silently do nothing. A few keys
-exist only in a workspace's file: `bu`, `host`, `label`, `genie_code_instructions`.
+exist only in a workspace's file: `prefix`, `host`, `label`, `genie_code_instructions`.
 See config/README.md for the files and a task table.
 
 **Leaving a setting alone releases it.** On a workspace that was already applied, a
@@ -81,7 +81,7 @@ workspace. What keeps that safe:
 | explorer (`groups.explorer`) | SQL access | Can use | User | By request (app) | USE CATALOG, USE SCHEMA |
 | builder (`groups.builder`) | Workspace and SQL access | Can use | User | By request (app) | same |
 | publisher (`groups.publisher`) | Workspace and SQL access | Can use | User | By request (app) | same |
-| platform admins (`{bu}_platform_admins`) | Workspace admin | Manage | User, manager | Yes (workspace admins) | Owner; all privileges |
+| platform admins (`{prefix}_platform_admins`) | Workspace admin | Manage | User, manager | Yes (workspace admins) | Owner; all privileges |
 
 - Entitlements are tiers, each including the one before: Consumer access (Databricks One
   only) < SQL access (plus the SQL editor, queries, dashboards and Genie) < workspace
@@ -101,7 +101,7 @@ workspace. What keeps that safe:
   Catalog and usage policies cannot use groups that exist only in a workspace
   ([docs](https://learn.microsoft.com/en-us/azure/databricks/admin/users-groups/workspace-local-groups)).
 - Each workspace names its own persona groups (`groups:` in its file); only
-  `{bu}_platform_admins` comes from the baseline. A persona without a group is skipped.
+  `{prefix}_platform_admins` comes from the baseline. A persona without a group is skipped.
 
 **Requests.** Three paths, by volume and risk:
 
@@ -113,7 +113,7 @@ workspace. What keeps that safe:
 
 ## 5. The workspace catalog
 
-Each workspace gets one catalog, `{bu}_citizen_dev` (`config/defaults/catalog.yaml`),
+Each workspace gets one catalog, `{prefix}_citizen_dev` (`config/defaults/catalog.yaml`),
 bound to the workspace and owned by the platform admins group, with predictive
 optimization on. Its schemas are not Terraform's: people get
 them from the self-service app.
@@ -135,7 +135,7 @@ them from the self-service app.
    (the drift check reports them first).
 3. **Usage policies tag usage; they do not cap spend.** A user with several policies who
    does not choose gets the first alphabetically, so the workspace's policy is named
-   `{BU}-0-SELF-SERVICE`: project policies from the app apply only when picked. Policies
+   `{PREFIX}-0-SELF-SERVICE`: project policies from the app apply only when picked. Policies
    need an account-level permission for the CI identity; without it, set
    `serverless_policy.enabled: false`.
 4. **The SQL statement timeout** manages the workspace-wide SQL configuration as a whole.
@@ -186,6 +186,6 @@ Catalogs shared between workspaces, storage credentials and external locations s
 
 Schemas and workspace folders are requested through the self-service app, which lives in its own repository and deploys its own jobs. What it relies on here:
 
-- **The workspace catalog** (`{bu}_citizen_dev`), owned by the platform admins group. Personas have only `USE CATALOG` and `USE SCHEMA` on it; the app grants on the schemas it creates.
+- **The workspace catalog** (`{prefix}_citizen_dev`), owned by the platform admins group. Personas have only `USE CATALOG` and `USE SCHEMA` on it; the app grants on the schemas it creates.
 - **Catalog grants are authoritative:** a privilege granted on the catalog outside this repository is removed on the next apply. The app's service principal needs a privilege on the catalog (for example `CREATE SCHEMA`): add it to the catalog grants in `config/defaults/catalog.yaml`, not by hand.
 - **The persona groups** each workspace names in its file.

@@ -27,7 +27,7 @@ request; nothing reaches a workspace until it is merged. The one-time setup is i
    and fill in:
 
    ```yaml
-   bu: hr
+   prefix: hr
    host: https://adb-6543210987654321.3.azuredatabricks.net
    groups:
      users: hr-cd-users

@@ -8,7 +8,7 @@
 # =============================================================================
 
 catalog:
-  name: "{bu}_citizen_dev"           # {bu} = the workspace's business unit code, lower case
+  name: "{prefix}_citizen_dev"           # {prefix} = the workspace's prefix, lower case
   comment: Citizen development catalog (managed by citizen_dev_terraform)
   # Where managed tables are stored. null = the metastore's default storage; a
   # metastore without one needs an external location here, for example

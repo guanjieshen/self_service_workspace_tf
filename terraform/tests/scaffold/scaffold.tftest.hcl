@@ -15,8 +15,8 @@ run "scaffolded_workspace" {
   command = plan
 
   assert {
-    condition     = local.bu == "scf" && local.workspace_id == "2222222222222222" && local.account_id == "00000000-0000-0000-0000-000000000000"
-    error_message = "bu and host come from the workspace's file, the workspace ID from the host, the account ID from the baseline."
+    condition     = local.prefix == "scf" && local.workspace_id == "2222222222222222" && local.account_id == "00000000-0000-0000-0000-000000000000"
+    error_message = "prefix and host come from the workspace's file, the workspace ID from the host, the account ID from the baseline."
   }
   assert {
     condition     = local.persona_groups == { explorer = ["scf-explorers"] } && local.platform_admins == tolist(["scf_platform_admins"])
@@ -24,7 +24,7 @@ run "scaffolded_workspace" {
   }
   assert {
     condition     = local.catalog.name == "scf_citizen_dev" && local.chargeback_tags.BUSINESS_UNIT == "SCF"
-    error_message = "The catalog is named from bu, and so is the BUSINESS_UNIT tag."
+    error_message = "The catalog is named from the prefix, and so is the BUSINESS_UNIT tag."
   }
 }
 

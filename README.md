@@ -44,7 +44,7 @@ Each workspace gets:
 | Path | What it is |
 | --- | --- |
 | `config/defaults/` | The baseline every workspace gets: `access`, `compute`, `cost`, `catalog`, `settings` `.yaml`, `genie-code/` |
-| `config/workspaces/<name>.yaml` | One file per workspace: `bu`, `host`, its groups, and any change to the baseline. The files are the list of workspaces |
+| `config/workspaces/<name>.yaml` | One file per workspace: `prefix`, `host`, its groups, and any change to the baseline. The files are the list of workspaces |
 | `config/setup.yaml` | The setup values ([docs/SETUP.md](docs/SETUP.md), step 1), and which workspace's model reviews plans |
 | `config/backend.hcl`, `.github/CODEOWNERS` | Where state is kept (written by `setup.py state`), who approves what |
 | `terraform/` | The root module and modules. You do not edit these for normal operations |

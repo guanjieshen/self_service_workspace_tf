@@ -1,5 +1,5 @@
 variable "names" {
-  description = "Name substitutions: {BU}, {bu}."
+  description = "Name substitutions: {PREFIX}, {prefix}."
   type        = map(string)
 }
 

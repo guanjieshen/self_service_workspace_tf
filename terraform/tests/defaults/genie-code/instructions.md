@@ -8,7 +8,7 @@ config/workspaces/<name>.yaml); they are appended below these.
 Skills (for specific tasks) are in skills/ next to this file.
 
 - Write plain Markdown, as you would brief a new colleague.
-- Placeholders filled in per workspace: {BU}, {CATALOG}, {WAREHOUSE}, {TAGS} (every chargeback tag), {WORKSPACE_TAGS} (the ones set for you, with their values).
+- Placeholders filled in per workspace: {PREFIX}, {CATALOG}, {WAREHOUSE}, {TAGS} (every chargeback tag), {WORKSPACE_TAGS} (the ones set for you, with their values).
 - Comments like this one are removed before deploying.
 - Deployed under the heading "Default instructions"; a workspace's own
   instructions follow under "Workspace instructions". Start sections here at ##.
@@ -17,7 +17,7 @@ Skills (for specific tasks) are in skills/ next to this file.
 - Workspace admins cannot keep manual edits: the next apply restores this text.
 =============================================================================
 -->
-This is a governed citizen development workspace for the {BU} business unit. Follow these conventions in everything you suggest or generate.
+This is a governed citizen development workspace ({PREFIX}). Follow these conventions in everything you suggest or generate.
 
 ## Data
 
@@ -30,13 +30,13 @@ This is a governed citizen development workspace for the {BU} business unit. Fol
 
 - For SQL, use the `{WAREHOUSE}` SQL warehouse.
 - For notebooks, jobs and pipelines, prefer serverless compute.
-- Classic compute is the exception. When it is needed, use the classic cluster policy for the kind of cluster: `{BU} Classic Interactive` for notebooks, `{BU} Classic Jobs` for job clusters, `{BU} Classic Pipelines` for pipelines (access is requested through the self-service app). Each sets the tags and limits, and asks for the tags you fill in; each allows one cluster per person.
+- Classic compute is the exception. When it is needed, use the classic cluster policy for the kind of cluster: `{PREFIX} Classic Interactive` for notebooks, `{PREFIX} Classic Jobs` for job clusters, `{PREFIX} Classic Pipelines` for pipelines (access is requested through the self-service app). Each sets the tags and limits, and asks for the tags you fill in; each allows one cluster per person.
 - Avoid the Personal Compute policy for shared or scheduled work: its clusters do not carry the chargeback tags.
 
 ## Cost attribution
 
 - Every workload is charged back with the tags {TAGS}. Set for you: {WORKSPACE_TAGS}. Keep the tags on any cluster or job you define.
-- For serverless jobs, pipelines and notebooks, select a serverless usage policy: `{BU}-0-SELF-SERVICE` for general work, or your project's policy if you have one.
+- For serverless jobs, pipelines and notebooks, select a serverless usage policy: `{PREFIX}-0-SELF-SERVICE` for general work, or your project's policy if you have one.
 
 ## Sharing work
 

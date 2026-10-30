@@ -90,7 +90,7 @@ run "genie_code_workspace_parts" {
   }
   assert {
     condition     = strcontains(local.genie_instructions, "Use the TST warehouse TST Default Warehouse and the catalog tst_citizen_dev; tags `APP_ID` = `TST-APP`, `BUSINESS_UNIT` = `TST`, `COST_CENTER` = `CC-42`.")
-    error_message = "Placeholders in the workspace instructions are filled ({BU}, {WAREHOUSE}, {CATALOG}, {WORKSPACE_TAGS})."
+    error_message = "Placeholders in the workspace instructions are filled ({PREFIX}, {WAREHOUSE}, {CATALOG}, {WORKSPACE_TAGS})."
   }
   assert {
     condition     = !strcontains(local.genie_instructions, "must not be deployed")
@@ -177,7 +177,7 @@ run "some_groups" {
   }
   assert {
     condition     = local.platform_admins == tolist(["tst_platform_admins"])
-    error_message = "The platform admins group comes from the baseline: {bu}_platform_admins."
+    error_message = "The platform admins group comes from the baseline: {prefix}_platform_admins."
   }
   assert {
     condition     = local.serverless_policies.self_service.groups == tolist(["tst-explorers", "tst_platform_admins"])

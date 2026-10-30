@@ -59,7 +59,7 @@ resource "databricks_workspace_setting_v2" "default_warehouse" {
 }
 
 resource "databricks_sql_endpoint" "default" {
-  name                      = replace(replace(local.wh.name, "{BU}", var.names.BU), "{bu}", var.names.bu)
+  name                      = replace(replace(local.wh.name, "{PREFIX}", var.names.PREFIX), "{prefix}", var.names.prefix)
   cluster_size              = local.wh.size
   min_num_clusters          = local.wh.min_clusters
   max_num_clusters          = local.wh.max_clusters
@@ -112,7 +112,7 @@ resource "databricks_permissions" "starter_warehouse" {
 # managing their permissions would remove the app's grants. Workspace admins can always use them.
 resource "databricks_cluster_policy" "classic" {
   for_each              = local.policy_kinds
-  name                  = replace(replace(each.value.name, "{BU}", var.names.BU), "{bu}", var.names.bu)
+  name                  = replace(replace(each.value.name, "{PREFIX}", var.names.PREFIX), "{prefix}", var.names.prefix)
   definition            = jsonencode(local.policy_definitions[each.key])
   max_clusters_per_user = each.value.max_clusters_per_user
 }

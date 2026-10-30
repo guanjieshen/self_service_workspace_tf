@@ -17,11 +17,11 @@
 # ---- The groups --------------------------------------------------------------
 # Account groups (Entra ID groups synced to the Databricks account): Unity Catalog
 # and serverless usage policies cannot use groups that exist only in a workspace.
-# Only the platform admins are named the same way everywhere ({bu} = the workspace's
-# business unit code, lower case). Each workspace names its own persona groups in its
+# Only the platform admins are named the same way everywhere ({prefix} = the workspace's
+# prefix, lower case). Each workspace names its own persona groups in its
 # file (groups:); a persona without a group is skipped: nobody gets it, and nothing fails.
 groups:
-  platform_admins: "{bu}_platform_admins"   # workspace admins; own the workspace catalog
+  platform_admins: "{prefix}_platform_admins"   # workspace admins; own the workspace catalog
   users: null                               # everyone who may use the workspace (consumer access)
   explorer: null
   builder: null

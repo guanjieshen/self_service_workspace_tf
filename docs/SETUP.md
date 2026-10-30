@@ -12,7 +12,7 @@ This guide takes the repository from a zip file to its first governed workspace.
 | 4 | [The pipeline identity](#4-the-pipeline-identity) | Entra admin | Once |
 | 5 | [Repository settings](#5-repository-settings) | GitHub organization admin | Once |
 | 6 | [Databricks account (by hand)](#6-databricks-account-by-hand) | Databricks account admin | Once, then per workspace |
-| 7 | [Groups](#7-groups) | Identity team | Per business unit |
+| 7 | [Groups](#7-groups) | Identity team | Per workspace |
 | 8 | [Decide the baseline](#8-decide-the-baseline) | Platform team, security | Once, before the first apply |
 | 9 | [Onboard a workspace](#9-onboard-a-workspace) | Platform team | Per workspace |
 | 10 | [Day to day](#10-day-to-day) | Platform team | Ongoing |
@@ -68,9 +68,9 @@ Two more things to know before you start; they live in their own files, not here
 | What | Example | Who | Where it goes |
 | --- | --- | --- | --- |
 | The network path to the workspaces | Public, IP access list or Private Link | Cloud team | Step 5: a runner, if not public |
-| For each workspace: name, business unit code, URL | `fin-citizen-dev`, `fin`, `https://adb-....azuredatabricks.net` | Platform team | Step 9: its file |
+| For each workspace: name, prefix (starts every name Terraform creates there), URL | `fin-citizen-dev`, `fin`, `https://adb-....azuredatabricks.net` | Platform team | Step 9: its file |
 | The Databricks account ID | `00000000-...` | Databricks account admin | Step 8: `account_id` in `config/defaults/cost.yaml` |
-| For each workspace: its persona groups; for each business unit: `{bu}_platform_admins` | `fin_platform_admins`, `fin-cd-explorers`, ... | Identity team | Step 7; persona groups in each workspace's file |
+| For each workspace: its persona groups; for each business unit: `{prefix}_platform_admins` | `fin_platform_admins`, `fin-cd-explorers`, ... | Identity team | Step 7; persona groups in each workspace's file |
 
 ## 2. Put the repository in your GitHub
 
@@ -163,14 +163,14 @@ Create Entra ID groups and sync them to the Databricks account (automatic identi
 
 | Group | Named | Gets |
 | --- | --- | --- |
-| Platform admins | `{bu}_platform_admins`, one per business unit (the baseline) | Workspace admin; owns the workspace catalog |
+| Platform admins | `{prefix}_platform_admins`, one per workspace prefix (the baseline) | Workspace admin; owns the workspace catalog |
 | Users | Per workspace, in its file (`groups.users`) | Consumer access (Databricks One): dashboards, Genie spaces, apps |
 | Explorers | Per workspace (`groups.explorer`) | SQL access: the SQL editor, queries, dashboards, Genie |
 | Builders, publishers | Per workspace (`groups.builder`, `groups.publisher`) | Workspace access: notebooks, jobs, pipelines on serverless; classic compute only through the self-service app |
 
 A workspace that leaves a persona's group `null` simply has nobody with that persona.
 
-Put the BU's platform team in `{bu}_platform_admins`: it manages the workspace's serverless usage policy and owns its catalog, and nobody outside the policy's groups can see the policy (workspace admin is not enough). Preflight warns while the group is empty.
+Put the BU's platform team in `{prefix}_platform_admins`: it manages the workspace's serverless usage policy and owns its catalog, and nobody outside the policy's groups can see the policy (workspace admin is not enough). Preflight warns while the group is empty.
 
 ## 8. Decide the baseline
 
@@ -185,11 +185,11 @@ The baseline in `config/defaults/` is what every workspace gets. Most of it is a
 | Collaboration platforms | `defaults/settings.yaml` `collaboration_platforms.allowed` | `ALLOW_TEAMS` | `ALLOW_ALL`, `ALLOW_SLACK`, `ALLOW_TEAMS` or `DENY_ALL` |
 | Dashboard embedding domains | `defaults/settings.yaml` `dashboard_embedding.approved_domains` | none | For example your SharePoint domain |
 | Personal access tokens | `defaults/settings.yaml` `personal_access_tokens`, `defaults/access.yaml` `personas.<persona>.can_create_tokens` | On, 90 days, no persona may create them | Only admins create tokens unless a persona is allowed |
-| Platform admins group name | `defaults/access.yaml` `groups.platform_admins` | `{bu}_platform_admins` | Match your Entra naming convention; `{bu}` is the workspace's business unit code. Persona groups are named per workspace |
+| Platform admins group name | `defaults/access.yaml` `groups.platform_admins` | `{prefix}_platform_admins` | Match your Entra naming convention; `{prefix}` is the workspace's prefix. Persona groups are named per workspace |
 | Databricks account | `defaults/cost.yaml` `account_id` | none | Required while the serverless usage policy is on (account console, top right) |
-| Chargeback tags | `defaults/cost.yaml` `tags`, `classic_user_tags` | `BUSINESS_UNIT` (from `bu`), `APP_ID: NONE`, `COST_CATEGORY: CITIZEN_SELF_SERVICE`; users fill in `APP_ID`, `TEAM`, `PROJECT` on classic clusters | One list, on the usage policy, the warehouse and classic clusters. Each workspace sets its own `APP_ID` (`tags:` in its file). Changing them later affects new usage only |
-| Serverless usage policy | `defaults/cost.yaml` `serverless_policy` | On, `{BU}-0-SELF-SERVICE`, every persona | Needs an account-level permission for the pipeline (step 6); set `enabled: false` if you will not grant it. Data classification (turned on by hand, step 9) uses it |
-| Catalog name and features | `defaults/catalog.yaml` `catalog` | `{bu}_citizen_dev`, predictive optimization on | `catalog.storage_root` is needed when the metastore has no storage root (preflight says so) |
+| Chargeback tags | `defaults/cost.yaml` `tags`, `classic_user_tags` | `BUSINESS_UNIT` (from `prefix`), `APP_ID: NONE`, `COST_CATEGORY: CITIZEN_SELF_SERVICE`; users fill in `APP_ID`, `TEAM`, `PROJECT` on classic clusters | One list, on the usage policy, the warehouse and classic clusters. Each workspace sets its own `APP_ID` (`tags:` in its file). Changing them later affects new usage only |
+| Serverless usage policy | `defaults/cost.yaml` `serverless_policy` | On, `{PREFIX}-0-SELF-SERVICE`, every persona | Needs an account-level permission for the pipeline (step 6); set `enabled: false` if you will not grant it. Data classification (turned on by hand, step 9) uses it |
+| Catalog name and features | `defaults/catalog.yaml` `catalog` | `{prefix}_citizen_dev`, predictive optimization on | `catalog.storage_root` is needed when the metastore has no storage root (preflight says so) |
 | Restrict workspace admins | `defaults/settings.yaml` `restrict_workspace_admins` | `false` | Needs account admin to change; leave `false` |
 | AI review of each plan | `config/setup.yaml` `ai_review_host`, `ai_review_model` | Off until a host is set; then `system.ai.claude-sonnet-5-5` there | Advice in the plan comment only. One workspace that has the model reviews every plan; the pipeline's service principal needs to be in it, with `EXECUTE` on the model (account users have it on `system.ai` by default) |
 
@@ -201,7 +201,7 @@ What each setting does is in the comment beside it, and in [config/README.md](..
 
 Before you start: the workspace exists and the runners can reach it (its private endpoint and DNS), the pipeline's service principal is workspace admin there (step 6, item 2), and its persona groups exist in Entra ID (step 7).
 
-1. **Create its file:** copy `config/workspaces/_example.yaml` to `config/workspaces/fin-citizen-dev.yaml` and fill in `bu`, `host` and `groups`. The file name is the workspace's name in this repository.
+1. **Create its file:** copy `config/workspaces/_example.yaml` to `config/workspaces/fin-citizen-dev.yaml` and fill in `prefix`, `host` and `groups`. The file name is the workspace's name in this repository.
 2. **Set anything that differs from the baseline**, in the same file (for example `catalog.storage_root`, or `null` for `settings.disable_legacy_access`, `disable_dbfs_root_and_mounts` and `enforce_user_isolation` for an existing workspace that is not ready). Leave the rest out.
 3. **Check it is ready** (optional; the pull request runs it too), signed in with the Azure or Databricks CLI:
 
@@ -212,8 +212,8 @@ Before you start: the workspace exists and the runners can reach it (its private
    It checks the sign-in and admin rights, the metastore, that every group is an account group, the catalog's storage, what still uses legacy access, and placeholders left in the baseline.
 4. **Open a pull request.** The deploy workflow plans only this workspace and posts its plan: everything the first apply creates. Preflight problems are at the top of the comment.
 5. **Merge.** After the approval step (if `apply-approval` has reviewers), the workspace is deployed.
-6. **Verify:** the next pull request that touches it (or the Monday drift check) shows no changes. In the workspace: the persona groups under Settings > Identity and access, the `<BU> Default Warehouse`, and the `{bu}_citizen_dev` catalog.
-7. **By hand, in Catalog Explorer** (`{bu}_citizen_dev` > Details), as a member of `{bu}_platform_admins`: turn on **Data Classification**, with the workspace's usage policy `<BU>-0-SELF-SERVICE`, and **Data Quality Monitoring** for the schemas it lists. Terraform does not manage either (classification's API needs a usage policy the Terraform provider cannot send; monitoring is per schema, and schemas come from the self-service app). Turn monitoring on again for schemas created later.
+6. **Verify:** the next pull request that touches it (or the Monday drift check) shows no changes. In the workspace: the persona groups under Settings > Identity and access, the `<PREFIX> Default Warehouse`, and the `{prefix}_citizen_dev` catalog.
+7. **By hand, in Catalog Explorer** (`{prefix}_citizen_dev` > Details), as a member of `{prefix}_platform_admins`: turn on **Data Classification**, with the workspace's usage policy `<PREFIX>-0-SELF-SERVICE`, and **Data Quality Monitoring** for the schemas it lists. Terraform does not manage either (classification's API needs a usage policy the Terraform provider cannot send; monitoring is per schema, and schemas come from the self-service app). Turn monitoring on again for schemas created later.
 8. **By hand, in Workspace settings > Appearance:** the workspace theme's categorical colors and the Genie One color and welcome message, with the values in `config/defaults/settings.yaml` ("Appearance: set by hand"). There is no API for them yet.
 
 > [!WARNING]

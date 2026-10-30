@@ -1,5 +1,5 @@
 # Test fixture: basic (one workspace file).
-bu: tst
+prefix: tst
 account_id: 00000000-0000-0000-0000-000000000000
 host: https://adb-1111111111111111.1.azuredatabricks.net
 id: 1111111111111111

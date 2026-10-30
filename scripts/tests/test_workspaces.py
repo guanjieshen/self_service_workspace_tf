@@ -19,11 +19,11 @@ class Fleet(unittest.TestCase):
         self.root = pathlib.Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.root)
 
-    def add(self, name, bu="fin", account="acct-1", host=None, id_=None, catalog=None, serverless_policy=True, extra=""):
+    def add(self, name, prefix="fin", account="acct-1", host=None, id_=None, catalog=None, serverless_policy=True, extra=""):
         f = self.root / f"{name}.yaml"
         host = host or f"https://adb-{abs(hash(name)) % 10**6}.1.azuredatabricks.net"
         id_ = id_ or str(abs(hash(name + "id")) % 10**9)
-        text = f"bu: {bu}          # business unit\naccount_id: \"{account}\"\nhost: {host}   # url\nid: {id_}\n"
+        text = f"prefix: {prefix}          # starts every name\naccount_id: \"{account}\"\nhost: {host}   # url\nid: {id_}\n"
         if catalog:
             text += f"default_catalog: null\ncatalog:\n  name: {catalog}   # metastore-wide\n"
         if not serverless_policy:
@@ -35,49 +35,49 @@ class Fleet(unittest.TestCase):
         return ws.check(self.root)[1]
 
     def test_distinct_workspaces_pass(self):
-        self.add("fin-dev", bu="fin", catalog="fin_dev")
-        self.add("hr-dev", bu="hr", catalog="hr_dev")
-        self.add("_example", bu="fin", catalog="fin_dev")  # templates are not workspaces
+        self.add("fin-dev", prefix="fin", catalog="fin_dev")
+        self.add("hr-dev", prefix="hr", catalog="hr_dev")
+        self.add("_example", prefix="fin", catalog="fin_dev")  # templates are not workspaces
         self.assertEqual(self.problems(), [])
 
     def test_same_host_or_id(self):
-        self.add("a", bu="a", host="https://adb-1.1.azuredatabricks.net", id_="1")
-        self.add("b", bu="b", host="https://adb-1.1.azuredatabricks.net/", id_="1")
+        self.add("a", prefix="a", host="https://adb-1.1.azuredatabricks.net", id_="1")
+        self.add("b", prefix="b", host="https://adb-1.1.azuredatabricks.net/", id_="1")
         got = self.problems()
         self.assertEqual(len(got), 2, got)
         self.assertTrue(any("same host" in p for p in got) and any("same workspace id" in p for p in got))
 
     def test_same_default_catalog(self):
-        # Without a catalog name, both get the baseline's {bu}_citizen_dev.
-        self.add("fin-dev", bu="fin", account="acct-1", serverless_policy=False)
-        b = self.add("fin-prd", bu="fin", account="acct-2", serverless_policy=False)
+        # Without a catalog name, both get the baseline's {prefix}_citizen_dev.
+        self.add("fin-dev", prefix="fin", account="acct-1", serverless_policy=False)
+        b = self.add("fin-prd", prefix="fin", account="acct-2", serverless_policy=False)
         self.assertIn("same catalog name (fin_citizen_dev)", " ".join(self.problems()))
         b.write_text(b.read_text() + "catalog: null   # no catalog here\n")
         self.assertEqual(self.problems(), [])
 
     def test_the_id_read_from_the_host_is_compared_too(self):
-        self.add("a", bu="a", host="https://adb-7.1.azuredatabricks.net", catalog="a_cd")
-        b = self.add("b", bu="b", host="https://adb-7.1.azuredatabricks.net", catalog="b_cd")
+        self.add("a", prefix="a", host="https://adb-7.1.azuredatabricks.net", catalog="a_cd")
+        b = self.add("b", prefix="b", host="https://adb-7.1.azuredatabricks.net", catalog="b_cd")
         for f in (self.root / "a.yaml", b):
             f.write_text(f.read_text().replace("\nid: ", "\n# id: "))
         self.assertIn("same workspace id (7)", " ".join(self.problems()))
 
     def test_same_catalog(self):
-        self.add("a", bu="a", catalog="shared_cat")
-        self.add("b", bu="b", catalog="shared_cat")
+        self.add("a", prefix="a", catalog="shared_cat")
+        self.add("b", prefix="b", catalog="shared_cat")
         self.assertIn("same catalog name (shared_cat)", " ".join(self.problems()))
 
     def test_same_bu_on_one_account_collides_on_the_usage_policy(self):
-        self.add("fin-dev", bu="fin", catalog="fin_dev")
-        self.add("fin-prd", bu="FIN", catalog="fin_prd")
+        self.add("fin-dev", prefix="fin", catalog="fin_dev")
+        self.add("fin-prd", prefix="FIN", catalog="fin_prd")
         got = self.problems()
         self.assertEqual(len(got), 1, got)
         self.assertIn("FIN-0-SELF-SERVICE", got[0])
 
     def test_same_bu_is_fine_on_another_account_or_without_the_usage_policy(self):
-        self.add("fin-dev", bu="fin", account="acct-1", catalog="fin_dev")
-        self.add("fin-prd", bu="fin", account="acct-2", catalog="fin_prd")
-        self.add("fin-test", bu="fin", account="acct-1", serverless_policy=False, catalog="fin_test")
+        self.add("fin-dev", prefix="fin", account="acct-1", catalog="fin_dev")
+        self.add("fin-prd", prefix="fin", account="acct-2", catalog="fin_prd")
+        self.add("fin-test", prefix="fin", account="acct-1", serverless_policy=False, catalog="fin_test")
         self.assertEqual(self.problems(), [])
 
     def test_unsafe_file_names(self):
@@ -99,20 +99,20 @@ class Fleet(unittest.TestCase):
         # dev/workspaces/ holds the workspaces that test the framework; names are unique across both.
         config, dev = self.root / "config", self.root / "dev"
         config.mkdir(), dev.mkdir()
-        (config / "org-ws.yaml").write_text("bu: o\nhost: https://org-ws\nid: o1\n")
-        (dev / "dev-ws.yaml").write_text("bu: d\nhost: https://dev-ws\nid: d1\n")
+        (config / "org-ws.yaml").write_text("prefix: o\nhost: https://org-ws\nid: o1\n")
+        (dev / "dev-ws.yaml").write_text("prefix: d\nhost: https://dev-ws\nid: d1\n")
         with mock.patch.object(ws, "WORKSPACES", config), mock.patch.object(ws, "DEV_WORKSPACES", dev):
             self.assertEqual(ws.ws_file("dev-ws"), dev / "dev-ws.yaml")
             self.assertEqual(ws.names(), ["dev-ws", "org-ws"])
             self.assertEqual(ws.check()[1], [])
-            (dev / "org-ws.yaml").write_text("bu: z\nhost: https://other\nid: z1\n")
+            (dev / "org-ws.yaml").write_text("prefix: z\nhost: https://other\nid: z1\n")
             self.assertIn("org-ws is in both", " ".join(ws.check()[1]))
             with self.assertRaises(SystemExit):
                 ws.ws_file("org-ws")
 
     def test_the_account_comes_from_the_baseline_unless_the_file_sets_it(self):
         f = self.root / "a.yaml"
-        f.write_text("bu: a\nhost: https://adb-1.1.azuredatabricks.net\n")
+        f.write_text("prefix: a\nhost: https://adb-1.1.azuredatabricks.net\n")
         baseline = self.root / "defaults"
         baseline.mkdir()
         (baseline / "cost.yaml").write_text("account_id: acct-base   # the account\n")
@@ -134,9 +134,9 @@ class Affected(unittest.TestCase):
         for d in ("config/workspaces", "config/defaults", "dev/workspaces", "terraform/tests", "docs"):
             (self.repo / d).mkdir(parents=True)
         for name in ("alpha", "beta"):
-            (self.repo / f"config/workspaces/{name}.yaml").write_text(f"bu: {name}\n")
-        (self.repo / "config/workspaces/_example.yaml").write_text("bu: xyz\n")
-        (self.repo / "dev/workspaces/gamma.yaml").write_text("bu: gamma\n")
+            (self.repo / f"config/workspaces/{name}.yaml").write_text(f"prefix: {name}\n")
+        (self.repo / "config/workspaces/_example.yaml").write_text("prefix: xyz\n")
+        (self.repo / "dev/workspaces/gamma.yaml").write_text("prefix: gamma\n")
         for f in ("config/defaults/settings.yaml", "terraform/main.tf", "terraform/tests/x.tftest.hcl", "docs/x.md"):
             (self.repo / f).write_text("x\n")
         self.git("init", "-q", "-b", "main")
@@ -157,7 +157,7 @@ class Affected(unittest.TestCase):
         for p in paths:
             f = self.repo / p
             f.parent.mkdir(parents=True, exist_ok=True)
-            f.write_text(f.read_text() + "y\n" if f.exists() else "bu: new\n")
+            f.write_text(f.read_text() + "y\n" if f.exists() else "prefix: new\n")
         for p in delete:
             (self.repo / p).unlink()
         self.git("add", "-A")
@@ -198,7 +198,7 @@ class Affected(unittest.TestCase):
         self.assertEqual(self.affected(), {"workspaces": [], "removed": ["beta"]})
 
     def test_a_workspace_moved_to_dev_is_not_removed(self):
-        (self.repo / "dev/workspaces/beta.yaml").write_text("bu: beta\n")
+        (self.repo / "dev/workspaces/beta.yaml").write_text("prefix: beta\n")
         self.change(delete=["config/workspaces/beta.yaml"])
         self.assertEqual(self.affected(), {"workspaces": ["beta"], "removed": []})
 

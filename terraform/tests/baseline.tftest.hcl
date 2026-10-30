@@ -20,15 +20,15 @@ run "names_and_tags" {
   command = plan
 
   assert {
-    condition     = local.bu == "tst" && local.bu_upper == "TST" && local.chargeback_tags == { BUSINESS_UNIT = "TST", APP_ID = "TST-APP", COST_CATEGORY = "CITIZEN_SELF_SERVICE" }
-    error_message = "The chargeback tags are the baseline's tags: with BUSINESS_UNIT from bu ({BU}) and the workspace's own APP_ID. Got: ${jsonencode(local.chargeback_tags)}"
+    condition     = local.prefix == "tst" && local.prefix_upper == "TST" && local.chargeback_tags == { BUSINESS_UNIT = "TST", APP_ID = "TST-APP", COST_CATEGORY = "CITIZEN_SELF_SERVICE" }
+    error_message = "The chargeback tags are the baseline's tags: with BUSINESS_UNIT from the prefix ({PREFIX}) and the workspace's own APP_ID. Got: ${jsonencode(local.chargeback_tags)}"
   }
   assert {
     condition     = local.account_host == "https://accounts.azuredatabricks.net"
     error_message = "An Azure workspace uses the Azure account console (AWS and GCP hosts get theirs)."
   }
   assert {
-    condition     = local.config.sql_warehouse.name == "{BU} Default Warehouse" && local.config.sql_warehouse.type == "serverless"
+    condition     = local.config.sql_warehouse.name == "{PREFIX} Default Warehouse" && local.config.sql_warehouse.type == "serverless"
     error_message = "The default warehouse comes from the baseline."
   }
   assert {
@@ -45,9 +45,9 @@ run "names_and_tags" {
   }
   assert {
     condition = (
-      local.config.cluster_policy.interactive.name == "{BU} Classic Interactive" &&
-      local.config.cluster_policy.jobs.name == "{BU} Classic Jobs" &&
-      local.config.cluster_policy.pipelines.name == "{BU} Classic Pipelines" &&
+      local.config.cluster_policy.interactive.name == "{PREFIX} Classic Interactive" &&
+      local.config.cluster_policy.jobs.name == "{PREFIX} Classic Jobs" &&
+      local.config.cluster_policy.pipelines.name == "{PREFIX} Classic Pipelines" &&
       alltrue([for k in ["interactive", "jobs", "pipelines"] : local.config.cluster_policy[k].max_clusters_per_user == 1]) &&
       tolist(local.config.cluster_policy.access_modes) == tolist(["STANDARD"])
     )
@@ -123,7 +123,7 @@ run "serverless_usage_policy" {
 
   assert {
     condition     = tolist(keys(local.serverless_policies)) == tolist(["self_service"]) && local.serverless_policies.self_service.name == "TST-0-SELF-SERVICE"
-    error_message = "One usage policy per workspace, named {BU}-0-SELF-SERVICE (first alphabetically, so it is the fallback)."
+    error_message = "One usage policy per workspace, named {PREFIX}-0-SELF-SERVICE (first alphabetically, so it is the fallback)."
   }
   assert {
     condition     = local.serverless_policies.self_service.tags == local.chargeback_tags
@@ -160,7 +160,7 @@ run "workspace_settings" {
   }
   assert {
     condition     = length(module.catalog) == 1 && local.catalog.name == "tst_citizen_dev" && local.catalog.owner == "tst-admins" && local.default_catalog == null
-    error_message = "Every workspace gets one catalog, {bu}_citizen_dev, owned by the platform admins group; no default catalog until set."
+    error_message = "Every workspace gets one catalog, {prefix}_citizen_dev, owned by the platform admins group; no default catalog until set."
   }
   assert {
     condition = alltrue([

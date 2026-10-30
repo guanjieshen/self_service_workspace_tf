@@ -6,6 +6,10 @@ them for you: a setting missing from your baseline is left alone).
 
 ## Unreleased
 
+- **`bu` is now `prefix`** in workspace files, and the placeholders `{bu}` / `{BU}` are `{prefix}` /
+  `{PREFIX}`: it is the short code that starts every name Terraform creates in a workspace. Rename
+  the key in each workspace file (and the placeholders in `config/defaults/`); the plan shows no
+  changes. A file that still says `bu:` fails the plan with its name.
 - The plan comment reads like a review: the AI writes a risk summary, what it means, what changes
   (a before/after table) and what to review, adapted to the risk; **Before merging** comes from
   the plan guard alone (only when it flagged something); the guard's findings, the changed

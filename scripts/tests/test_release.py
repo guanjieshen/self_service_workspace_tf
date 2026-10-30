@@ -128,7 +128,7 @@ class TfShRelease(unittest.TestCase):
             shutil.copy(SCRIPTS / f, self.repo / "scripts")
         (self.repo / "terraform").mkdir()
         (self.repo / "config/workspaces").mkdir(parents=True)
-        (self.repo / "config/workspaces/ws.yaml").write_text("bu: x\n")
+        (self.repo / "config/workspaces/ws.yaml").write_text("prefix: x\n")
         self.fake = self.repo / "fake"
         self.fake.mkdir()
         tf = self.fake / "terraform"
