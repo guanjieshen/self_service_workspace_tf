@@ -1,8 +1,8 @@
-# AGENTS.md
+# Working on this repository
 
-Guidance for coding agents (and people) working in this repository. Read this first, then
-the guide in [`agents/`](agents/) for the folder you are changing. All agent guidance lives
-there; the AGENTS.md files in `terraform/` and `config/` only point to it.
+Guidance for **coding agents and people** changing the framework: the Terraform, the scripts, the workflows and the docs. If you only need to configure workspaces, start with the [README](README.md) and [config/README.md](config/README.md) instead.
+
+> **Start here.** Read this file, then the guide for the folder you are changing. All agent guidance lives in [`agents/`](agents/); the AGENTS.md files in `terraform/` and `config/` only point to it.
 
 | You are changing | Read |
 | --- | --- |
@@ -37,6 +37,7 @@ Each topic has one home. Update that file; link to it from elsewhere instead of 
 | `docs/user-journeys.md` | Everyone | The everyday journeys, step by step: add a workspace, change one or all, give access, retire one |
 | `docs/design.md` | Maintainers, reviewers | Why it works the way it does: config model, access model, catalog, caveats, open questions, what is not built |
 | `docs/github-actions.md` | Maintainers | The workflows: how CI signs in, which workspaces a change plans and applies, runners, the plan comment, who can run code with the credentials |
+| `docs/github-enterprise.md` | Whoever installs it in their own GitHub | The from-scratch flow in a new organization, what differs per GitHub plan (issuer, subjects), self-hosted runners |
 | `CHANGELOG.md` | Everyone upgrading | What changed in each release, and what the first plan after an upgrade shows |
 | `AGENTS.md`, `agents/*.md` | Coding agents | How to change the project (this file), and one guide per folder |
 | `config/defaults/*.yaml`, `config/setup.yaml` | Whoever edits them | The comment beside each key is its documentation |
@@ -128,11 +129,18 @@ further step. When you add something:
 
 ## Writing style
 
-- Plain words in comments, error messages and docs: say what happens and why, for someone
-  who has not read the code.
+Write for someone who has not read the code. The [README](README.md) is the model for every markdown file:
+
+- **Lead with what matters.** Open with one or two sentences on what the page is for, and put a `> **New to …?**` or `> **Start here.**` callout where a reader needs a pointer.
+- **Tables for anything with more than two parts:** steps (with who does them), paths, options, "You want to… / Where to make the change".
+- **Bold the key phrase** in a sentence or a cell, not whole sentences.
+- **Short sentences, plain words, sentence case headings.** Say what happens and why.
+- **One home per topic.** Link to it instead of repeating it.
+
+In code:
+
 - Comments explain why, not what. Match the comment density of the file you are in.
 - Error messages name the setting, the file and what to do.
-- Docs: no em dashes; short sections; tables for options.
 
 ## Gotchas learned the hard way
 
