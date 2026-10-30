@@ -1,0 +1,96 @@
+{
+ "description": "The baseline adds a chargeback tag, COST_CENTER, to every workspace's policy and warehouse.",
+ "expected_risk": [
+  "Low"
+ ],
+ "must_mention": [
+  [
+   "COST_CENTER"
+  ]
+ ],
+ "must_not_mention": [
+  "break"
+ ],
+ "state": "update",
+ "changed_files": "- config/defaults/cost.yaml: baseline (affects every workspace)",
+ "config_diff": "--- a/config/defaults/cost.yaml\n+++ b/config/defaults/cost.yaml\n tags:\n   BUSINESS_UNIT: \"{BU}\"\n   APP_ID: NONE\n   COST_CATEGORY: CITIZEN_SELF_SERVICE\n+  COST_CENTER: UNASSIGNED              # finance asked for it on every workspace",
+ "workspace_file": "bu: ss1\nhost: https://adb-1234567890123456.7.azuredatabricks.net\ngroups:\n  users: ss1-cd-users\n  explorer: ss1-cd-explorers\n  builder: ss1-cd-builders\n  publisher: null\ncatalog:\n  storage_root: abfss://catalogs@examplestorage.dfs.core.windows.net/self_service_1\nsql_warehouse:\n  size: X-Small",
+ "plan": [
+  {
+   "address": "module.compute.databricks_sql_endpoint.default",
+   "mode": "managed",
+   "type": "databricks_sql_endpoint",
+   "name": "default",
+   "change": {
+    "actions": [
+     "update"
+    ],
+    "before": {
+     "tags": [
+      {
+       "custom_tags": [
+        {
+         "key": "BUSINESS_UNIT",
+         "value": "SS1"
+        }
+       ]
+      }
+     ]
+    },
+    "after": {
+     "tags": [
+      {
+       "custom_tags": [
+        {
+         "key": "BUSINESS_UNIT",
+         "value": "SS1"
+        },
+        {
+         "key": "COST_CENTER",
+         "value": "UNASSIGNED"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "address": "module.budget_policies[0].databricks_budget_policy.this[\"self_service\"]",
+   "mode": "managed",
+   "type": "databricks_budget_policy",
+   "name": "this",
+   "change": {
+    "actions": [
+     "update"
+    ],
+    "before": {
+     "policy_name": "SS1-0-SELF-SERVICE",
+     "custom_tags": [
+      {
+       "key": "BUSINESS_UNIT",
+       "value": "SS1"
+      }
+     ]
+    },
+    "after": {
+     "policy_name": "SS1-0-SELF-SERVICE",
+     "custom_tags": [
+      {
+       "key": "BUSINESS_UNIT",
+       "value": "SS1"
+      },
+      {
+       "key": "COST_CENTER",
+       "value": "UNASSIGNED"
+      }
+     ]
+    }
+   },
+   "index": "self_service"
+  }
+ ],
+ "plan_guard": "",
+ "preflight": "ok: signed in as the pipeline, a workspace admin\nok: metastore sandbox_canadacentral\nok: account group ss1-cd-users (users)\nok: account group ss1-cd-explorers (explorer)\nok: account group ss1-cd-builders (builder)\nok: no publisher group: skipped (nobody gets it in this workspace)\nok: account group ss1_platform_admins (platform_admins)\nok: nothing found that still uses legacy access (Hive metastore, DBFS mounts, legacy clusters)",
+ "workspace": "self_service_1 (https://adb-1234567890123456.7.azuredatabricks.net)"
+}

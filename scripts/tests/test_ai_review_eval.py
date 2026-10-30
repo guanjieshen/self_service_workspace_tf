@@ -6,15 +6,13 @@ from helpers import ROOT, load
 
 ev = load("ai-review-eval")
 CASES = sorted(p.stem for p in (ROOT / ".github/ai/eval").glob("*.json") if not p.name.endswith(".plan.json"))
-GOOD = """**Risk:** 🟢 **Low**: the default warehouse grows; nothing is removed.
+GOOD = """**🟢 Low risk: the default warehouse gets bigger**
+SS1 Default Warehouse in this workspace grows from X-Small to Small: more capacity, nothing removed.
 
-#### What changes
-| | Change | Details | Affects |
-|---|---|---|---|
-| ✏️ | SS1 Default Warehouse | X-Small → Small | explorers, builders |
-
-#### Check before merging
-Nothing stands out."""
+### What's changing?
+| Setting | Before | After |
+|---|---|---|
+| SS1 Default Warehouse size | X-Small | Small |"""
 
 
 class Cases(unittest.TestCase):
@@ -51,9 +49,14 @@ class Checks(unittest.TestCase):
     def test_format_and_generic_advice_are_caught(self):
         case = {"expected_risk": ["Low"], "must_mention": [], "must_not_mention": []}
         results = {c: ok for c, ok, _ in ev.check(case, "Risk: Low. Please review carefully.")}
-        self.assertFalse(results["risk line"])
-        self.assertFalse(results["table"])
+        self.assertFalse(results["risk summary"])
+        self.assertFalse(results["what's changing"])
         self.assertFalse(results["avoids 'review carefully'"])
+        # What the comment shows itself, and the sections a Medium or High answer needs.
+        high = GOOD.replace("🟢 Low", "🔴 High") + "\nAdd the label allow-risky-changes."
+        results = {c: ok for c, ok, _ in ev.check({**case, "expected_risk": ["High"]}, high)}
+        self.assertFalse(results["leaves 'allow-risky-changes' to the comment"])
+        self.assertFalse(results["### What should you review?"])
 
 
 if __name__ == "__main__":

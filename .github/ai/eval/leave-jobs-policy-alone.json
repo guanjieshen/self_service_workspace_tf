@@ -9,11 +9,12 @@
    "SS1 Classic Jobs"
   ],
   [
-   "stays",
-   "keeps",
+   "stay",
+   "keep",
+   "kept",
    "unmanaged",
    "not deleted",
-   "remains"
+   "remain"
   ]
  ],
  "must_not_mention": [

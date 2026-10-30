@@ -1,0 +1,112 @@
+{
+ "description": "The default warehouse changes from serverless to pro, which replaces it with a new ID.",
+ "expected_risk": [
+  "High"
+ ],
+ "must_mention": [
+  [
+   "SS1 Default Warehouse"
+  ],
+  [
+   "new ID",
+   "dashboards",
+   "alerts",
+   "jobs"
+  ]
+ ],
+ "must_not_mention": [
+  "data will be lost",
+  "loses its data",
+  "deletes the data"
+ ],
+ "state": "update",
+ "changed_files": "- config/workspaces/self_service_1.yaml: this workspace's file",
+ "config_diff": " sql_warehouse:\n   size: X-Small\n+  type: pro",
+ "workspace_file": "bu: ss1\nhost: https://adb-1234567890123456.7.azuredatabricks.net\ngroups:\n  users: ss1-cd-users\n  explorer: ss1-cd-explorers\n  builder: ss1-cd-builders\n  publisher: null\ncatalog:\n  storage_root: abfss://catalogs@examplestorage.dfs.core.windows.net/self_service_1\nsql_warehouse:\n  size: X-Small\n  type: pro",
+ "plan": [
+  {
+   "address": "module.compute.databricks_sql_endpoint.default",
+   "mode": "managed",
+   "type": "databricks_sql_endpoint",
+   "name": "default",
+   "change": {
+    "actions": [
+     "delete",
+     "create"
+    ],
+    "before": {
+     "name": "SS1 Default Warehouse",
+     "cluster_size": "X-Small",
+     "warehouse_type": "PRO",
+     "enable_serverless_compute": true,
+     "min_num_clusters": 1,
+     "max_num_clusters": 5,
+     "auto_stop_mins": 5
+    },
+    "after": {
+     "name": "SS1 Default Warehouse",
+     "cluster_size": "X-Small",
+     "warehouse_type": "PRO",
+     "enable_serverless_compute": false,
+     "min_num_clusters": 1,
+     "max_num_clusters": 5,
+     "auto_stop_mins": 5
+    }
+   }
+  },
+  {
+   "address": "module.compute.databricks_permissions.default_warehouse[0]",
+   "mode": "managed",
+   "type": "databricks_permissions",
+   "name": "default_warehouse",
+   "change": {
+    "actions": [
+     "delete",
+     "create"
+    ],
+    "before": {
+     "access_control": [
+      {
+       "group_name": "ss1-cd-builders",
+       "permission_level": "CAN_USE"
+      }
+     ]
+    },
+    "after": {
+     "access_control": [
+      {
+       "group_name": "ss1-cd-builders",
+       "permission_level": "CAN_USE"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "address": "module.compute.databricks_workspace_setting_v2.default_warehouse[0]",
+   "mode": "managed",
+   "type": "databricks_workspace_setting_v2",
+   "name": "default_warehouse",
+   "change": {
+    "actions": [
+     "update"
+    ],
+    "before": {
+     "name": "default_warehouse_id",
+     "string_val": {
+      "value": "abc123"
+     }
+    },
+    "after": {
+     "name": "default_warehouse_id",
+     "string_val": {
+      "value": null
+     }
+    }
+   }
+  }
+ ],
+ "plan_guard": "Needs approval: 2 changes that are hard to undo or weaken security\n(a person adds the label allow-risky-changes once they have reviewed them):\n  - REPLACE SQL warehouse (new ID; dashboards and alerts using it break)\n      module.compute.databricks_sql_endpoint.default\n  - REPLACE permissions (everyone listed loses that access)\n      module.compute.databricks_permissions.default_warehouse[0]",
+ "preflight": "ok: signed in as the pipeline, a workspace admin\nok: metastore sandbox_canadacentral\nok: account group ss1-cd-users (users)\nok: account group ss1-cd-explorers (explorer)\nok: account group ss1-cd-builders (builder)\nok: no publisher group: skipped (nobody gets it in this workspace)\nok: account group ss1_platform_admins (platform_admins)\nok: nothing found that still uses legacy access (Hive metastore, DBFS mounts, legacy clusters)",
+ "workspace": "self_service_1 (https://adb-1234567890123456.7.azuredatabricks.net)"
+}

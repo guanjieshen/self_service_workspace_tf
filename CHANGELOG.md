@@ -6,6 +6,11 @@ them for you: a setting missing from your baseline is left alone).
 
 ## Unreleased
 
+- The plan comment reads like a review: the AI writes a risk summary, what it means, what changes
+  (a before/after table) and what to review, adapted to the risk; **Before merging** comes from
+  the plan guard alone (only when it flagged something); the guard's findings, the changed
+  resources and the plan move to a collapsed **Technical details**. The guard prints a plain
+  header instead of an ASCII banner. Enforcement is unchanged.
 - The AI review also reads the Terraform code and CHANGELOG diff (`<code_diff>`), so a
   framework change is explained instead of reported as unexplained drift, and is calibrated
   against false alarms: a security change made on purpose with a reason is Medium, the

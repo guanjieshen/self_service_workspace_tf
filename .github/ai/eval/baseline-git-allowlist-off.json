@@ -62,7 +62,7 @@
    "index": "projectsAllowList"
   }
  ],
- "plan_guard": "This plan contains changes that are hard or impossible to undo:\n\n  - LOOSEN workspace setting enableProjectsAllowList: true -> false\n      module.workspace_settings.databricks_workspace_conf.key[\"enableProjectsAllowList\"]\n  - DELETE workspace configuration (enable*/enforce* keys reset to false)\n      module.workspace_settings.databricks_workspace_conf.key[\"projectsAllowList\"]",
+ "plan_guard": "Needs approval: 2 changes that are hard to undo or weaken security\n(a person adds the label allow-risky-changes once they have reviewed them):\n  - LOOSEN workspace setting enableProjectsAllowList: true -> false\n      module.workspace_settings.databricks_workspace_conf.key[\"enableProjectsAllowList\"]\n  - DELETE workspace configuration (enable*/enforce* keys reset to false)\n      module.workspace_settings.databricks_workspace_conf.key[\"projectsAllowList\"]",
  "preflight": "ok: signed in as the pipeline, a workspace admin\nok: metastore sandbox_canadacentral\nok: account group ss1-cd-users (users)\nok: account group ss1-cd-explorers (explorer)\nok: account group ss1-cd-builders (builder)\nok: no publisher group: skipped (nobody gets it in this workspace)\nok: account group ss1_platform_admins (platform_admins)\nok: nothing found that still uses legacy access (Hive metastore, DBFS mounts, legacy clusters)",
  "workspace": "self_service_1 (https://adb-1234567890123456.7.azuredatabricks.net)"
 }

@@ -32,9 +32,12 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 CASES = ROOT / ".github/ai/eval"
 OUT = ROOT / ".ai-eval"
 PINNED = ROOT / "terraform/tests/defaults"
-MAX_WORDS = 240                       # the prompt asks for under 220; a little slack for tables
+MAX_WORDS = 250                       # Medium and High: the prompt asks for under 220; slack for tables
+MAX_WORDS_LOW = 120                   # Low: the prompt asks for under 90
+MAX_WORDS_FIRST = 290                 # a first apply: the table lists a whole baseline
 LEVELS = ("Low", "Medium", "High")
-GENERIC = ["review carefully", "test first", "confirm this is intended", "double-check", "as always"]
+GENERIC = ["review carefully", "test first", "double-check", "as always", "attack surface",
+           "potential security implications", "best practices", "critical", "dangerous"]
 
 sys.path.insert(0, str(ROOT / "scripts"))
 import importlib.util  # noqa: E402
@@ -69,16 +72,23 @@ def inputs_for(case):
 
 
 def check(case, answer):
-    """[(check, passed, detail)]."""
+    """[(check, passed, detail)]: the format the comment expects, the risk level, and the content."""
     out = []
-    m = re.search(r"^\*\*Risk:\*\* \S+ \*\*(Low|Medium|High)\*\*", answer, re.M)
+    first = answer.lstrip().splitlines()[0] if answer.strip() else ""
+    m = re.match(r"^\*\*(?:🟢|🟡|🔴) (Low|Medium|High) risk: .+\*\*$", first)
     level = m.group(1) if m else None
-    out.append(("risk line", m is not None and answer.lstrip().startswith("**Risk:**"), level or "missing"))
+    out.append(("risk summary", m is not None, level or f"missing: {first[:60]!r}"))
     out.append(("risk level", level in case["expected_risk"], f"{level} (expected {'/'.join(case['expected_risk'])})"))
-    out.append(("table", "| | Change | Details | Affects |\n|---|---|---|---|" in answer, ""))
-    out.append(("check section", "#### Check before merging" in answer, ""))
+    out.append(("what's changing", "### What's changing?" in answer and re.search(r"(?m)^\|.*\|$", answer) is not None, ""))
+    if level in ("Medium", "High"):
+        for section in ("### What does this mean?", "### What should you review?"):
+            out.append((section, section in answer, ""))
     words = len(re.findall(r"\w+", answer))
-    out.append(("length", words <= MAX_WORDS, f"{words} words"))
+    limit = MAX_WORDS_LOW if level == "Low" else MAX_WORDS_FIRST if case.get("state") == "first" else MAX_WORDS
+    out.append(("length", words <= limit, f"{words} words (at most {limit})"))
+    # What the comment around the review shows: never repeated by it.
+    for word in ("allow-risky-changes", "Before merging", "<details", "AI-generated", "module.", "!!!"):
+        out.append((f"leaves '{word}' to the comment", word not in answer, ""))
     low = answer.lower()
     for group in case["must_mention"]:
         out.append((f"mentions {' / '.join(group)}", any(g.lower() in low for g in group), ""))

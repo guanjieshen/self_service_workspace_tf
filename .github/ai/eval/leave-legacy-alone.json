@@ -22,7 +22,8 @@
  ],
  "must_not_mention": [
   "this pr enables legacy access",
-  "re-enables legacy access"
+  "this pr re-enables",
+  "this change re-enables"
  ],
  "preflight": "ok: signed in as the pipeline, a workspace admin\nok: metastore sandbox_canadacentral\nok: account group ss1-cd-users (users)\nok: account group ss1-cd-explorers (explorer)\nok: account group ss1-cd-builders (builder)\nok: no publisher group: skipped (nobody gets it in this workspace)\nok: account group ss1_platform_admins (platform_admins)\nok: legacy access is already disabled",
  "state": "update",
