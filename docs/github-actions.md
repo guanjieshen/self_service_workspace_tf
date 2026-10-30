@@ -73,7 +73,7 @@ The jobs that reach Databricks or the state use `TERRAFORM_RUNNER`. The checks a
 
 ## Hardening and noise
 
-- **Permissions per job.** The workflow grants nothing; each job asks for what it uses: `id-token: write` only where it signs in (plan, apply, retire, drift), `pull-requests: write` only for the plan comment, `issues: write` only for the drift issue.
+- **Permissions per job.** The workflow grants nothing; each job asks for what it uses: `id-token: write` only where it signs in (plan, apply, retire, drift), `pull-requests: write` only for the plan and retire comments, `issues: write` only for the drift issue.
 - **Pinned actions.** Every third-party action is pinned to a commit SHA, with its version in a comment; Dependabot (`.github/dependabot.yml`) proposes updates once a month, as one pull request. `scripts/tests/test_workflows.py` fails on an unpinned action, a job without its own permissions or time limit, or a plan that takes the state lock.
 - **No token left in the checkout** (`persist-credentials: false`), except in the apply job, which asks the remote whether `main` moved on before a re-run.
 - **Time limits** on every job, so a hung self-hosted runner does not hold a workspace's apply for hours.

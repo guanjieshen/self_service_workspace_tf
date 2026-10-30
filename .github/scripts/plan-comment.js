@@ -80,16 +80,36 @@ function worthPosting(ws, dir = '.plans') {
   return read('.changes') !== '0' || /^error:/m.test(read('.preflight.txt'));
 }
 
-// Creates the workspace's comment, or updates it on later pushes (an existing comment is
-// updated even when there is nothing to show any more, so it never goes stale).
-async function post({ github, context }, ws, endpoint, dir = '.plans') {
-  const body = buildBody(ws, endpoint, dir);
+// What merging a pull request that deletes a workspace's file does. Retirement plans
+// nothing (Terraform only forgets the workspace), so this comment stands in for the plan.
+function retireBody(ws) {
+  return [
+    marker(ws),
+    `### Retire: \`${ws}\``,
+    `This pull request deletes \`config/workspaces/${ws}.yaml\`. When it is merged, the workspace's Terraform state is deleted and this repository stops managing it.`,
+    '**Nothing in the workspace changes:** its settings, groups, catalog and data stay as they are, and nobody keeps them at the baseline any more. ' +
+      'Deleting the workspace itself is a separate decision, outside this repository.',
+    'Retired by mistake? Restore the state file from the storage account\'s blob versions, then restore the workspace file (docs/SETUP.md, troubleshooting).',
+  ].join('\n\n');
+}
+
+// Creates the workspace's comment, or updates it on later pushes. An existing comment is
+// updated even when there is nothing to show any more, so it never goes stale.
+async function upsert({ github, context }, ws, body, create) {
   const { owner, repo } = context.repo;
   const issue_number = context.issue.number;
   const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
   const mine = comments.find((c) => c.body.startsWith(marker(ws)));
   if (mine) await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
-  else if (worthPosting(ws, dir)) await github.rest.issues.createComment({ owner, repo, issue_number, body });
+  else if (create) await github.rest.issues.createComment({ owner, repo, issue_number, body });
 }
 
-module.exports = { buildBody, post, worthPosting, redact };
+async function post(ctx, ws, endpoint, dir = '.plans') {
+  await upsert(ctx, ws, buildBody(ws, endpoint, dir), worthPosting(ws, dir));
+}
+
+async function postRetire(ctx, ws) {
+  await upsert(ctx, ws, retireBody(ws), true);
+}
+
+module.exports = { buildBody, retireBody, post, postRetire, worthPosting, redact };

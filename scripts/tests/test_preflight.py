@@ -22,11 +22,16 @@ class FakeApi:
 
     def __init__(self, me=ADMIN, account_groups=ACCOUNT_GROUPS, local_groups=(), storage_root="abfss://ms@x/",
                  catalog_exists=False, legacy_disabled=False, hive=(), mounts=(), clusters=(),
-                 empty_groups=(), billing_admins=("users/sp-terraform",), rule_set_error=None):
+                 empty_groups=(), billing_admins=("users/sp-terraform",), rule_set_error=None,
+                 metastore_owner="uc-admins", catalog_owner="sp-terraform", metastore_rights=("CREATE_CATALOG",),
+                 locations=(("catalogs", "abfss://catalogs@acct.dfs.core.windows.net/", "uc-admins"),),
+                 location_rights=("CREATE_MANAGED_STORAGE",)):
         self.me, self.account_groups, self.local_groups = me, set(account_groups), set(local_groups)
         self.empty_groups, self.billing_admins, self.rule_set_error = set(empty_groups), list(billing_admins), rule_set_error
         self.storage_root, self.catalog_exists, self.legacy_disabled = storage_root, catalog_exists, legacy_disabled
         self.hive, self.mounts, self.clusters = hive, mounts, clusters
+        self.metastore_owner, self.catalog_owner, self.metastore_rights = metastore_owner, catalog_owner, metastore_rights
+        self.locations, self.location_rights = locations, location_rights
         self.paths = []
 
     def __call__(self, path):
@@ -36,7 +41,12 @@ class FakeApi:
         if path == "/api/2.1/unity-catalog/current-metastore-assignment":
             return {"metastore_id": "ms-1"}, None
         if path == "/api/2.1/unity-catalog/metastores/ms-1":
-            return {"name": "ms", "storage_root": self.storage_root}, None
+            return {"name": "ms", "storage_root": self.storage_root, "owner": self.metastore_owner}, None
+        for securable, rights in (("metastore", self.metastore_rights), ("external_location", self.location_rights)):
+            if path.startswith(f"/api/2.1/unity-catalog/effective-permissions/{securable}/"):
+                return {"privilege_assignments": [{"principal": "sp-terraform", "privileges": [{"privilege": r} for r in rights]}]}, None
+        if path.startswith("/api/2.1/unity-catalog/external-locations"):
+            return {"external_locations": [{"name": n, "url": u, "owner": o} for n, u, o in self.locations]}, None
         if path.startswith("/api/2.0/preview/accounts/access-control/rule-sets"):
             if self.rule_set_error:
                 return None, self.rule_set_error
@@ -48,7 +58,7 @@ class FakeApi:
                 return {"totalResults": len(hit), "Resources": [
                     {"displayName": g, "members": [] if g in self.empty_groups else [{"value": "1"}]} for g in hit]}, None
         if path.startswith("/api/2.1/unity-catalog/catalogs/"):
-            return ({"name": path.rsplit("/", 1)[1]}, None) if self.catalog_exists else (None, "does not exist")
+            return ({"name": path.rsplit("/", 1)[1], "owner": self.catalog_owner}, None) if self.catalog_exists else (None, "does not exist")
         if path == "/api/2.1/settings/disable_legacy_access":
             return {"disable_legacy_access": {"value": self.legacy_disabled}}, None
         if path.startswith("/api/2.1/unity-catalog/schemas?catalog_name=hive_metastore"):
@@ -151,6 +161,28 @@ class Preflight(Base):
         self.assertIn("the metastore has no storage root", " ".join(self.levels(self.run_checks(FakeApi(storage_root=None)), "error")))
         self.set("catalog", "catalog:\n  storage_root: abfss://catalogs@acct.dfs.core.windows.net/fin\n")
         self.assertEqual(self.levels(self.run_checks(FakeApi(storage_root=None)), "error"), [])
+
+    def test_the_pipeline_may_create_the_catalog_then_owns_it(self):
+        api = FakeApi(metastore_rights=())
+        self.assertIn("cannot create catalog fin_citizen_dev", " ".join(self.levels(self.run_checks(api), "warning")))
+        self.assertTrue(any("effective-permissions/metastore/ms-1?principal=sp-terraform" in p for p in api.paths))
+        self.assertEqual(self.levels(self.run_checks(FakeApi(metastore_rights=(), metastore_owner="account users")), "warning"), [],
+                         "a metastore admin (here every account user) needs no grant")
+        api = FakeApi(catalog_exists=True, catalog_owner="fin_platform_admins", metastore_rights=())
+        warnings = " ".join(self.levels(self.run_checks(api), "warning"))
+        self.assertIn("does not own catalog fin_citizen_dev", warnings)
+        self.assertIn("ALTER CATALOG fin_citizen_dev OWNER TO `sp-terraform`", warnings)
+        self.assertFalse(any("effective-permissions" in p for p in api.paths), "an existing catalog needs no CREATE CATALOG")
+        with mock.patch.dict(pf.os.environ, {"GITHUB_ACTIONS": "true", "ARM_CLIENT_ID": "x", "ARM_TENANT_ID": "y"}):
+            self.assertIn("does not own catalog fin_citizen_dev", " ".join(self.levels(self.run_checks(api), "error")),
+                          "in CI the pipeline is the one signed in: an error")
+
+    def test_a_catalog_in_an_external_location_needs_managed_storage(self):
+        self.set("catalog", "catalog:\n  storage_root: abfss://catalogs@acct.dfs.core.windows.net/fin\n")
+        results = self.run_checks(FakeApi())
+        self.assertIn("sp-terraform may store catalog fin_citizen_dev in external location catalogs", self.levels(results, "ok"))
+        self.assertIn("CREATE MANAGED STORAGE", " ".join(self.levels(self.run_checks(FakeApi(location_rights=())), "warning")))
+        self.assertIn("no external location covers", " ".join(self.levels(self.run_checks(FakeApi(locations=())), "error")))
 
     def test_an_existing_catalog_needs_no_storage(self):
         self.assertEqual(self.levels(self.run_checks(FakeApi(storage_root=None, catalog_exists=True)), "error"), [])

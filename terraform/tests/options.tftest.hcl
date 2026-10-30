@@ -67,6 +67,10 @@ run "catalog_and_settings" {
     error_message = "catalog.yaml names the catalog."
   }
   assert {
+    condition     = local.catalog.owner == "tst-admins" && local.catalog_grants["11111111-2222-3333-4444-555555555555"] == tolist(["CREATE_SCHEMA", "USE_CATALOG"]) && local.catalog_grants["tst-admins"] == tolist(["ALL_PRIVILEGES", "MANAGE"])
+    error_message = "catalog.owner can name a key of groups, and other_privileges adds a principal's grants next to the personas' and platform admins'."
+  }
+  assert {
     condition     = local.default_catalog == "tst_citizen_dev"
     error_message = "default_catalog is passed to the default namespace setting."
   }

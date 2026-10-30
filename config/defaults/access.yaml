@@ -18,7 +18,7 @@
 # prefix, lower case). Each workspace names its own persona groups in its
 # file (groups:); a persona without a group is skipped: nobody gets it, and nothing fails.
 groups:
-  platform_admins: "{prefix}_platform_admins"   # workspace admins; own the workspace catalog
+  platform_admins: "{prefix}_platform_admins"   # workspace admins; MANAGE on the workspace catalog
   users: null                               # everyone who may use the workspace (consumer access)
   explorer: null
   builder: null
