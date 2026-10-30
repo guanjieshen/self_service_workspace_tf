@@ -14,7 +14,7 @@
   ],
   [
    "by hand",
-   "manually",
+   "manual",
    "re-enable",
    "turn it back on",
    "turn legacy access back on"
@@ -24,7 +24,7 @@
   "this pr enables legacy access",
   "re-enables legacy access"
  ],
- "preflight": "ok: signed in as the pipeline, a workspace admin\nok: metastore sandbox_canadacentral\nok: account group ss1-cd-users (users)\nok: account group ss1-cd-explorers (explorer)\nok: account group ss1-cd-builders (builder)\nok: no publisher group: skipped (nobody gets it in this workspace)\nok: account group ss1_platform_admins (platform_admins)\nwarning: the Git allowlist (settings.git.allowed_urls in config/defaults/settings.yaml) still has the placeholder https://github.com/<org>/: replace it with your organization's URL\nok: legacy access is already disabled",
+ "preflight": "ok: signed in as the pipeline, a workspace admin\nok: metastore sandbox_canadacentral\nok: account group ss1-cd-users (users)\nok: account group ss1-cd-explorers (explorer)\nok: account group ss1-cd-builders (builder)\nok: no publisher group: skipped (nobody gets it in this workspace)\nok: account group ss1_platform_admins (platform_admins)\nok: legacy access is already disabled",
  "state": "update",
  "changed_files": "- config/workspaces/self_service_1.yaml: this workspace's file",
  "config_diff": "+settings:\n+  disable_legacy_access: null   # still on Hive until the Q3 migration",

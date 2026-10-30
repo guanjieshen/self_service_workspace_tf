@@ -212,7 +212,7 @@
    }
   }
  ],
- "preflight": "ok: signed in as the pipeline, a workspace admin\nok: metastore sandbox_canadacentral\nok: account group ss1-cd-users (users)\nok: account group ss1-cd-explorers (explorer)\nok: account group ss1-data-builders (builder)\nok: no publisher group: skipped (nobody gets it in this workspace)\nok: account group ss1_platform_admins (platform_admins)\nwarning: the Git allowlist (settings.git.allowed_urls in config/defaults/settings.yaml) still has the placeholder https://github.com/<org>/: replace it with your organization's URL\nok: nothing found that still uses legacy access (Hive metastore, DBFS mounts, legacy clusters)",
+ "preflight": "ok: signed in as the pipeline, a workspace admin\nok: metastore sandbox_canadacentral\nok: account group ss1-cd-users (users)\nok: account group ss1-cd-explorers (explorer)\nok: account group ss1-data-builders (builder)\nok: no publisher group: skipped (nobody gets it in this workspace)\nok: account group ss1_platform_admins (platform_admins)\nok: nothing found that still uses legacy access (Hive metastore, DBFS mounts, legacy clusters)",
  "plan_guard": "This plan contains changes that are hard or impossible to undo:\n\n  - DELETE group's access to the workspace\n      module.personas.databricks_permission_assignment.this[\"ss1-cd-builders\"]\n  - DELETE group entitlements\n      module.personas.databricks_entitlements.persona[\"ss1-cd-builders\"]",
  "workspace": "self_service_1 (https://adb-1234567890123456.7.azuredatabricks.net)"
 }

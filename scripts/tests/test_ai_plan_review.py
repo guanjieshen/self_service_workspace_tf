@@ -114,11 +114,41 @@ class Request(unittest.TestCase):
                 review.ROOT = orig
         system, user = req["messages"][0]["content"], req["messages"][1]["content"]
         self.assertEqual(system, (ROOT / ".github/ai/plan-review-prompt.md").read_text())
-        for tag in ("workspace", "state", "changed_files", "config_diff", "workspace_files", "baseline", "planned_changes", "plan_guard", "preflight"):
+        for tag in ("workspace", "state", "changed_files", "config_diff", "code_diff", "workspace_files", "baseline", "planned_changes", "plan_guard", "preflight"):
             self.assertIn(f"<{tag}>", user)
         self.assertIn("First apply", user)
         self.assertIn("nothing found that still uses legacy access", user, "preflight's findings reach the reviewer")
         self.assertNotIn("#", user.split("<baseline>")[1].split("</baseline>")[0].replace("# config/", ""), "YAML comments are removed")
+
+
+class CodeDiff(unittest.TestCase):
+    """The framework diff explains changes that no config change does (and only Terraform code counts)."""
+
+    def test_terraform_code_and_changelog_but_not_tests_or_docs(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            run = lambda *a: subprocess.run(["git", "-C", tmp, *a], check=True, capture_output=True)
+            run("init", "-q"); run("config", "user.email", "t@example.com"); run("config", "user.name", "t")
+            files = {"terraform/main.tf": "a\n", "terraform/tests/t.tftest.hcl": "a\n", "CHANGELOG.md": "a\n", "docs/x.md": "a\n"}
+            for f, text in files.items():
+                (root / f).parent.mkdir(parents=True, exist_ok=True)
+                (root / f).write_text(text)
+            run("add", "-A"); run("commit", "-q", "-m", "base")
+            for f in files:
+                (root / f).write_text(f"changed {f}\n")
+            orig = review.ROOT
+            review.ROOT = root
+            try:
+                diff = review.code_diff("HEAD")
+                listed = review.changed_files("HEAD", "ws")
+            finally:
+                review.ROOT = orig
+        self.assertIn("changed terraform/main.tf", diff)
+        self.assertIn("changed CHANGELOG.md", diff)
+        self.assertNotIn("tftest", diff)
+        self.assertNotIn("docs/x.md", diff)
+        self.assertIn("terraform/main.tf: framework code", listed)
 
 
 class Comments(unittest.TestCase):

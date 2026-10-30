@@ -59,6 +59,7 @@ def inputs_for(case):
         "state": state,
         "changed_files": case["changed_files"],
         "config_diff": case["config_diff"],
+        "code_diff": case.get("code_diff", "(no Terraform code or CHANGELOG changes in this pull request)"),
         "workspace_files": "# self_service_1.yaml\n" + case["workspace_file"],
         "baseline": baseline,
         "planned_changes": review.planned_changes({"resource_changes": case["resource_changes"]}),
