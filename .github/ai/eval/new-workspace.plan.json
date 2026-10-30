@@ -208,35 +208,6 @@
    }
   },
   {
-   "address": "module.catalog[0].databricks_data_classification_catalog_config.this[0]",
-   "module_address": "module.catalog[0]",
-   "mode": "managed",
-   "type": "databricks_data_classification_catalog_config",
-   "name": "this",
-   "index": 0,
-   "provider_name": "registry.terraform.io/databricks/databricks",
-   "change": {
-    "actions": [
-     "create"
-    ],
-    "before": null,
-    "after": {
-     "auto_tag_configs": null,
-     "excluded_schemas": null,
-     "included_schemas": null,
-     "parent": "catalogs/ss1_citizen_dev"
-    },
-    "after_unknown": {
-     "name": true,
-     "provider_config": true
-    },
-    "before_sensitive": false,
-    "after_sensitive": {
-     "provider_config": {}
-    }
-   }
-  },
-  {
    "address": "module.catalog[0].databricks_grants.catalog[0]",
    "module_address": "module.catalog[0]",
    "mode": "managed",
@@ -526,6 +497,75 @@
      "access_control": [
       {},
       {},
+      {}
+     ],
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.compute.databricks_permissions.starter_warehouse[\"2cd38f111de7ce99\"]",
+   "module_address": "module.compute",
+   "mode": "managed",
+   "type": "databricks_permissions",
+   "name": "starter_warehouse",
+   "index": "2cd38f111de7ce99",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "access_control": [
+      {
+       "group_name": "ss1_platform_admins",
+       "permission_level": "CAN_MANAGE",
+       "service_principal_name": "",
+       "user_name": ""
+      }
+     ],
+     "alert_v2_id": null,
+     "app_name": null,
+     "authorization": null,
+     "cluster_id": null,
+     "cluster_policy_id": null,
+     "dashboard_id": null,
+     "database_instance_name": null,
+     "database_project_name": null,
+     "directory_id": null,
+     "directory_path": null,
+     "experiment_id": null,
+     "instance_pool_id": null,
+     "job_id": null,
+     "knowledge_assistant_id": null,
+     "notebook_id": null,
+     "notebook_path": null,
+     "pipeline_id": null,
+     "registered_model_id": null,
+     "repo_id": null,
+     "repo_path": null,
+     "serving_endpoint_id": null,
+     "sql_alert_id": null,
+     "sql_dashboard_id": null,
+     "sql_endpoint_id": "2cd38f111de7ce99",
+     "sql_query_id": null,
+     "supervisor_agent_id": null,
+     "vector_search_endpoint_id": null,
+     "workspace_file_id": null,
+     "workspace_file_path": null
+    },
+    "after_unknown": {
+     "access_control": [
+      {}
+     ],
+     "id": true,
+     "object_type": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "access_control": [
       {}
      ],
      "provider_config": []
@@ -1533,7 +1573,7 @@
     "before": null,
     "after": {
      "custom_config": {
-      "enableProjectsAllowList": "true"
+      "enableProjectsAllowList": "false"
      }
     },
     "after_unknown": {
@@ -1714,36 +1754,6 @@
     "after": {
      "custom_config": {
       "mlflowRunArtifactDownloadEnabled": "true"
-     }
-    },
-    "after_unknown": {
-     "custom_config": {},
-     "id": true,
-     "provider_config": true
-    },
-    "before_sensitive": false,
-    "after_sensitive": {
-     "custom_config": {},
-     "provider_config": []
-    }
-   }
-  },
-  {
-   "address": "module.workspace_settings.databricks_workspace_conf.key[\"projectsAllowList\"]",
-   "module_address": "module.workspace_settings",
-   "mode": "managed",
-   "type": "databricks_workspace_conf",
-   "name": "key",
-   "index": "projectsAllowList",
-   "provider_name": "registry.terraform.io/databricks/databricks",
-   "change": {
-    "actions": [
-     "create"
-    ],
-    "before": null,
-    "after": {
-     "custom_config": {
-      "projectsAllowList": "https://github.com/<org>/"
      }
     },
     "after_unknown": {

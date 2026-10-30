@@ -6,6 +6,11 @@ them for you: a setting missing from your baseline is left alone).
 
 ## Unreleased
 
+- The AI review also reads the Terraform code and CHANGELOG diff (`<code_diff>`), so a
+  framework change is explained instead of reported as unexplained drift, and is calibrated
+  against false alarms: a security change made on purpose with a reason is Medium, the
+  pipeline's own grant removed by the code is Low, and nothing is High only because it is
+  unknown. Two evaluation cases from real pull requests; 20/20 with Opus (17/20 before).
 - Data classification and data quality monitoring are turned on by hand in Catalog Explorer
   (`docs/SETUP.md`, step 9): removed `catalog.data_classification` and its checks. The
   classification API needs a usage policy ID the Terraform provider cannot send, and

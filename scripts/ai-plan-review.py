@@ -32,6 +32,7 @@ DEFAULT_MODEL = "system.ai.claude-sonnet-5-5"
 MAX_TOKENS = 4000   # the model reasons before it writes; answers in testing used 300 to 600
 PROMPT = ".github/ai/plan-review-prompt.md"
 MAX_DIFF_CHARS = 30000
+MAX_CODE_DIFF_CHARS = 15000   # the framework diff explains a change; the plan shows its effect
 MAX_CHANGES_CHARS = 60000
 SKIP_TYPES = {"terraform_data"}
 # Attributes that are noise for a reviewer.
@@ -181,6 +182,17 @@ def config_diff(base):
     return diff or "(no configuration changes in this pull request)"
 
 
+def code_diff(base):
+    """The framework changes that can change what is deployed: the Terraform code (not its
+    tests), and the CHANGELOG entry that says why, in plain words."""
+    if not base:
+        return "(no base ref given)"
+    diff = git("diff", base, "--", "terraform/", ":(exclude)terraform/tests/", "CHANGELOG.md")
+    if len(diff) > MAX_CODE_DIFF_CHARS:
+        diff = diff[:MAX_CODE_DIFF_CHARS] + "\n... (diff truncated)"
+    return diff or "(no Terraform code or CHANGELOG changes in this pull request)"
+
+
 def changed_files(base, workspace):
     if not base:
         return "(no base ref given)"
@@ -192,6 +204,8 @@ def changed_files(base, workspace):
             kind = "this workspace's file"
         elif re.match(r"(config|dev)/workspaces/", path):
             kind = "another workspace's file (not this plan)"
+        elif path.startswith("terraform/") and not path.startswith("terraform/tests/"):
+            kind = "framework code (can change what every workspace gets; see code_diff)"
         else:
             kind = "code, workflows or docs (no direct workspace change)"
         lines.append(f"- {path}: {kind}")
@@ -256,6 +270,7 @@ def gather(workspace, base):
         "state": state_note(plan),
         "changed_files": changed_files(base, workspace),
         "config_diff": config_diff(base),
+        "code_diff": code_diff(base),
         "workspace_files": f"# {path.name}\n{without_comments(path)}",
         "baseline": baseline(),
         "planned_changes": planned_changes(plan),
@@ -264,7 +279,7 @@ def gather(workspace, base):
     }
 
 
-SECTIONS = ["workspace", "state", "changed_files", "config_diff", "workspace_files", "baseline",
+SECTIONS = ["workspace", "state", "changed_files", "config_diff", "code_diff", "workspace_files", "baseline",
             "planned_changes", "plan_guard", "preflight"]
 
 
