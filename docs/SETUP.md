@@ -22,7 +22,7 @@ Steps 3 to 8 can run in parallel once step 2 is done, except that step 4 needs t
 
 Steps 3 to 5 are commands that read their values from `config/setup.yaml`; step 6 is done by hand in the Databricks account console. Each command prints the script it would run, so you can read it first or send it to the team that owns the step; add `--run` to run it. Each one checks before it creates, so running it again is safe.
 
-> **Tip:** Run every command from the repository root. Tools: Terraform 1.9+, Python 3.9+, the Databricks CLI, the Azure CLI (`az`) and the GitHub CLI (`gh`), each signed in as the person running that step.
+> **Tip:** Run every command from the repository root. Tools: git, Terraform 1.9+, Python 3.9+, the Databricks CLI, the Azure CLI (`az`) and the GitHub CLI (`gh`), each signed in as the person running that step. Node.js 22 runs the plan comment's tests.
 
 ## 1. Fill in `config/setup.yaml`
 
@@ -86,7 +86,7 @@ Two more things to know before you start; they live in their own files, not here
    ```
 
 3. **Push only what you want deployed.** Once step 5 is done, every push to `main` applies each workspace file in `config/workspaces/`. A release ships with none (only `_example.yaml`), so the first push deploys nothing.
-4. Replace the owners in `.github/CODEOWNERS` with your teams (for example `@my-org/databricks-platform` and `@my-org/security`), in a pull request once step 5 is done. Until then, push directly; afterwards branch protection requires pull requests.
+4. **Replace the owners in `.github/CODEOWNERS`** with your teams (for example `@my-org/databricks-platform` and `@my-org/security`) **before step 5**, in this push or a direct one after it. Step 5 turns on branch protection that requires code owners to review, so a placeholder owner would leave nobody able to approve.
 
 > **Note:** The repository's GitHub OIDC subject includes its numeric IDs, so create the repository with its final name before step 4. Renaming it later means recreating the two federated credentials (update `github_repo` and run step 4 again).
 
@@ -270,6 +270,7 @@ The baseline in `config/defaults/` is what every workspace gets. Most of it is a
 | Serverless usage policy | `defaults/cost.yaml` `serverless_policy` | On, `{PREFIX}-0-SELF-SERVICE`, every persona | Needs an account-level permission for the pipeline (step 6); set `enabled: false` if you will not grant it. Data classification (turned on by hand, step 9) uses it |
 | Catalog name and features | `defaults/catalog.yaml` `catalog` | `{prefix}_citizen_dev`, predictive optimization on | `catalog.storage_root` is needed when the metastore has no storage root (preflight says so) |
 | Serverless Starter Warehouse | `defaults/compute.yaml` `starter_warehouse.admins_only` | `true` | Only the platform admins may use the Starter warehouse Databricks creates in a new workspace; on an existing one, **anyone using it loses access** on the first apply. `null` leaves its access alone |
+| Classic cluster node types | `defaults/compute.yaml` `cluster_policy.node_types` | `Standard_E8_v3`, `Standard_E16_v3`, `Standard_E32_v3` | Azure VM sizes: check they are offered in your workspaces' region and that the subscription has quota |
 | Restrict workspace admins | `defaults/settings.yaml` `restrict_workspace_admins` | `false` | Needs account admin to change; leave `false` |
 | AI review of each plan | `config/setup.yaml` `ai_review_host`, `ai_review_model` | Off until a host is set; then `system.ai.claude-sonnet-5-5` there | Advice in the plan comment only. One workspace that has the model reviews every plan; the pipeline's service principal needs to be in it, with `EXECUTE` on the model (account users have it on `system.ai` by default) |
 
@@ -306,9 +307,10 @@ Before you start: the workspace exists and the runners can reach it (its private
 | Change one workspace | Pull request editing `config/workspaces/<name>.yaml`: only that workspace is planned and applied |
 | Change every workspace | Pull request editing `config/defaults/`: every workspace is planned, and applied, each in its own job (one that fails does not stop the others) |
 | Retire a workspace | Delete its file in a pull request: its Terraform state is removed on merge; the workspace itself is unchanged |
-| A plan is flagged as risky | Review the warning in the plan comment; if intended, a person adds the label `allow-risky-changes`. A new workspace's first apply is not flagged for disabling legacy access when preflight found nothing that still uses it |
+| A plan is flagged as risky | Review the warning in the plan comment; if intended, a person adds the label `allow-risky-changes`. The apply checks it too: a flagged change merged without the label stops at apply. Add the label to the merged pull request, then re-run the apply. A new workspace's first apply is not flagged for disabling legacy access when preflight found nothing that still uses it |
 | A `drift` issue opens | Someone changed a setting by hand: update the configuration to match, or re-apply to restore it |
 | Retry a failed apply | Fix the cause, then re-run the latest Apply run (it refuses if `main` has moved on) |
+| Plan locally | `./scripts/tf.sh <name> plan`, signed in with `az login`. You need **Storage Blob Data Reader** (or Contributor) on the state container, and Databricks access to the workspace. CI's plan is the one to trust |
 | Upgrade to a new release | Below: the pull request's plan shows what the new version changes in each workspace |
 
 More: [config/README.md](../config/README.md) (configuration tasks) and [github-actions.md](github-actions.md) (the workflows).
@@ -353,6 +355,7 @@ State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (ste
 | Preflight: `the metastore has no storage root` | New catalogs have nowhere to store data | Set `catalog.storage_root` in the workspace's file to an external location URL |
 | Preflight: `cannot create the workspace's serverless usage policy`, or the apply fails with `missing CreateBudgetPolicyPermission` | The service principal lacks the account's **Billing admin** role (account admin alone is not enough) | Step 6, item 3, or `serverless_policy.enabled: false` |
 | `setup.py github` fails at branch protection: `Upgrade to GitHub Pro or make this repository public` | Branch protection on a private repository needs a paid GitHub plan | The rest of step 5 is done. Protect `main` by hand once the plan allows it; until then, merging is the only review |
+| Apply: `the merged pull request has no allow-risky-changes label` | The plan guard flagged the change, and it was merged without the label | If a person approves it, add the label to the merged pull request and re-run the apply; otherwise revert the change in a new pull request |
 | A local plan shows permission changes that CI does not | Local plans run as you, not the pipeline: the owner entry differs | Trust the CI plan and the drift check |
 | The plan comment has no AI review | `ai_review_host` is not set, the service principal is not in that workspace, or the model is unavailable to it there (region, Unity Gateway, missing EXECUTE) | Set `ai_review_host` to a workspace that has the model, add the service principal to it, or change `ai_review_model`; the review is advice only |
 | Apply ran straight after the merge, without approval | `apply-approval` has no required reviewers (or the GitHub plan does not support them) | Add reviewers to the environment (`apply_approvers`, then step 5 again) |

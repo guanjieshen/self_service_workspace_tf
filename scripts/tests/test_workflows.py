@@ -83,5 +83,14 @@ class Workflows(unittest.TestCase):
                       "other labels do not re-run the plans")
 
 
+    def test_a_flagged_apply_needs_the_label_on_the_merged_pull_request(self):
+        # The approval is checked at apply time: a pull request can be merged with a failed plan.
+        apply = jobs(ROOT / ".github/workflows/deploy.yml")["apply"]
+        self.assertIn("allow-risky-changes", apply)
+        self.assertIn("listPullRequestsAssociatedWithCommit", apply)
+        self.assertRegex(apply, r"CONFIRM_ENV: \$\{\{ steps\.approval\.outputs\.approved == 'true' && matrix\.workspace \|\| '' \}\}")
+        self.assertNotRegex(apply, r"(?m)^      CONFIRM_ENV:", "never set for the whole job")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -126,5 +126,5 @@ them for you: a setting missing from your baseline is left alone).
 ## 1.0.0
 
 First release of the workspace baseline on its own: settings, personas, compute, the
-workspace catalog, usage policies, Genie Code, and the on-request personal schema and team
-folder jobs, with the plan, apply and drift workflows.
+workspace catalog, usage policies and Genie Code, with the plan, apply and drift workflows.
+The Unreleased notes above describe how the configuration changed on the way to it.

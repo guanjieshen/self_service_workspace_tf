@@ -8,8 +8,7 @@ workspaces), so that every change is tested for real. A customer must not receiv
 From the committed files only (git archive of HEAD), the zip:
 
   - leaves out dev/, config/backend.hcl and every workspace file but _example.yaml;
-  - sets the values in config/setup.yaml to null (the comments stay: they are the instructions),
-    keeping ai_review_model, a choice rather than a fact about this environment;
+  - sets the values in config/setup.yaml to null (the comments stay: they are the instructions);
   - sets account_id in config/defaults/cost.yaml to null;
   - replaces the owners in .github/CODEOWNERS with @your-org/databricks-platform;
 
@@ -31,7 +30,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import workspaces as wsf  # noqa: E402  (the same YAML reading as the other scripts)
 
 LEFT_OUT = re.compile(r"^(dev/|config/backend\.hcl$|config/workspaces/(?!_example\.yaml$)[^/]+\.yaml$)")
-KEEP_IN_SETUP = {"ai_review_model"}
+KEEP_IN_SETUP = set()
 # Blanked, but not identifiers: an Azure region is a common word, found in examples too.
 NOT_IDENTIFIERS = {"state_location"}
 OWNER = "@your-org/databricks-platform"
