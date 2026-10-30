@@ -23,14 +23,6 @@ locals {
       name   = replace(replace(tostring(local.sp.name), "{BU}", local.bu_upper), "{bu}", local.bu)
       tags   = local.chargeback_tags
       groups = distinct(concat(flatten(values(local.persona_groups)), local.platform_admins))
-      # The identity running Terraform uses it too: data classification runs on serverless as
-      # whoever turns it on, and fails without a usage policy ("Usage policy ID must not be empty").
-      users = compact([try(data.databricks_current_user.pipeline[0].acl_principal_id, "")])
     }
   }
-}
-
-# Who runs Terraform (the pipeline's service principal in CI), as a principal for the policy.
-data "databricks_current_user" "pipeline" {
-  count = local.sp.enabled ? 1 : 0
 }

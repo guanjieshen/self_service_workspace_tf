@@ -9,7 +9,7 @@ Each workspace gets:
 - **Secure admin settings:** legacy access and DBFS off, user isolation, token limits, downloads, Git allowlist, Unity Gateway, Microsoft Teams only, and more.
 - **Three personas granted to groups:** explorer (SQL), builder and publisher (full workspace); everyone else gets Consumer access (Databricks One). Who is in each group is managed in Entra ID, for example through access packages.
 - **Serverless first:** a default serverless SQL warehouse and one serverless usage policy every persona can use; classic cluster policies (interactive, jobs, pipelines; one cluster each per person) for people the self-service app approves.
-- **One Unity Catalog catalog** with predictive optimization (data classification is turned on by hand for now); its schemas come from the self-service app.
+- **One Unity Catalog catalog** with predictive optimization; its schemas come from the self-service app.
 - **Chargeback tags** from one list (`config/defaults/cost.yaml`), on the usage policy, the warehouse and every classic cluster.
 
 ## Get started

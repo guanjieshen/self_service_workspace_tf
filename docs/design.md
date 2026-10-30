@@ -115,7 +115,7 @@ workspace. What keeps that safe:
 
 Each workspace gets one catalog, `{bu}_citizen_dev` (`config/defaults/catalog.yaml`),
 bound to the workspace and owned by the platform admins group, with predictive
-optimization on (data classification is left alone until the provider can send its usage policy). Its schemas are not Terraform's: people get
+optimization on. Its schemas are not Terraform's: people get
 them from the self-service app.
 
 - **Catalog-level grants are minimal.** Personas get `USE CATALOG` and `USE SCHEMA`:
@@ -143,11 +143,7 @@ them from the self-service app.
    model calls must use `system.ai` model services.
 6. **`/Workspace/Shared` is open to all:** it grants `users` Can manage. Data access is
    still decided by Unity Catalog.
-7. **Data classification needs a usage policy.** It runs on serverless; the identity
-   running Terraform must be able to use a serverless usage policy, or turning it on fails
-   with "Usage policy ID must not be empty". Workspaces without usage policies set
-   `catalog.data_classification: null`.
-8. **Provider workaround:** `effective_workspace_label` is set to the label too (provider
+7. **Provider workaround:** `effective_workspace_label` is set to the label too (provider
    1.137.0 declares it optional instead of computed, which failed the apply).
 
 ## 7. Open questions

@@ -90,13 +90,6 @@ run "unknown_override" {
   expect_failures = [terraform_data.config_checks]
 }
 
-# Data classification needs the serverless usage policy
-run "classification_without_usage_policies" {
-  command = plan
-  variables { workspace = "classification-without-usage-policies" }
-  expect_failures = [terraform_data.config_checks]
-}
-
 # Only some sections can be null as a whole
 run "null_section" {
   command = plan
@@ -123,12 +116,5 @@ run "user_tag_bad_default" {
 run "bad_tag_key" {
   command = plan
   variables { workspace = "bad-tag-key" }
-  expect_failures = [terraform_data.config_checks]
-}
-
-# Data classification cannot be turned on by Terraform yet (the provider cannot send its usage policy)
-run "classification_on" {
-  command = plan
-  variables { workspace = "classification-on" }
   expect_failures = [terraform_data.config_checks]
 }
