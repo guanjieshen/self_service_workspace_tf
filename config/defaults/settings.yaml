@@ -131,6 +131,20 @@ settings:
     instructions: true
     skills: true
 
+  # ---- Appearance: set by hand ---------------------------------------------
+  # Workspace settings > Appearance has no API or Terraform resource yet, so these are set
+  # in each workspace when it is onboarded (docs/SETUP.md, step 9). They are here so every
+  # workspace gets the same values; nothing reads them.
+  #
+  #   Workspace theme > Color palette > Categorical colors, in this order:
+  #     #FFB81C  brand yellow
+  #     #353535  dark gray
+  #     #555555  gray
+  #     #1A1A1A  near black
+  #     #EAEAED  light gray
+  #   (White, #FFFFFF, is left out: a white series does not show on a white canvas.)
+  #   Genie One customization > Color: #FFB81C, and a short welcome message.
+
   # ---- The built-in "users" group ------------------------------------------
   # Every workspace user is in this group, so its entitlements apply to everyone,
   # on top of their personas. Nothing here: access comes only from a persona
