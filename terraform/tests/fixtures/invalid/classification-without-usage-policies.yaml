@@ -7,3 +7,4 @@ tags: {APP_ID: TST-APP}
 auth: {workspace_profile: null, account_profile: null}
 groups: {explorer: tst-explorers, builder: tst-builders, publisher: tst-publishers, platform_admins: tst-admins}
 serverless_policy: {enabled: false}
+catalog: {data_classification: true}

@@ -115,7 +115,7 @@ workspace. What keeps that safe:
 
 Each workspace gets one catalog, `{bu}_citizen_dev` (`config/defaults/catalog.yaml`),
 bound to the workspace and owned by the platform admins group, with predictive
-optimization and data classification on. Its schemas are not Terraform's: people get
+optimization on (data classification is left alone until the provider can send its usage policy). Its schemas are not Terraform's: people get
 them from the self-service app.
 
 - **Catalog-level grants are minimal.** Personas get `USE CATALOG` and `USE SCHEMA`:
