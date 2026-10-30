@@ -20,8 +20,8 @@ run "names_and_tags" {
   command = plan
 
   assert {
-    condition     = local.prefix == "tst" && local.prefix_upper == "TST" && local.chargeback_tags == { BUSINESS_UNIT = "TST", APP_ID = "TST-APP", COST_CATEGORY = "CITIZEN_SELF_SERVICE" }
-    error_message = "The chargeback tags are the baseline's tags: with BUSINESS_UNIT from the prefix ({PREFIX}) and the workspace's own APP_ID. Got: ${jsonencode(local.chargeback_tags)}"
+    condition     = local.prefix == "tst" && local.prefix_upper == "TST" && local.chargeback_tags == { BUSINESS_UNIT = "TST", APPID = "TST-APP", COST_CATEGORY = "CITIZEN_SELF_SERVICE" }
+    error_message = "The chargeback tags are the baseline's tags: with BUSINESS_UNIT from the prefix ({PREFIX}) and the workspace's own APPID. Got: ${jsonencode(local.chargeback_tags)}"
   }
   assert {
     condition     = local.account_host == "https://accounts.azuredatabricks.net"
@@ -40,8 +40,8 @@ run "names_and_tags" {
     error_message = "SQL results download, UI uploads and MLflow artifact downloads are managed (on); collaboration platforms are limited to Microsoft Teams; public messages are left alone."
   }
   assert {
-    condition     = tolist(local.classic_user_tags) == tolist(["APP_ID", "TEAM", "PROJECT"]) && local.all_tag_keys == tolist(["APP_ID", "BUSINESS_UNIT", "COST_CATEGORY", "TEAM", "PROJECT"])
-    error_message = "Users fill in APP_ID, TEAM and PROJECT on classic clusters. Got: ${jsonencode(local.all_tag_keys)}"
+    condition     = tolist(local.classic_user_tags) == tolist(["APPID", "TEAM", "PROJECT"]) && local.all_tag_keys == tolist(["APPID", "BUSINESS_UNIT", "COST_CATEGORY", "TEAM", "PROJECT"])
+    error_message = "Users fill in APPID, TEAM and PROJECT on classic clusters. Got: ${jsonencode(local.all_tag_keys)}"
   }
   assert {
     condition = (
@@ -197,7 +197,7 @@ run "genie_code_defaults" {
     error_message = "Placeholders in skills are filled ({WAREHOUSE} = the default warehouse's name)."
   }
   assert {
-    condition     = strcontains(base64decode(local.genie_skills["build-tagged-assets/SKILL.md"]), "`APP_ID`, `BUSINESS_UNIT`, `COST_CATEGORY`, `TEAM`, `PROJECT`")
+    condition     = strcontains(base64decode(local.genie_skills["build-tagged-assets/SKILL.md"]), "`APPID`, `BUSINESS_UNIT`, `COST_CATEGORY`, `TEAM`, `PROJECT`")
     error_message = "{TAGS} in a skill is every chargeback tag."
   }
 }

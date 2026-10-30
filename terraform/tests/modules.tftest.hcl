@@ -17,8 +17,8 @@ run "compute" {
   }
   variables {
     names             = { PREFIX = "TST", prefix = "tst" }
-    tags              = { BUSINESS_UNIT = "TST", APP_ID = "TST-APP", COST_CATEGORY = "CITIZEN_SELF_SERVICE" }
-    classic_user_tags = ["APP_ID", "TEAM"]
+    tags              = { BUSINESS_UNIT = "TST", APPID = "TST-APP", COST_CATEGORY = "CITIZEN_SELF_SERVICE" }
+    classic_user_tags = ["APPID", "TEAM"]
     user_tag_pattern  = "^[A-Z0-9_-]+$"
     sql_warehouse = {
       name         = "{PREFIX} Default Warehouse", type = "serverless", size = "Small",
@@ -48,7 +48,7 @@ run "compute" {
     error_message = "{PREFIX} is filled in the warehouse name; type serverless makes it serverless."
   }
   assert {
-    condition     = toset([for t in databricks_sql_endpoint.default.tags[0].custom_tags : "${t.key}=${t.value}"]) == toset(["BUSINESS_UNIT=TST", "APP_ID=TST-APP", "COST_CATEGORY=CITIZEN_SELF_SERVICE"])
+    condition     = toset([for t in databricks_sql_endpoint.default.tags[0].custom_tags : "${t.key}=${t.value}"]) == toset(["BUSINESS_UNIT=TST", "APPID=TST-APP", "COST_CATEGORY=CITIZEN_SELF_SERVICE"])
     error_message = "The warehouse carries the chargeback tags."
   }
   assert {
@@ -84,7 +84,7 @@ run "compute" {
   }
   assert {
     condition = (
-      jsondecode(databricks_cluster_policy.classic["jobs"].definition)["custom_tags.APP_ID"] == { type = "regex", pattern = "^[A-Z0-9_-]+$", isOptional = false, defaultValue = "TST-APP" } &&
+      jsondecode(databricks_cluster_policy.classic["jobs"].definition)["custom_tags.APPID"] == { type = "regex", pattern = "^[A-Z0-9_-]+$", isOptional = false, defaultValue = "TST-APP" } &&
       jsondecode(databricks_cluster_policy.classic["jobs"].definition)["custom_tags.TEAM"] == { type = "regex", pattern = "^[A-Z0-9_-]+$", isOptional = false }
     )
     error_message = "Tags users fill in are required and must match the pattern; one with a chargeback value starts from it."

@@ -31,7 +31,7 @@ groups:
 # Chargeback tags (tags: in config/defaults/cost.yaml): change a value, add a tag, or
 # null to drop one, for this workspace. On the usage policy, the warehouse and classic clusters.
 # tags:
-#   APP_ID: APP-1234                 # the BU's default self-service application ID
+#   APPID: APP-1234                 # the BU's default self-service application ID
 
 # A label next to the workspace name in the top bar.
 # Colors: coral, lemon, lime, turquoise, indigo, purple, pink.

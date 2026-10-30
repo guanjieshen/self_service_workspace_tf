@@ -17,7 +17,7 @@ groups:
 
 # This BU's default self-service application ID (a placeholder until it has one).
 tags:
-  APP_ID: SS1-SANDBOX
+  APPID: SS1-SANDBOX
 
 # The metastore has no storage root, so the catalog keeps its data under our own
 # external location (guanjie-cd-catalogs-2026), in a folder of its own.

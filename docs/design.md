@@ -161,7 +161,7 @@ them from the self-service app.
 | S4 | Interactive notebook results in the workspace's own storage? | Not managed |
 | P5 | Approved dashboard embedding domains? | None |
 | P7 | GitHub org URL for the Git allowlist? | Placeholder |
-| P8 | The chargeback tag set (it will change; one list in `config/defaults/cost.yaml`)? | `BUSINESS_UNIT`, `APP_ID`, `COST_CATEGORY`; users fill in `APP_ID`, `TEAM`, `PROJECT` on classic |
+| P8 | The chargeback tag set (it will change; one list in `config/defaults/cost.yaml`)? | `BUSINESS_UNIT`, `APPID`, `COST_CATEGORY`; users fill in `APPID`, `TEAM`, `PROJECT` on classic |
 | P12 | Remove `users` from `/Workspace/Shared` so folder permissions mean something? | Organisation only |
 
 ## 8. Not built yet
