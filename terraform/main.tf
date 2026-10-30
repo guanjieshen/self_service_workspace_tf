@@ -40,6 +40,15 @@ module "workspace_settings" {
   depends_on = [terraform_data.config_checks]
 }
 
+# The Serverless Starter Warehouse Databricks creates in a new workspace, found by name (only
+# its permissions are managed). Read here, not in the compute module: that module waits for
+# config_checks, which on a first apply would defer its data sources, and for_each needs the
+# IDs at plan time.
+data "databricks_sql_warehouses" "starter" {
+  count                   = try(local.config.starter_warehouse.admins_only, null) == true ? 1 : 0
+  warehouse_name_contains = local.config.starter_warehouse.name
+}
+
 module "compute" {
   source = "./modules/compute"
 
@@ -50,6 +59,7 @@ module "compute" {
   sql_warehouse     = local.config.sql_warehouse
   cluster_policy    = local.config.cluster_policy
   warehouse_acl     = { for g, l in local.persona_acl.default_warehouse : lookup(local.group, g, g) => l }
+  starter_warehouse = try(tolist(data.databricks_sql_warehouses.starter[0].ids), [])
   platform_admins   = [for g in local.platform_admins : lookup(local.group, g, g)]
 
   # Invalid input stops at the plain-language checks in checks.tf, not a crash inside a

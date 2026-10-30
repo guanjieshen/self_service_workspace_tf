@@ -30,10 +30,15 @@ run "compute" {
       jobs        = { name = "{BU} Classic Jobs", max_clusters_per_user = 1 }
       pipelines   = { name = "{BU} Classic Pipelines", max_clusters_per_user = 1 }
     }
-    warehouse_acl   = { tst-explorers = "CAN_USE" }
-    platform_admins = ["tst-admins"]
+    warehouse_acl     = { tst-explorers = "CAN_USE" }
+    starter_warehouse = ["starter-id"]
+    platform_admins   = ["tst-admins"]
   }
 
+  assert {
+    condition     = databricks_permissions.starter_warehouse["starter-id"].sql_endpoint_id == "starter-id" && toset([for a in databricks_permissions.starter_warehouse["starter-id"].access_control : "${a.group_name}=${a.permission_level}"]) == toset(["tst-admins=CAN_MANAGE"])
+    error_message = "Only the platform admins may use the Serverless Starter Warehouse (everyone else's access goes)."
+  }
   assert {
     condition     = databricks_workspace_setting_v2.default_warehouse[0].name == "default_warehouse_id"
     error_message = "workspace_default makes the default warehouse the workspace's Default warehouse."
@@ -112,7 +117,7 @@ run "compute_minimal" {
   }
 
   assert {
-    condition     = length(databricks_workspace_setting_v2.default_warehouse) == 0 && length(databricks_permissions.default_warehouse) == 0
+    condition     = length(databricks_workspace_setting_v2.default_warehouse) == 0 && length(databricks_permissions.default_warehouse) == 0 && length(databricks_permissions.starter_warehouse) == 0
     error_message = "Without workspace_default the Default warehouse setting is left alone; empty grants create no permissions."
   }
   assert {

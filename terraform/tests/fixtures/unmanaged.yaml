@@ -7,6 +7,7 @@ tags: {APP_ID: TST-APP}
 auth: {workspace_profile: null, account_profile: null}
 groups: {users: tst_users, explorer: tst-explorers, builder: tst-builders, publisher: tst-publishers, platform_admins: tst-admins}
 serverless_policy: {enabled: false}
+starter_warehouse: {admins_only: null}
 catalog: null
 settings: {disable_legacy_access: null, disable_dbfs_root_and_mounts: null, enforce_user_isolation: null, compliance_security_profile: null,
   restrict_workspace_admins: null, personal_access_tokens: null, enhanced_security_monitoring: null, automatic_cluster_update: null,

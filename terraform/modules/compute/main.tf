@@ -91,6 +91,22 @@ resource "databricks_permissions" "default_warehouse" {
   }
 }
 
+# ---- The Serverless Starter Warehouse ----
+# Databricks creates it usable by every user; only its permissions are managed here, and
+# authoritatively: everyone but the platform admins loses access. Admins always keep it.
+resource "databricks_permissions" "starter_warehouse" {
+  for_each        = toset(var.starter_warehouse)
+  sql_endpoint_id = each.value
+
+  dynamic "access_control" {
+    for_each = toset(var.platform_admins)
+    content {
+      group_name       = access_control.value
+      permission_level = "CAN_MANAGE"
+    }
+  }
+}
+
 # ---- The classic cluster policies ----
 # Who may use them is not managed here: the self-service app grants them on request, and
 # managing their permissions would remove the app's grants. Workspace admins can always use them.
