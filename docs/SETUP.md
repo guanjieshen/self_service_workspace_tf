@@ -170,6 +170,8 @@ Create Entra ID groups and sync them to the Databricks account (automatic identi
 
 A workspace that leaves a persona's group `null` simply has nobody with that persona.
 
+Put the BU's platform team in `{bu}_platform_admins`: it manages the workspace's serverless usage policy and owns its catalog, and nobody outside the policy's groups can see the policy (workspace admin is not enough). Preflight warns while the group is empty.
+
 ## 8. Decide the baseline
 
 The baseline in `config/defaults/` is what every workspace gets. Most of it is a sensible default; these settings need a decision before the first apply, because they are hard to undo or depend on your organization. Change them in a pull request (or before the first push).

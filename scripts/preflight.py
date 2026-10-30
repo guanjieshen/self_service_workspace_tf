@@ -11,6 +11,10 @@ and checks what Terraform needs but cannot fix itself:
   - the workspace has a Unity Catalog metastore;
   - every group the workspace names exists as an ACCOUNT group (Entra ID, synced to the account):
     Unity Catalog grants and usage policies cannot use workspace-local groups;
+  - the platform admins group has members (nobody else can manage the workspace's usage
+    policy, or even see it);
+  - the identity may create the workspace's serverless usage policy (the account's Billing
+    admin role; account admin alone is not enough);
   - the workspace catalog has somewhere to keep its data (a metastore storage root, or
     catalog.storage_root in the workspace's file);
   - before legacy access is disabled (one-way after 30 days): what still uses it;
@@ -115,17 +119,26 @@ def checks(ws, get):
             continue
         name = name.replace("{bu}", bu).replace("{BU}", bu.upper())
         flt = urllib.parse.quote(f'displayName eq "{name}"')
-        found, err = get(f"/api/2.0/account/scim/v2/Groups?filter={flt}&attributes=displayName")
+        found, err = get(f"/api/2.0/account/scim/v2/Groups?filter={flt}&attributes=displayName,members")
         if err:
             out.append(("warning", f"could not look up group {name} in the account: {err}"))
         elif found.get("totalResults", 0) > 0:
             out.append(("ok", f"account group {name} ({key})"))
+            # The platform admins manage the usage policy and own the catalog: an empty group
+            # means only the pipeline can (people cannot even see the policy).
+            if key == "platform_admins" and not any(g.get("members") for g in found.get("Resources", [])):
+                out.append(("warning", f"group {name} (platform_admins) has no members, so nobody but the pipeline can "
+                                       "manage the workspace's usage policy (or see it) or the catalog it owns: add the "
+                                       "BU's platform admins to it in Entra ID (docs/SETUP.md, step 7)"))
         else:
             local, _ = get(f"/api/2.0/preview/scim/v2/Groups?filter={flt}&attributes=displayName")
             what = ("exists only in this workspace (a workspace-local group)" if (local or {}).get("totalResults", 0)
                     else "does not exist in the account")
             out.append(("error", f"group {name} ({key}) {what}: create it in Entra ID and sync it to the account, "
                                f"or name another group under groups.{key} in the workspace's file"))
+
+    if info.get("serverless_policy") and info.get("account"):
+        out.append(billing_admin(get, info["account"], me, who))
 
     # The workspace catalog needs storage: the metastore's, or its own storage_root.
     if info["catalog"] and metastore is not None:
@@ -177,6 +190,25 @@ def legacy_uses(get):
                         "workspace still has " + "; ".join(found) + ". Migrate them first, or set "
                         "disable_legacy_access, disable_dbfs_root_and_mounts and enforce_user_isolation to null under settings: "
                         "in its file (config/workspaces/<name>.yaml)")]
+
+
+def billing_admin(get, account, me, who):
+    """Whether the identity may create usage policies: the account's Billing admin role, given to
+    it or to one of its groups. Account admin alone fails with "missing CreateBudgetPolicyPermission"."""
+    name = urllib.parse.quote(f"accounts/{account}/ruleSets/default")
+    rules, err = get(f"/api/2.0/preview/accounts/access-control/rule-sets?name={name}&etag=")
+    if err:
+        return ("warning", f"could not check that {who} may create usage policies (the account's Billing admin role): {err}")
+    me_id = me.get("userName") or ""
+    mine = {f"servicePrincipals/{me_id}", f"users/{me_id}"} | {f"groups/{g.get('display')}" for g in me.get("groups", [])}
+    billing = {p for r in rules.get("grant_rules", []) if r.get("role") == "roles/billing.admin" for p in r.get("principals", [])}
+    if mine & billing:
+        return ("ok", f"{who} may create usage policies (Billing admin)")
+    # Only the pipeline's identity matters: locally (signed in as a person) it is a warning.
+    level = "error" if os.environ.get("GITHUB_ACTIONS") == "true" else "warning"
+    return (level, f"{who} cannot create the workspace's serverless usage policy: give the pipeline's service principal "
+                   "the account's Billing admin role (account console > User management > Service principals > Roles; "
+                   "account admin alone is not enough), docs/SETUP.md step 6, or set serverless_policy.enabled: false")
 
 
 def main(argv):
