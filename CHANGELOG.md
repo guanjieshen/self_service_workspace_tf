@@ -16,6 +16,10 @@ them for you: a setting missing from your baseline is left alone).
   against false alarms: a security change made on purpose with a reason is Medium, the
   pipeline's own grant removed by the code is Low, and nothing is High only because it is
   unknown. Two evaluation cases from real pull requests; 20/20 with Opus (17/20 before).
+- Git folders are not restricted by default (`settings.git.restrict_to_allowlist: false`, no
+  URLs): the shipped placeholder allowlist (`https://github.com/<org>/`) allowed nothing. The
+  first plan turns the allowlist off, which the plan guard flags. Preflight no longer warns
+  about the placeholder.
 - Data classification and data quality monitoring are turned on by hand in Catalog Explorer
   (`docs/SETUP.md`, step 9): removed `catalog.data_classification` and its checks. The
   classification API needs a usage policy ID the Terraform provider cannot send, and

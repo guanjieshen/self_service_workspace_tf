@@ -63,7 +63,7 @@ class Preflight(unittest.TestCase):
         self.root = pathlib.Path(tempfile.mkdtemp())
         # The workspace's file, composed from parts so a test can change one.
         self.parts = {"workspace": "bu: fin\nhost: https://adb-123.1.azuredatabricks.net\n",
-                      "settings": GIT,       # the baseline's Git allowlist is a placeholder
+                      "settings": GIT,
                       "access": GROUPS}      # each workspace names its persona groups
         self.write()
         # Outside CI by default (the runner sets GITHUB_ACTIONS); the CI test sets it itself.
@@ -91,12 +91,6 @@ class Preflight(unittest.TestCase):
         results = self.run_checks(FakeApi())
         self.assertEqual(self.levels(results, "error") + self.levels(results, "warning"), [])
         self.assertIn("signed in as sp-terraform, a workspace admin", self.levels(results, "ok"))
-
-    def test_the_git_allowlist_placeholder_is_flagged(self):
-        self.set("settings", "")
-        warnings = self.levels(self.run_checks(FakeApi()), "warning")
-        self.assertEqual(len(warnings), 1)
-        self.assertIn("still has the placeholder https://github.com/<org>/", warnings[0])
 
     def test_errors_keep_the_reason_and_drop_credentials(self):
         leak = 'cannot sign in to https://adb-1.1.azuredatabricks.net: failed during request visitor: github-oidc-azure auth: not configured. Config: host=https://adb-1.1.azuredatabricks.net, account_id=acct, actions_id_token_request_url=https://x/idtoken?api-version=2.0, actions_id_token_request_token=eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJyZXBvIn0.c2lnbmF0dXJl. Env: DATABRICKS_HOST'

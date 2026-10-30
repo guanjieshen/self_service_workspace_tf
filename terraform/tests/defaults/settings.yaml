@@ -102,10 +102,12 @@ settings:
 
   # ---- Git folders ---------------------------------------------------------
 
+  # No restriction for now: Git folders may use any Git URL. To restrict them, set
+  # restrict_to_allowlist: true and list the allowed URL prefixes, for example
+  # "https://github.com/my-org/".
   git:
-    restrict_to_allowlist: true        # only allow Git URLs in the list below
-    allowed_urls:
-      - "https://github.com/<org>/"    # replace with your GitHub organization
+    restrict_to_allowlist: false
+    allowed_urls: []
 
   # ---- Dashboards ----------------------------------------------------------
 
