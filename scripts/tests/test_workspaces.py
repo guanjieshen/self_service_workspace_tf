@@ -185,8 +185,16 @@ class Affected(unittest.TestCase):
                 self.assertEqual(self.affected()["workspaces"], ["alpha", "beta", "gamma"])
 
     def test_tests_docs_and_templates_concern_nothing(self):
-        self.change("terraform/tests/x.tftest.hcl", "docs/x.md", "config/workspaces/_example.yaml")
+        self.change("terraform/tests/x.tftest.hcl", "docs/x.md", "config/workspaces/_example.yaml",
+                    "terraform/AGENTS.md", "config/defaults/genie-code/skills/README.md")
         self.assertEqual(self.affected(), {"workspaces": [], "removed": []})
+
+    def test_deployed_genie_code_files_concern_every_workspace(self):
+        # Unlike the skills folder's README, these are deployed to every workspace.
+        for f in ("config/defaults/genie-code/instructions.md", "config/defaults/genie-code/skills/build-tagged-assets/SKILL.md"):
+            with self.subTest(f=f):
+                self.change(f)
+                self.assertEqual(self.affected()["workspaces"], ["alpha", "beta", "gamma"])
 
     def test_what_the_plan_comment_shows_is_planned_everywhere_but_never_applied(self):
         self.change("config/setup.yaml")

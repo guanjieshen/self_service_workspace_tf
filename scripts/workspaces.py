@@ -46,6 +46,9 @@ NAME = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 
 # Paths whose change concerns every workspace: applied (EVERYTHING), or only planned (PLAN_ONLY).
 EVERYTHING = r"^(config/defaults/|terraform/(?!tests/)|scripts/tf\.sh$|scripts/plan-guard\.py$)"
+# Under those paths, files Terraform never reads: guidance for maintainers (terraform/**.md) and
+# loose files in the Genie Code skills folder (only skill folders are deployed, not its README).
+NOT_DEPLOYED = r"^(terraform/.*\.md$|config/defaults/genie-code/skills/[^/]+$)"
 PLAN_ONLY = (r"^(scripts/preflight\.py$|scripts/ai-plan-review\.py$|\.github/ai/|config/setup\.yaml$|"
              r"\.github/workflows/deploy\.yml$|\.github/actions/|\.github/scripts/plan-comment\.js$)")
 
@@ -208,7 +211,8 @@ def affected(base, head, plan=False):
     workspace_file = re.compile(r"^(config|dev)/workspaces/([^/_][^/]*)\.yaml$")
     removed = sorted({m.group(2) for status, p in paths for m in [workspace_file.match(p)]
                       if m and status == "D" and m.group(2) not in current})
-    if any(re.match(EVERYTHING, p) or (plan and re.match(PLAN_ONLY, p)) for _, p in paths):
+    every = lambda p: re.match(EVERYTHING, p) and not re.match(NOT_DEPLOYED, p)
+    if any(every(p) or (plan and re.match(PLAN_ONLY, p)) for _, p in paths):
         return {"workspaces": current, "removed": removed}
     touched = {m.group(2) for _, p in paths for m in [workspace_file.match(p)] if m}
     return {"workspaces": sorted(touched & set(current)), "removed": removed}
