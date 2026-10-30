@@ -10,7 +10,8 @@ From the committed files only (git archive of HEAD), the zip:
   - leaves out dev/, config/backend.hcl and every workspace file but _example.yaml;
   - sets the values in config/setup.yaml to null (the comments stay: they are the instructions);
   - sets account_id in config/defaults/cost.yaml to null;
-  - replaces the owners in .github/CODEOWNERS with @your-org/databricks-platform;
+  - replaces the owners in .github/CODEOWNERS with @your-org/databricks-platform, and on the
+    security settings (config/defaults/settings.yaml) with it and @your-org/security;
 
 then refuses to write the zip if any of this repository's identifiers is still in it (its tenant,
 subscription, storage, account, workspace hosts and storage roots, CODEOWNERS owners). Run it
@@ -34,6 +35,9 @@ KEEP_IN_SETUP = set()
 # Blanked, but not identifiers: an Azure region is a common word, found in examples too.
 NOT_IDENTIFIERS = {"state_location"}
 OWNER = "@your-org/databricks-platform"
+SECURITY_OWNER = "@your-org/security"
+# CODEOWNERS paths that also need the security team (docs/SETUP.md, step 2).
+SECURITY_PATHS = ("/config/defaults/settings.yaml",)
 
 
 def committed_files():
@@ -61,12 +65,13 @@ def own_identifiers(files):
             text = data.decode()
             found.update(re.findall(r"https://adb-[0-9]+\.[0-9]+\.azuredatabricks\.net", text))
             found.update(re.findall(r"abfss://[^\s\"']+", text))
-    found.update(o for o in re.findall(r"@[\w.-]+(?:/[\w.-]+)?", files.get(".github/CODEOWNERS", b"").decode()) if o != OWNER)
+    found.update(o for o in re.findall(r"@[\w.-]+(?:/[\w.-]+)?", files.get(".github/CODEOWNERS", b"").decode())
+                 if o not in (OWNER, SECURITY_OWNER))
     return {v for v in found if len(v) >= 6}
 
 
 def blank_setup(text):
-    """Every value in config/setup.yaml to null, its comment kept (except ai_review_model)."""
+    """Every value in config/setup.yaml to null, its comment kept."""
     def blank(m):
         key, value, rest = m.group(1), m.group(2), m.group(3) or ""
         if key in KEEP_IN_SETUP or value == "null":
@@ -86,12 +91,22 @@ def release_files(files):
             data = re.sub(r"(?m)^account_id: .*$", "account_id: null   # the Databricks account ID (account console, top right)",
                           data.decode()).encode()
         elif path == ".github/CODEOWNERS":
-            text = data.decode()
-            for owner in set(re.findall(r"@[\w.-]+(?:/[\w.-]+)?", text)) - {OWNER}:
-                text = re.sub(rf"{re.escape(owner)}(?![\w/.-])", OWNER, text)
-            data = text.encode()
+            data = release_codeowners(data.decode()).encode()
         out[path] = data
     return out
+
+
+def release_codeowners(text):
+    """Every owner to OWNER; the security paths' owners to OWNER and SECURITY_OWNER."""
+    lines = []
+    for line in text.splitlines():
+        if line.split(maxsplit=1)[:1] and line.split()[0] in SECURITY_PATHS:
+            line = line.split()[0].ljust(len(line) - len(line.lstrip()) + 36) + f"{OWNER} {SECURITY_OWNER}"
+        else:
+            for owner in set(re.findall(r"@[\w.-]+(?:/[\w.-]+)?", line)) - {OWNER, SECURITY_OWNER}:
+                line = re.sub(rf"{re.escape(owner)}(?![\w/.-])", OWNER, line)
+        lines.append(line)
+    return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
 
 
 def leaks(files, identifiers):

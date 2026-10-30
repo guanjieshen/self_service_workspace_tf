@@ -119,6 +119,12 @@ def loosened(rc):
     return out
 
 
+def acl_principals(perms):
+    """The users, groups and service principals a databricks_permissions resource lists."""
+    return {a.get("group_name") or a.get("user_name") or a.get("service_principal_name")
+            for a in (perms or {}).get("access_control") or []} - {None}
+
+
 def released(plan):
     """The released_addresses output: addresses (resources, or modules) to release."""
     out = ((plan.get("planned_values") or {}).get("outputs") or {}).get("released_addresses") or {}
@@ -160,6 +166,16 @@ def main(argv=None) -> int:
         if "delete" in actions and rtype in PROTECTED:
             verb = "REPLACE" if "create" in actions else "DELETE"
             warnings.append(f"{verb} {PROTECTED[rtype]}\n      {addr}")
+
+        # Databricks makes the Starter warehouse usable by everyone; managing its permissions takes
+        # that away, so people's queries, dashboards and alerts on it stop working for them.
+        if rtype == "databricks_permissions" and rc.get("name") == "starter_warehouse":
+            gone = acl_principals(rc["change"].get("before")) - acl_principals(rc["change"].get("after"))
+            if actions == ["create"]:
+                warnings.append("REMOVE everyone's access to the Starter warehouse but the platform admins': check nobody "
+                                "relies on it (queries, dashboards, alerts), or set starter_warehouse.admins_only: null\n      " + addr)
+            elif "update" in actions and gone:
+                warnings.append(f"REMOVE access to the Starter warehouse for {', '.join(sorted(gone))}\n      " + addr)
 
         if rtype == "databricks_default_namespace_setting" and ("update" in actions or "delete" in actions):
             warnings.append(

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run Terraform for one workspace (or all of them).
 #
-#   ./scripts/tf.sh <workspace|all> <validate|plan|apply|destroy|output> [extra terraform args]
+#   ./scripts/tf.sh <workspace|all> <validate|plan|apply|destroy|output|force-unlock> [extra terraform args]
 #
 # <workspace> is a file name, without .yaml, in config/workspaces/ (or dev/workspaces/, the
 # workspaces that test the framework itself).
@@ -17,13 +17,14 @@
 # hard to undo (deleted folders, replaced warehouses, disabling legacy access).
 # apply then asks you to type the workspace name to continue. In CI, set
 # CONFIRM_ENV=<workspace> to approve; without it a flagged apply fails.
+# force-unlock <lock ID> releases a state lock left by a run that died (docs/SETUP.md, 11).
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 tf_dir="$root/terraform"
 terraform_bin="${TERRAFORM:-terraform}"
 
-usage() { sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+usage() { sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
 [[ $# -ge 2 ]] || usage
 workspace="$1"; cmd="$2"; shift 2
 
@@ -59,6 +60,14 @@ done
 if [[ ("$cmd" == "apply" || "$cmd" == "destroy") && "${GITHUB_ACTIONS:-}" != "true" && "${ALLOW_LOCAL_APPLY:-}" != "1" ]]; then
   echo "Refusing to $cmd outside GitHub Actions: changes are deployed by merging a pull request."
   echo "Plan locally with: ./scripts/tf.sh $workspace plan. Break glass only: ALLOW_LOCAL_APPLY=1."
+  exit 1
+fi
+
+# Break glass applies to the shared state, the one CI uses: without config/backend.hcl it
+# would write a local state the pipeline never sees, and the next CI apply would fight it.
+if [[ ("$cmd" == "apply" || "$cmd" == "destroy" || "$cmd" == "force-unlock") && "${GITHUB_ACTIONS:-}" != "true" && ! -f "$root/config/backend.hcl" ]]; then
+  echo "Refusing to $cmd without config/backend.hcl: it would use a local state that CI does not share."
+  echo "Get config/backend.hcl from the repository (or python3 scripts/setup.py state) first (docs/SETUP.md, step 3)."
   exit 1
 fi
 
@@ -167,5 +176,7 @@ case "$cmd" in
     ;;
   destroy)  "$terraform_bin" -chdir="$tf_dir" destroy "${vars[@]}" "$@" ;;
   output)   "$terraform_bin" -chdir="$tf_dir" output "$@" ;;
+  # Asks to confirm. Only for a lock whose run is gone: unlocking a running apply corrupts the state.
+  force-unlock) "$terraform_bin" -chdir="$tf_dir" force-unlock "$@" ;;
   *) usage ;;
 esac

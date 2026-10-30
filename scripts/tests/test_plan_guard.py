@@ -60,6 +60,16 @@ class PlanGuard(unittest.TestCase):
         self.assertIn("CHANGE the default catalog", out)
         self.assertEqual(run(change("databricks_default_namespace_setting", ["create"]))[0], 0)
 
+    def test_the_starter_warehouse_made_admins_only(self):
+        acl = lambda *gs: {"access_control": [{"group_name": g, "permission_level": "CAN_USE"} for g in gs]}
+        code, out = run(change("databricks_permissions", ["create"], after=acl("admins"), name="starter_warehouse"))
+        self.assertEqual(code, 2)
+        self.assertIn("REMOVE everyone's access to the Starter warehouse", out)
+        code, out = run(change("databricks_permissions", ["update"], before=acl("admins", "old-admins"), after=acl("admins"), name="starter_warehouse"))
+        self.assertIn("REMOVE access to the Starter warehouse for old-admins", out)
+        self.assertEqual(run(change("databricks_permissions", ["update"], before=acl("admins"), after=acl("admins", "new"), name="starter_warehouse"))[0], 0)
+        self.assertEqual(run(change("databricks_permissions", ["create"], name="other"))[0], 0, "other permissions are new access, not removed")
+
     def test_compliance_security_profile_is_one_way(self):
         code, out = run(change("databricks_compliance_security_profile_workspace_setting", ["create"]))
         self.assertEqual(code, 2)

@@ -29,7 +29,10 @@ class ReleaseZip(unittest.TestCase):
                 self.assertRegex(setup, rf"(?m)^{key}: null\b")
         self.assertIn("# ---- REQUIRED", setup, "the comments stay: they are the instructions")
         self.assertRegex(out["config/defaults/cost.yaml"].decode(), r"(?m)^account_id: null\b")
-        self.assertRegex(out[".github/CODEOWNERS"].decode(), r"(?m)^\*\s+@your-org/databricks-platform$")
+        owners = out[".github/CODEOWNERS"].decode()
+        self.assertRegex(owners, r"(?m)^\*\s+@your-org/databricks-platform$")
+        self.assertRegex(owners, r"(?m)^/config/defaults/settings\.yaml\s+@your-org/databricks-platform @your-org/security$",
+                         "the security settings keep a separate security reviewer")
 
     def test_none_of_this_environment_is_left(self):
         identifiers = rel.own_identifiers(self.files)

@@ -137,7 +137,7 @@ A release is a zip an organization installs ([SETUP.md](docs/SETUP.md), step 2).
 | Step | What to do |
 | --- | --- |
 | 1 | Merge everything for the release; `./scripts/test.sh` passes on `main` |
-| 2 | In `CHANGELOG.md`, rename **Unreleased** to the version, with what the first plan after an upgrade shows |
+| 2 | In `CHANGELOG.md`, rename **Unreleased** to the version, with what the first plan after an upgrade shows. Check its **Baseline edits** table lists every change to `config/defaults/` since the last release (`git diff <last tag> -- config/defaults/`): an upgrade never copies them |
 | 3 | Tag it: `git tag v1.0.0 && git push origin v1.0.0` |
 | 4 | Build the zip: `python3 scripts/release.py v1.0.0` writes `dist/<repo>-v1.0.0.zip` |
 | 5 | Check it: unzip it, `git init`, commit, and run `./scripts/test.sh` there |
