@@ -1,65 +1,100 @@
-# Citizen Development Workspace Baseline (Terraform)
+# Citizen Development Workspace Baseline
 
-## Overview
+A Terraform framework for keeping **existing Azure Databricks citizen development workspaces** consistent, secure, and easy to manage.
 
-This project applies one governed baseline to every **existing** Azure Databricks citizen development workspace, and keeps it there. You configure it with YAML only, in pull requests; GitHub Actions plans and applies it.
+The goal is to make workspace configuration predictable without having to manage each workspace separately. Most changes happen in YAML, go through a pull request, and are deployed by GitHub Actions.
 
-Each workspace gets:
+> **New to the project?** Start with [the setup guide](docs/SETUP.md). It walks through the initial setup and onboarding your first workspace.
 
-- **Secure admin settings:** legacy access and DBFS off, user isolation, token limits, downloads, Git allowlist, Unity Gateway, Microsoft Teams only, and more.
-- **Three personas granted to groups:** explorer (SQL), builder and publisher (full workspace); everyone else gets Consumer access (Databricks One). Who is in each group is managed in Entra ID, for example through access packages.
-- **Serverless first:** a default serverless SQL warehouse and one serverless usage policy every persona can use; classic cluster policies (interactive, jobs, pipelines; one cluster each per person) for people the self-service app approves.
-- **One Unity Catalog catalog** with predictive optimization; its schemas come from the self-service app.
-- **Chargeback tags** from one list (`config/defaults/cost.yaml`), on the usage policy, the warehouse and every classic cluster.
+## What this project manages
 
-## Get started
+Every onboarded workspace gets the same baseline, with workspace-specific settings where needed.
 
-> [!IMPORTANT]
-> **New here? Follow [docs/SETUP.md](docs/SETUP.md).** It goes from this zip to your first governed workspace, one team at a time. The first thing you edit is **[`config/setup.yaml`](config/setup.yaml)**: the values every setup step reads (your tenant, the state storage, this repository, the Databricks account).
+| Area | What's included |
+| --- | --- |
+| **Security** | Standard workspace admin settings, including restrictions on legacy access, DBFS, downloads, personal access tokens, Git providers, and other workspace features. User isolation is enforced, and integrations such as Unity Gateway and Microsoft Teams are configured through the baseline. |
+| **Access** | Three group-based personas: **Explorer** for SQL access, and **Builder** and **Publisher** for broader workspace access. Users without one of these personas get **Consumer** access through Databricks One. Group membership is managed in Entra ID, not in this repository. |
+| **Compute** | A serverless-first setup with a default serverless SQL warehouse and a shared serverless usage policy. Approved users can also request access to classic compute policies for interactive clusters, jobs, and pipelines through the self-service app. Classic compute is limited to one cluster per user. |
+| **Unity Catalog** | One catalog per workspace with predictive optimization enabled. The self-service app manages schemas within that catalog. |
+| **Cost tracking** | A shared set of chargeback tags, defined in `config/defaults/cost.yaml`, applied to serverless usage, the SQL warehouse, and classic compute. |
 
-| Step | What | Who |
+**This project does not create Databricks workspaces.** It applies and maintains the baseline on workspaces that already exist.
+
+## How it works
+
+There are two main layers of configuration:
+
+- **`config/defaults/`** defines the baseline shared by all workspaces.
+- **`config/workspaces/`** lists the workspaces managed by this project and holds their workspace-specific values and overrides.
+
+When you open a pull request, the GitHub workflows run checks and generate Terraform plans so you can review the impact before changes are applied. The deployment workflows also support drift detection to flag changes made outside the repository.
+
+For normal operations, you should not need to edit Terraform modules or deployment scripts. Start with the YAML configuration.
+
+## Getting started
+
+The full walkthrough is in [docs/SETUP.md](docs/SETUP.md). Here's the setup process at a glance:
+
+| Step | What to do | Usually handled by |
 | --- | --- | --- |
-| 1 | Fill in `config/setup.yaml` | Platform team |
-| 2 | Push this repository to your GitHub | Platform team |
-| 3 to 5 | `python3 scripts/setup.py state`, `identity`, `github` (each prints what it will do; `--run` does it) | Cloud team, Entra admin, GitHub admin |
-| 6 | In the Databricks account console, by hand: add the service principal, make it workspace admin, let it create serverless usage (budget) policies | Databricks account admin |
-| 7 | Create the Entra groups and sync them to the account | Identity team |
-| 8 | Decide the baseline in `config/defaults/` | Platform team, security |
-| 9 | Onboard a workspace: copy `config/workspaces/_example.yaml` to `<name>.yaml`, fill it in, open a pull request | Platform team |
+| 1 | Fill in [`config/setup.yaml`](config/setup.yaml) with the Azure tenant, Terraform state storage, GitHub repository, and Databricks account details. | Platform team |
+| 2 | Push this project to your GitHub repository. | Platform team |
+| 3 | Run `python3 scripts/setup.py state` to prepare Terraform state storage and its backend configuration. | Cloud team |
+| 4 | Run `python3 scripts/setup.py identity` to prepare the deployment identity. | Entra admin |
+| 5 | Run `python3 scripts/setup.py github` to configure GitHub for deployments. | GitHub admin |
+| 6 | In the Databricks account console, add the deployment service principal, grant it workspace admin access to the target workspaces, and allow it to create serverless usage (budget) policies. | Databricks account admin |
+| 7 | Create the persona groups in Entra ID and sync them to the Databricks account. | Identity team |
+| 8 | Review the baseline YAML files in `config/defaults/` with the platform and security teams. | Platform and security teams |
+| 9 | Copy [`config/workspaces/_example.yaml`](config/workspaces/_example.yaml) to `config/workspaces/<name>.yaml`, update the workspace details, and open a pull request. | Platform team |
+
+The setup commands in steps 3–5 **show what they would do by default**. Add `--run` when you're ready to execute a step. Follow the setup guide for prerequisites and the full sequence.
+
+## Making changes after setup
+
+Most day-to-day requests fit into one of these paths:
+
+| You want to… | Where to make the change |
+| --- | --- |
+| Update the baseline for all workspaces | `config/defaults/` |
+| Onboard a workspace | Add a YAML file under `config/workspaces/` using `_example.yaml` |
+| Change settings for one workspace | Update its file in `config/workspaces/` |
+| Change who has Explorer, Builder, or Publisher access | Update group membership in Entra ID (for example, through access packages) |
+| Give someone access to classic compute | Use the self-service app's approval process |
+| Change who must review configuration changes | `.github/CODEOWNERS` |
+
+Changes to the Terraform modules, scripts, or workflows are **framework changes**, not normal workspace configuration changes. See [AGENTS.md](AGENTS.md) before working on those areas.
+
+## Repository structure
+
+| Path | Purpose |
+| --- | --- |
+| `config/setup.yaml` | Shared values used during initial setup, including the workspace used for AI plan review. |
+| `config/defaults/` | Baseline configuration for access, compute, cost, catalogs, workspace settings, and `genie-code/`. |
+| `config/workspaces/` | One YAML file per managed workspace. These files define which workspaces are in scope. |
+| `config/backend.hcl` | Terraform state backend configuration, generated by the setup process. |
+| `terraform/` | Root Terraform configuration and reusable modules. |
+| `scripts/` | Setup, workspace onboarding and validation, preflight checks, Terraform execution, plan review, and tests. |
+| `.github/` | GitHub Actions workflows (`deploy.yml` and `checks.yml`) and `CODEOWNERS`. |
+| `docs/` | Setup, design decisions, workflows, and operational guides. |
+| `dev/` | Workspaces used to test the framework itself; not included in a release. |
+| `AGENTS.md`, `agents/`, `CLAUDE.md` | Contributor and coding-agent guidance. `AGENTS.md` is the main entry point. |
 
 ## Documentation
 
-| Read | For |
-| --- | --- |
-| [docs/SETUP.md](docs/SETUP.md) | Setting it up, onboarding workspaces, day to day, upgrades, troubleshooting |
-| [docs/user-journeys.md](docs/user-journeys.md) | Step by step: add a workspace, change one or all, give access, retire one |
-| [config/README.md](config/README.md) | Changing the configuration: which key to set for what |
-| [docs/design.md](docs/design.md) | Why it works the way it does |
-| [docs/github-actions.md](docs/github-actions.md) | The plan, apply and drift workflows |
-| [CHANGELOG.md](CHANGELOG.md) | What changed in each release |
-| [AGENTS.md](AGENTS.md) | Changing the project itself (for coding agents and maintainers) |
+- **[Setup and operations](docs/SETUP.md)** — Initial setup, workspace onboarding, routine operations, upgrades, and troubleshooting.
+- **[Common workflows](docs/user-journeys.md)** — Adding, updating, and retiring workspaces; changing access.
+- **[Configuration reference](config/README.md)** — Which YAML file and setting to change.
+- **[Design](docs/design.md)** — The architecture and the reasoning behind it.
+- **[GitHub Actions](docs/github-actions.md)** — How checks, plans, deployments, and drift detection work.
+- **[Changelog](CHANGELOG.md)** — Changes between releases.
+- **[Contributor guidance](AGENTS.md)** — How to work on the framework itself.
 
-## Layout
+## Running tests
 
-| Path | What it is |
-| --- | --- |
-| `config/defaults/` | The baseline every workspace gets: `access`, `compute`, `cost`, `catalog`, `settings` `.yaml`, `genie-code/` |
-| `config/workspaces/<name>.yaml` | One file per workspace: `prefix`, `host`, its groups, and any change to the baseline. The files are the list of workspaces |
-| `config/setup.yaml` | The setup values ([docs/SETUP.md](docs/SETUP.md), step 1), and which workspace's model reviews plans |
-| `config/backend.hcl`, `.github/CODEOWNERS` | Where state is kept (written by `setup.py state`), who approves what |
-| `terraform/` | The root module and modules. You do not edit these for normal operations |
-| `scripts/` | `setup.py` (one-time setup), `workspaces.py` (new workspace, which workspaces a change affects, checks), `preflight.py` (is a workspace ready?), `tf.sh` (run Terraform), `plan-guard.py`, `ai-plan-review.py`, `test.sh` |
-| `.github/` | `deploy.yml` (plan, apply and drift, one job per workspace) and `checks.yml` (pull request checks) ([docs/github-actions.md](docs/github-actions.md)) |
-| `docs/` | Setup, design and CI documentation |
-| `dev/` | The framework's own test workspaces; not in a release |
-| `AGENTS.md`, `agents/` | Guidance for coding agents: `AGENTS.md` is the entry point (`CLAUDE.md` points Claude Code to it), `agents/` has one guide per area |
-
-Everything outside `config/` (and `.github/CODEOWNERS`) is the framework: you upgrade it, you do not edit it.
-
-## Tests
+From the repository root:
 
 ```bash
 ./scripts/test.sh
 ```
 
-Runs every test without a workspace or credentials (Terraform against mocked providers), the same as the **Tests** check on every pull request.
+The tests run locally without Databricks workspace access or cloud credentials. Terraform tests use mocked providers. The same suite runs as the **Tests** check on pull requests.
