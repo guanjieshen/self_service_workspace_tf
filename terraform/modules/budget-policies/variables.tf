@@ -8,7 +8,7 @@ variable "workspace_id" {
 }
 
 variable "policies" {
-  description = "Key => { name, tags, groups }."
+  description = "Key => { name, tags, groups, users }; users are principals (servicePrincipals/<id>, users/<email>)."
   type        = any
 }
 

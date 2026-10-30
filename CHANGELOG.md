@@ -6,6 +6,10 @@ them for you: a setting missing from your baseline is left alone).
 
 ## Unreleased
 
+- The identity running Terraform (the pipeline's service principal) may use the workspace's
+  serverless usage policy, and data classification waits for it: turning classification on
+  failed with "Usage policy ID must not be empty". The service principal needs the account's
+  **Billing admin** role to create the policy (`docs/SETUP.md`, step 6).
 - The Serverless Starter Warehouse Databricks creates in a new workspace is for the platform
   admins only (`starter_warehouse.admins_only` in `config/defaults/compute.yaml`): people use
   the default warehouse, which is sized and tagged. Only its permissions are managed. The first

@@ -91,6 +91,9 @@ module "catalog" {
 
   catalog = local.catalog
   grants  = { for g, privs in local.catalog_grants : lookup(local.group, g, g) => privs if length(privs) > 0 }
+  # Data classification runs on this usage policy: passing it makes it wait for the policy
+  # and for the pipeline's right to use it (the output waits for both).
+  usage_policy_id = try(one(values(module.budget_policies[0].policy_ids)), null)
 
   # Invalid input stops at the plain-language checks in checks.tf, not a crash inside a
   # module. Harmless for the plan: config_checks has no inputs, so it only has changes
