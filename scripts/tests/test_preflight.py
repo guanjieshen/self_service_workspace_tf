@@ -166,8 +166,10 @@ class Preflight(Base):
         api = FakeApi(metastore_rights=())
         self.assertIn("cannot create catalog fin_citizen_dev", " ".join(self.levels(self.run_checks(api), "warning")))
         self.assertTrue(any("effective-permissions/metastore/ms-1?principal=sp-terraform" in p for p in api.paths))
-        self.assertEqual(self.levels(self.run_checks(FakeApi(metastore_rights=(), metastore_owner="account users")), "warning"), [],
-                         "a metastore admin (here every account user) needs no grant")
+        self.assertEqual(self.levels(self.run_checks(FakeApi(metastore_rights=(), metastore_owner="sp-terraform")), "warning"), [],
+                         "a metastore admin needs no grant")
+        self.assertIn("cannot create catalog", " ".join(self.levels(self.run_checks(FakeApi(metastore_rights=(), metastore_owner="account users")), "warning")),
+                      "a metastore owned by account users does not make its users metastore admins")
         api = FakeApi(catalog_exists=True, catalog_owner="fin_platform_admins", metastore_rights=())
         warnings = " ".join(self.levels(self.run_checks(api), "warning"))
         self.assertIn("does not own catalog fin_citizen_dev", warnings)

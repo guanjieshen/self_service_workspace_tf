@@ -191,9 +191,10 @@ def legacy_uses(get):
 
 def catalog_rights(get, metastore, catalog, existing, storage_root, me, who):
     """Whether the identity may create the workspace catalog, or change it once it exists.
-    A metastore admin (the metastore's owner, a group it is in, or "account users") may do both."""
+    A metastore admin (the metastore's owner, or a group it is in) may do both. A metastore owned
+    by "account users" does not make every account user one: Unity Catalog refuses them."""
     principal = me.get("applicationId") or me.get("userName") or ""
-    mine = {principal, me.get("userName"), "account users"} | {g.get("display") for g in me.get("groups", [])}
+    mine = {principal, me.get("userName")} | {g.get("display") for g in me.get("groups", [])}
     mine.discard(None)
     if metastore.get("owner") in mine:
         return [("ok", f"{who} is a metastore admin (the metastore's owner is {metastore['owner']})")]

@@ -8,7 +8,7 @@
 #
 # Sizes, scaling, timeouts, node types and names are updated in place. Changing the
 # warehouse `type` may recreate it with a new ID (dashboards and jobs pointing at the
-# old ID then need updating); scripts/tf.sh warns before applying that.
+# old ID then need updating); the plan guard (scripts/plan-guard.py) flags that.
 # A single workspace can change any key below in its file (config/workspaces/<name>.yaml).
 # All of them carry the chargeback tags (tags: in config/defaults/cost.yaml).
 # =============================================================================
@@ -30,7 +30,8 @@ sql_warehouse:
 # Databricks creates "Serverless Starter Warehouse" in a new workspace, usable by every
 # user. admins_only: true = only the platform admins may use it, so people use the default
 # warehouse above (sized and tagged here). Terraform manages only its permissions, never
-# the warehouse itself; a workspace without one gets nothing. null = leave its access alone.
+# the warehouse itself; a workspace without one gets nothing. null = leave its access alone
+# (it does not give access back once an apply removed it). The plan guard flags the first apply.
 starter_warehouse:
   name: Serverless Starter Warehouse
   admins_only: true

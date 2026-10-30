@@ -1,11 +1,32 @@
 # Changelog
 
 Releases are git tags (`v1.0.0`). Each entry says what the first plan after an upgrade
-shows, and lists new baseline settings to add to `config/defaults/` (an upgrade never adds
-them for you: a setting missing from your baseline is left alone).
+shows. An upgrade never touches `config/defaults/` (it is your baseline), so each entry also
+lists, under **Baseline edits**, the exact YAML to change there: new settings to add, and
+defaults the release changed that you may want to copy. A setting missing from your baseline
+is left alone.
 
 ## Unreleased
 
+**Baseline edits** (`config/defaults/`, in the upgrade's pull request):
+
+| File | Edit |
+| --- | --- |
+| `catalog.yaml` | Under `catalog:`, set `owner: null` and add `other_privileges: {}` |
+| `catalog.yaml` | Optional: `comment: Citizen development catalog (managed by Terraform)` |
+| `settings.yaml` | Git allowlist: `allowed_urls: ["https://github.com/"]` if you kept the placeholder `https://github.com/<org>/` |
+| `cost.yaml` | Rename the tag `APP_ID` to `APPID` in `tags:` and `classic_user_tags` |
+| every file | Placeholders `{bu}` / `{BU}` to `{prefix}` / `{PREFIX}` |
+
+- The plan guard flags the first apply that makes the **Starter warehouse admins only** (and any
+  later change that removes someone from it): everyone else loses it, with their queries,
+  dashboards and alerts on it. The first plan of an existing workspace now needs
+  `allow-risky-changes`, or `starter_warehouse.admins_only: null`.
+- `tf.sh` refuses to apply, destroy or `force-unlock` locally without `config/backend.hcl`: break
+  glass works on the shared state, never a local one. New: `./scripts/tf.sh <name> force-unlock
+  <lock ID>`. SETUP.md step 11 has runbooks for a lock left by a run that died, and for break glass.
+- The release zip's CODEOWNERS keeps a separate security reviewer on `config/defaults/settings.yaml`
+  (`@your-org/databricks-platform @your-org/security`).
 - **The pipeline owns the workspace catalog** (`catalog.owner: null` in `config/defaults/catalog.yaml`,
   was `platform_admins`). Handing ownership to a group the service principal is not in made the
   next apply fail with `PERMISSION_DENIED` in any metastore where it is not metastore admin.

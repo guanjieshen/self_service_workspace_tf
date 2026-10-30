@@ -129,6 +129,7 @@ class TfShRelease(unittest.TestCase):
         (self.repo / "terraform").mkdir()
         (self.repo / "config/workspaces").mkdir(parents=True)
         (self.repo / "config/workspaces/ws.yaml").write_text("prefix: x\n")
+        (self.repo / "config/backend.hcl").write_text('container_name = "x"\n')   # break glass uses the shared state
         self.fake = self.repo / "fake"
         self.fake.mkdir()
         tf = self.fake / "terraform"
@@ -196,7 +197,6 @@ class TfShRelease(unittest.TestCase):
     def test_in_ci_a_flagged_apply_needs_the_approval_label(self):
         # The apply job sets CONFIRM_ENV only when the merged pull request has allow-risky-changes.
         folder = 'module.folders.databricks_directory.team["a"]'
-        (self.repo / "config/backend.hcl").write_text('container_name = "x"\n')
         for confirm, applied in (("", False), ("ws", True)):
             with self.subTest(label=bool(confirm)):
                 (self.fake / "calls.log").write_text("")
@@ -221,6 +221,17 @@ class TfShRelease(unittest.TestCase):
                                  capture_output=True, text=True, timeout=60)
             self.assertNotEqual(out.returncode, 0, cmd)
             self.assertIn(f"Refusing to {cmd} outside GitHub Actions", out.stdout)
+            self.assertFalse((self.fake / "calls.log").exists(), f"{cmd}: terraform was not run")
+
+    def test_break_glass_refuses_a_local_state(self):
+        (self.repo / "config/backend.hcl").unlink()
+        env = {k: v for k, v in os.environ.items() if k != "GITHUB_ACTIONS"}
+        env.update(TERRAFORM=str(self.fake / "terraform"), FAKE_DIR=str(self.fake), CONFIRM_ENV="ws", ALLOW_LOCAL_APPLY="1")
+        for cmd in ("apply", "destroy", "force-unlock"):
+            out = subprocess.run([str(self.repo / "scripts/tf.sh"), "ws", cmd], env=env, stdin=subprocess.DEVNULL,
+                                 capture_output=True, text=True, timeout=60)
+            self.assertNotEqual(out.returncode, 0, cmd)
+            self.assertIn(f"Refusing to {cmd} without config/backend.hcl", out.stdout)
             self.assertFalse((self.fake / "calls.log").exists(), f"{cmd}: terraform was not run")
 
 

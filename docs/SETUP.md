@@ -336,7 +336,7 @@ git rm -r -q --ignore-unmatch $FRAMEWORK             # also drops files the rele
 git add -A && git checkout -b upgrade-v1.3.0
 ```
 
-It touches nothing else: not `config/defaults/`, your workspaces, `config/setup.yaml` or `.github/CODEOWNERS`. A baseline setting that is new in the release is absent from your `config/defaults/` until you add it, which means "leave alone", so an upgrade never turns something on by itself; `CHANGELOG.md` lists new settings to add. Open a pull request: its plan shows what the new version changes in each workspace before anything is applied.
+It touches nothing else: not `config/defaults/`, your workspaces, `config/setup.yaml` or `.github/CODEOWNERS`. A baseline setting that is new in the release is absent from your `config/defaults/` until you add it, which means "leave alone", so an upgrade never turns something on by itself. Each release's **Baseline edits** in `CHANGELOG.md` lists the YAML to change in `config/defaults/`: new settings, and defaults the release changed that you may want too. Open a pull request: its plan shows what the new version changes in each workspace before anything is applied.
 
 > **Warning:** Do not edit framework files in your repository: the next upgrade replaces them. Send a fix to the framework maintainers so it is in the next release.
 
@@ -346,7 +346,7 @@ State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (ste
 
 **To stop managing a workspace, retire it** (delete its file in a pull request): Terraform forgets it, and nothing in the workspace changes.
 
-`./scripts/tf.sh <name> destroy` is different: it **deletes** what this project created, including the default warehouse, the usage and cluster policies, and the workspace catalog **with its data**, and resets the workspace configuration keys it manages (`enable*`, `enforce*`) to `false`, which turns personal access tokens off. Outside GitHub Actions it refuses unless `ALLOW_LOCAL_APPLY=1` (break glass). Review the plan before confirming.
+`./scripts/tf.sh <name> destroy` is different: it **deletes** what this project created, including the default warehouse, the usage and cluster policies, and the workspace catalog **with its data**, and resets the workspace configuration keys it manages (`enable*`, `enforce*`) to `false`, which turns personal access tokens off. Outside GitHub Actions it refuses unless `ALLOW_LOCAL_APPLY=1` (see **Break glass**, step 11). Review the plan before confirming.
 
 ## 11. Troubleshooting
 
@@ -355,7 +355,8 @@ State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (ste
 | `No matching federated identity record found for presented assertion` (an `AADSTS` error at sign-in) | The token's subject is not one of the two credentials: the repository was renamed or transferred, or a workflow ran from a branch other than `main` (Drift or Apply run by hand on a branch) | Update `github_repo` in `config/setup.yaml` and run step 4 again (it reads the current subject prefix); run Apply and Drift only from `main` |
 | `Source IP address ... is blocked by Databricks IP ACL`, or a timeout reaching the workspace | GitHub-hosted runners cannot reach the workspace | A runner inside the network and `TERRAFORM_RUNNER` (step 5) |
 | `AuthorizationPermissionMismatch` or `403` reading the state | The role on the state container is missing or still propagating | Wait a few minutes after step 4; check Storage Blob Data Contributor on the container |
-| `state blob is already locked` | An apply while another apply or a local plan holds the lock (CI plans do not lock) | Wait for the other run, then re-run |
+| `state blob is already locked` | Another apply, or a local plan, holds the lock (CI plans do not lock) | If an apply for the workspace is running (the repository's Actions tab), wait for it and re-run. If none is, see **A lock left by a run that died**, below |
+| An apply was cancelled or timed out partway | The changes before the stop are made and in the state; the rest are not | Re-run the apply: Terraform makes only what is left. If it says the state is locked, see below |
 | Preflight: `is not a workspace admin` | Step 6 not done for this workspace | Step 6, item 2, for this workspace |
 | Preflight: group `does not exist in the account` or `exists only in this workspace` | The Entra group is missing, not synced, or a workspace-local group has the same name | Step 7; or name the right group under `groups:` in the workspace's file |
 | Preflight: `the metastore has no storage root` | New catalogs have nowhere to store data | Set `catalog.storage_root` in the workspace's file to an external location URL |
@@ -368,3 +369,36 @@ State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (ste
 | A local plan shows permission changes that CI does not | Local plans run as you, not the pipeline: the owner entry differs | Trust the CI plan and the drift check |
 | The plan comment has no AI review | `ai_review_host` is not set, the service principal is not in that workspace, or the model is unavailable to it there (region, Unity Gateway, missing EXECUTE) | Set `ai_review_host` to a workspace that has the model, add the service principal to it, or change `ai_review_model`; the review is advice only |
 | Apply ran straight after the merge, without approval | `apply-approval` has no required reviewers (or the GitHub plan does not support them) | Add reviewers to the environment (`apply_approvers`, then step 5 again) |
+
+### A lock left by a run that died
+
+An apply takes a lock on its workspace's state, and releases it when it ends. A runner that is killed partway (cancelled, timed out, the machine lost) can leave it behind, and every later apply for that workspace fails with `state blob is already locked`.
+
+1. **Make sure nothing is running.** In the repository's **Actions** tab, no Deploy run for the workspace is in progress, and nobody is running `tf.sh` locally. Releasing the lock of a running apply corrupts the state.
+2. **Copy the lock ID** from the error (`ID: 1a2b3c4d-...`). It also says who took the lock and when.
+3. **Release it**, signed in with the Azure CLI as someone with **Storage Blob Data Contributor** on the state container:
+
+   ```bash
+   ./scripts/tf.sh <name> force-unlock <lock ID>
+   ```
+
+   Without a terminal: in the Azure portal, the state container > `citizen-dev/<name>.tfstate` > **Break lease**.
+4. **Re-run the apply** (the failed run's **Re-run jobs**, or the latest run on `main`). Terraform finishes what the stopped run did not.
+
+If the state itself is damaged (an apply reports it cannot read it), restore the last good version: the container > the blob > **Versions** > **Make current version**, then re-run the apply.
+
+### Break glass: applying from a laptop
+
+For when CI cannot run (GitHub is down, the runner is broken) and a workspace needs a fix now. Everything else goes through a pull request.
+
+1. **Use the shared state.** `config/backend.hcl` must be in your checkout: `tf.sh` refuses to apply without it, because a local state would split from the one CI uses.
+2. **Sign in as someone with the pipeline's rights:** workspace admin in the workspace, Storage Blob Data Contributor on the state container, and for usage policies the account's Billing admin role (step 6). A local run uses your identity, not the service principal.
+3. **Plan, then apply** from `main` with the fix on top:
+
+   ```bash
+   ./scripts/tf.sh <name> plan
+   ALLOW_LOCAL_APPLY=1 ./scripts/tf.sh <name> apply
+   ```
+
+   The apply takes the same lock CI does, so it cannot run at the same time as a CI apply.
+4. **Open a pull request with the same change straight after.** Until it is merged, `main` does not match the workspace, and the next CI apply or drift check undoes the fix.
