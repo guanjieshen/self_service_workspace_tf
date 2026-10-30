@@ -102,12 +102,14 @@ settings:
 
   # ---- Git folders ---------------------------------------------------------
 
-  # No restriction for now: Git folders may use any Git URL. To restrict them, set
-  # restrict_to_allowlist: true and list the allowed URL prefixes, for example
-  # "https://github.com/my-org/".
+  # Git folders may use repositories whose URL starts with one of these prefixes.
+  # https://github.com/ allows every github.com repository (any organization) and blocks
+  # other Git hosts. Add a GitHub Enterprise host the same way, for example
+  # "https://github.example.com/" (Enterprise Server) or "https://<name>.ghe.com/"; no wildcards.
   git:
-    restrict_to_allowlist: false
-    allowed_urls: []
+    restrict_to_allowlist: true
+    allowed_urls:
+      - "https://github.com/"
 
   # ---- Dashboards ----------------------------------------------------------
 

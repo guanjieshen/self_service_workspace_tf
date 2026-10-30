@@ -17,7 +17,8 @@ and checks what Terraform needs but cannot fix itself:
     admin role; account admin alone is not enough);
   - the workspace catalog has somewhere to keep its data (a metastore storage root, or
     catalog.storage_root in the workspace's file);
-  - before legacy access is disabled (one-way after 30 days): what still uses it.
+  - before legacy access is disabled (one-way after 30 days): what still uses it;
+  - placeholders in the baseline that must be replaced (the Git allowlist's <org>).
 
 Changes nothing. Prints ok / warning / error lines and exits 1 if there is an error. The
 workspace's workflow runs it before every plan; run it yourself before onboarding a workspace.
@@ -147,6 +148,16 @@ def checks(ws, get):
         elif not metastore.get("storage_root") and not wsf.setting(f, "catalog", "storage_root"):
             out.append(("error", f"the metastore has no storage root, so catalog {info['catalog']} needs one: set "
                                  "catalog.storage_root in the workspace's file to an external location's URL"))
+
+    # The baseline ships with placeholders to replace: a Git allowlist of github.com/<org>/
+    # allows nothing that exists.
+    for path in (f, wsf.DEFAULTS / "settings.yaml"):
+        lines = wsf.block(path, "settings")
+        if any("allowed_urls" in l for l in lines):
+            if any("<org>" in l for l in lines):
+                out.append(("warning", f"the Git allowlist (settings.git.allowed_urls in {path.relative_to(wsf.ROOT) if path.is_relative_to(wsf.ROOT) else path.name}) "
+                                       "still has the placeholder https://github.com/<org>/: replace it with your organization's URL"))
+            break
 
     # Legacy access: once disabled for 30 days, the workspace is Unity Catalog only, for good.
     if wsf.setting(f, "settings", "disable_legacy_access") == "true":
