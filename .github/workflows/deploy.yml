@@ -109,10 +109,13 @@ jobs:
           VERSION: v0.3.20
           SHA256: 6ab68aad6200586ee983e8112b67aa2050c61dc6e67182dbb287b30c7a97c9a8   # tf-summarize_linux_amd64.tar.gz
         run: |
-          dir="$RUNNER_TEMP/tf-summarize"; mkdir -p "$dir"
-          curl -fsSL -o "$dir/tf-summarize.tar.gz" "https://github.com/dineshba/tf-summarize/releases/download/$VERSION/tf-summarize_linux_amd64.tar.gz"
-          echo "$SHA256  $dir/tf-summarize.tar.gz" | sha256sum -c -
-          tar -xzf "$dir/tf-summarize.tar.gz" -C "$dir" tf-summarize
+          # Kept in the runner's tool cache: a long-lived self-hosted runner downloads it once.
+          dir="${RUNNER_TOOL_CACHE:-$RUNNER_TEMP}/tf-summarize/$VERSION"; mkdir -p "$dir"
+          if [[ ! -x "$dir/tf-summarize" ]]; then
+            curl -fsSL -o "$dir/tf-summarize.tar.gz" "https://github.com/dineshba/tf-summarize/releases/download/$VERSION/tf-summarize_linux_amd64.tar.gz"
+            echo "$SHA256  $dir/tf-summarize.tar.gz" | sha256sum -c -
+            tar -xzf "$dir/tf-summarize.tar.gz" -C "$dir" tf-summarize
+          fi
           "$dir/tf-summarize" -md ".plans/$WORKSPACE.json" > ".plans/$WORKSPACE.summary.md"
 
       # Advice only: on when config/setup.yaml sets ai_review_host, the workspace whose model
@@ -127,7 +130,8 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: ./scripts/ai-plan-review.py "$WORKSPACE" --base "origin/$BASE_REF" > ".plans/$WORKSPACE.ai.md"
 
-      # One comment per workspace, updated on every push; none for a plan without changes.
+      # One comment per workspace, updated on every push; none for a plan without changes
+      # (unless preflight found an error).
       - name: Post the plan to the pull request
         if: always()
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
