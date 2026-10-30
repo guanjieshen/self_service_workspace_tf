@@ -106,21 +106,71 @@ It creates a storage account with no public blob access and no shared keys (Entr
 
 **Who:** an Entra admin who can create app registrations and assign roles on the storage account (Owner or User Access Administrator), signed in to `gh` with read access to the repository.
 
-Uses `tenant_id`, `subscription_id`, the `state_*` values, `github_repo` and `pipeline_name`.
+GitHub Actions signs in as one Entra service principal, for every workspace and for the Terraform state. **No client secret is stored anywhere.** On each run, GitHub issues a short-lived OIDC token, Entra checks it against a *federated credential* on the app registration, and hands back an access token for the service principal. That token is then used for the state storage (step 3) and for Databricks (step 6).
+
+The quickest way is the setup script. It uses `tenant_id`, `subscription_id`, the `state_*` values, `github_repo` and `pipeline_name`:
 
 ```bash
-python3 scripts/setup.py identity          # read it
-python3 scripts/setup.py identity --run
+python3 scripts/setup.py identity          # shows the commands it would run
+python3 scripts/setup.py identity --run    # runs them
 ```
 
-It creates the app registration and service principal (`pipeline_name`), two federated credentials for GitHub Actions, and gives the service principal **Storage Blob Data Contributor** on the state container only. It writes the client ID (`pipeline_client_id`) into `config/setup.yaml` for the next steps; commit the file.
+It writes the client ID (`pipeline_client_id`) into `config/setup.yaml` for the next steps. Commit the file.
 
-| Federated credential | Subject | Lets sign in |
+### What the app registration needs
+
+Whether you run the script or set it up by hand, this is everything on the Entra side:
+
+| Item | Value | Why |
 | --- | --- | --- |
-| `github-pull-requests` | `<repo prefix>:pull_request` | Plans, on every pull request |
-| `github-main` | `<repo prefix>:ref:refs/heads/main` | Applies and drift checks, from `main` |
+| **App registration** and its service principal | Any name, for example `pipeline_name` (`sp-citizen-dev-terraform`) | The identity CI signs in as |
+| **Federated credential** `github-pull-requests` | Subject `<prefix>:pull_request` | Lets plans sign in, on every pull request |
+| **Federated credential** `github-main` | Subject `<prefix>:ref:refs/heads/main` | Lets applies, drift checks and retirements sign in, from `main` |
+| **Role** on the state container | **Storage Blob Data Contributor**, scoped to the container only | Reads and writes the Terraform state |
 
-No client secret is created: GitHub exchanges its own short-lived token for an Entra token on each run. One service principal serves every workspace, so new workspaces need nothing here.
+Both federated credentials use the issuer `https://token.actions.githubusercontent.com` and the audience `api://AzureADTokenExchange` (the defaults).
+
+`<prefix>` is your repository's subject prefix. Read it with:
+
+```bash
+gh api repos/<org>/<repo>/actions/oidc/customization/sub --jq .sub_claim_prefix
+```
+
+For example `repo:my-org@123456/my-repo@456789`. Repositories created or renamed since July 15, 2026 include numeric IDs.
+
+**Not needed:** client secrets or certificates, API permissions (Microsoft Graph or others), redirect URIs, or one credential per workspace. Adding a workspace later needs nothing in Entra.
+
+> **Do not use the "Environment" entity type.** A job that runs in a GitHub Environment signs in with the subject `environment:<name>`, which matches neither credential, so the sign-in fails. This repository's jobs that sign in never use an environment; `apply-approval` is only an approval step.
+
+### Setting it up in the Azure portal
+
+If your team does not run the script, do this by hand:
+
+1. **Create the app registration:** Microsoft Entra ID > App registrations > New registration. Leave the redirect URI empty.
+2. **Add the first federated credential:** the app > Certificates & secrets > Federated credentials > Add credential > **GitHub Actions deploying Azure resources**.
+   - Organization and Repository: your repository.
+   - Entity type: **Pull request**.
+   - Name: `github-pull-requests`.
+3. **Add the second:** the same, with Entity type **Branch** and branch `main`. Name: `github-main`.
+4. **Check both subjects** match `<prefix>:pull_request` and `<prefix>:ref:refs/heads/main`. If your repository's prefix includes numeric IDs, use **Edit (optional)** under the subject to enter it exactly.
+5. **Grant the role:** the storage account > Containers > the state container > Access control (IAM) > Add role assignment > **Storage Blob Data Contributor** > the app's service principal.
+6. **Copy the Application (client) ID** into `pipeline_client_id` in `config/setup.yaml`.
+
+### Checking it
+
+```bash
+az ad app federated-credential list --id <application-id> --query "[].{name:name, subject:subject}" -o table
+```
+
+You should see exactly the two credentials above, with your repository's prefix. Credentials for other repositories can stay; they do not affect this one.
+
+| If a run fails with | It means |
+| --- | --- |
+| `AADSTS70021: No matching federated identity record found` | A subject does not match: check the prefix, and that the job is not in an environment |
+| `AuthorizationPermissionMismatch`, or `403` reading the state | The storage role is missing, or still propagating (wait a few minutes) |
+| `the repository variables ... are not set` | Step 5 is not done yet |
+
+The Databricks side of the same identity (account, workspace admin, Billing admin) is [step 6](#6-databricks-account-by-hand).
 
 ## 5. Repository settings
 
