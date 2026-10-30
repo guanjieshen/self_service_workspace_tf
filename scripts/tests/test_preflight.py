@@ -93,7 +93,8 @@ class Preflight(unittest.TestCase):
         self.assertIn("signed in as sp-terraform, a workspace admin", self.levels(results, "ok"))
 
     def test_the_git_allowlist_placeholder_is_flagged(self):
-        self.set("settings", "")
+        # Its own placeholder, so the test does not depend on what the repository's baseline holds.
+        self.set("settings", 'settings:\n  git:\n    allowed_urls:\n      - "https://github.com/<org>/"\n')
         warnings = self.levels(self.run_checks(FakeApi()), "warning")
         self.assertEqual(len(warnings), 1)
         self.assertIn("still has the placeholder https://github.com/<org>/", warnings[0])

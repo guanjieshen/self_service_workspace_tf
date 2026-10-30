@@ -179,7 +179,7 @@ The baseline in `config/defaults/` is what every workspace gets. Most of it is a
 | Decision | File and key | Shipped value | Notes |
 | --- | --- | --- | --- |
 | **Disable legacy access** (Hive metastore, DBFS root and mounts, No-isolation clusters) | `defaults/settings.yaml` `disable_legacy_access`, `disable_dbfs_root_and_mounts`, `enforce_user_isolation` | `true` | **One-way after 30 days.** Fine for new workspaces. For an existing one, `preflight.py` lists what still uses legacy access; set them to `null` under `settings:` in that workspace's file until it is migrated |
-| Git URLs allowed in Git folders | `defaults/settings.yaml` `git.allowed_urls` | `https://github.com/<org>/` | **Replace the placeholder**; preflight warns until you do |
+| Git URLs allowed in Git folders | `defaults/settings.yaml` `git.allowed_urls` | `https://github.com/` (every github.com repository; other Git hosts blocked) | Narrow it to your organization (`https://github.com/<your-org>/`), or add your GitHub Enterprise host; preflight warns while a `<org>` placeholder is left |
 | Compliance security profile | `defaults/settings.yaml` `compliance_security_profile` | `null` (leave alone) | **One-way**, and billed. Only if your compliance team requires it |
 | Unity Gateway enforced | `defaults/settings.yaml` `enforce_unity_gateway` | `true` | Switches off the `databricks-` pay-per-token endpoints; model calls must use `system.ai` models |
 | Collaboration platforms | `defaults/settings.yaml` `collaboration_platforms.allowed` | `ALLOW_TEAMS` | `ALLOW_ALL`, `ALLOW_SLACK`, `ALLOW_TEAMS` or `DENY_ALL` |

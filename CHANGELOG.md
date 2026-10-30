@@ -16,6 +16,9 @@ them for you: a setting missing from your baseline is left alone).
   against false alarms: a security change made on purpose with a reason is Medium, the
   pipeline's own grant removed by the code is Low, and nothing is High only because it is
   unknown. Two evaluation cases from real pull requests; 20/20 with Opus (17/20 before).
+- The Git allowlist allows every github.com repository (`https://github.com/`) instead of the
+  placeholder `https://github.com/<org>/`, which matched none; other Git hosts stay blocked. Add a
+  GitHub Enterprise host to `allowed_urls` when you have one.
 - Data classification and data quality monitoring are turned on by hand in Catalog Explorer
   (`docs/SETUP.md`, step 9): removed `catalog.data_classification` and its checks. The
   classification API needs a usage policy ID the Terraform provider cannot send, and
