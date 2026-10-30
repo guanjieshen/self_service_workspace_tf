@@ -16,7 +16,7 @@
 # ---- Default SQL warehouse --------------------------------------------------
 # One warehouse every persona can use (see default_warehouse in config/defaults/access.yaml).
 sql_warehouse:
-  name: "{BU} Default Warehouse"
+  name: "{PREFIX} Default Warehouse"
   type: serverless             # serverless | pro | classic
   size: Small                  # 2X-Small | X-Small | Small | Medium | Large | X-Large | ...
   auto_stop_minutes: 5         # stop after this many idle minutes
@@ -61,17 +61,17 @@ cluster_policy:
 
   # All-purpose clusters, for notebooks.
   interactive:
-    name: "{BU} Classic Interactive"
+    name: "{PREFIX} Classic Interactive"
     max_clusters_per_user: 1
     max_autotermination_minutes: 60   # must stop after at most this many idle minutes
 
   # Job clusters: created for a run and stopped when it ends. "Per user" is whoever the
   # job runs as, so jobs that run as one service principal share its limit.
   jobs:
-    name: "{BU} Classic Jobs"
+    name: "{PREFIX} Classic Jobs"
     max_clusters_per_user: 1
 
   # Pipeline (Lakeflow) clusters, for a pipeline that cannot run serverless.
   pipelines:
-    name: "{BU} Classic Pipelines"
+    name: "{PREFIX} Classic Pipelines"
     max_clusters_per_user: 1

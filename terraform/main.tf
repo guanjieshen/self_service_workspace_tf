@@ -52,7 +52,7 @@ data "databricks_sql_warehouses" "starter" {
 module "compute" {
   source = "./modules/compute"
 
-  names             = { BU = local.bu_upper, bu = local.bu }
+  names             = { PREFIX = local.prefix_upper, prefix = local.prefix }
   tags              = local.chargeback_tags
   classic_user_tags = local.classic_user_tags
   user_tag_pattern  = local.user_tag_pattern

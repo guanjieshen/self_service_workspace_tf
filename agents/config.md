@@ -15,7 +15,7 @@ A workspace is one file, `config/workspaces/<name>.yaml`. It changes a default b
   the setting is released (it keeps its current value), never reset.
 - A key the baseline does not have fails the plan with its name, so a typo cannot
   silently do nothing.
-- Keys only a workspace has: `bu`, `host` (required), `genie_code_instructions`, `label`, and rarely `account_id`, `auth`, `id`
+- Keys only a workspace has: `prefix`, `host` (required), `genie_code_instructions`, `label`, and rarely `account_id`, `auth`, `id`
   (`workspace_keys` in `terraform/config.tf`).
 - Each workspace names its persona groups (`groups:`); a persona left `null` is skipped.
   Only `groups.platform_admins` comes from the baseline.

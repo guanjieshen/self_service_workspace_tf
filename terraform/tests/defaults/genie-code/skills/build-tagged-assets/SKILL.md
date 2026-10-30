@@ -5,7 +5,7 @@ in every workspace.
 - The front matter (between the --- lines) must come first and give name (the
   folder name) and description. Genie Code reads the description to decide when
   to use the skill, so say plainly what it is for.
-- Placeholders filled in per workspace: {BU}, {CATALOG}, {WAREHOUSE}, {TAGS} (every chargeback tag), {WORKSPACE_TAGS} (the ones set for you, with their values).
+- Placeholders filled in per workspace: {PREFIX}, {CATALOG}, {WAREHOUSE}, {TAGS} (every chargeback tag), {WORKSPACE_TAGS} (the ones set for you, with their values).
 - Comments like this one are removed before deploying.
 -->
 ---
@@ -29,10 +29,10 @@ Untagged work cannot be charged back, so treat the tags as required, not optiona
 
 ## How to tag each kind of asset
 
-- **Serverless notebooks, jobs and pipelines**: select a serverless usage policy. It adds the tags for you. Use the project's policy if the user has one, otherwise `{BU}-0-SELF-SERVICE`. If no usage policy is offered, tag the job or pipeline itself as below.
+- **Serverless notebooks, jobs and pipelines**: select a serverless usage policy. It adds the tags for you. Use the project's policy if the user has one, otherwise `{PREFIX}-0-SELF-SERVICE`. If no usage policy is offered, tag the job or pipeline itself as below.
 - **Jobs**: add the tags in the job's tags (`tags` in the job definition). For serverless tasks, also set the usage policy (`budget_policy_id` in the job definition).
-- **Classic clusters and job clusters**: create them only from `{BU} Classic Interactive` (all-purpose clusters) or `{BU} Classic Jobs` (job clusters); the user requests access through the self-service app. The policy sets the fixed tags and asks for the others; fill in the owner's. Do not use the Personal Compute policy for shared or scheduled work, because its clusters do not carry the tags.
-- **Pipelines on classic compute**: put the tags in the custom tags of the pipeline's clusters and use the `{BU} Classic Pipelines` cluster policy.
+- **Classic clusters and job clusters**: create them only from `{PREFIX} Classic Interactive` (all-purpose clusters) or `{PREFIX} Classic Jobs` (job clusters); the user requests access through the self-service app. The policy sets the fixed tags and asks for the others; fill in the owner's. Do not use the Personal Compute policy for shared or scheduled work, because its clusters do not carry the tags.
+- **Pipelines on classic compute**: put the tags in the custom tags of the pipeline's clusters and use the `{PREFIX} Classic Pipelines` cluster policy.
 - **Model serving endpoints and other assets that offer tags or a usage policy**: set the usage policy if offered and add the tags.
 - **SQL**: use the existing `{WAREHOUSE}` warehouse (or a team's warehouse from the self-service app) rather than creating a new one; those warehouses are already tagged. Dashboards and Genie spaces are charged through the warehouse they use.
 

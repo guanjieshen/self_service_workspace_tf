@@ -5,7 +5,7 @@
 # dashes and underscores (for example hr-citizen-dev). One file per workspace;
 # the files in this folder are the list of workspaces CI deploys.
 #
-# Required: bu, host, and the groups. Everything else comes from the baseline
+# Required: prefix, host, and the groups. Everything else comes from the baseline
 # (config/defaults/). To change a baseline setting for this workspace only, set
 # the same key here, with the same shape: maps merge key by key, anything else
 # replaces the baseline value, and null means "leave it alone". Give the reason
@@ -14,11 +14,12 @@
 
 # ---- REQUIRED ---------------------------------------------------------------
 
-bu: xyz                    # business unit code: BUSINESS_UNIT tag, <BU> Default Warehouse, {bu}_citizen_dev, {bu}_platform_admins
+prefix: xyz                # starts every name Terraform creates here (xyz_citizen_dev, XYZ Default Warehouse,
+                           # xyz_platform_admins); short, lower case, unique per workspace. Not the file name.
 host: https://adb-0000000000000000.0.azuredatabricks.net
 
 # One Entra ID account group per persona. null = nobody gets that persona here.
-# The platform admins group comes from the baseline ({bu}_platform_admins).
+# The platform admins group comes from the baseline ({prefix}_platform_admins).
 groups:
   users: null              # everyone who may use the workspace: consumer access (Databricks One)
   explorer: null           # SQL, dashboards and Genie

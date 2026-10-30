@@ -15,7 +15,7 @@ config/
 │   └── genie-code/           Genie Code instructions and skills, for every workspace
 ├── workspaces/               one file per workspace: the list of workspaces CI deploys
 │   ├── _example.yaml         the template to copy
-│   └── <name>.yaml           a workspace: bu, host, its groups, and any change to the baseline
+│   └── <name>.yaml           a workspace: prefix, host, its groups, and any change to the baseline
 ├── setup.yaml                the setup values (docs/SETUP.md, step 1), and the AI review's workspace
 └── backend.hcl               where Terraform state is kept (written by scripts/setup.py state)
 ```
@@ -26,7 +26,7 @@ config/
 
 ```yaml
 # workspaces/hr-citizen-dev.yaml
-bu: hr                     # business unit code: used in names ({bu}_citizen_dev, <BU> Default Warehouse, ...)
+prefix: hr                 # starts every name Terraform creates here ({prefix}_citizen_dev, <PREFIX> Default Warehouse, ...)
 host: https://adb-6543210987654321.3.azuredatabricks.net
 groups:                    # the Entra ID group that holds each persona; null = nobody
   users: hr-cd-users
@@ -62,7 +62,7 @@ The workspace keys (not in the baseline):
 
 | Key | |
 | --- | --- |
-| `bu` | Required. The business unit code, used in every name |
+| `prefix` | Required. A short code that starts every name Terraform creates in the workspace, unique per workspace: `hr` gives `hr_citizen_dev`, `HR Default Warehouse`, `hr_platform_admins`, and the default `BUSINESS_UNIT` tag. Changing it recreates them |
 | `host` | Required. The workspace URL; the workspace ID is read from it (or set `id`) |
 | `groups` | The group for each persona (a baseline key: the platform admins group comes from the baseline) |
 | `genie_code_instructions` | Genie Code instructions for this workspace (Markdown), after the baseline's |
@@ -73,7 +73,7 @@ The workspace keys (not in the baseline):
 
 | Task | Every workspace | One workspace |
 | --- | --- | --- |
-| Add a workspace | | Copy `workspaces/_example.yaml` to `workspaces/<name>.yaml` and fill in `bu`, `host`, `groups` |
+| Add a workspace | | Copy `workspaces/_example.yaml` to `workspaces/<name>.yaml` and fill in `prefix`, `host`, `groups` |
 | Stop managing a workspace | | Delete its file (its Terraform state goes; the workspace is unchanged) |
 | Give someone a persona | | Add them to the workspace's group for it in Entra ID; no change here |
 | Change which group holds a persona | | `groups.<persona>` in its file |
@@ -111,7 +111,7 @@ Put the reason for a difference in a comment next to it: the reviewer sees it in
 | You see | It means |
 | --- | --- |
 | `null` | Terraform leaves the setting alone. |
-| `{BU}` / `{bu}` | The workspace's business unit code, upper / lower case. |
+| `{PREFIX}` / `{prefix}` | The workspace's `prefix`, upper / lower case. |
 | `{TAGS}`, `{WORKSPACE_TAGS}` (Genie Code text) | Every chargeback tag; the ones set for you, with their values. |
 | `CAN_USE`, `CAN_RESTART`, ... | Databricks permission levels, as shown in the workspace UI. |
 | `ONE-WAY` in a comment | Cannot be undone once applied. |

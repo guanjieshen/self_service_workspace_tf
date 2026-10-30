@@ -26,8 +26,8 @@ Terraform validates one workspace at a time; some mistakes only show across work
 because what they create is shared by the whole account or metastore:
   - two workspaces with the same host or id;
   - two workspaces creating a catalog with the same name (catalogs are per metastore);
-  - two workspaces with the same bu on the same account, both managing the serverless usage policy:
-    the policies are account-wide and named from bu ({BU}-0-SELF-SERVICE), so they collide;
+  - two workspaces with the same prefix on the same account, both managing the serverless usage policy:
+    the policies are account-wide and named from the prefix ({PREFIX}-0-SELF-SERVICE), so they collide;
   - a file name that is not safe to use in workflow commands and state file names.
 Standard library only: reads the simple YAML these files use (no anchors or flow maps).
 """
@@ -144,19 +144,19 @@ def field(ws, key):
 
 def workspace_info(f):
     ws = top_level(f)
-    bu = (ws.get("bu") or "").lower()
+    prefix = (ws.get("prefix") or "").lower()
     host = (ws.get("host") or "").rstrip("/")
     # The catalog Terraform creates: the workspace's name, or the baseline's pattern
-    # ({bu}_citizen_dev); none when the workspace sets catalog: null.
+    # ({prefix}_citizen_dev); none when the workspace sets catalog: null.
     if "catalog" in ws and not block(f, "catalog"):
         catalog = None
     else:
         catalog = setting(f, "catalog", "name")
-        catalog = catalog.replace("{bu}", bu).replace("{BU}", bu.upper()) if catalog else None
+        catalog = catalog.replace("{prefix}", prefix).replace("{PREFIX}", prefix.upper()) if catalog else None
     enabled = setting(f, "serverless_policy", "enabled") or "true"
     workspace_id = ws.get("id") or next(iter(re.findall(r"adb-([0-9]+)\.", host)), None)
     account = ws.get("account_id") or top_level(defaults_file("account_id") or f).get("account_id")
-    return {"bu": bu, "account": account, "host": host,
+    return {"prefix": prefix, "account": account, "host": host,
             "id": workspace_id, "catalog": catalog, "serverless_policy": enabled == "true"}
 
 
@@ -182,12 +182,12 @@ def check(*dirs):
                 if other != f.stem:
                     problems.append(f"{f.stem} and {other} use the same {what} ({value})"
                                     + (": catalogs are shared by the metastore, so only one can create it" if key == "catalog" else ""))
-        if info["serverless_policy"] and info["bu"]:
-            other = seen.setdefault(("bu", info["account"], info["bu"]), f.stem)
+        if info["serverless_policy"] and info["prefix"]:
+            other = seen.setdefault(("prefix", info["account"], info["prefix"]), f.stem)
             if other != f.stem:
-                problems.append(f"{f.stem} and {other} both have bu {info['bu']} on account {info['account']} and manage "
-                                f"a serverless usage policy, which is account-wide and named from bu ({info['bu'].upper()}-0-SELF-SERVICE): "
-                                "give one a different bu, or set serverless_policy: enabled: false in one's file")
+                problems.append(f"{f.stem} and {other} both have prefix {info['prefix']} on account {info['account']} and manage "
+                                f"a serverless usage policy, which is account-wide and named from the prefix ({info['prefix'].upper()}-0-SELF-SERVICE): "
+                                "give one a different prefix, or set serverless_policy: enabled: false in one's file")
     return found, problems
 
 

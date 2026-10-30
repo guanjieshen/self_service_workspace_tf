@@ -2,9 +2,9 @@
 # Everything is granted to groups; who is in them is managed in Entra ID.
 
 locals {
-  # ---- The groups (groups: in the baseline and the workspace's file), with {bu} / {BU} filled in ----
+  # ---- The groups (groups: in the baseline and the workspace's file), with {prefix} / {PREFIX} filled in ----
   group_names = {
-    for k, g in local.config.groups : k => replace(replace(g, "{BU}", local.bu_upper), "{bu}", local.bu) if g != null
+    for k, g in local.config.groups : k => replace(replace(g, "{PREFIX}", local.prefix_upper), "{prefix}", local.prefix) if g != null
   }
   persona_groups  = { for p in keys(local.personas) : p => [local.group_names[p]] if contains(keys(local.group_names), p) }
   platform_admins = compact([try(local.group_names.platform_admins, "")])
@@ -55,14 +55,14 @@ locals {
   # ---- Unity Catalog: the workspace's catalog (config/defaults/catalog.yaml) ----
   # The owner can be a key of groups (platform_admins, ...) or a group name.
   catalog = local.config.catalog == null ? null : merge(local.config.catalog, {
-    name  = replace(replace(local.config.catalog.name, "{BU}", local.bu_upper), "{bu}", local.bu)
+    name  = replace(replace(local.config.catalog.name, "{PREFIX}", local.prefix_upper), "{prefix}", local.prefix)
     owner = try(local.config.catalog.owner, null) == null ? null : lookup(local.group_names, local.config.catalog.owner, local.config.catalog.owner)
   })
   catalog_grants = merge(
     { for g in distinct(flatten(values(local.persona_groups))) : g => sort(try(local.config.catalog.persona_privileges, [])) },
     { for g in local.platform_admins : g => sort(try(local.config.catalog.platform_admin_privileges, [])) },
   )
-  default_catalog = try(replace(replace(local.config.default_catalog, "{BU}", local.bu_upper), "{bu}", local.bu), null)
+  default_catalog = try(replace(replace(local.config.default_catalog, "{PREFIX}", local.prefix_upper), "{prefix}", local.prefix), null)
 
   # ---- Genie Code: workspace instructions and skills ----
   # The baseline's (config/defaults/genie-code/), the same in every workspace, plus a
@@ -73,7 +73,7 @@ locals {
   manage_genie_skills       = try(local.settings.genie_code.skills, null) == true
 
   genie_catalog   = coalesce(try(local.catalog.name, null), local.default_catalog, "the workspace's catalog")
-  genie_warehouse = replace(replace(try(local.config.sql_warehouse.name, "the default warehouse"), "{BU}", local.bu_upper), "{bu}", local.bu)
+  genie_warehouse = replace(replace(try(local.config.sql_warehouse.name, "the default warehouse"), "{PREFIX}", local.prefix_upper), "{prefix}", local.prefix)
 
   # Instructions: the default followed by this workspace's own, with <!-- comments -->
   # removed, each under a heading.
@@ -88,7 +88,7 @@ locals {
   ])
   genie_instructions = length(local.genie_parts) == 0 ? null : replace(replace(replace(replace(replace(
     join("\n\n", local.genie_parts),
-    "{BU}", local.bu_upper),
+    "{PREFIX}", local.prefix_upper),
     "{CATALOG}", local.genie_catalog),
     "{WAREHOUSE}", local.genie_warehouse),
     "{WORKSPACE_TAGS}", local.genie_workspace_tags),
@@ -101,7 +101,7 @@ locals {
   genie_skill_text = {
     for f, src in local.genie_skill_sources : f => replace(replace(replace(replace(replace(
       trimspace(replace(file(src), "/(?s)<!--.*?-->/", "")),
-      "{BU}", local.bu_upper),
+      "{PREFIX}", local.prefix_upper),
       "{CATALOG}", local.genie_catalog),
       "{WAREHOUSE}", local.genie_warehouse),
       "{WORKSPACE_TAGS}", local.genie_workspace_tags),

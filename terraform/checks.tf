@@ -53,9 +53,9 @@ resource "terraform_data" "config_checks" {
     }
     precondition {
       condition = alltrue([
-        for k in ["bu", "host"] : try(local.workspace[k], null) != null
+        for k in ["prefix", "host"] : try(local.workspace[k], null) != null
       ]) && local.workspace_id != null
-      error_message = "The workspace file must set bu and host (an https://adb-<id>.<n>.azuredatabricks.net URL, or set id as well)."
+      error_message = "The workspace file must set prefix and host (an https://adb-<id>.<n>.azuredatabricks.net URL, or set id as well)."
     }
     precondition {
       condition     = alltrue([for p, d in merge(local.personas, { users = local.config.users }) : contains(keys(local.access_tiers), try(d.access, ""))])

@@ -79,7 +79,7 @@ def checks(ws, get):
     """[(level, message)] for workspace ws; get(path) -> (json, error)."""
     f = wsf.ws_file(ws)
     info = wsf.workspace_info(f)
-    bu = info["bu"]
+    prefix = info["prefix"]
     out = []
 
     # In CI, the pipeline signs in as the service principal named by the repository variables.
@@ -117,7 +117,7 @@ def checks(ws, get):
         if not name:
             out.append(("ok", f"no {key} group: skipped (nobody gets it in this workspace)"))
             continue
-        name = name.replace("{bu}", bu).replace("{BU}", bu.upper())
+        name = name.replace("{prefix}", prefix).replace("{PREFIX}", prefix.upper())
         flt = urllib.parse.quote(f'displayName eq "{name}"')
         found, err = get(f"/api/2.0/account/scim/v2/Groups?filter={flt}&attributes=displayName,members")
         if err:

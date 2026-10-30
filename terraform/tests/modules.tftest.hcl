@@ -16,19 +16,19 @@ run "compute" {
     source = "./modules/compute"
   }
   variables {
-    names             = { BU = "TST", bu = "tst" }
+    names             = { PREFIX = "TST", prefix = "tst" }
     tags              = { BUSINESS_UNIT = "TST", APP_ID = "TST-APP", COST_CATEGORY = "CITIZEN_SELF_SERVICE" }
     classic_user_tags = ["APP_ID", "TEAM"]
     user_tag_pattern  = "^[A-Z0-9_-]+$"
     sql_warehouse = {
-      name         = "{BU} Default Warehouse", type = "serverless", size = "Small",
+      name         = "{PREFIX} Default Warehouse", type = "serverless", size = "Small",
       min_clusters = 1, max_clusters = 2, auto_stop_minutes = 5, workspace_default = true
     }
     cluster_policy = {
       runtime     = "lts_only", access_modes = ["STANDARD"], node_types = ["Standard_E8_v3", "Standard_E16_v3"], max_workers = 4
-      interactive = { name = "{BU} Classic Interactive", max_clusters_per_user = 1, max_autotermination_minutes = 60 }
-      jobs        = { name = "{BU} Classic Jobs", max_clusters_per_user = 1 }
-      pipelines   = { name = "{BU} Classic Pipelines", max_clusters_per_user = 1 }
+      interactive = { name = "{PREFIX} Classic Interactive", max_clusters_per_user = 1, max_autotermination_minutes = 60 }
+      jobs        = { name = "{PREFIX} Classic Jobs", max_clusters_per_user = 1 }
+      pipelines   = { name = "{PREFIX} Classic Pipelines", max_clusters_per_user = 1 }
     }
     warehouse_acl     = { tst-explorers = "CAN_USE" }
     starter_warehouse = ["starter-id"]
@@ -45,7 +45,7 @@ run "compute" {
   }
   assert {
     condition     = databricks_sql_endpoint.default.name == "TST Default Warehouse" && databricks_sql_endpoint.default.enable_serverless_compute
-    error_message = "{BU} is filled in the warehouse name; type serverless makes it serverless."
+    error_message = "{PREFIX} is filled in the warehouse name; type serverless makes it serverless."
   }
   assert {
     condition     = toset([for t in databricks_sql_endpoint.default.tags[0].custom_tags : "${t.key}=${t.value}"]) == toset(["BUSINESS_UNIT=TST", "APP_ID=TST-APP", "COST_CATEGORY=CITIZEN_SELF_SERVICE"])
@@ -101,7 +101,7 @@ run "compute_minimal" {
     source = "./modules/compute"
   }
   variables {
-    names             = { BU = "TST", bu = "tst" }
+    names             = { PREFIX = "TST", prefix = "tst" }
     tags              = {}
     classic_user_tags = []
     user_tag_pattern  = "^[A-Z0-9_-]+$"
