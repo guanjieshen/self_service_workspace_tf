@@ -15,12 +15,12 @@ groups:
 
 # ---- Changes to the baseline, for this workspace only ----------------------
 
-# This BU's default self-service application ID (a placeholder until it has one).
+# This workspace's default self-service application ID (a placeholder until it has one).
 tags:
   APPID: SS1-SANDBOX
 
-# The metastore has no storage root, so the catalog keeps its data under our own
-# external location (guanjie-cd-catalogs-2026), in a folder of its own.
+# The metastore has no storage root, so the catalog keeps its data in our own storage,
+# in a folder of its own (an external location must cover this path).
 catalog:
   storage_root: abfss://catalogs@guanjieadls2026.dfs.core.windows.net/self_service_1
 

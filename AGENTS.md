@@ -2,7 +2,7 @@
 
 Guidance for **coding agents and people** changing the framework: the Terraform, the scripts, the workflows and the docs. If you only need to configure workspaces, start with the [README](README.md) and [config/README.md](config/README.md) instead.
 
-> **Start here.** Read this file, then the guide for the folder you are changing. All agent guidance lives in [`agents/`](agents/); the AGENTS.md files in `terraform/` and `config/` only point to it.
+> **Start here.** Read this file (the rules and the workflow), then the guide in [`agents/`](agents/) for the folder you are changing. The AGENTS.md files in `terraform/` and `config/` only point here.
 
 | You are changing | Read |
 | --- | --- |
@@ -63,6 +63,9 @@ Each topic has one home. Update that file; link to it from elsewhere instead of 
 | A baseline value in `config/defaults/` | The comment beside it; `CHANGELOG.md` if it changes what workspaces get | None, unless the shipped baseline changes: then the copy in `terraform/tests/defaults/` too |
 | A new baseline key (an option) | The same key in `terraform/tests/defaults/`; its use in `terraform/`; `config/README.md` (task table) if operators set it; `CHANGELOG.md` (what the first plan shows) | A fixture under `terraform/tests/fixtures/` and an assertion (`agents/terraform.md`) |
 | A Databricks setting | Map it in `terraform/overrides.tf` (`setting_addresses`) so `null` releases it | `scripts/tests/test_release.py` checks the mapping |
+| A plan guard rule (what needs approval) | `PROTECTED`, `SECURITY_SETTINGS`, `SECURE_CONF` in `scripts/plan-guard.py`; the list in `docs/design.md`, section 3 | `scripts/tests/test_plan_guard.py` (`EverySecurityRule` covers each table entry) |
+| A Genie Code placeholder (`{CATALOG}`, ...) | `terraform/access.tf` (`genie_instructions`, `genie_skill_text`); the placeholder table in `config/README.md` | `baseline.tftest.hcl` (`genie_code_defaults`: no placeholder left unfilled) |
+| A persona, or what one gets | `personas` in `config/defaults/access.yaml` and `terraform/tests/defaults/access.yaml`; `groups` in `_example.yaml`; the persona tables in `docs/design.md` and the AI prompt | `baseline.tftest.hcl` (`personas`) |
 | A check (a wrong value fails the plan) | `terraform/checks.tf`: the message names the key, the file and what to do | A fixture under `terraform/tests/fixtures/invalid/` and a run in `validation.tftest.hcl` |
 | A setup step or a manual step | `scripts/setup.py` if a command can do it, else the checklist in `docs/SETUP.md`; a `scripts/preflight.py` check if Terraform depends on it | `scripts/tests/test_setup.py`, `test_preflight.py` |
 | A value in `config/setup.yaml` | `docs/SETUP.md` step 1 table; `OPTIONS` in `scripts/setup.py` (or `scripts/ai-plan-review.py` for `ai_review_host` and `ai_review_model`) | `test_setup.py` checks every key in the file is read |
@@ -70,7 +73,7 @@ Each topic has one home. Update that file; link to it from elsewhere instead of 
 | A workflow step | `.github/workflows/deploy.yml`; `docs/github-actions.md` | A job that signs in must not run in a GitHub Environment (`test_setup.py`) |
 | What a change plans or applies | `EVERYTHING` and `PLAN_ONLY` in `scripts/workspaces.py`; `docs/github-actions.md` | `scripts/tests/test_workspaces.py` (`Affected`) |
 | A new workspace key (in a workspace file, not the baseline) | `workspace_keys` in `terraform/config.tf`; `config/workspaces/_example.yaml`; the workspace keys table in `config/README.md` | A fixture and an assertion |
-| Something removed or renamed | Every doc that mentions it (search the repository), and its tests and fixtures | The suite still passes with nothing skipped; `scripts/tests/test_docs.py` fails on a path in the docs or comments that no longer exists |
+| Something removed or renamed | Every doc that mentions it (search the repository), and its tests and fixtures; add the old name to `RETIRED` in `scripts/tests/test_docs.py` | The suite still passes with nothing skipped; `test_docs.py` fails on a path that no longer exists, or a retired name that comes back |
 
 ### Keep it simple
 
@@ -100,7 +103,7 @@ further step. When you add something:
    and `destroy` refuse outside GitHub Actions (`ALLOW_LOCAL_APPLY=1` is break-glass for a
    human, not for an agent). Never push to `main` directly and never add a manual trigger
    to Apply.
-2. **Never bypass git hooks** (`--no-verify`, `-n`, `core.hooksPath`). If a hook fails,
+2. **Never bypass git hooks** (`--no-verify`, `-n`, `core.hooksPath`), whether they come from the repository or from the machine you work on (for example a secret-scanning hook). If a hook fails,
    fix the cause.
 3. **Do not handle secrets.** Never create, print or export tokens or client secrets;
    CI signs in with GitHub OIDC (Entra). Locally, sign in with the Azure or Databricks CLI.
@@ -148,7 +151,7 @@ In code:
   state), so they never collide with an apply. Applies lock, and run one at a time per
   workspace (`concurrency: apply-<ws>`). A local `tf.sh plan` locks: do not run one while
   CI applies.
-- **A hook false positive** blocks a command that has `git commit` (or `git push`) together
+- **A local hook false positive** (a hook on the maintainer's machine, not in this repository) blocks a command that has `git commit` (or `git push`) together
   with short flags such as `grep -n`, `sed -n` or `az ... -n`. Run git as its own command.
 - **Stacked PRs:** always target `main`. Deleting a merged base branch closes PRs stacked
   on it.

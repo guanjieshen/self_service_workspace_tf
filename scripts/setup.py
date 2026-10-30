@@ -5,7 +5,7 @@
     scripts/setup.py identity     an Entra admin
     scripts/setup.py github       a GitHub admin
 
-Every value comes from config/setup.yaml: the required values at the top, three optional ones
+Every value comes from config/setup.yaml: the required values at the top, the optional ones
 with defaults below (docs/SETUP.md, step 1). A flag overrides one value for one run (for
 example --storage-account x). `identity --run` writes the client ID it creates into the
 file, for the steps after it. The Azure steps stop unless the Azure CLI is signed in to tenant_id. In the

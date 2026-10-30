@@ -3,7 +3,7 @@
 # Replace @guanjieshen with your teams, for example @<org>/databricks-platform and
 # @<org>/security. The last matching line wins.
 
-# Workspace folders: the platform team.
+# Everything else (the configuration): the platform team.
 *                                   @guanjieshen
 
 # Code that runs with the workspace credentials (plan, apply, drift, AI review):
@@ -13,5 +13,5 @@
 /.github/                           @guanjieshen
 
 # The security settings every workspace gets (legacy access, DBFS, isolation, tokens, downloads):
-# the platform team and security.
+# the platform team and security. Add your security team here.
 /config/defaults/settings.yaml      @guanjieshen

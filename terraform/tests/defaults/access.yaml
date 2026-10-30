@@ -56,7 +56,7 @@ personas:
     default_warehouse: CAN_USE
     can_create_tokens: false
 
-  # ---- Publisher: shares finished work with the BU ---------------------------
+  # ---- Publisher: shares finished work with the business unit ---------------
   # The same as builder in this project; what makes a publisher different is
   # handled outside it.
   publisher:

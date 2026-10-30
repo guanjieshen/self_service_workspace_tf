@@ -1,5 +1,9 @@
 # Automated deployment with GitHub Actions
 
+How the workflows plan, apply, check for drift and retire workspaces, and how they sign in. Setting them up is [SETUP.md](SETUP.md), steps 4 and 5.
+
+> **Just want to know what happens to your pull request?** See [The plan comment](#the-plan-comment) and [Hardening and noise](#hardening-and-noise).
+
 ## Overview
 
 **One deploy workflow, one job per workspace.** `.github/workflows/deploy.yml` first works out
@@ -31,14 +35,9 @@ example, can restart running clusters).
 
 ## How CI signs in
 
-One Entra service principal, for every workspace and for the Terraform state, through GitHub OIDC: no secret is stored in GitHub. It is workspace admin in each workspace this repository manages. Entra matches each GitHub token's subject exactly, and this repository needs only two federated credentials, whatever the number of workspaces:
+One Entra service principal, for every workspace and for the Terraform state, through GitHub OIDC: no secret is stored in GitHub. It is workspace admin in each workspace this repository manages. Entra matches each GitHub token's subject exactly, and this repository needs only two federated credentials, whatever the number of workspaces.
 
-| Credential | Subject | Used by |
-| --- | --- | --- |
-| `github-pull-requests` | `<prefix>:pull_request` | Plans (every pull request) |
-| `github-main` | `<prefix>:ref:refs/heads/main` | Applies (merge to `main`), drift checks (scheduled, or run on `main`) |
-
-`<prefix>` is the repository's, for example `repo:my-org@123456/my-repo@456789` (repositories created or renamed since July 15, 2026 include numeric IDs): `gh api repos/<org>/<repo>/actions/oidc/customization/sub --jq .sub_claim_prefix`. `scripts/setup.py identity` reads it and creates both credentials.
+One credential for plans (`<prefix>:pull_request`) and one for everything run from `main` (`<prefix>:ref:refs/heads/main`): what the app registration needs, and how to set it up, is in [SETUP.md, step 4](SETUP.md#4-the-pipeline-identity).
 
 No job that signs in runs in a GitHub Environment, because that would change its subject to `environment:<name>`. The one environment, `apply-approval`, is the approval step before each workspace's apply: it holds nothing and signs in to nothing.
 

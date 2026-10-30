@@ -100,7 +100,7 @@ After an edit: open a pull request. Its plan comments show what changes in each 
 
 Any default can be changed for one workspace, so differences from the baseline are caught in the pull request rather than forbidden by the code:
 
-- **Plan guard** (`scripts/tf.sh`, and the plan check on every pull request) fails the check when a plan deletes or replaces something people depend on (warehouses, clusters, policies, budget policies, permissions, grants, catalogs), or weakens security: a security setting turned off, deleted or loosened, a catalog opened to every workspace, a grant to everyone, more groups allowed to create tokens. A person must add the label `allow-risky-changes`.
+- **Plan guard** (the plan check on every pull request) fails the check when a plan deletes or replaces something people depend on, or weakens security, until a person adds the label `allow-risky-changes`. What it looks for: [design.md](../docs/design.md), section 3.
 - **The AI review** in the plan comment calls out every value in a workspace file that differs from the baseline, with the old and new value, and flags security-relevant ones first.
 - **Code owners** (`.github/CODEOWNERS`) decide who must approve which files: the platform team for `defaults/` and everything outside `config/`, security for `defaults/settings.yaml`.
 
@@ -113,6 +113,7 @@ Put the reason for a difference in a comment next to it: the reviewer sees it in
 | `null` | Terraform leaves the setting alone. |
 | `{PREFIX}` / `{prefix}` | The workspace's `prefix`, upper / lower case. |
 | `{TAGS}`, `{WORKSPACE_TAGS}` (Genie Code text) | Every chargeback tag; the ones set for you, with their values. |
+| `{CATALOG}`, `{WAREHOUSE}` (Genie Code text) | The workspace catalog's name; the default SQL warehouse's name. |
 | `CAN_USE`, `CAN_RESTART`, ... | Databricks permission levels, as shown in the workspace UI. |
 | `ONE-WAY` in a comment | Cannot be undone once applied. |
 | "Decide at onboarding" | Switching it later on a busy workspace is disruptive; decide it before the first apply. |

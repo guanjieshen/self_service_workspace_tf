@@ -22,8 +22,7 @@ Steps 3 to 8 can run in parallel once step 2 is done, except that step 4 needs t
 
 Steps 3 to 5 are commands that read their values from `config/setup.yaml`; step 6 is done by hand in the Databricks account console. Each command prints the script it would run, so you can read it first or send it to the team that owns the step; add `--run` to run it. Each one checks before it creates, so running it again is safe.
 
-> [!TIP]
-> Run every command from the repository root. Tools: Terraform 1.9+, Python 3.9+, the Databricks CLI, the Azure CLI (`az`) and the GitHub CLI (`gh`), each signed in as the person running that step.
+> **Tip:** Run every command from the repository root. Tools: Terraform 1.9+, Python 3.9+, the Databricks CLI, the Azure CLI (`az`) and the GitHub CLI (`gh`), each signed in as the person running that step.
 
 ## 1. Fill in `config/setup.yaml`
 
@@ -70,7 +69,7 @@ Two more things to know before you start; they live in their own files, not here
 | The network path to the workspaces | Public, IP access list or Private Link | Cloud team | Step 5: a runner, if not public |
 | For each workspace: name, prefix (starts every name Terraform creates there), URL | `fin-citizen-dev`, `fin`, `https://adb-....azuredatabricks.net` | Platform team | Step 9: its file |
 | The Databricks account ID | `00000000-...` | Databricks account admin | Step 8: `account_id` in `config/defaults/cost.yaml` |
-| For each workspace: its persona groups; for each business unit: `{prefix}_platform_admins` | `fin_platform_admins`, `fin-cd-explorers`, ... | Identity team | Step 7; persona groups in each workspace's file |
+| For each workspace: its persona groups; for each workspace prefix: `{prefix}_platform_admins` | `fin_platform_admins`, `fin-cd-explorers`, ... | Identity team | Step 7; persona groups in each workspace's file |
 
 ## 2. Put the repository in your GitHub
 
@@ -86,10 +85,10 @@ Two more things to know before you start; they live in their own files, not here
    git remote add origin https://github.com/<org>/<repo>.git && git push -u origin main
    ```
 
-3. Replace the owners in `.github/CODEOWNERS` with your teams (for example `@my-org/databricks-platform` and `@my-org/security`), in a pull request once step 5 is done. Until then, push directly; afterwards branch protection requires pull requests.
+3. **Push only what you want deployed.** Once step 5 is done, every push to `main` applies each workspace file in `config/workspaces/`. A release ships with none (only `_example.yaml`), so the first push deploys nothing.
+4. Replace the owners in `.github/CODEOWNERS` with your teams (for example `@my-org/databricks-platform` and `@my-org/security`), in a pull request once step 5 is done. Until then, push directly; afterwards branch protection requires pull requests.
 
-> [!NOTE]
-> The repository's GitHub OIDC subject includes its numeric IDs, so create the repository with its final name before step 4. Renaming it later means recreating the two federated credentials (update `github_repo` and run step 4 again).
+> **Note:** The repository's GitHub OIDC subject includes its numeric IDs, so create the repository with its final name before step 4. Renaming it later means recreating the two federated credentials (update `github_repo` and run step 4 again).
 
 ## 3. Terraform state storage
 
@@ -110,7 +109,7 @@ It creates a storage account with no public blob access and no shared keys (Entr
 
 ### Using an existing storage account and container
 
-Create `config/backend.hcl` with your names, and commit it:
+Create `config/backend.hcl` (or overwrite the one in the repository) with your names, and commit it:
 
 ```hcl
 # Shared Terraform state in Azure Storage (Entra sign-in only).
@@ -221,8 +220,7 @@ Then, if needed:
 - **Private networking.** If the workspaces use Private Link or an IP access list, GitHub-hosted runners cannot reach them. Register a self-hosted runner inside the network (or use GitHub's Azure private networking) and set the repository variable `TERRAFORM_RUNNER`, for example `"citizen-dev"` with the quotes ([docs/github-actions.md](github-actions.md)).
 - **Write access.** Only the platform team should be able to push branches: a pull request's plan runs with the pipeline's workspace-admin rights before review ([docs/github-actions.md](github-actions.md), "Who can run code with the workspace credentials").
 
-> [!WARNING]
-> Required reviewers and branch protection need GitHub Team or Enterprise for private repositories. Without them, merging is the only approval and nothing stops a merge before its plan finishes: wait for every check first.
+> **Warning:** Required reviewers and branch protection need GitHub Team or Enterprise for private repositories. Without them, merging is the only approval and nothing stops a merge before its plan finishes: wait for every check first.
 
 ## 6. Databricks account (by hand)
 
@@ -251,7 +249,7 @@ Create Entra ID groups and sync them to the Databricks account (automatic identi
 
 A workspace that leaves a persona's group `null` simply has nobody with that persona.
 
-Put the BU's platform team in `{prefix}_platform_admins`: it manages the workspace's serverless usage policy and owns its catalog, and nobody outside the policy's groups can see the policy (workspace admin is not enough). Preflight warns while the group is empty.
+Put the workspace's platform team in `{prefix}_platform_admins`: it manages the workspace's serverless usage policy and owns its catalog, and nobody outside the policy's groups can see the policy (workspace admin is not enough). Preflight warns while the group is empty.
 
 ## 8. Decide the baseline
 
@@ -260,7 +258,7 @@ The baseline in `config/defaults/` is what every workspace gets. Most of it is a
 | Decision | File and key | Shipped value | Notes |
 | --- | --- | --- | --- |
 | **Disable legacy access** (Hive metastore, DBFS root and mounts, No-isolation clusters) | `defaults/settings.yaml` `disable_legacy_access`, `disable_dbfs_root_and_mounts`, `enforce_user_isolation` | `true` | **One-way after 30 days.** Fine for new workspaces. For an existing one, `preflight.py` lists what still uses legacy access; set them to `null` under `settings:` in that workspace's file until it is migrated |
-| Git URLs allowed in Git folders | `defaults/settings.yaml` `git.allowed_urls` | `https://github.com/` (every github.com repository; other Git hosts blocked) | Narrow it to your organization (`https://github.com/<your-org>/`), or add your GitHub Enterprise host; preflight warns while a `<org>` placeholder is left |
+| Git URLs allowed in Git folders | `defaults/settings.yaml` `git.allowed_urls` | `https://github.com/` (every github.com repository; other Git hosts blocked) | Narrow it to your organization (`https://github.com/<your-org>/`), or add your GitHub Enterprise host |
 | Compliance security profile | `defaults/settings.yaml` `compliance_security_profile` | `null` (leave alone) | **One-way**, and billed. Only if your compliance team requires it |
 | Unity Gateway enforced | `defaults/settings.yaml` `enforce_unity_gateway` | `true` | Switches off the `databricks-` pay-per-token endpoints; model calls must use `system.ai` models |
 | Collaboration platforms | `defaults/settings.yaml` `collaboration_platforms.allowed` | `ALLOW_TEAMS` | `ALLOW_ALL`, `ALLOW_SLACK`, `ALLOW_TEAMS` or `DENY_ALL` |
@@ -271,6 +269,7 @@ The baseline in `config/defaults/` is what every workspace gets. Most of it is a
 | Chargeback tags | `defaults/cost.yaml` `tags`, `classic_user_tags` | `BUSINESS_UNIT` (from `prefix`), `APPID: NONE`, `COST_CATEGORY: CITIZEN_SELF_SERVICE`; users fill in `APPID`, `TEAM`, `PROJECT` on classic clusters | One list, on the usage policy, the warehouse and classic clusters. Each workspace sets its own `APPID` (`tags:` in its file). Changing them later affects new usage only |
 | Serverless usage policy | `defaults/cost.yaml` `serverless_policy` | On, `{PREFIX}-0-SELF-SERVICE`, every persona | Needs an account-level permission for the pipeline (step 6); set `enabled: false` if you will not grant it. Data classification (turned on by hand, step 9) uses it |
 | Catalog name and features | `defaults/catalog.yaml` `catalog` | `{prefix}_citizen_dev`, predictive optimization on | `catalog.storage_root` is needed when the metastore has no storage root (preflight says so) |
+| Serverless Starter Warehouse | `defaults/compute.yaml` `starter_warehouse.admins_only` | `true` | Only the platform admins may use the Starter warehouse Databricks creates in a new workspace; on an existing one, **anyone using it loses access** on the first apply. `null` leaves its access alone |
 | Restrict workspace admins | `defaults/settings.yaml` `restrict_workspace_admins` | `false` | Needs account admin to change; leave `false` |
 | AI review of each plan | `config/setup.yaml` `ai_review_host`, `ai_review_model` | Off until a host is set; then `system.ai.claude-sonnet-5-5` there | Advice in the plan comment only. One workspace that has the model reviews every plan; the pipeline's service principal needs to be in it, with `EXECUTE` on the model (account users have it on `system.ai` by default) |
 
@@ -284,21 +283,20 @@ Before you start: the workspace exists and the runners can reach it (its private
 
 1. **Create its file:** copy `config/workspaces/_example.yaml` to `config/workspaces/fin-citizen-dev.yaml` and fill in `prefix`, `host` and `groups`. The file name is the workspace's name in this repository.
 2. **Set anything that differs from the baseline**, in the same file (for example `catalog.storage_root`, or `null` for `settings.disable_legacy_access`, `disable_dbfs_root_and_mounts` and `enforce_user_isolation` for an existing workspace that is not ready). Leave the rest out.
-3. **Check it is ready** (optional; the pull request runs it too), signed in with the Azure or Databricks CLI:
+3. **Check it is ready** (optional; the pull request runs it too). It uses the Databricks CLI: sign in with `az login` (used automatically for Azure workspaces), or set a Databricks CLI profile in the workspace's file (`auth.workspace_profile`):
 
    ```bash
    python3 scripts/preflight.py fin-citizen-dev
    ```
 
-   It checks the sign-in and admin rights, the metastore, that every group is an account group, the catalog's storage, what still uses legacy access, and placeholders left in the baseline.
+   It checks the sign-in and admin rights, the metastore, that every group is an account group (and that the platform admins group has members), that the pipeline may create usage policies (Billing admin), the catalog's storage, and what still uses legacy access.
 4. **Open a pull request.** The deploy workflow plans only this workspace and posts its plan: everything the first apply creates. Preflight problems are at the top of the comment.
 5. **Merge.** After the approval step (if `apply-approval` has reviewers), the workspace is deployed.
 6. **Verify:** the next pull request that touches it (or the Monday drift check) shows no changes. In the workspace: the persona groups under Settings > Identity and access, the `<PREFIX> Default Warehouse`, and the `{prefix}_citizen_dev` catalog.
 7. **By hand, in Catalog Explorer** (`{prefix}_citizen_dev` > Details), as a member of `{prefix}_platform_admins`: turn on **Data Classification**, with the workspace's usage policy `<PREFIX>-0-SELF-SERVICE`, and **Data Quality Monitoring** for the schemas it lists. Terraform does not manage either (classification's API needs a usage policy the Terraform provider cannot send; monitoring is per schema, and schemas come from the self-service app). Turn monitoring on again for schemas created later.
 8. **By hand, in Workspace settings > Appearance:** the workspace theme's categorical colors and the Genie One color and welcome message, with the values in `config/defaults/settings.yaml` ("Appearance: set by hand"). There is no API for them yet.
 
-> [!WARNING]
-> Applying the baseline to an existing workspace changes its settings for everyone in it (downloads, tokens, Git folders, legacy access). Read the plan comment's settings changes with the workspace's owners before merging.
+> **Warning:** Applying the baseline to an existing workspace changes its settings for everyone in it (downloads, tokens, Git folders, legacy access). Read the plan comment's settings changes with the workspace's owners before merging.
 
 ## 10. Day to day
 
@@ -319,24 +317,28 @@ More: [config/README.md](../config/README.md) (configuration tasks) and [github-
 
 Releases are git tags (`v1.2.0`), with what changed in `CHANGELOG.md`.
 
-Replace the framework files, keep your configuration:
-```bash
-git fetch <framework repo> 'refs/tags/*:refs/tags/*'
-git restore --source=v1.3.0 --staged --worktree -- \
-  terraform scripts .github/workflows .github/actions .github/scripts .github/ai docs \
-  README.md CHANGELOG.md AGENTS.md CLAUDE.md agents config/README.md config/AGENTS.md \
-  config/workspaces/_example.yaml
-```
-`git restore` also removes files the release dropped, and touches nothing else: not `config/defaults/`, your workspaces, `config/setup.yaml` or `.github/CODEOWNERS`. A baseline setting that is new in the release is absent from your `config/defaults/` until you add it, which means "leave alone", so an upgrade never turns something on by itself; `CHANGELOG.md` lists new settings to add. Open a pull request: its plan shows what the new version changes in each workspace before anything is applied.
+Replace the framework files, keep your configuration. Unpack the new release next to your repository (for example as `../new`), then from your repository:
 
-> [!WARNING]
-> Do not edit framework files in your repository: the next upgrade replaces them. Send a fix to the framework maintainers so it is in the next release.
+```bash
+FRAMEWORK="terraform scripts .github/workflows .github/actions .github/scripts .github/ai docs \
+  README.md CHANGELOG.md AGENTS.md CLAUDE.md agents config/README.md config/AGENTS.md \
+  config/workspaces/_example.yaml"
+git rm -r -q --ignore-unmatch $FRAMEWORK             # also drops files the release removed
+(cd ../new && tar -cf - $FRAMEWORK) | tar -xf -      # the release's versions
+git add -A && git checkout -b upgrade-v1.3.0
+```
+
+It touches nothing else: not `config/defaults/`, your workspaces, `config/setup.yaml` or `.github/CODEOWNERS`. A baseline setting that is new in the release is absent from your `config/defaults/` until you add it, which means "leave alone", so an upgrade never turns something on by itself; `CHANGELOG.md` lists new settings to add. Open a pull request: its plan shows what the new version changes in each workspace before anything is applied.
+
+> **Warning:** Do not edit framework files in your repository: the next upgrade replaces them. Send a fix to the framework maintainers so it is in the next release.
 
 ### State and teardown
 
 State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (step 3 writes it); then each workspace has its own state file in Azure Storage, which CI requires.
 
-`./scripts/tf.sh <name> destroy` removes what this project manages. It resets the workspace configuration keys it manages (`enable*`, `enforce*`) to `false`, which includes turning personal access tokens off; review the plan before confirming.
+**To stop managing a workspace, retire it** (delete its file in a pull request): Terraform forgets it, and nothing in the workspace changes.
+
+`./scripts/tf.sh <name> destroy` is different: it **deletes** what this project created, including the default warehouse, the usage and cluster policies, and the workspace catalog **with its data**, and resets the workspace configuration keys it manages (`enable*`, `enforce*`) to `false`, which turns personal access tokens off. Outside GitHub Actions it refuses unless `ALLOW_LOCAL_APPLY=1` (break glass). Review the plan before confirming.
 
 ## 11. Troubleshooting
 
@@ -349,7 +351,8 @@ State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (ste
 | Preflight: `is not a workspace admin` | Step 6 not done for this workspace | Step 6, item 2, for this workspace |
 | Preflight: group `does not exist in the account` or `exists only in this workspace` | The Entra group is missing, not synced, or a workspace-local group has the same name | Step 7; or name the right group under `groups:` in the workspace's file |
 | Preflight: `the metastore has no storage root` | New catalogs have nowhere to store data | Set `catalog.storage_root` in the workspace's file to an external location URL |
-| Apply fails creating a budget policy (permission denied) | The service principal lacks the account-level budget policy permission | Step 6, item 3, or `serverless_policy.enabled: false` |
+| Preflight: `cannot create the workspace's serverless usage policy`, or the apply fails with `missing CreateBudgetPolicyPermission` | The service principal lacks the account's **Billing admin** role (account admin alone is not enough) | Step 6, item 3, or `serverless_policy.enabled: false` |
+| `setup.py github` fails at branch protection: `Upgrade to GitHub Pro or make this repository public` | Branch protection on a private repository needs a paid GitHub plan | The rest of step 5 is done. Protect `main` by hand once the plan allows it; until then, merging is the only review |
 | A local plan shows permission changes that CI does not | Local plans run as you, not the pipeline: the owner entry differs | Trust the CI plan and the drift check |
 | The plan comment has no AI review | `ai_review_host` is not set, the service principal is not in that workspace, or the model is unavailable to it there (region, Unity Gateway, missing EXECUTE) | Set `ai_review_host` to a workspace that has the model, add the service principal to it, or change `ai_review_model`; the review is advice only |
 | Apply ran straight after the merge, without approval | `apply-approval` has no required reviewers (or the GitHub plan does not support them) | Add reviewers to the environment (`apply_approvers`, then step 5 again) |

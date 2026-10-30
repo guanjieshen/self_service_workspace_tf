@@ -16,6 +16,16 @@ BARE_BASELINE = re.compile(r"(?<![\w/.-])(access|compute|cost|catalog|settings)\
 GENERATED = {"config/backend.hcl"}           # written by scripts/setup.py
 EXAMPLE_WORKSPACE = re.compile(r"config/workspaces/[a-z0-9-]+\.yaml")  # a workspace in an example
 SKIP = {"CHANGELOG.md"}                       # history: it names what was removed
+# Keys and names that were removed or renamed, and must not come back.
+RETIRED = {
+    "bu (now prefix)": re.compile(r"(^|\s|`)bu:|\{bu\}|\{BU\}|`bu`"),
+    "APP_ID (now APPID)": re.compile(r"(?<![$\w])APP_ID\b(?!=)"),
+    "teams / team_warehouses": re.compile(r"(^|\s|`)(teams|team_warehouses):"),
+    "shared_cluster / classic_warehouse": re.compile(r"(^|\s|`)(shared_cluster|classic_warehouse):"),
+    "budget_policies (now serverless_policy)": re.compile(r"(^|\s|`)budget_policies:|budget_policies\.(enabled|policies)"),
+    "required_tags (now tags)": re.compile(r"(^|\s|`)required_tags:"),
+    "catalog.data_classification (manual now)": re.compile(r"(^|\s|`)data_classification:"),
+}
 
 
 def tracked():
@@ -63,6 +73,23 @@ class Docs(unittest.TestCase):
                     if not line[:m.start()].endswith("defaults/"):
                         bare.append(f"{path.relative_to(ROOT)}:{n}: {line.strip()[:100]}")
         self.assertEqual(bare, [], "say config/defaults/<file>.yaml, or the workspace's file")
+
+
+    def test_retired_names_do_not_come_back(self):
+        # Removed or renamed (CHANGELOG.md keeps the history): a doc or comment naming one
+        # sends someone looking for a key that does not exist.
+        found = []
+        # Docs in full, code by its comments, YAML in full (keys and comments), but not the
+        # fixtures that test that an old key fails.
+        for path in files():
+            if path.name in SKIP or path.name == "test_docs.py" or "/tests/fixtures/invalid/" in str(path):
+                continue
+            lines = enumerate(path.read_text().splitlines(), 1) if path.suffix in (".yaml", ".yml") else text_lines(path)
+            for n, line in lines:
+                for name, pattern in RETIRED.items():
+                    if pattern.search(line):
+                        found.append(f"{path.relative_to(ROOT)}:{n}: {name}: {line.strip()[:80]}")
+        self.assertEqual(sorted(set(found)), [], "renamed or removed; see CHANGELOG.md")
 
 
 if __name__ == "__main__":

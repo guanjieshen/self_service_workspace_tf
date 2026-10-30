@@ -128,7 +128,7 @@ def checks(ws, get):
             if key == "platform_admins" and not any(g.get("members") for g in found.get("Resources", [])):
                 out.append(("warning", f"group {name} (platform_admins) has no members, so nobody but the pipeline can "
                                        "manage the workspace's usage policy (or see it) or the catalog it owns: add the "
-                                       "BU's platform admins to it in Entra ID (docs/SETUP.md, step 7)"))
+                                       "workspace's platform admins to it in Entra ID (docs/SETUP.md, step 7)"))
         else:
             local, _ = get(f"/api/2.0/preview/scim/v2/Groups?filter={flt}&attributes=displayName")
             what = ("exists only in this workspace (a workspace-local group)" if (local or {}).get("totalResults", 0)
