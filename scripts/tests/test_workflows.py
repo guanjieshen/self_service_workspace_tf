@@ -75,5 +75,13 @@ class Workflows(unittest.TestCase):
                 self.assertNotIn("-lock=false", line)
 
 
+    def test_the_approval_label_re_runs_the_check(self):
+        # Without labeled/unlabeled, adding allow-risky-changes leaves the check red until a push.
+        deploy = (ROOT / ".github/workflows/deploy.yml").read_text()
+        self.assertRegex(deploy, r"(?m)^    types: \[[^\]]*\blabeled\b[^\]]*\bunlabeled\b")
+        self.assertIn("github.event.label.name == 'allow-risky-changes'", jobs(ROOT / ".github/workflows/deploy.yml")["route"],
+                      "other labels do not re-run the plans")
+
+
 if __name__ == "__main__":
     unittest.main()

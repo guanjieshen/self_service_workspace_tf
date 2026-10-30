@@ -12,6 +12,8 @@ name: Deploy
 
 on:
   pull_request:
+    # labeled / unlabeled: adding or removing allow-risky-changes re-runs the check that reads it.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     branches: [main]
   schedule:
@@ -30,6 +32,8 @@ env:
 jobs:
   route:
     name: Find the workspaces
+    # A label change re-runs the plans only for the approval label; any other label is noise.
+    if: (github.event.action != 'labeled' && github.event.action != 'unlabeled') || github.event.label.name == 'allow-risky-changes'
     runs-on: ${{ fromJSON(vars.CHECKS_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     permissions:
@@ -147,7 +151,7 @@ jobs:
         run: |
           status="$(cat ".plans/$WORKSPACE.guard")"
           if [[ "$status" != "0" ]]; then
-            echo "::error::Hard-to-undo changes in $WORKSPACE. Review the plan comment; add the label allow-risky-changes if intended."
+            echo "::error::Hard-to-undo changes in $WORKSPACE need approval. Review the plan comment; if a person approves, add the label allow-risky-changes (that re-runs this check)."
             exit 1
           fi
 
