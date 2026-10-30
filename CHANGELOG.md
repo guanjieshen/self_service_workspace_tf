@@ -6,6 +6,8 @@ them for you: a setting missing from your baseline is left alone).
 
 ## Unreleased
 
+- `scripts/release.py <version>` builds the zip an organization installs, without the framework
+  repository's own environment, and refuses to if any of it is left (AGENTS.md, "Releasing").
 - The chargeback tag `APP_ID` is now `APPID` (the baseline's `tags:`, `classic_user_tags`, and
   `tags:` in workspace files). The first plan updates the tags on the usage policy, the warehouse
   and the classic cluster policies; cost reports show `APP_ID` before and `APPID` after.
