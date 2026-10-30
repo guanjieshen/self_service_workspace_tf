@@ -24,7 +24,7 @@ class ReleaseZip(unittest.TestCase):
     def test_blanks_the_values_and_keeps_the_instructions(self):
         out = rel.release_files(self.files)
         setup = out["config/setup.yaml"].decode()
-        for key in ("tenant_id", "subscription_id", "state_storage_account", "ai_review_host", "pipeline_client_id"):
+        for key in ("tenant_id", "subscription_id", "state_storage_account", "ai_review_host", "ai_review_model", "pipeline_client_id"):
             with self.subTest(key=key):
                 self.assertRegex(setup, rf"(?m)^{key}: null\b")
         self.assertIn("# ---- REQUIRED", setup, "the comments stay: they are the instructions")

@@ -180,6 +180,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
+      pull-requests: read     # the approval label on the merged pull request
       id-token: write
     # One apply at a time per workspace; the others wait (they share its state).
     concurrency:
@@ -187,7 +188,6 @@ jobs:
       cancel-in-progress: false
     env:
       WORKSPACE: ${{ matrix.workspace }}
-      CONFIRM_ENV: ${{ matrix.workspace }}   # the approval above is the confirmation
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # A re-run applies its own commit: refuse once main has moved on, or it would apply
@@ -205,7 +205,22 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           workspace: ${{ matrix.workspace }}
+      # The plan guard's approval, enforced here whatever the GitHub plan: a pull request can be
+      # merged with a failed plan check (branch protection cannot require the per-workspace plan
+      # jobs), so a flagged apply goes ahead only if the merged pull request carries the label.
+      # tf.sh refuses a flagged apply without CONFIRM_ENV; an unflagged one does not need it.
+      - name: Approval label
+        id: approval
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { data } = await github.rest.repos.listPullRequestsAssociatedWithCommit({ ...context.repo, commit_sha: context.sha });
+            const approved = data.some((pr) => pr.labels.some((l) => l.name === 'allow-risky-changes'));
+            core.setOutput('approved', approved ? 'true' : 'false');
+            core.info(approved ? 'The merged pull request has allow-risky-changes.' : 'No allow-risky-changes on the merged pull request: a flagged apply stops.');
       - name: Apply
+        env:
+          CONFIRM_ENV: ${{ steps.approval.outputs.approved == 'true' && matrix.workspace || '' }}
         run: ./scripts/tf.sh "$WORKSPACE" apply -no-color -input=false
       # The summary is shown on the run's page, which GitHub does not mask: redacted like comments.
       - name: Summary

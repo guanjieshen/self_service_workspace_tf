@@ -78,6 +78,7 @@ The jobs that reach Databricks or the state use `TERRAFORM_RUNNER`. The checks a
 - **No token left in the checkout** (`persist-credentials: false`), except in the apply job, which asks the remote whether `main` moved on before a re-run.
 - **Time limits** on every job, so a hung self-hosted runner does not hold a workspace's apply for hours.
 - **Plans do not lock the state** (`-lock=false`: a plan never writes it), so a plan never fails because an apply is running. A newer push to a pull request cancels its older plans and checks.
+- **The approval label is checked twice.** On the pull request, the plan check fails until a person adds `allow-risky-changes`. At apply, a flagged change goes ahead only if the merged pull request carries the label, so merging past a failed plan check does not apply it. Branch protection cannot require the per-workspace plan jobs (their names change with the workspaces), so the apply-time check is what enforces it on every GitHub plan.
 - **Adding or removing `allow-risky-changes` re-runs the plan check**, so the approval takes effect without a new push. Other labels do not re-run anything.
 - **Pull requests from forks are not planned:** GitHub gives them no OIDC token, so the plan could only fail.
 - **Plan comments** appear only for a plan that changes something, failed, or hit a preflight error. Preflight warnings alone (a placeholder still in the baseline, say) are shown with the next plan that changes something, and in the job's annotations, instead of a new comment on every pull request.

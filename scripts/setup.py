@@ -249,7 +249,8 @@ def main(argv):
     if a.repo is None and a.step in ("identity", "github"):
         a.repo, a.repo_source = origin_repo(), "this clone's git origin"
         if a.repo is None:
-            raise SystemExit(f"This clone has no GitHub origin: fill in github_repo in {shown(path)}.")
+            raise SystemExit(f"Could not read <org>/<repo> from this clone's git origin (none, or not github.com, for "
+                             f"example GitHub Enterprise Server): fill in github_repo in {shown(path)}.")
     if a.repo is not None and not re.fullmatch(r"[\w.-]+/[\w.-]+", a.repo):
         raise SystemExit(f"github_repo must be <org>/<repo>, not {a.repo!r}")
     if a.approvers and not re.fullmatch(r"[\w.-]+/[\w.-]+", a.approvers):

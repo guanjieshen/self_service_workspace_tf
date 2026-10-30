@@ -84,7 +84,7 @@ class Scripts(unittest.TestCase):
         with mock.patch.object(setup, "origin_repo", lambda: None), \
                 mock.patch.object(setup.wsf, "top_level", lambda path: {}), self.assertRaises(SystemExit) as e:
             setup.main(args)
-        self.assertIn("no GitHub origin: fill in github_repo", str(e.exception))
+        self.assertIn("fill in github_repo", str(e.exception))
         for url, repo in (("git@github.com:acme/baseline.git", "acme/baseline"), ("https://github.com/acme/base.line", "acme/base.line"),
                           ("https://gitlab.com/acme/x.git", None)):
             with mock.patch.object(setup.subprocess, "run", lambda *a, **k: mock.Mock(stdout=url)):

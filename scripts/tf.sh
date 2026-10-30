@@ -152,7 +152,12 @@ case "$cmd" in
         read -r -p "Type the workspace name ($workspace) to apply anyway: " answer
         [[ "$answer" == "$workspace" ]] || { echo "Cancelled."; exit 1; }
       else
-        echo "Refusing to apply risky changes without CONFIRM_ENV=$workspace."; exit 1
+        if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+          echo "::error::The plan guard flagged this apply, and the merged pull request has no allow-risky-changes label. If a person approves the change, add the label to the pull request and re-run this job."
+        else
+          echo "Refusing to apply risky changes without CONFIRM_ENV=$workspace."
+        fi
+        exit 1
       fi
     elif [[ -t 0 ]]; then
       read -r -p "Apply this plan to $workspace? Type yes: " answer

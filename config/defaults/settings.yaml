@@ -82,8 +82,8 @@ settings:
                                        # Volumes uploads are governed by Volume privileges instead)
     notebook_export: true              # export notebooks as files
     notebook_table_clipboard: true     # copy result tables to the clipboard
-    web_terminal: null                 # shell access on clusters. Not managed: the API rejected
-                                       # turning it off in testing (2026-10); set in the admin console.
+    web_terminal: null                 # shell access on clusters. Not managed: the API rejects turning
+                                       # it off; set it in the admin console.
     dbfs_file_browser: false           # browse and upload files in DBFS
     # true = keep interactive notebook results in the workspace's own storage
     # account instead of the Databricks control plane. null = leave alone.

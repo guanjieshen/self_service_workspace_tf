@@ -193,6 +193,26 @@ class TfShRelease(unittest.TestCase):
         self.assertIn("Refusing to apply risky changes", out.stdout + out.stderr)
         self.assertFalse(any(c.startswith("apply") for c in (self.fake / "calls.log").read_text().splitlines()))
 
+    def test_in_ci_a_flagged_apply_needs_the_approval_label(self):
+        # The apply job sets CONFIRM_ENV only when the merged pull request has allow-risky-changes.
+        folder = 'module.folders.databricks_directory.team["a"]'
+        (self.repo / "config/backend.hcl").write_text('container_name = "x"\n')
+        for confirm, applied in (("", False), ("ws", True)):
+            with self.subTest(label=bool(confirm)):
+                (self.fake / "calls.log").write_text("")
+                (self.fake / "state.txt").write_text(folder + "\n")
+                (self.fake / "plan.json").write_text(self.plan([folder], []))
+                (self.fake / "plan-after.json").write_text(self.plan([folder], []))
+                env = {k: v for k, v in os.environ.items() if k != "CONFIRM_ENV"}
+                env.update(TERRAFORM=str(self.fake / "terraform"), FAKE_DIR=str(self.fake), GITHUB_ACTIONS="true", CONFIRM_ENV=confirm)
+                out = subprocess.run([str(self.repo / "scripts/tf.sh"), "ws", "apply"], env=env, stdin=subprocess.DEVNULL,
+                                     capture_output=True, text=True, timeout=60)
+                ran = any(c.startswith("apply") for c in (self.fake / "calls.log").read_text().splitlines())
+                self.assertEqual(ran, applied, out.stdout + out.stderr)
+                if not applied:
+                    self.assertNotEqual(out.returncode, 0)
+                    self.assertIn("no allow-risky-changes label", out.stdout + out.stderr)
+
     def test_apply_and_destroy_refuse_outside_github_actions(self):
         env = {k: v for k, v in os.environ.items() if k not in ("GITHUB_ACTIONS", "ALLOW_LOCAL_APPLY")}
         env.update(TERRAFORM=str(self.fake / "terraform"), FAKE_DIR=str(self.fake), CONFIRM_ENV="ws")
