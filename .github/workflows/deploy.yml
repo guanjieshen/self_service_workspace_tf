@@ -18,11 +18,9 @@ on:
     - cron: "0 13 * * 1"     # drift check, Mondays 13:00 UTC
   workflow_dispatch:         # drift check, by hand
 
-permissions:
-  contents: read
-  pull-requests: write       # the plan comments
-  issues: write              # the drift issues
-  id-token: write            # GitHub OIDC sign-in (Azure and Databricks)
+# Nothing by default: each job asks for what it needs (id-token: the OIDC sign-in to Azure and
+# Databricks; pull-requests: the plan comments; issues: the drift issues).
+permissions: {}
 
 env:
   ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
@@ -33,13 +31,17 @@ jobs:
   route:
     name: Find the workspaces
     runs-on: ${{ fromJSON(vars.CHECKS_RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
     outputs:
       workspaces: ${{ steps.route.outputs.workspaces }}
       removed: ${{ steps.route.outputs.removed }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - id: route
         env:
           EVENT: ${{ github.event_name }}
@@ -58,8 +60,21 @@ jobs:
   plan:
     name: Plan ${{ matrix.workspace }}
     needs: route
-    if: github.event_name == 'pull_request' && needs.route.outputs.workspaces != '[]'
+    # A pull request from a fork gets no OIDC token: it could only fail, so it is not planned.
+    if: >-
+      github.event_name == 'pull_request' && needs.route.outputs.workspaces != '[]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ${{ fromJSON(vars.TERRAFORM_RUNNER || '"ubuntu-latest"') }}   # must reach the workspaces; see docs
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    # A newer push to the pull request replaces this plan. Plans do not lock the state (below),
+    # so a cancelled one leaves nothing behind.
+    concurrency:
+      group: plan-${{ github.event.pull_request.number }}-${{ matrix.workspace }}
+      cancel-in-progress: true
     strategy:
       fail-fast: false
       matrix:
@@ -69,9 +84,10 @@ jobs:
     # This job runs the pull request's code with the pipeline's credentials, before the code
     # is reviewed: see "Who can run code with the workspace credentials" in docs/github-actions.md.
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0     # the AI review compares the configuration with the base branch
+          persist-credentials: false
       - uses: ./.github/actions/setup
         with:
           workspace: ${{ matrix.workspace }}
@@ -81,8 +97,10 @@ jobs:
       - name: Preflight
         run: python3 scripts/preflight.py "$WORKSPACE" --out ".plans/$WORKSPACE.preflight.txt"
 
+      # A plan never writes the state, so it does not take the lock: it cannot collide with an
+      # apply or another plan ("state blob is already locked"). Applies still lock.
       - name: Plan
-        run: ./scripts/tf.sh "$WORKSPACE" plan -no-color -input=false
+        run: ./scripts/tf.sh "$WORKSPACE" plan -no-color -input=false -lock=false
 
       # A table of every resource the plan adds, changes or removes (github.com/dineshba/tf-summarize).
       - name: Summarize the plan
@@ -112,7 +130,7 @@ jobs:
       # One comment per workspace, updated on every push; none for a plan without changes.
       - name: Post the plan to the pull request
         if: always()
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           ENDPOINT: ${{ steps.ai.outputs.label }}
         with:
@@ -137,6 +155,8 @@ jobs:
     # Holds no credentials, so it does not change how the applies sign in. Without required
     # reviewers on it, merging the pull request is the approval.
     environment: apply-approval
+    timeout-minutes: 5
+    permissions: {}
     steps:
       - run: echo "Approved."
 
@@ -149,6 +169,10 @@ jobs:
       fail-fast: false        # one workspace failing does not stop the others
       matrix:
         workspace: ${{ fromJSON(needs.route.outputs.workspaces) }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
     # One apply at a time per workspace; the others wait (they share its state).
     concurrency:
       group: apply-${{ matrix.workspace }}
@@ -157,7 +181,7 @@ jobs:
       WORKSPACE: ${{ matrix.workspace }}
       CONFIRM_ENV: ${{ matrix.workspace }}   # the approval above is the confirmation
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # A re-run applies its own commit: refuse once main has moved on, or it would apply
       # older configuration over what was merged since.
       - name: Check the commit is still the latest on main
@@ -198,12 +222,18 @@ jobs:
       fail-fast: false
       matrix:
         workspace: ${{ fromJSON(needs.route.outputs.removed) }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
     concurrency:
       group: apply-${{ matrix.workspace }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v7
-      - uses: azure/login@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -222,6 +252,11 @@ jobs:
     needs: route
     if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && needs.route.outputs.workspaces != '[]'
     runs-on: ${{ fromJSON(vars.TERRAFORM_RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -229,14 +264,18 @@ jobs:
     env:
       WORKSPACE: ${{ matrix.workspace }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup
         with:
           workspace: ${{ matrix.workspace }}
       - name: Plan
-        run: ./scripts/tf.sh "$WORKSPACE" plan -no-color -input=false
+        run: ./scripts/tf.sh "$WORKSPACE" plan -no-color -input=false -lock=false
+      # One issue per workspace. A new comment only when the drift itself changed: the same
+      # drift found again on Monday does not notify anyone again.
       - name: Open, update or close the drift issue
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const fs = require('fs');
@@ -255,7 +294,18 @@ jobs:
               }
               return;
             }
+            const hash = require('crypto').createHash('sha256').update(plan).digest('hex').slice(0, 16);
+            const marker = `<!-- drift:${hash} -->`;
+            if (open) {
+              const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: open.number });
+              const latest = comments.length ? comments[comments.length - 1].body : open.body;
+              if ((latest || '').includes(marker)) {
+                core.info(`Same drift as already reported in #${open.number}; not commenting again.`);
+                return;
+              }
+            }
             const body = [
+              marker,
               `The live settings of \`${ws}\` no longer match the configuration (${changes} resource change${changes === 1 ? '' : 's'}).`,
               'Either update the configuration to match (if the change was intended), or re-apply: re-run the latest Deploy run that applied it, or merge a pull request that touches it.',
               '<details><summary>Plan</summary>\n\n```\n' + plan.slice(-60000) + '\n```\n</details>',

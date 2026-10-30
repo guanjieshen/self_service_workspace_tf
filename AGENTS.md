@@ -136,9 +136,10 @@ further step. When you add something:
 
 ## Gotchas learned the hard way
 
-- **State lock collisions.** Two CI runs on the same workspace (a PR plan and an Apply)
-  collide on the state lock: "state blob is already locked". Re-run the failed one. Do
-  not run local plans while CI plans or applies.
+- **State lock.** Plans and drift checks run with `-lock=false` (a plan never writes the
+  state), so they never collide with an apply. Applies lock, and run one at a time per
+  workspace (`concurrency: apply-<ws>`). A local `tf.sh plan` locks: do not run one while
+  CI applies.
 - **A hook false positive** blocks a command that has `git commit` (or `git push`) together
   with short flags such as `grep -n`, `sed -n` or `az ... -n`. Run git as its own command.
 - **Stacked PRs:** always target `main`. Deleting a merged base branch closes PRs stacked

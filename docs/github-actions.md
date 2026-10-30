@@ -72,6 +72,16 @@ In that case, run these jobs on a runner inside an allowed network and set the r
 
 The jobs that reach Databricks or the state use `TERRAFORM_RUNNER`. The checks and the routing step use `CHECKS_RUNNER` (default `ubuntu-latest`): set it too if your organization has no GitHub-hosted runners.
 
+## Hardening and noise
+
+- **Permissions per job.** The workflow grants nothing; each job asks for what it uses: `id-token: write` only where it signs in (plan, apply, retire, drift), `pull-requests: write` only for the plan comment, `issues: write` only for the drift issue.
+- **Pinned actions.** Every third-party action is pinned to a commit SHA, with its version in a comment; Dependabot (`.github/dependabot.yml`) proposes updates once a month, as one pull request. `scripts/tests/test_workflows.py` fails on an unpinned action, a job without its own permissions or time limit, or a plan that takes the state lock.
+- **No token left in the checkout** (`persist-credentials: false`), except in the apply job, which asks the remote whether `main` moved on before a re-run.
+- **Time limits** on every job, so a hung self-hosted runner does not hold a workspace's apply for hours.
+- **Plans do not lock the state** (`-lock=false`: a plan never writes it), so a plan never fails because an apply is running. A newer push to a pull request cancels its older plans and checks.
+- **Pull requests from forks are not planned:** GitHub gives them no OIDC token, so the plan could only fail.
+- **Drift issues** get a new comment only when the drift changed; the same drift found again next Monday does not notify anyone again. The issue closes itself when the drift is gone.
+
 ## The plan comment
 
 Each affected workspace gets one comment on the pull request, updated on every push:
