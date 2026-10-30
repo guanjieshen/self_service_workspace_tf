@@ -343,9 +343,10 @@ def main() -> int:
             settings = load_settings()
         except ValueError as e:  # advice only: a wrong setting switches the review off, never the plan
             print(f"::warning::AI review off: {e}", file=sys.stderr)
-            settings = {"enabled": False, "workspace": "", "host": "", "endpoint": "", "label": ""}
-        for key, value in settings.items():
-            print(f"{key}={str(value).lower() if isinstance(value, bool) else value}")
+            settings = {"enabled": False, "label": ""}
+        # Only what the workflow reads (deploy.yml: steps.ai.outputs.enabled and .label).
+        print(f"enabled={str(settings['enabled']).lower()}")
+        print(f"label={settings['label']}")
         return 0
     if not args.workspace:
         ap.error("workspace is required")

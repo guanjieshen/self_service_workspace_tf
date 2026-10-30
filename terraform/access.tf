@@ -25,27 +25,20 @@ locals {
   )
   entitlement_groups = merge(local.persona_groups, local.users_group == null ? {} : { users = [local.users_group] })
 
-  # ---- Persona permissions, resolved per group ----
+  # ---- The default warehouse's permission, per persona group ----
   # A group in several personas gets the highest permission any of them grants.
-  permission_rank = {
-    CAN_READ = 1, CAN_VIEW = 1, CAN_RUN = 2, CAN_ATTACH_TO = 2, CAN_MONITOR = 2,
-    CAN_USE  = 3, CAN_RESTART = 3, CAN_EDIT = 3, CAN_MANAGE = 4,
-  }
-  persona_grants = {
-    for attr in ["default_warehouse"] : attr => flatten([
-      for p, gs in local.persona_groups : [
-        for g in gs : { group = g, level = local.personas[p][attr] }
-      ] if try(local.personas[p][attr], null) != null
-    ])
-  }
-  persona_acl = {
-    for attr, grants in local.persona_grants : attr => {
-      for g in distinct([for x in grants : x.group]) : g => [
-        for level, rank in local.permission_rank : level
-        if rank == max([for x in grants : local.permission_rank[x.level] if x.group == g]...)
-        && contains([for x in grants : x.level if x.group == g], level)
-      ][0]
-    }
+  permission_rank = { CAN_VIEW = 1, CAN_MONITOR = 2, CAN_USE = 3, CAN_MANAGE = 4 }
+  warehouse_grants = flatten([
+    for p, gs in local.persona_groups : [
+      for g in gs : { group = g, level = local.personas[p].default_warehouse }
+    ] if try(local.personas[p].default_warehouse, null) != null
+  ])
+  warehouse_acl = {
+    for g in distinct([for x in local.warehouse_grants : x.group]) : g => [
+      for level, rank in local.permission_rank : level
+      if rank == max([for x in local.warehouse_grants : local.permission_rank[x.level] if x.group == g]...)
+      && contains([for x in local.warehouse_grants : x.level if x.group == g], level)
+    ][0]
   }
 
   token_groups = distinct(flatten([

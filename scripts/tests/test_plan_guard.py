@@ -1,6 +1,7 @@
 """scripts/plan-guard.py: which plan changes are flagged as hard to undo."""
 import contextlib
 import io
+import os
 import json
 import sys
 import tempfile
@@ -28,6 +29,8 @@ def run(*changes, released=None, preflight=None):
                 argv = ["--preflight", f.name]
             code = guard.main(argv)
     finally:
+        if preflight is not None:
+            os.unlink(argv[1])
         sys.stdin = stdin
     return code, out.getvalue()
 
@@ -213,6 +216,39 @@ class Releases(unittest.TestCase):
         code, out = run(rc, released=["module.personas.databricks_entitlements.users"])
         self.assertEqual(code, 2)
         self.assertIn("REPLACE", out)
+
+
+
+class EverySecurityRule(unittest.TestCase):
+    """Each key in the guard's security tables is flagged when it moves away from its secure value."""
+
+    def test_every_workspace_conf_key(self):
+        for key, secure in guard.SECURE_CONF.items():
+            loose = "false" if secure == "true" else "true"
+            with self.subTest(key=key):
+                code, out = run(change("databricks_workspace_conf", ["update"],
+                                       before={"custom_config": {key: secure}}, after={"custom_config": {key: loose}}))
+                self.assertEqual(code, 2)
+                self.assertIn(f"LOOSEN workspace setting {key}", out)
+                self.assertEqual(run(change("databricks_workspace_conf", ["update"],
+                                            before={"custom_config": {key: loose}}, after={"custom_config": {key: secure}}))[0], 0,
+                                 "tightening is not flagged")
+
+    def test_every_security_setting_turned_off(self):
+        for rtype, (name, read, secure) in guard.SECURITY_SETTINGS.items():
+            block = {
+                "databricks_disable_legacy_access_setting": "disable_legacy_access",
+                "databricks_disable_legacy_dbfs_setting": "disable_legacy_dbfs",
+                "databricks_restrict_workspace_admins_setting": "restrict_workspace_admins",
+                "databricks_enhanced_security_monitoring_workspace_setting": "enhanced_security_monitoring_workspace",
+            }[rtype]
+            field = "status" if rtype == "databricks_restrict_workspace_admins_setting" else (
+                "is_enabled" if "monitoring" in rtype else "value")
+            loose = "ALLOW_ALL" if field == "status" else False
+            with self.subTest(rtype=rtype):
+                code, out = run(change(rtype, ["update"], before={block: [{field: secure}]}, after={block: [{field: loose}]}))
+                self.assertEqual(code, 2)
+                self.assertIn(f"TURN OFF {name}", out)
 
 
 if __name__ == "__main__":

@@ -58,7 +58,7 @@ module "compute" {
   user_tag_pattern  = local.user_tag_pattern
   sql_warehouse     = local.config.sql_warehouse
   cluster_policy    = local.config.cluster_policy
-  warehouse_acl     = { for g, l in local.persona_acl.default_warehouse : lookup(local.group, g, g) => l }
+  warehouse_acl     = { for g, l in local.warehouse_acl : lookup(local.group, g, g) => l }
   starter_warehouse = try(tolist(data.databricks_sql_warehouses.starter[0].ids), [])
   platform_admins   = [for g in local.platform_admins : lookup(local.group, g, g)]
 

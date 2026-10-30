@@ -18,7 +18,6 @@ before apply, so the workspace keeps its current value. It is listed as a releas
 import argparse
 import json
 import pathlib
-import re
 import sys
 
 # Objects people build on. Deleting or replacing them loses work, IDs or access.

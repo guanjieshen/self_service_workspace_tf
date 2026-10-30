@@ -75,8 +75,8 @@ function worthPosting(ws, dir = '.plans') {
     const f = `${dir}/${ws}${name}`;
     return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim() : '';
   };
-  // Preflight warnings alone (a placeholder still in the baseline, ...) repeat on every pull
-  // request: they are shown with a plan that changes something, and in the job's annotations.
+  // Preflight warnings alone repeat on every pull request: they are shown with a plan that
+  // changes something, and in the job's annotations.
   return read('.changes') !== '0' || /^error:/m.test(read('.preflight.txt'));
 }
 

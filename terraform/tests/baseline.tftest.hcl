@@ -82,11 +82,7 @@ run "personas" {
     error_message = "One group per persona, from groups (baseline and the workspace's file)."
   }
   assert {
-    condition     = !contains(keys(local.persona_acl), "bu_folder")
-    error_message = "The BU folder has no persona permissions: /Workspace/Shared already gives everyone access."
-  }
-  assert {
-    condition     = local.persona_acl.default_warehouse == { "tst-explorers" = "CAN_USE", "tst-builders" = "CAN_USE", "tst-publishers" = "CAN_USE" }
+    condition     = local.warehouse_acl == { "tst-explorers" = "CAN_USE", "tst-builders" = "CAN_USE", "tst-publishers" = "CAN_USE" }
     error_message = "Every persona can use the default warehouse."
   }
   assert {
@@ -182,7 +178,7 @@ run "genie_code_defaults" {
     error_message = "Without genie-code/instructions.md there is no workspace section."
   }
   assert {
-    condition     = !strcontains(local.genie_instructions, "<!--") && length(regexall("\\{(BU|TAGS|WORKSPACE_TAGS|CATALOG|WAREHOUSE)\\}", local.genie_instructions)) == 0
+    condition     = !strcontains(local.genie_instructions, "<!--") && length(regexall("\\{(PREFIX|prefix|TAGS|WORKSPACE_TAGS|CATALOG|WAREHOUSE)\\}", local.genie_instructions)) == 0
     error_message = "Comments are removed and placeholders filled."
   }
   assert {
@@ -191,7 +187,7 @@ run "genie_code_defaults" {
   }
   assert {
     condition = (
-      length(regexall("\\{(BU|TAGS|WORKSPACE_TAGS|CATALOG|WAREHOUSE)\\}", base64decode(local.genie_skills["build-tagged-assets/SKILL.md"]))) == 0 &&
+      length(regexall("\\{(PREFIX|prefix|TAGS|WORKSPACE_TAGS|CATALOG|WAREHOUSE)\\}", base64decode(local.genie_skills["build-tagged-assets/SKILL.md"]))) == 0 &&
       strcontains(base64decode(local.genie_skills["build-tagged-assets/SKILL.md"]), "TST Default Warehouse")
     )
     error_message = "Placeholders in skills are filled ({WAREHOUSE} = the default warehouse's name)."

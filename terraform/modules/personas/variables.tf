@@ -19,7 +19,7 @@ variable "platform_admin_role" {
 }
 
 variable "extra_groups" {
-  description = "Team and project groups that must be assigned to the workspace (no entitlements managed)."
+  description = "Other groups to assign to the workspace with no entitlements managed here (the users group)."
   type        = list(string)
 }
 
