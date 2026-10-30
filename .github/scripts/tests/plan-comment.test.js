@@ -5,7 +5,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { buildBody, post } = require('../plan-comment.js');
+const { buildBody, retireBody, post, postRetire } = require('../plan-comment.js');
 
 function plans(files) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'plans-'));
@@ -122,4 +122,17 @@ test('post updates the workspace comment, or creates it', async () => {
     process.chdir(cwd);
   }
   assert.deepStrictEqual(calls, [['update', 8], ['create']]);
+});
+
+test('a retirement says what merging does, and is always posted', async () => {
+  const body = retireBody('hr');
+  assert.ok(body.startsWith('<!-- plan:hr -->'), 'the same marker as the plan, so it replaces an older plan comment');
+  assert.ok(body.includes('config/workspaces/hr.yaml') && /Nothing in the workspace changes/.test(body));
+  const calls = [];
+  const github = {
+    paginate: async () => [],
+    rest: { issues: { listComments: {}, updateComment: async () => calls.push('update'), createComment: async (a) => calls.push(a.body) } },
+  };
+  await postRetire({ github, context: { repo: { owner: 'o', repo: 'r' }, issue: { number: 1 } } }, 'hr');
+  assert.deepStrictEqual(calls, [body]);
 });

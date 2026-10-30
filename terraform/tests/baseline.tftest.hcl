@@ -155,8 +155,8 @@ run "workspace_settings" {
     error_message = "SQL statements time out after 4 hours."
   }
   assert {
-    condition     = length(module.catalog) == 1 && local.catalog.name == "tst_citizen_dev" && local.catalog.owner == "tst-admins" && local.default_catalog == null
-    error_message = "Every workspace gets one catalog, {prefix}_citizen_dev, owned by the platform admins group; no default catalog until set."
+    condition     = length(module.catalog) == 1 && local.catalog.name == "tst_citizen_dev" && local.catalog.owner == null && local.default_catalog == null
+    error_message = "Every workspace gets one catalog, {prefix}_citizen_dev, left owned by the pipeline that creates it; no default catalog until set."
   }
   assert {
     condition = alltrue([

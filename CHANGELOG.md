@@ -6,6 +6,23 @@ them for you: a setting missing from your baseline is left alone).
 
 ## Unreleased
 
+- **The pipeline owns the workspace catalog** (`catalog.owner: null` in `config/defaults/catalog.yaml`,
+  was `platform_admins`). Handing ownership to a group the service principal is not in made the
+  next apply fail with `PERMISSION_DENIED` in any metastore where it is not metastore admin.
+  Platform admins keep all privileges and `MANAGE`. An existing catalog keeps its owner (`null`
+  leaves it alone); if a group owns it, preflight says how to make the pipeline the owner. Set
+  `owner: null` in your baseline. The first plan updates the catalog's comment.
+- **New baseline setting `catalog.other_privileges`** (add `other_privileges: {}` under `catalog:`):
+  catalog privileges for anyone else, for example the self-service app's service principal
+  (`CREATE_SCHEMA`), which a grant by hand would lose on the next apply.
+- SETUP.md step 6 lists the Unity Catalog privileges the service principal needs: `CREATE CATALOG`
+  on the metastore, and `CREATE MANAGED STORAGE` on the external location of `catalog.storage_root`
+  (a metastore admin grants them; it is never metastore admin itself). Preflight checks them.
+- A pull request that deletes a workspace's file gets a **Retire** comment saying what merging does
+  (retirement plans nothing). SETUP.md troubleshooting says how to recover a workspace retired by
+  mistake.
+- `setup.py github` protects `main` for repository admins too (`enforce_admins`): run step 5 again.
+  A pull request then needs an approval from someone other than its author.
 - `scripts/release.py <version>` builds the zip an organization installs, without the framework
   repository's own environment, and refuses to if any of it is left (AGENTS.md, "Releasing").
 - The chargeback tag `APP_ID` is now `APPID` (the baseline's `tags:`, `classic_user_tags`, and

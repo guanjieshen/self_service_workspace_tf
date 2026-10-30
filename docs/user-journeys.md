@@ -89,7 +89,7 @@ group holds each persona; who is in the group is Entra ID's business.
 
 ## 5. Retire a workspace
 
-1. Delete `config/workspaces/hr-citizen-dev.yaml` and open a pull request. Nothing is planned.
+1. Delete `config/workspaces/hr-citizen-dev.yaml` and open a pull request. Nothing is planned: a **Retire** comment on the pull request says what merging does.
 2. Merge. The workspace's Terraform state is removed, so Terraform no longer manages it.
    **Nothing in the workspace changes:** its settings, groups and data stay as they are.
    Deleting the workspace itself is a separate decision, outside this repository.

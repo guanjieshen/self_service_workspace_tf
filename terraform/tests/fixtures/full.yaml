@@ -12,7 +12,12 @@ personas:
   publisher: {can_create_tokens: false}
 sql_warehouse: {size: Medium, max_clusters: 4}
 cluster_policy: {max_workers: 8, pipelines: null}
-catalog: {name: tst_citizen_dev, comment: Test catalog}
+catalog:
+  name: tst_citizen_dev
+  comment: Test catalog
+  owner: platform_admins
+  other_privileges:
+    11111111-2222-3333-4444-555555555555: [USE_CATALOG, CREATE_SCHEMA]
 default_catalog: tst_citizen_dev
 settings:
   dashboard_embedding:

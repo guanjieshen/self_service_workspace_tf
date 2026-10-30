@@ -213,7 +213,7 @@ python3 scripts/setup.py github          # read it
 python3 scripts/setup.py github --run
 ```
 
-It sets the repository variables `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID`, creates the labels `allow-risky-changes` and `drift`, the environment `apply-approval` (deployments from `main` only; with `apply_approvers` set, that team must approve each apply), and protects `main`: pull requests only, the **Format and validate** and **Tests** checks must pass, and code owners must approve.
+It sets the repository variables `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID`, creates the labels `allow-risky-changes` and `drift`, the environment `apply-approval` (deployments from `main` only; with `apply_approvers` set, that team must approve each apply), and protects `main`: pull requests only, the **Format and validate** and **Tests** checks must pass, and code owners must approve. The rule applies to **repository admins too**: a push to `main` is an apply with workspace admin rights, so nobody can skip the review. A pull request needs an approval from someone other than its author, so name at least two people in each code owner team.
 
 Then, if needed:
 
@@ -224,15 +224,21 @@ Then, if needed:
 
 ## 6. Databricks account (by hand)
 
-**Who:** a Databricks account admin, in the account console (https://accounts.azuredatabricks.net). Once, before the first workspace; items 2 and 5 again for each new workspace. You need the service principal's client ID, `pipeline_client_id` in `config/setup.yaml` (step 4 writes it).
+**Who:** a Databricks account admin, in the account console (https://accounts.azuredatabricks.net). Once, before the first workspace; items 2 and 5 again for each new workspace (item 5 needs a metastore admin). You need the service principal's client ID, `pipeline_client_id` in `config/setup.yaml` (step 4 writes it).
 
 1. **Add the service principal to the account:** User management > Service principals > Add service principal > **Microsoft Entra ID managed**, with the application ID `pipeline_client_id` and the name `pipeline_name` (default `sp-citizen-dev-terraform`).
 2. **Make it workspace admin** of each workspace this repository manages: Workspaces > the workspace > Permissions > Add permissions > the service principal, **Admin**.
 3. **Let it create budget policies** (serverless usage policies): in the account console, User management > Service principals > the service principal > Roles, turn on **Billing admin**. Account admin alone is not enough ("missing CreateBudgetPolicyPermission"). If you will not grant this, set `serverless_policy.enabled: false` in `config/defaults/cost.yaml` instead.
 4. **Note the account ID** (account console, top right) for `account_id` in `config/defaults/cost.yaml` (step 8): usage policies belong to the account.
-5. Check that each workspace's metastore can hold the workspace catalog: either the metastore has a storage root, or the workspace's file sets `catalog.storage_root` to an external location (the Unity Catalog team creates the storage credential and external location). Preflight checks this.
+5. **Let it create the workspace catalog.** A **metastore admin** of each workspace's metastore grants, in a SQL editor or Catalog Explorer (the metastore > Permissions):
 
-The service principal is never account admin: it needs workspace admin in the workspaces it manages, plus the budget policy permission. `scripts/preflight.py` (step 9) confirms items 2 and 5 for each workspace.
+   ```sql
+   GRANT CREATE CATALOG ON METASTORE TO `<pipeline_client_id>`;
+   ```
+
+   A workspace that Databricks enabled for Unity Catalog automatically may already give its workspace admins this privilege, and with it the pipeline (item 2); preflight tells you. The catalog also needs somewhere to keep its data: either the metastore has a storage root, or the workspace's file sets `catalog.storage_root` to an external location (the Unity Catalog team creates the storage credential and external location). In that case, also grant `CREATE MANAGED STORAGE` on that external location to the service principal.
+
+The service principal is never account admin or metastore admin: it needs workspace admin in the workspaces it manages, the budget policy permission and `CREATE CATALOG`. It owns the catalog it creates, which is what lets later applies change it; the platform admins group gets all privileges and `MANAGE` on it (`config/defaults/catalog.yaml`). `scripts/preflight.py` (step 9) confirms items 2, 3 and 5 for each workspace.
 
 ## 7. Groups
 
@@ -242,7 +248,7 @@ Create Entra ID groups and sync them to the Databricks account (automatic identi
 
 | Group | Named | Gets |
 | --- | --- | --- |
-| Platform admins | `{prefix}_platform_admins`, one per workspace prefix (the baseline) | Workspace admin; owns the workspace catalog |
+| Platform admins | `{prefix}_platform_admins`, one per workspace prefix (the baseline) | Workspace admin; all privileges and MANAGE on the workspace catalog |
 | Users | Per workspace, in its file (`groups.users`) | Consumer access (Databricks One): dashboards, Genie spaces, apps |
 | Explorers | Per workspace (`groups.explorer`) | SQL access: the SQL editor, queries, dashboards, Genie |
 | Builders, publishers | Per workspace (`groups.builder`, `groups.publisher`) | Workspace access: notebooks, jobs, pipelines on serverless; classic compute only through the self-service app |
@@ -353,6 +359,9 @@ State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (ste
 | Preflight: `is not a workspace admin` | Step 6 not done for this workspace | Step 6, item 2, for this workspace |
 | Preflight: group `does not exist in the account` or `exists only in this workspace` | The Entra group is missing, not synced, or a workspace-local group has the same name | Step 7; or name the right group under `groups:` in the workspace's file |
 | Preflight: `the metastore has no storage root` | New catalogs have nowhere to store data | Set `catalog.storage_root` in the workspace's file to an external location URL |
+| Preflight: `cannot create catalog`, or the apply fails with `PERMISSION_DENIED` creating the catalog | The service principal lacks `CREATE CATALOG` on the metastore, or `CREATE MANAGED STORAGE` on the external location of `catalog.storage_root` | Step 6, item 5 |
+| Preflight: `does not own catalog`, or the apply fails with `PERMISSION_DENIED` updating the catalog or its grants | Someone else owns the catalog (it existed before, or `catalog.owner` handed it to a group the pipeline is not in) | A metastore admin runs `ALTER CATALOG <name> OWNER TO \`<pipeline_client_id>\``, and `catalog.owner` stays `null` |
+| A workspace was retired by mistake | Merging the deletion of its file deleted its Terraform state | Restore `citizen-dev/<name>.tfstate` from an earlier blob version in the state container (blob versioning, step 3: in the Azure portal, the container > Show deleted blobs > the blob > Versions > Make current version), then restore the workspace's file in a pull request |
 | Preflight: `cannot create the workspace's serverless usage policy`, or the apply fails with `missing CreateBudgetPolicyPermission` | The service principal lacks the account's **Billing admin** role (account admin alone is not enough) | Step 6, item 3, or `serverless_policy.enabled: false` |
 | `setup.py github` fails at branch protection: `Upgrade to GitHub Pro or make this repository public` | Branch protection on a private repository needs a paid GitHub plan | The rest of step 5 is done. Protect `main` by hand once the plan allows it; until then, merging is the only review |
 | Apply: `the merged pull request has no allow-risky-changes label` | The plan guard flagged the change, and it was merged without the label | If a person approves it, add the label to the merged pull request and re-run the apply; otherwise revert the change in a new pull request |

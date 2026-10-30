@@ -54,6 +54,8 @@ locals {
   catalog_grants = merge(
     { for g in distinct(flatten(values(local.persona_groups))) : g => sort(try(local.config.catalog.persona_privileges, [])) },
     { for g in local.platform_admins : g => sort(try(local.config.catalog.platform_admin_privileges, [])) },
+    # Anyone else: an application ID or a group name, or a key of groups.
+    { for p, privs in coalesce(try(local.config.catalog.other_privileges, null), {}) : lookup(local.group_names, p, p) => sort(privs) },
   )
   default_catalog = try(replace(replace(local.config.default_catalog, "{PREFIX}", local.prefix_upper), "{prefix}", local.prefix), null)
 

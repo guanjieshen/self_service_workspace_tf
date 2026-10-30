@@ -116,15 +116,20 @@ workspace. What keeps that safe:
 ## 5. The workspace catalog
 
 Each workspace gets one catalog, `{prefix}_citizen_dev` (`config/defaults/catalog.yaml`),
-bound to the workspace and owned by the platform admins group, with predictive
-optimization on. Its schemas are not Terraform's: people get
-them from the self-service app.
+bound to the workspace, with predictive optimization on. Its schemas are not
+Terraform's: people get them from the self-service app.
 
+- **The pipeline owns the catalog.** It creates it, and every apply changes the catalog and
+  its grants, which needs the owner (or a metastore admin). Handing ownership to a group the
+  pipeline is not in would make the next apply fail. Platform admins get all privileges
+  and `MANAGE` instead, which lets them grant, rename and drop. Being owner of its own
+  catalog is all the pipeline needs; it is never metastore admin.
 - **Catalog-level grants are minimal.** Personas get `USE CATALOG` and `USE SCHEMA`:
   enough to reach a schema and use what was shared with them, never data catalog-wide,
-  and no `CREATE SCHEMA`. Data access is per schema. Platform admins get all privileges.
+  and no `CREATE SCHEMA`. Data access is per schema.
 - The grants are authoritative: anything else granted on the catalog by hand is removed
-  on the next apply, so the self-service app works with schemas, not catalog grants.
+  on the next apply. A principal that needs a catalog privilege, such as the self-service
+  app's service principal, is listed under `other_privileges`.
 
 ## 6. Caveats
 
@@ -188,6 +193,6 @@ Catalogs shared between workspaces, storage credentials and external locations s
 
 Schemas and workspace folders are requested through the self-service app, which lives in its own repository and deploys its own jobs. What it relies on here:
 
-- **The workspace catalog** (`{prefix}_citizen_dev`), owned by the platform admins group. Personas have only `USE CATALOG` and `USE SCHEMA` on it; the app grants on the schemas it creates.
-- **Catalog grants are authoritative:** a privilege granted on the catalog outside this repository is removed on the next apply. The app's service principal needs a privilege on the catalog (for example `CREATE SCHEMA`): add it to the catalog grants in `config/defaults/catalog.yaml`, not by hand.
+- **The workspace catalog** (`{prefix}_citizen_dev`), owned by the pipeline; the platform admins group has all privileges and `MANAGE`. Personas have only `USE CATALOG` and `USE SCHEMA` on it; the app grants on the schemas it creates.
+- **Catalog grants are authoritative:** a privilege granted on the catalog outside this repository is removed on the next apply. The app's service principal needs privileges on the catalog (for example `USE CATALOG` and `CREATE SCHEMA`): add them under `other_privileges` in `config/defaults/catalog.yaml`, not by hand.
 - **The persona groups** each workspace names in its file.

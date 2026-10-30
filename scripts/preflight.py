@@ -17,6 +17,9 @@ and checks what Terraform needs but cannot fix itself:
     admin role; account admin alone is not enough);
   - the workspace catalog has somewhere to keep its data (a metastore storage root, or
     catalog.storage_root in the workspace's file);
+  - the identity may create the catalog (CREATE CATALOG on the metastore, and CREATE MANAGED
+    STORAGE on the external location of catalog.storage_root), or, once it exists, owns it
+    (later applies change the catalog and its grants);
   - before legacy access is disabled (one-way after 30 days): what still uses it.
 
 Changes nothing. Prints ok / warning / error lines and exits 1 if there is an error. The
@@ -107,6 +110,8 @@ def checks(ws, get):
         out.append(("error", f"no Unity Catalog metastore is assigned to the workspace ({err or 'none'})"))
     else:
         metastore, err = get(f"/api/2.1/unity-catalog/metastores/{assignment['metastore_id']}")
+        if metastore is not None:
+            metastore.setdefault("metastore_id", assignment["metastore_id"])
         out.append(("ok", f"metastore {(metastore or {}).get('name', assignment['metastore_id'])}"))
 
     # Groups: in this workspace's file, or the baseline's (platform admins). A
@@ -123,11 +128,11 @@ def checks(ws, get):
             out.append(("warning", f"could not look up group {name} in the account: {err}"))
         elif found.get("totalResults", 0) > 0:
             out.append(("ok", f"account group {name} ({key})"))
-            # The platform admins manage the usage policy and own the catalog: an empty group
+            # The platform admins manage the usage policy and the catalog: an empty group
             # means only the pipeline can (people cannot even see the policy).
             if key == "platform_admins" and not any(g.get("members") for g in found.get("Resources", [])):
                 out.append(("warning", f"group {name} (platform_admins) has no members, so nobody but the pipeline can "
-                                       "manage the workspace's usage policy (or see it) or the catalog it owns: add the "
+                                       "manage the workspace's usage policy (or see it) or manage the catalog: add the "
                                        "workspace's platform admins to it in Entra ID (docs/SETUP.md, step 7)"))
         else:
             local, _ = get(f"/api/2.0/preview/scim/v2/Groups?filter={flt}&attributes=displayName")
@@ -142,11 +147,14 @@ def checks(ws, get):
     # The workspace catalog needs storage: the metastore's, or its own storage_root.
     if info["catalog"] and metastore is not None:
         existing, _ = get(f"/api/2.1/unity-catalog/catalogs/{info['catalog']}")
+        storage_root = wsf.setting(f, "catalog", "storage_root")
         if existing and existing.get("name"):
             out.append(("ok", f"catalog {info['catalog']} already exists"))
-        elif not metastore.get("storage_root") and not wsf.setting(f, "catalog", "storage_root"):
+        elif not metastore.get("storage_root") and not storage_root:
             out.append(("error", f"the metastore has no storage root, so catalog {info['catalog']} needs one: set "
                                  "catalog.storage_root in the workspace's file to an external location's URL"))
+        out.extend(catalog_rights(get, metastore, info["catalog"], existing if existing and existing.get("name") else None,
+                                  storage_root, me, who))
 
     # Legacy access: once disabled for 30 days, the workspace is Unity Catalog only, for good.
     if wsf.setting(f, "settings", "disable_legacy_access") == "true":
@@ -179,6 +187,63 @@ def legacy_uses(get):
                         "workspace still has " + "; ".join(found) + ". Migrate them first, or set "
                         "disable_legacy_access, disable_dbfs_root_and_mounts and enforce_user_isolation to null under settings: "
                         "in its file (config/workspaces/<name>.yaml)")]
+
+
+def catalog_rights(get, metastore, catalog, existing, storage_root, me, who):
+    """Whether the identity may create the workspace catalog, or change it once it exists.
+    A metastore admin (the metastore's owner, a group it is in, or "account users") may do both."""
+    principal = me.get("applicationId") or me.get("userName") or ""
+    mine = {principal, me.get("userName"), "account users"} | {g.get("display") for g in me.get("groups", [])}
+    mine.discard(None)
+    if metastore.get("owner") in mine:
+        return [("ok", f"{who} is a metastore admin (the metastore's owner is {metastore['owner']})")]
+    # Only the pipeline's identity matters: locally (signed in as a person) these are warnings.
+    level = "error" if os.environ.get("GITHUB_ACTIONS") == "true" else "warning"
+    if existing:
+        if existing.get("owner") in mine:
+            return [("ok", f"{who} owns catalog {catalog}")]
+        return [(level, f"{who} does not own catalog {catalog} (its owner is {existing.get('owner')}), so applies cannot "
+                        f"change it or its grants: a metastore admin runs ALTER CATALOG {catalog} OWNER TO `{principal}`, "
+                        "and catalog.owner stays null (docs/SETUP.md, step 6)")]
+
+    def has(securable, name, wanted):
+        rights, err = get(f"/api/2.1/unity-catalog/effective-permissions/{securable}/{urllib.parse.quote(name)}"
+                          f"?principal={urllib.parse.quote(principal)}")
+        if err:
+            return None, err
+        held = {p.get("privilege") for a in rights.get("privilege_assignments", []) for p in a.get("privileges", [])}
+        return bool(held & {wanted, "ALL_PRIVILEGES"}), None
+
+    out = []
+    ok, err = has("metastore", metastore.get("metastore_id", ""), "CREATE_CATALOG")
+    if ok is None:
+        out.append(("warning", f"could not check that {who} may create catalog {catalog} (CREATE CATALOG): {err}"))
+    elif ok:
+        out.append(("ok", f"{who} may create catalog {catalog} (CREATE CATALOG)"))
+    else:
+        out.append((level, f"{who} cannot create catalog {catalog}: a metastore admin grants it CREATE CATALOG ON "
+                           f"METASTORE (docs/SETUP.md, step 6)"))
+    if storage_root:
+        locations, err = get("/api/2.1/unity-catalog/external-locations?max_results=1000")
+        covering = sorted((l for l in (locations or {}).get("external_locations", [])
+                           if storage_root.rstrip("/").startswith(l.get("url", "").rstrip("/"))),
+                          key=lambda l: len(l.get("url", "")))
+        if err:
+            out.append(("warning", f"could not look up the external location of catalog.storage_root: {err}"))
+        elif not covering:
+            out.append(("error", f"no external location covers catalog.storage_root ({storage_root}): the Unity Catalog "
+                                 "team creates one (docs/SETUP.md, step 6)"))
+        else:
+            loc = covering[-1]
+            ok, err = (True, None) if loc.get("owner") in mine else has("external_location", loc["name"], "CREATE_MANAGED_STORAGE")
+            if ok is None:
+                out.append(("warning", f"could not check CREATE MANAGED STORAGE on external location {loc['name']}: {err}"))
+            elif ok:
+                out.append(("ok", f"{who} may store catalog {catalog} in external location {loc['name']}"))
+            else:
+                out.append((level, f"{who} cannot create catalog {catalog} in external location {loc['name']}: grant it "
+                                   "CREATE MANAGED STORAGE on that external location (docs/SETUP.md, step 6)"))
+    return out
 
 
 def billing_admin(get, account, me, who):

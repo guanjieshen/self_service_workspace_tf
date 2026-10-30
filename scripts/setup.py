@@ -135,7 +135,8 @@ def github(a):
     put_env = "" if a.approvers else f"gh api repos/{a.repo}/environments/apply-approval >/dev/null 2>&1 ||\n  "
     protection = json.dumps({
         "required_status_checks": {"strict": False, "contexts": REQUIRED_CHECKS},
-        "enforce_admins": False,
+        # Repository admins too: a push to main is an apply with workspace admin rights.
+        "enforce_admins": True,
         "required_pull_request_reviews": {"require_code_owner_reviews": True, "required_approving_review_count": 1},
         "restrictions": None,
     })
@@ -153,7 +154,7 @@ gh label create drift -R {repo} --force --color FBCA04 --description "A workspac
 EOF
 gh api repos/{a.repo}/environments/apply-approval/deployment-branch-policies --jq '.branch_policies[].name' | grep -qx main ||
   gh api -X POST repos/{a.repo}/environments/apply-approval/deployment-branch-policies -f name=main -f type=branch >/dev/null
-# main: pull requests only, the checks pass, and code owners approve (.github/CODEOWNERS).
+# main: pull requests only, for everyone including admins; the checks pass, and code owners approve (.github/CODEOWNERS).
 gh api -X PUT repos/{a.repo}/branches/main/protection --input - >/dev/null <<'EOF'
 {protection}
 EOF
