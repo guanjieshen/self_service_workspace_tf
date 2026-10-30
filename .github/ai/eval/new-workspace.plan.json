@@ -115,7 +115,7 @@
      ],
      "custom_tags": [
       {
-       "key": "APP_ID",
+       "key": "APPID",
        "value": "NONE"
       },
       {
@@ -327,7 +327,7 @@
     ],
     "before": null,
     "after": {
-     "definition": "{\"autoscale.max_workers\":{\"maxValue\":4,\"type\":\"range\"},\"autotermination_minutes\":{\"defaultValue\":60,\"maxValue\":60,\"minValue\":10,\"type\":\"range\"},\"cluster_type\":{\"type\":\"fixed\",\"value\":\"all-purpose\"},\"custom_tags.APP_ID\":{\"defaultValue\":\"NONE\",\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.BUSINESS_UNIT\":{\"type\":\"fixed\",\"value\":\"SS1\"},\"custom_tags.COST_CATEGORY\":{\"type\":\"fixed\",\"value\":\"CITIZEN_SELF_SERVICE\"},\"custom_tags.PROJECT\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.TEAM\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"data_security_mode\":{\"defaultValue\":\"USER_ISOLATION\",\"type\":\"allowlist\",\"values\":[\"USER_ISOLATION\",\"DATA_SECURITY_MODE_STANDARD\"]},\"driver_node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"num_workers\":{\"maxValue\":4,\"type\":\"range\"},\"spark_version\":{\"defaultValue\":\"auto:latest-lts\",\"type\":\"allowlist\",\"values\":[\"auto:latest-lts\",\"auto:latest-lts-ml\"]}}",
+     "definition": "{\"autoscale.max_workers\":{\"maxValue\":4,\"type\":\"range\"},\"autotermination_minutes\":{\"defaultValue\":60,\"maxValue\":60,\"minValue\":10,\"type\":\"range\"},\"cluster_type\":{\"type\":\"fixed\",\"value\":\"all-purpose\"},\"custom_tags.APPID\":{\"defaultValue\":\"NONE\",\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.BUSINESS_UNIT\":{\"type\":\"fixed\",\"value\":\"SS1\"},\"custom_tags.COST_CATEGORY\":{\"type\":\"fixed\",\"value\":\"CITIZEN_SELF_SERVICE\"},\"custom_tags.PROJECT\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.TEAM\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"data_security_mode\":{\"defaultValue\":\"USER_ISOLATION\",\"type\":\"allowlist\",\"values\":[\"USER_ISOLATION\",\"DATA_SECURITY_MODE_STANDARD\"]},\"driver_node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"num_workers\":{\"maxValue\":4,\"type\":\"range\"},\"spark_version\":{\"defaultValue\":\"auto:latest-lts\",\"type\":\"allowlist\",\"values\":[\"auto:latest-lts\",\"auto:latest-lts-ml\"]}}",
      "description": null,
      "libraries": [],
      "max_clusters_per_user": 1,
@@ -362,7 +362,7 @@
     ],
     "before": null,
     "after": {
-     "definition": "{\"autoscale.max_workers\":{\"maxValue\":4,\"type\":\"range\"},\"cluster_type\":{\"type\":\"fixed\",\"value\":\"job\"},\"custom_tags.APP_ID\":{\"defaultValue\":\"NONE\",\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.BUSINESS_UNIT\":{\"type\":\"fixed\",\"value\":\"SS1\"},\"custom_tags.COST_CATEGORY\":{\"type\":\"fixed\",\"value\":\"CITIZEN_SELF_SERVICE\"},\"custom_tags.PROJECT\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.TEAM\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"data_security_mode\":{\"defaultValue\":\"USER_ISOLATION\",\"type\":\"allowlist\",\"values\":[\"USER_ISOLATION\",\"DATA_SECURITY_MODE_STANDARD\"]},\"driver_node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"num_workers\":{\"maxValue\":4,\"type\":\"range\"},\"spark_version\":{\"defaultValue\":\"auto:latest-lts\",\"type\":\"allowlist\",\"values\":[\"auto:latest-lts\",\"auto:latest-lts-ml\"]}}",
+     "definition": "{\"autoscale.max_workers\":{\"maxValue\":4,\"type\":\"range\"},\"cluster_type\":{\"type\":\"fixed\",\"value\":\"job\"},\"custom_tags.APPID\":{\"defaultValue\":\"NONE\",\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.BUSINESS_UNIT\":{\"type\":\"fixed\",\"value\":\"SS1\"},\"custom_tags.COST_CATEGORY\":{\"type\":\"fixed\",\"value\":\"CITIZEN_SELF_SERVICE\"},\"custom_tags.PROJECT\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.TEAM\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"data_security_mode\":{\"defaultValue\":\"USER_ISOLATION\",\"type\":\"allowlist\",\"values\":[\"USER_ISOLATION\",\"DATA_SECURITY_MODE_STANDARD\"]},\"driver_node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"num_workers\":{\"maxValue\":4,\"type\":\"range\"},\"spark_version\":{\"defaultValue\":\"auto:latest-lts\",\"type\":\"allowlist\",\"values\":[\"auto:latest-lts\",\"auto:latest-lts-ml\"]}}",
      "description": null,
      "libraries": [],
      "max_clusters_per_user": 1,
@@ -397,7 +397,7 @@
     ],
     "before": null,
     "after": {
-     "definition": "{\"autoscale.max_workers\":{\"maxValue\":4,\"type\":\"range\"},\"cluster_type\":{\"type\":\"fixed\",\"value\":\"dlt\"},\"custom_tags.APP_ID\":{\"defaultValue\":\"NONE\",\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.BUSINESS_UNIT\":{\"type\":\"fixed\",\"value\":\"SS1\"},\"custom_tags.COST_CATEGORY\":{\"type\":\"fixed\",\"value\":\"CITIZEN_SELF_SERVICE\"},\"custom_tags.PROJECT\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.TEAM\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"data_security_mode\":{\"defaultValue\":\"USER_ISOLATION\",\"type\":\"allowlist\",\"values\":[\"USER_ISOLATION\",\"DATA_SECURITY_MODE_STANDARD\"]},\"driver_node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"num_workers\":{\"maxValue\":4,\"type\":\"range\"}}",
+     "definition": "{\"autoscale.max_workers\":{\"maxValue\":4,\"type\":\"range\"},\"cluster_type\":{\"type\":\"fixed\",\"value\":\"dlt\"},\"custom_tags.APPID\":{\"defaultValue\":\"NONE\",\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.BUSINESS_UNIT\":{\"type\":\"fixed\",\"value\":\"SS1\"},\"custom_tags.COST_CATEGORY\":{\"type\":\"fixed\",\"value\":\"CITIZEN_SELF_SERVICE\"},\"custom_tags.PROJECT\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.TEAM\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"data_security_mode\":{\"defaultValue\":\"USER_ISOLATION\",\"type\":\"allowlist\",\"values\":[\"USER_ISOLATION\",\"DATA_SECURITY_MODE_STANDARD\"]},\"driver_node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"num_workers\":{\"maxValue\":4,\"type\":\"range\"}}",
      "description": null,
      "libraries": [],
      "max_clusters_per_user": 1,
@@ -600,7 +600,7 @@
       {
        "custom_tags": [
         {
-         "key": "APP_ID",
+         "key": "APPID",
          "value": "NONE"
         },
         {

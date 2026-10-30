@@ -1,5 +1,5 @@
 # Test fixture: workspace-missing-host (one workspace file).
 prefix: tst
 account_id: 00000000-0000-0000-0000-000000000000
-tags: {APP_ID: TST-APP}
+tags: {APPID: TST-APP}
 groups: {explorer: tst-explorers, builder: tst-builders, publisher: tst-publishers, platform_admins: tst-admins}

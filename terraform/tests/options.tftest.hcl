@@ -31,7 +31,7 @@ run "tags" {
   variables { workspace = "full" }
 
   assert {
-    condition     = local.chargeback_tags == { BUSINESS_UNIT = "TST", APP_ID = "TST-APP", COST_CENTER = "CC-42" }
+    condition     = local.chargeback_tags == { BUSINESS_UNIT = "TST", APPID = "TST-APP", COST_CENTER = "CC-42" }
     error_message = "A workspace's tags: change a value, add a tag, and null drops one (COST_CATEGORY). Got: ${jsonencode(local.chargeback_tags)}"
   }
   assert {
@@ -89,7 +89,7 @@ run "genie_code_workspace_parts" {
     error_message = "Default and workspace instructions each get their heading, default first."
   }
   assert {
-    condition     = strcontains(local.genie_instructions, "Use the TST warehouse TST Default Warehouse and the catalog tst_citizen_dev; tags `APP_ID` = `TST-APP`, `BUSINESS_UNIT` = `TST`, `COST_CENTER` = `CC-42`.")
+    condition     = strcontains(local.genie_instructions, "Use the TST warehouse TST Default Warehouse and the catalog tst_citizen_dev; tags `APPID` = `TST-APP`, `BUSINESS_UNIT` = `TST`, `COST_CENTER` = `CC-42`.")
     error_message = "Placeholders in the workspace instructions are filled ({PREFIX}, {WAREHOUSE}, {CATALOG}, {WORKSPACE_TAGS})."
   }
   assert {

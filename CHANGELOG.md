@@ -6,6 +6,9 @@ them for you: a setting missing from your baseline is left alone).
 
 ## Unreleased
 
+- The chargeback tag `APP_ID` is now `APPID` (the baseline's `tags:`, `classic_user_tags`, and
+  `tags:` in workspace files). The first plan updates the tags on the usage policy, the warehouse
+  and the classic cluster policies; cost reports show `APP_ID` before and `APPID` after.
 - **`bu` is now `prefix`** in workspace files, and the placeholders `{bu}` / `{BU}` are `{prefix}` /
   `{PREFIX}`: it is the short code that starts every name Terraform creates in a workspace. Rename
   the key in each workspace file (and the placeholders in `config/defaults/`); the plan shows no

@@ -16,7 +16,7 @@ account_id: null
 # adds a tag) under tags: in its file; null there drops the tag in that workspace.
 tags:
   BUSINESS_UNIT: "{PREFIX}"                 # the workspace's prefix, upper case
-  APP_ID: NONE                          # the BU's default self-service application ID, if it has one
+  APPID: NONE                          # the BU's default self-service application ID, if it has one
   COST_CATEGORY: CITIZEN_SELF_SERVICE
 
 # Tags a user must fill in when creating a classic cluster: upper case letters, digits,
@@ -24,7 +24,7 @@ tags:
 # A tag that is also under tags: above starts with that value, and the user may change it.
 # Serverless usage and the SQL warehouse carry only the tags above.
 classic_user_tags:
-  - APP_ID
+  - APPID
   - TEAM
   - PROJECT
 
