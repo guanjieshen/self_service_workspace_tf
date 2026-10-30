@@ -6,6 +6,11 @@ them for you: a setting missing from your baseline is left alone).
 
 ## Unreleased
 
+- The Serverless Starter Warehouse Databricks creates in a new workspace is for the platform
+  admins only (`starter_warehouse.admins_only` in `config/defaults/compute.yaml`): people use
+  the default warehouse, which is sized and tagged. Only its permissions are managed. The first
+  plan creates `module.compute.databricks_permissions.starter_warehouse`; anyone using it loses
+  access, so check an existing workspace first, or set it to `null` there.
 - A new workspace's first apply no longer needs `allow-risky-changes` for disabling legacy
   access: the plan guard reads preflight's findings and lets it through when nothing still
   uses legacy access. An existing workspace that still uses Hive or DBFS mounts is flagged as before.

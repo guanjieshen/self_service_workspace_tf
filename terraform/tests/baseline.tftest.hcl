@@ -55,6 +55,25 @@ run "names_and_tags" {
   }
 }
 
+# The Starter warehouse Databricks creates in a new workspace: found by name, admins only.
+run "starter_warehouse" {
+  command = plan
+
+  override_data {
+    target = data.databricks_sql_warehouses.starter[0]
+    values = { ids = ["starter-id"] }
+  }
+
+  assert {
+    condition     = local.config.starter_warehouse.admins_only == true && data.databricks_sql_warehouses.starter[0].warehouse_name_contains == "Serverless Starter Warehouse"
+    error_message = "The baseline restricts the Serverless Starter Warehouse to the platform admins, found by name."
+  }
+  assert {
+    condition     = toset([for a in module.compute.starter_warehouse_permissions["starter-id"] : a]) == toset(["tst-admins=CAN_MANAGE"])
+    error_message = "Only the platform admins may use it."
+  }
+}
+
 run "personas" {
   command = plan
 

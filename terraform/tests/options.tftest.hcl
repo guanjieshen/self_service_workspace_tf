@@ -116,8 +116,8 @@ run "settings_left_alone" {
     error_message = "catalog: null (a whole section) means no catalog managed (the baseline is not used instead), and an existing one is released, not deleted."
   }
   assert {
-    condition     = length(module.budget_policies) == 0
-    error_message = "serverless_policy.enabled: false stops managing the usage policy."
+    condition     = length(module.budget_policies) == 0 && length(data.databricks_sql_warehouses.starter) == 0
+    error_message = "serverless_policy.enabled: false stops managing the usage policy; starter_warehouse.admins_only: null does not even look the warehouse up."
   }
   assert {
     condition     = !local.manage_genie_instructions && !local.manage_genie_skills
@@ -126,6 +126,7 @@ run "settings_left_alone" {
   assert {
     condition = alltrue([for a in [
       "module.budget_policies",
+      "module.compute.databricks_permissions.starter_warehouse",
       "module.personas.databricks_entitlements.users",
       "module.workspace_settings.databricks_disable_legacy_access_setting.this",
       "module.workspace_settings.databricks_workspace_conf.key[\"enableTokensConfig\"]",

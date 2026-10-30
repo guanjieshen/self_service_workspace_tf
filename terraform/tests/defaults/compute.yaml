@@ -26,6 +26,15 @@ sql_warehouse:
   # setting "Default warehouse"; users can still pick another). false = leave that setting alone.
   workspace_default: true
 
+# ---- The Serverless Starter Warehouse ---------------------------------------
+# Databricks creates "Serverless Starter Warehouse" in a new workspace, usable by every
+# user. admins_only: true = only the platform admins may use it, so people use the default
+# warehouse above (sized and tagged here). Terraform manages only its permissions, never
+# the warehouse itself; a workspace without one gets nothing. null = leave its access alone.
+starter_warehouse:
+  name: Serverless Starter Warehouse
+  admins_only: true
+
 # ---- Classic cluster policies -----------------------------------------------
 # Serverless first: classic compute is the exception. Three policies per workspace,
 # one per kind of cluster, so an approved person can have one interactive cluster and

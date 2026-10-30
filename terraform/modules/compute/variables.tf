@@ -33,6 +33,12 @@ variable "warehouse_acl" {
   type        = map(string)
 }
 
+variable "starter_warehouse" {
+  description = "IDs of the Serverless Starter Warehouse (none, or one): only the platform admins may use it."
+  type        = list(string)
+  default     = []
+}
+
 variable "platform_admins" {
   type = list(string)
 }
