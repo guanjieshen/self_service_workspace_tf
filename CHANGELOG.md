@@ -6,6 +6,9 @@ them for you: a setting missing from your baseline is left alone).
 
 ## Unreleased
 
+- Data classification is left alone by default (`catalog.data_classification: null`): the API
+  now requires a `usage_policy_id` the Terraform provider cannot send yet (up to 1.140.0), so
+  turning it on failed every apply. Turn it on in Catalog Explorer, with the workspace's usage policy.
 - The identity running Terraform (the pipeline's service principal) may use the workspace's
   serverless usage policy, and data classification waits for it: turning classification on
   failed with "Usage policy ID must not be empty". The service principal needs the account's
