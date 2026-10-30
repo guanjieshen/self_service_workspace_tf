@@ -59,7 +59,6 @@ locals {
     "settings.genie_code"                                         = ["${local.ws}.databricks_workspace_file.genie_code_instructions", "${local.ws}.databricks_workspace_file.genie_code_skills"]
     "settings.genie_code.instructions"                            = ["${local.ws}.databricks_workspace_file.genie_code_instructions"]
     "settings.genie_code.skills"                                  = ["${local.ws}.databricks_workspace_file.genie_code_skills"]
-    "catalog.data_classification"                                 = ["module.catalog[0].databricks_data_classification_catalog_config.this"]
     "starter_warehouse.admins_only"                               = ["module.compute.databricks_permissions.starter_warehouse"]
     "cluster_policy.interactive"                                  = ["module.compute.databricks_cluster_policy.classic[\"interactive\"]"]
     "cluster_policy.jobs"                                         = ["module.compute.databricks_cluster_policy.classic[\"jobs\"]"]

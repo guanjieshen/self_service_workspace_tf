@@ -23,14 +23,8 @@ catalog:
   # Predictive optimization: Databricks runs OPTIMIZE, VACUUM and ANALYZE on managed
   # tables when worth it (serverless, billed). Set on the catalog; every schema inherits it.
   predictive_optimization: true
-  # Data classification: scans every schema (new ones too) and finds sensitive data
-  # (names, emails, card numbers, ...) so it can be tagged and governed. It runs on
-  # serverless and needs a usage policy (serverless_policy in config/defaults/cost.yaml).
-  # null = leave it alone: the API now requires a usage_policy_id that the Databricks
-  # Terraform provider cannot send yet (checked up to 1.140.0), so true fails with "Usage
-  # policy ID must not be empty". Turn it on in Catalog Explorer (catalog > Details) and
-  # pick the workspace's usage policy, until the provider supports it.
-  data_classification: null
+  # Data classification and data quality monitoring are turned on by hand, in Catalog
+  # Explorer (catalog > Details), not here (docs/SETUP.md, step 9).
 
   # On the whole catalog, for every persona: enough to reach a schema and use what
   # was shared with them, nothing more. USE SCHEMA does not show any data: a table

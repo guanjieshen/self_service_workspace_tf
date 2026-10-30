@@ -6,21 +6,17 @@ them for you: a setting missing from your baseline is left alone).
 
 ## Unreleased
 
+- Data classification and data quality monitoring are turned on by hand in Catalog Explorer
+  (`docs/SETUP.md`, step 9): removed `catalog.data_classification` and its checks. The
+  classification API needs a usage policy ID the Terraform provider cannot send, and
+  monitoring is per schema, and schemas come from the self-service app.
 - CI hardening, no change in what it deploys: permissions per job, actions pinned to commit
   SHAs (with Dependabot), no token kept in checkouts, time limits on every job. Less noise:
   plans do not take the state lock (no more collisions with applies), a newer push cancels
   older plans, fork pull requests are not planned, an unchanged drift is not re-reported, and
   preflight warnings alone no longer post a comment on a plan without changes.
 - Preflight checks that the pipeline may create usage policies (the account's **Billing admin**
-  role; an error, before the plan) and warns when the platform admins group is empty. A plan with
-  `catalog.data_classification: true` fails with why (the provider cannot send its usage policy yet).
-- Data classification is left alone by default (`catalog.data_classification: null`): the API
-  now requires a `usage_policy_id` the Terraform provider cannot send yet (up to 1.140.0), so
-  turning it on failed every apply. Turn it on in Catalog Explorer, with the workspace's usage policy.
-- The identity running Terraform (the pipeline's service principal) may use the workspace's
-  serverless usage policy, and data classification waits for it: turning classification on
-  failed with "Usage policy ID must not be empty". The service principal needs the account's
-  **Billing admin** role to create the policy (`docs/SETUP.md`, step 6).
+  role; an error, before the plan) and warns when the platform admins group is empty.
 - The Serverless Starter Warehouse Databricks creates in a new workspace is for the platform
   admins only (`starter_warehouse.admins_only` in `config/defaults/compute.yaml`): people use
   the default warehouse, which is sized and tagged. Only its permissions are managed. The first

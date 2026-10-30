@@ -13,20 +13,6 @@ resource "databricks_catalog" "this" {
   enable_predictive_optimization = try(var.catalog.predictive_optimization, null) == null ? null : (var.catalog.predictive_optimization ? "ENABLE" : "DISABLE")
 }
 
-# Data classification for the whole catalog (every schema, new ones too).
-resource "databricks_data_classification_catalog_config" "this" {
-  count  = try(var.catalog.data_classification, null) == true ? 1 : 0
-  parent = "catalogs/${databricks_catalog.this.name}"
-
-  lifecycle {
-    # It runs on serverless as the identity running Terraform, on that identity's usage policy.
-    precondition {
-      condition     = var.usage_policy_id != null
-      error_message = "Data classification needs the workspace's serverless usage policy (serverless_policy in config/defaults/cost.yaml)."
-    }
-  }
-}
-
 # Who may use the catalog. Schemas, tables and views inherit these privileges.
 # Authoritative: the list replaces any other grants on the catalog.
 resource "databricks_grants" "catalog" {

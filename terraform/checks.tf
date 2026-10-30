@@ -39,14 +39,6 @@ resource "terraform_data" "config_checks" {
       error_message = "The serverless usage policy is account-level: set account_id in config/defaults/cost.yaml to the Databricks account ID (a GUID), or set serverless_policy.enabled: false."
     }
     precondition {
-      condition     = try(local.catalog.data_classification, null) != true
-      error_message = "catalog.data_classification: true cannot work yet: the data classification API requires a usage policy ID that the Databricks Terraform provider cannot send (checked up to 1.140.0), so the apply would fail with \"Usage policy ID must not be empty\". Leave it null and turn classification on in Catalog Explorer (catalog > Details), with the workspace's usage policy."
-    }
-    precondition {
-      condition     = try(local.catalog.data_classification, null) != true || local.sp.enabled == true
-      error_message = "catalog.data_classification needs the serverless usage policy (serverless_policy.enabled in config/defaults/cost.yaml): data classification runs on serverless and fails without one (\"Usage policy ID must not be empty\"). Turn on the policy, or set catalog.data_classification: null in this workspace's file."
-    }
-    precondition {
       condition     = contains(["ALLOW_ALL", "ALLOW_SLACK", "ALLOW_TEAMS", "DENY_ALL"], coalesce(try(local.settings.collaboration_platforms.allowed, null), "ALLOW_ALL"))
       error_message = "settings collaboration_platforms.allowed must be ALLOW_ALL, ALLOW_SLACK, ALLOW_TEAMS, DENY_ALL or null (leave alone)."
     }

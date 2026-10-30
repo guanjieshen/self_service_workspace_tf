@@ -1,12 +1,6 @@
 variable "catalog" {
-  description = "The workspace's catalog (catalog.yaml `catalog:`): name, comment, owner, storage_root, workspace_only, predictive_optimization, data_classification."
+  description = "The workspace's catalog (catalog.yaml `catalog:`): name, comment, owner, storage_root, workspace_only, predictive_optimization."
   type        = any
-}
-
-variable "usage_policy_id" {
-  description = "The serverless usage policy data classification runs on (null: classification is not turned on)."
-  type        = string
-  default     = null
 }
 
 variable "grants" {
