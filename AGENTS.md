@@ -130,6 +130,20 @@ further step. When you add something:
 - `node`: the plan comment (`.github/scripts/tests/`).
 - `scaffold`: a workspace file copied from `_example.yaml` and filled in plans.
 
+## Releasing
+
+A release is a zip an organization installs ([SETUP.md](docs/SETUP.md), step 2). This repository holds a working installation (its tenant, state storage, account and workspaces) so every change is tested for real; the release must hold none of it.
+
+| Step | What to do |
+| --- | --- |
+| 1 | Merge everything for the release; `./scripts/test.sh` passes on `main` |
+| 2 | In `CHANGELOG.md`, rename **Unreleased** to the version, with what the first plan after an upgrade shows |
+| 3 | Tag it: `git tag v1.0.0 && git push origin v1.0.0` |
+| 4 | Build the zip: `python3 scripts/release.py v1.0.0` writes `dist/<repo>-v1.0.0.zip` |
+| 5 | Check it: unzip it, `git init`, commit, and run `./scripts/test.sh` there |
+
+`scripts/release.py` leaves out `dev/`, `config/backend.hcl` and every workspace file but `_example.yaml`, sets the values in `config/setup.yaml` and `account_id` to `null`, and replaces the CODEOWNERS owners. It **refuses to write the zip** if any of this repository's own identifiers (tenant, subscription, storage, account, workspace hosts, owners) is still in it. A value it does not know about yet (a new file holding an environment value) is your job: add it to the script and to `scripts/tests/test_release_zip.py`.
+
 ## Writing style
 
 Write for someone who has not read the code. The [README](README.md) is the model for every markdown file:
