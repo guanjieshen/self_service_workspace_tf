@@ -149,7 +149,7 @@ Then, if needed:
 
 1. **Add the service principal to the account:** User management > Service principals > Add service principal > **Microsoft Entra ID managed**, with the application ID `pipeline_client_id` and the name `pipeline_name` (default `sp-citizen-dev-terraform`).
 2. **Make it workspace admin** of each workspace this repository manages: Workspaces > the workspace > Permissions > Add permissions > the service principal, **Admin**.
-3. **Let it create budget policies** (serverless usage policies), in the account console. If you will not grant this, set `serverless_policy.enabled: false` in `config/defaults/cost.yaml` instead (and `catalog.data_classification: null`, which needs them).
+3. **Let it create budget policies** (serverless usage policies): in the account console, User management > Service principals > the service principal > Roles, turn on **Billing admin**. Account admin alone is not enough ("missing CreateBudgetPolicyPermission"). If you will not grant this, set `serverless_policy.enabled: false` in `config/defaults/cost.yaml` instead (and `catalog.data_classification: null`, which needs them).
 4. **Note the account ID** (account console, top right) for `account_id` in `config/defaults/cost.yaml` (step 8): usage policies belong to the account.
 5. Check that each workspace's metastore can hold the workspace catalog: either the metastore has a storage root, or the workspace's file sets `catalog.storage_root` to an external location (the Unity Catalog team creates the storage credential and external location). Preflight checks this.
 

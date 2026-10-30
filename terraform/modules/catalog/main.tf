@@ -17,6 +17,14 @@ resource "databricks_catalog" "this" {
 resource "databricks_data_classification_catalog_config" "this" {
   count  = try(var.catalog.data_classification, null) == true ? 1 : 0
   parent = "catalogs/${databricks_catalog.this.name}"
+
+  lifecycle {
+    # It runs on serverless as the identity running Terraform, on that identity's usage policy.
+    precondition {
+      condition     = var.usage_policy_id != null
+      error_message = "Data classification needs the workspace's serverless usage policy (serverless_policy in config/defaults/cost.yaml)."
+    }
+  }
 }
 
 # Who may use the catalog. Schemas, tables and views inherit these privileges.

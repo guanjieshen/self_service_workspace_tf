@@ -134,6 +134,10 @@ run "serverless_usage_policy" {
     error_message = "Every persona and the platform admins may use it."
   }
   assert {
+    condition     = length(local.serverless_policies.self_service.users) == 1
+    error_message = "The identity running Terraform may use it too (data classification runs as that identity)."
+  }
+  assert {
     condition     = length(module.budget_policies) == 1
     error_message = "The usage policy is managed by default."
   }

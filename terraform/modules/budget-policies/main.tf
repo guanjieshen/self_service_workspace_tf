@@ -16,7 +16,7 @@ resource "databricks_access_control_rule_set" "this" {
   dynamic "grant_rules" {
     for_each = length(each.value.groups) > 0 ? [1] : []
     content {
-      principals = [for g in each.value.groups : "groups/${g}"]
+      principals = concat([for g in each.value.groups : "groups/${g}"], try(each.value.users, []))
       role       = "roles/budgetPolicy.user"
     }
   }
