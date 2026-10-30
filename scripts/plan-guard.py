@@ -202,14 +202,12 @@ def main(argv=None) -> int:
     if not warnings:
         return 0
 
-    print("\n" + "!" * 78)
-    print("  This plan contains changes that are hard or impossible to undo:\n")
+    one = len(warnings) == 1
+    print(f"\nNeeds approval: {len(warnings)} change{'' if one else 's'} that {'is' if one else 'are'} hard to undo or weaken{'s' if one else ''} security")
+    print("(a person adds the label allow-risky-changes once they have reviewed them):")
     for w in warnings:
         print(f"  - {w}")
-    print("\n  If this is not intended, check for a renamed bu or policy name,")
-    print("  a changed security setting in config/defaults/settings.yaml, or one")
-    print("  being turned off or loosened (TURN OFF, LOOSEN, OPEN, GRANT, WIDEN, GIVE).")
-    print("!" * 78 + "\n")
+    print()
     return 2
 
 

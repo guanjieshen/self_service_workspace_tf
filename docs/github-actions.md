@@ -85,16 +85,16 @@ The jobs that reach Databricks or the state use `TERRAFORM_RUNNER`. The checks a
 
 ## The plan comment
 
-Each affected workspace gets one comment on the pull request, updated on every push:
+Each affected workspace gets one comment on the pull request, updated on every push, written to be read in about 30 seconds. The plan guard decides what needs approval; the AI review only explains.
 
 | Section | Source | Notes |
 | --- | --- | --- |
 | Title | Plan | Number of resource changes |
 | Preflight | `scripts/preflight.py` | When it found a problem: what is missing, and what to do |
-| Warning | `scripts/plan-guard.py` | Only when the plan has hard-to-undo changes |
-| AI impact review | `scripts/ai-plan-review.py` | When `ai_review_host` is set in `config/setup.yaml`. Risk level, a plain-language table of changes and who they affect, and up to three things to check |
-| Changed resources | [tf-summarize](https://github.com/dineshba/tf-summarize) | Table of every resource added, changed or removed (collapsed) |
-| Full Terraform plan | Plan | Collapsed; the start is cut if the comment would exceed GitHub's size limit |
+| Risk summary, What does this mean?, What's changing?, What should you review? | `scripts/ai-plan-review.py` | When `ai_review_host` is set. Adapts to the risk: a Low change gets the summary and the table only. It never mentions the approval label or resource addresses |
+| Before merging | `scripts/plan-guard.py` (its status) | Only when the plan guard flagged something: approval is needed, and what the `allow-risky-changes` label means. Never written by the AI |
+| Technical details | Plan guard, [tf-summarize](https://github.com/dineshba/tf-summarize), plan | Collapsed: the guard's findings with resource addresses, every changed resource, the full plan (its start cut if the comment would exceed GitHub's size limit) |
+| Footer | | *AI-generated review based on the Terraform plan. Verify findings before merging.* (only with an AI review) |
 
 The AI review is one call to a model in **one review workspace** (`ai_review_host` in `config/setup.yaml`: any workspace the pipeline's service principal is in, whether or not this repository manages it), whatever workspace the plan is for, signed in as the pipeline. Only that workspace needs the model: `ai_review_model`, by default the Unity Gateway model service `system.ai.claude-sonnet-5-5` (the pipeline identity needs EXECUTE on it; account users have it on `system.ai` by default). It sees the pull request's configuration diff, the diff of the Terraform code and CHANGELOG (so a framework change that changes what is deployed is explained, not reported as drift), the planned changes and the plan guard output, nothing else, and takes seconds. The instructions it follows are `.github/ai/plan-review-prompt.md`.
 
