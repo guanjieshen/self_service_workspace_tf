@@ -95,14 +95,43 @@ Two more things to know before you start; they live in their own files, not here
 
 **Who:** the cloud team, with Contributor on the subscription (or the resource group).
 
-Uses `tenant_id`, `subscription_id` and the `state_*` values from `config/setup.yaml`.
+Terraform keeps one state file per workspace in an Azure Storage container. CI reads and writes it with its Entra identity (step 4), so no storage key is ever used.
+
+> **Storage account and container already exist?** Skip the script and [do it by hand](#using-an-existing-storage-account-and-container): it is one small file.
+
+To create them, use the setup script. It uses `tenant_id`, `subscription_id` and the `state_*` values from `config/setup.yaml`:
 
 ```bash
 python3 scripts/setup.py state          # prints the script: read it
 python3 scripts/setup.py state --run    # runs it
 ```
 
-It creates a storage account with no public blob access and no shared keys (Entra sign-in only), with versioning and 30 days of soft delete, a private `tfstate` container, and `config/backend.hcl`. Commit `config/backend.hcl`: it holds names, not secrets. Run outside the repository, the script prints the file's content instead, to send to the platform team.
+It creates a storage account with no public blob access and no shared keys (Entra sign-in only), with versioning and 30 days of soft delete, a private container, and `config/backend.hcl`. An account that already exists is left as it is. Commit `config/backend.hcl`: it holds names, not secrets. Run outside the repository, the script prints the file's content instead, to send to the platform team.
+
+### Using an existing storage account and container
+
+Create `config/backend.hcl` with your names, and commit it:
+
+```hcl
+# Shared Terraform state in Azure Storage (Entra sign-in only).
+# scripts/tf.sh adds key=citizen-dev/<workspace>.tfstate for each workspace.
+resource_group_name  = "<resource group>"
+storage_account_name = "<storage account>"
+container_name       = "<container>"
+use_azuread_auth     = true
+```
+
+Then check the account against this list:
+
+| Setting | Required? | Why |
+| --- | --- | --- |
+| **Container is private** (no anonymous access) | Required | State files hold resource IDs and settings |
+| **The runners can reach it** (its network rules or private endpoint) | Required | Plans and applies read and write the state |
+| **Storage Blob Data Contributor** for the pipeline identity, on the container | Required, in [step 4](#4-the-pipeline-identity) | CI signs in with Entra, not with keys |
+| **Versioning and soft delete** on blobs | Recommended | Lets you recover a state file that was overwritten or deleted |
+| **Shared key access off** | Recommended | Nothing in this project uses keys |
+
+Fill in `state_resource_group`, `state_storage_account` and `state_container` in `config/setup.yaml` too: step 4 uses them to scope the storage role.
 
 ## 4. The pipeline identity
 
