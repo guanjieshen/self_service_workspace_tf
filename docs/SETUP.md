@@ -214,6 +214,7 @@ Before you start: the workspace exists and the runners can reach it (its private
 5. **Merge.** After the approval step (if `apply-approval` has reviewers), the workspace is deployed.
 6. **Verify:** the next pull request that touches it (or the Monday drift check) shows no changes. In the workspace: the persona groups under Settings > Identity and access, the `<BU> Default Warehouse`, and the `{bu}_citizen_dev` catalog.
 7. **By hand, in Catalog Explorer** (`{bu}_citizen_dev` > Details), as a member of `{bu}_platform_admins`: turn on **Data Classification**, with the workspace's usage policy `<BU>-0-SELF-SERVICE`, and **Data Quality Monitoring** for the schemas it lists. Terraform does not manage either (classification's API needs a usage policy the Terraform provider cannot send; monitoring is per schema, and schemas come from the self-service app). Turn monitoring on again for schemas created later.
+8. **By hand, in Workspace settings > Appearance:** the workspace theme's categorical colors and the Genie One color and welcome message, with the values in `config/defaults/settings.yaml` ("Appearance: set by hand"). There is no API for them yet.
 
 > [!WARNING]
 > Applying the baseline to an existing workspace changes its settings for everyone in it (downloads, tokens, Git folders, legacy access). Read the plan comment's settings changes with the workspace's owners before merging.
