@@ -124,13 +124,15 @@ def main():
         if not os.environ["DATABRICKS_HOST"]:
             raise SystemExit("No review workspace: set ai_review_host in config/setup.yaml, or pass --host")
     names = args.case or sorted(p.stem for p in CASES.glob("*.json") if not p.name.endswith(".plan.json"))
-    jobs = [(n, a) for n in names for a in range(args.repeat if args.repeat > 1 else 1)]
+    repeat = max(args.repeat, 1)
+    # Attempt 0 writes <case>.md, the others <case>.<n>.md (run()).
+    jobs = [(n, a) for n in names for a in range(repeat)]
     failed = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-        for name, attempt, results in pool.map(lambda j: run(j[0], model, j[1] if args.repeat > 1 else 0), jobs):
+        for name, attempt, results in pool.map(lambda j: run(j[0], model, j[1]), jobs):
             bad = [r for r in results if not r[1]]
             failed += bool(bad)
-            label = f"{name}{f' #{attempt}' if args.repeat > 1 else ''}"
+            label = f"{name} #{attempt}" if repeat > 1 else name
             risk = next(r[2] for r in results if r[0] == "risk level")
             print(f"{'PASS' if not bad else 'FAIL'}  {label:32} risk {risk}")
             for c, _, detail in bad:

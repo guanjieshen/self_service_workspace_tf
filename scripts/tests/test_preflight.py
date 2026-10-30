@@ -1,4 +1,6 @@
 """scripts/preflight.py: read-only checks before a workspace's first apply, against a fake API."""
+import contextlib
+import io
 import pathlib
 import shutil
 import tempfile
@@ -226,6 +228,22 @@ class RedactionAgrees(unittest.TestCase):
         self.assertEqual(pf.redact(sample), js)
         self.assertNotIn("eyJ", js)
         self.assertNotIn("hunter2", js)
+
+
+
+class OutFiles(Base):
+    """--out writes the problems, and every finding next to it, without overwriting either."""
+
+    def test_both_files_whatever_the_name(self):
+        for name, all_name in ((".plans/ws.preflight.txt", ".plans/ws.preflight-all.txt"), ("report.txt", "report-all.txt")):
+            with self.subTest(name=name), mock.patch.object(pf, "cli_get", lambda profile: FakeApi()), \
+                    mock.patch.dict(pf.os.environ, {"DATABRICKS_HOST": "https://adb-1.1.azuredatabricks.net"}), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                out = self.root / name
+                pf.main(["fin-dev", "--out", str(out)])
+                self.assertTrue(out.exists() and (self.root / all_name).exists())
+                self.assertIn("ok:", (self.root / all_name).read_text(), "every finding, ok ones too")
+                self.assertNotIn("ok:", out.read_text(), "only the problems")
 
 
 if __name__ == "__main__":

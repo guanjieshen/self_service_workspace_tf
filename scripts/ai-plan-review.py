@@ -28,6 +28,8 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "scripts"))
+from workspaces import drop_comment  # noqa: E402  (one YAML comment rule for every script)
 DEFAULT_MODEL = "system.ai.claude-sonnet-5-5"
 MAX_TOKENS = 4000   # the model reasons before it writes; answers in testing used 300 to 600
 PROMPT = ".github/ai/plan-review-prompt.md"
@@ -210,15 +212,6 @@ def changed_files(base, workspace):
             kind = "code, workflows or docs (no direct workspace change)"
         lines.append(f"- {path}: {kind}")
     return "\n".join(lines) or "(none)"
-
-
-def drop_comment(line):
-    """A YAML line without its trailing comment: a # after whitespace, outside quotes."""
-    for m in re.finditer(r"\s#", line):
-        before = line[:m.start()]
-        if before.count('"') % 2 == 0 and before.count("'") % 2 == 0:
-            return before.rstrip()
-    return line.rstrip()
 
 
 def strip_comments(text):
