@@ -40,7 +40,8 @@ function buildBody(ws, endpoint, dir = '.plans') {
   const summary = read('.summary.md').trim();
   const ai = read('.ai.md').trim();
   const preflight = read('.preflight.txt').trim();
-  const findings = (guard.match(/^  - /gm) || []).length;
+  // The guard's own count: its output also lists releases and notes, which need no approval.
+  const findings = Number((guard.match(/^Needs approval: (\d+) change/m) || [])[1] || 0);
 
   const sections = [
     marker(ws),

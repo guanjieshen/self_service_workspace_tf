@@ -34,7 +34,7 @@ test('optional sections are left out', () => {
 });
 
 test('approval is asked for only when the plan guard flagged something', () => {
-  const flagged = buildBody('ws', 'm', plans({ '.txt': 'p', '.guard.txt': 'Needs approval: 2 changes\n  - LOOSEN x\n  - DELETE y', '.guard': '2\n' }));
+  const flagged = buildBody('ws', 'm', plans({ '.txt': 'p', '.guard.txt': 'Left unmanaged from now on:\n  - RELEASE r\n\nNeeds approval: 2 changes that are hard to undo\n  - LOOSEN x\n  - DELETE y', '.guard': '2\n' }));
   assert.match(flagged, /### Before merging[^]*flagged 2 changes[^]*`allow-risky-changes`[^]*does not make the change safer/);
   const noted = buildBody('ws', 'm', plans({ '.txt': 'p', '.guard.txt': 'Not flagged, with the evidence: DISABLE legacy access', '.guard': '0\n' }));
   assert.ok(!noted.includes('Before merging') && !noted.includes('allow-risky-changes'), 'no approval asked when the guard needs none');
