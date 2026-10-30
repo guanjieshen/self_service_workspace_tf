@@ -58,13 +58,15 @@ function buildBody(ws, endpoint, dir = '.plans') {
 }
 
 // Whether a workspace's plan is worth a comment: it changes something, failed, or preflight
-// found a problem. A workspace a change does not touch plans no changes and gets none.
+// found an error. A workspace a change does not touch plans no changes and gets none.
 function worthPosting(ws, dir = '.plans') {
   const read = (name) => {
     const f = `${dir}/${ws}${name}`;
     return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim() : '';
   };
-  return read('.changes') !== '0' || read('.preflight.txt') !== '';
+  // Preflight warnings alone (a placeholder still in the baseline, ...) repeat on every pull
+  // request: they are shown with a plan that changes something, and in the job's annotations.
+  return read('.changes') !== '0' || /^error:/m.test(read('.preflight.txt'));
 }
 
 // Creates the workspace's comment, or updates it on later pushes (an existing comment is

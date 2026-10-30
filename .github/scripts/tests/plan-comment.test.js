@@ -56,6 +56,7 @@ test('a workspace with no changes gets no new comment, but an existing one is up
   const quiet = plans({ '.changes': '0', '.txt': 'No changes.' });
   assert.equal(worthPosting('ws', quiet), false);
   assert.equal(worthPosting('ws', plans({ '.changes': '0', '.preflight.txt': 'error: x' })), true, 'preflight problems are shown');
+  assert.equal(worthPosting('ws', plans({ '.changes': '0', '.preflight.txt': 'warning: placeholder' })), false, 'warnings alone do not post a new comment');
   assert.equal(worthPosting('ws', plans({ '.changes': '3' })), true);
   assert.equal(worthPosting('ws', plans({})), true, 'a failed plan is shown');
   const calls = [];

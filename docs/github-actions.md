@@ -80,6 +80,7 @@ The jobs that reach Databricks or the state use `TERRAFORM_RUNNER`. The checks a
 - **Time limits** on every job, so a hung self-hosted runner does not hold a workspace's apply for hours.
 - **Plans do not lock the state** (`-lock=false`: a plan never writes it), so a plan never fails because an apply is running. A newer push to a pull request cancels its older plans and checks.
 - **Pull requests from forks are not planned:** GitHub gives them no OIDC token, so the plan could only fail.
+- **Plan comments** appear only for a plan that changes something, failed, or hit a preflight error. Preflight warnings alone (a placeholder still in the baseline, say) are shown with the next plan that changes something, and in the job's annotations, instead of a new comment on every pull request.
 - **Drift issues** get a new comment only when the drift changed; the same drift found again next Monday does not notify anyone again. The issue closes itself when the drift is gone.
 
 ## The plan comment
@@ -89,7 +90,7 @@ Each affected workspace gets one comment on the pull request, updated on every p
 | Section | Source | Notes |
 | --- | --- | --- |
 | Title | Plan | Number of resource changes |
-| Preflight | `scripts/preflight.py` | Only when it found a problem: what is missing, and what to do |
+| Preflight | `scripts/preflight.py` | When it found a problem: what is missing, and what to do |
 | Warning | `scripts/plan-guard.py` | Only when the plan has hard-to-undo changes |
 | AI impact review | `scripts/ai-plan-review.py` | When `ai_review_host` is set in `config/setup.yaml`. Risk level, a plain-language table of changes and who they affect, and up to three things to check |
 | Changed resources | [tf-summarize](https://github.com/dineshba/tf-summarize) | Table of every resource added, changed or removed (collapsed) |
