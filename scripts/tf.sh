@@ -40,7 +40,7 @@ if [[ "$workspace" == "all" ]]; then
   status=0
   for e in $(list_workspaces); do
     echo "================ $e ================"
-    "$0" "$e" "$cmd" "$@" || status=1
+    bash "$0" "$e" "$cmd" "$@" || status=1
   done
   exit $status
 fi
