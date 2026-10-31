@@ -14,10 +14,20 @@ is left alone.
 | --- | --- |
 | `catalog.yaml` | Under `catalog:`, set `owner: null` and add `other_privileges: {}` |
 | `catalog.yaml` | Optional: `comment: Citizen development catalog (managed by Terraform)` |
+| `catalog.yaml` | Optional: `default_catalog: "{prefix}_citizen_dev"` (the workspace's own catalog as its default) |
 | `settings.yaml` | Git allowlist: `allowed_urls: ["https://github.com/"]` if you kept the placeholder `https://github.com/<org>/` |
 | `cost.yaml` | Rename the tag `APP_ID` to `APPID` in `tags:` and `classic_user_tags` |
 | every file | Placeholders `{bu}` / `{BU}` to `{prefix}` / `{PREFIX}` |
 
+- The default Genie Code instructions say to work in the user's **personal schema** in the workspace
+  catalog by default (`cd_<email name>`, created by the self-service app), and to use team schemas
+  only for shared work.
+- **The workspace's default catalog is its own catalog** (`default_catalog: "{prefix}_citizen_dev"` in
+  `config/defaults/catalog.yaml`, was `null`). On a first apply it is set after the catalog is
+  created. Unqualified table names then resolve to it instead of the catalog Databricks created with
+  the workspace, so the plan guard now flags setting the default for the first time too: the first
+  plan of every workspace needs `allow-risky-changes`. Keep `null` in your baseline, or in a
+  workspace's file, to leave the default alone.
 - **A brand-new workspace needs one personal access token, created and revoked**, before its first
   apply: Databricks has no token permissions until the first token, and the apply failed with
   `cannot create permissions: tokens tokens does not exist`. Preflight checks it and says what to

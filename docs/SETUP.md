@@ -255,7 +255,9 @@ Create Entra ID groups and sync them to the Databricks account (automatic identi
 
 A workspace that leaves a persona's group `null` simply has nobody with that persona.
 
-Put the workspace's platform team in `{prefix}_platform_admins`: it manages the workspace's serverless usage policy and owns its catalog, and nobody outside the policy's groups can see the policy (workspace admin is not enough). Preflight warns while the group is empty.
+Put the workspace's platform team in `{prefix}_platform_admins`: it manages the workspace's serverless usage policy and the catalog, and nobody outside the policy's groups can see the policy (workspace admin is not enough). Preflight warns while the group is empty.
+
+> **Tip:** Groups created in the Databricks account instead of Entra ID (a test account, for example) can be managed there: to let the platform admins add and remove members, open each persona group in the account console > **Permissions** and give `{prefix}_platform_admins` **Manage**. Do not do this for groups synced from Entra ID: the next sync overwrites members changed in Databricks. Terraform does not manage group managers.
 
 ## 8. Decide the baseline
 

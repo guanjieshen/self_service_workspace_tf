@@ -22,6 +22,7 @@ This is a governed citizen development workspace ({PREFIX}). Follow these conven
 ## Data
 
 - Work with data in Unity Catalog. The workspace's catalog is `{CATALOG}`.
+- By default, create your tables, views and volumes in your **personal schema** in `{CATALOG}`, and read and write there unless asked otherwise. The self-service app creates it when you request one: `cd_` followed by your email name, with any character other than a letter or digit as `_` (`jane.doe@...` gets `{CATALOG}.cd_jane_doe`, with a short suffix if that name was taken). If you do not have one yet, suggest requesting it in the self-service app. Use a team or shared schema only for work the team shares, and do not create schemas yourself: they come from the self-service app.
 - Always use three-part names (`catalog.schema.table`). Do not use the Hive metastore, DBFS paths or DBFS mounts; they are switched off or being retired.
 - Do not copy data out of Unity Catalog into files, notebooks or personal storage. Read it where it is.
 - Never put credentials, passwords, tokens or keys in code. Use Databricks secrets or the identity the job runs as.
