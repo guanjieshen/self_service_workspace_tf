@@ -19,6 +19,9 @@ is left alone.
 | `cost.yaml` | Rename the tag `APP_ID` to `APPID` in `tags:` and `classic_user_tags` |
 | every file | Placeholders `{bu}` / `{BU}` to `{prefix}` / `{PREFIX}` |
 
+- The default Genie Code instructions say to work in the user's **personal schema** in the workspace
+  catalog by default (`cd_<email name>`, created by the self-service app), and to use team schemas
+  only for shared work.
 - **The workspace's default catalog is its own catalog** (`default_catalog: "{prefix}_citizen_dev"` in
   `config/defaults/catalog.yaml`, was `null`). On a first apply it is set after the catalog is
   created. Unqualified table names then resolve to it instead of the catalog Databricks created with
