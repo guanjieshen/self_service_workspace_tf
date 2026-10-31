@@ -67,8 +67,8 @@ run "catalog_and_settings" {
     error_message = "catalog.yaml names the catalog."
   }
   assert {
-    condition     = local.catalog.owner == "tst-admins" && local.catalog_grants["11111111-2222-3333-4444-555555555555"] == tolist(["CREATE_SCHEMA", "USE_CATALOG"]) && local.catalog_grants["tst-admins"] == tolist(["ALL_PRIVILEGES", "MANAGE"])
-    error_message = "catalog.owner can name a key of groups, and other_privileges adds a principal's grants next to the personas' and platform admins'."
+    condition     = local.catalog.owner == "tst-admins" && local.catalog_grants["11111111-2222-3333-4444-555555555555"] == tolist(["CREATE_SCHEMA", "USE_CATALOG"]) && local.catalog_grants["tst-admins"] == tolist(["ALL_PRIVILEGES", "MANAGE"]) && local.catalog_grants["tst-builders"] == tolist(["CREATE_SCHEMA", "USE_CATALOG", "USE_SCHEMA"])
+    error_message = "catalog.owner can name a key of groups, and other_privileges adds a principal's grants next to the personas' and platform admins', and adds to a persona group's own instead of replacing them."
   }
   assert {
     condition     = local.default_catalog == "tst_citizen_dev"
@@ -118,6 +118,14 @@ run "settings_left_alone" {
   assert {
     condition     = local.config.catalog == null && local.catalog == null && length(module.catalog) == 0 && contains(output.released_addresses, "module.catalog")
     error_message = "catalog: null (a whole section) means no catalog managed (the baseline is not used instead), and an existing one is released, not deleted."
+  }
+  assert {
+    condition = alltrue([for a in [
+      "module.workspace_settings.databricks_default_namespace_setting.this",
+      "module.workspace_settings.databricks_permissions.tokens",
+      "module.workspace_settings.databricks_workspace_conf.key[\"maxTokenLifetimeDays\"]",
+    ] : contains(output.released_addresses, a)])
+    error_message = "default_catalog: null and personal_access_tokens: null release the default namespace, the token permissions and the token lifetime, never delete them."
   }
   assert {
     condition     = length(module.budget_policies) == 0 && length(data.databricks_sql_warehouses.starter) == 0

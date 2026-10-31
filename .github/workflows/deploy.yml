@@ -198,7 +198,8 @@ jobs:
   apply:
     name: Apply ${{ matrix.workspace }}
     needs: [route, approve]
-    if: needs.route.outputs.workspaces != '[]'
+    # Only after a merge to main; approve runs only then too, this says it here as well.
+    if: github.event_name == 'push' && needs.route.outputs.workspaces != '[]'
     runs-on: ${{ fromJSON(vars.TERRAFORM_RUNNER || '"ubuntu-latest"') }}
     strategy:
       fail-fast: false        # one workspace failing does not stop the others
@@ -232,6 +233,11 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           workspace: ${{ matrix.workspace }}
+      # The same read-only checks as the plan: a problem stops here, before anything is
+      # changed, and the plan guard gets the same evidence it had on the pull request (what
+      # still uses legacy access), so it decides the same way.
+      - name: Preflight
+        run: python3 scripts/preflight.py "$WORKSPACE" --out ".plans/$WORKSPACE.preflight.txt"
       # The plan guard's approval, enforced here whatever the GitHub plan: a pull request can be
       # merged with a failed plan check (branch protection cannot require the per-workspace plan
       # jobs), so a flagged apply goes ahead only if the merged pull request carries the label.
@@ -293,8 +299,13 @@ jobs:
           WORKSPACE: ${{ matrix.workspace }}
         run: |
           value() { sed -n "s/^$1 *= *\"\(.*\)\"/\1/p" config/backend.hcl; }
-          az storage blob delete --auth-mode login --account-name "$(value storage_account_name)" \
-            --container-name "$(value container_name)" --name "citizen-dev/$WORKSPACE.tfstate" --delete-snapshots include
+          blob=(--auth-mode login --account-name "$(value storage_account_name)" --container-name "$(value container_name)" --name "citizen-dev/$WORKSPACE.tfstate")
+          # A workspace file deleted before its first apply has no state: nothing to remove.
+          if [[ "$(az storage blob exists "${blob[@]}" --query exists -o tsv)" != "true" ]]; then
+            echo "### Retired: \`$WORKSPACE\` (it had no Terraform state)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          az storage blob delete "${blob[@]}" --delete-snapshots include
           echo "### Retired: \`$WORKSPACE\` (Terraform state removed; the workspace itself is unchanged)" >> "$GITHUB_STEP_SUMMARY"
 
   drift:

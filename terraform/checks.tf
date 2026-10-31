@@ -19,6 +19,12 @@ resource "terraform_data" "config_checks" {
       error_message = "The workspace file has keys that are neither a baseline setting nor a workspace key (usually a typo): ${join(", ", local.unknown_keys)}. Workspace keys: ${join(", ", local.workspace_keys)}; baseline settings: ${join(", ", sort(local.defaults_sections))}."
     }
     precondition {
+      # catalog: null manages no catalog, so the baseline's default (the catalog it would
+      # have made) would point at one that may not exist.
+      condition     = local.catalog != null || local.default_catalog == null || local.default_catalog != try(replace(replace(local.defaults.catalog.name, "{PREFIX}", local.prefix_upper), "{prefix}", local.prefix), null)
+      error_message = "catalog: null leaves the catalog alone, but default_catalog still names the catalog the baseline would create (${coalesce(local.default_catalog, "-")}). Set default_catalog: null in the workspace's file too, or name a catalog that exists."
+    }
+    precondition {
       condition     = local.catalog == null || can(regex("^[a-z0-9_]+$", try(local.catalog.name, "")))
       error_message = "catalog.yaml catalog: the name must be lowercase letters, digits and underscores."
     }
@@ -35,7 +41,7 @@ resource "terraform_data" "config_checks" {
       error_message = "classic_user_tags lists tags users fill in on a classic cluster, which must be upper case letters, digits, _ and -; a starting value under tags: must be too: ${join(", ", [for k, v in local.chargeback_tags : "${k} = ${v}" if contains(local.classic_user_tags, k) && !can(regex(local.user_tag_pattern, v))])}."
     }
     precondition {
-      condition     = !local.sp.enabled || can(regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", coalesce(local.account_id, "-")))
+      condition     = try(local.sp.enabled, null) != true || can(regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", coalesce(local.account_id, "-")))
       error_message = "The serverless usage policy is account-level: set account_id in config/defaults/cost.yaml to the Databricks account ID (a GUID), or set serverless_policy.enabled: false."
     }
     precondition {

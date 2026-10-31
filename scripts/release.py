@@ -31,7 +31,6 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import workspaces as wsf  # noqa: E402  (the same YAML reading as the other scripts)
 
 LEFT_OUT = re.compile(r"^(dev/|config/backend\.hcl$|config/workspaces/(?!_example\.yaml$)[^/]+\.yaml$)")
-KEEP_IN_SETUP = set()
 # Blanked, but not identifiers: an Azure region is a common word, found in examples too.
 NOT_IDENTIFIERS = {"state_location"}
 OWNER = "@your-org/databricks-platform"
@@ -53,7 +52,7 @@ def own_identifiers(files):
     setup = files.get("config/setup.yaml", b"").decode()
     for line in setup.splitlines():
         m = re.match(r"^([a-z_]+):\s*(\S+)", line)
-        if m and m.group(1) not in KEEP_IN_SETUP | NOT_IDENTIFIERS and m.group(2) not in ("null", '""'):
+        if m and m.group(1) not in NOT_IDENTIFIERS and m.group(2) not in ("null", '""'):
             found.add(m.group(2).strip('"'))
     for value in re.findall(r'=\s*"([^"]+)"', files.get("config/backend.hcl", b"").decode()):
         found.add(value)
@@ -74,7 +73,7 @@ def blank_setup(text):
     """Every value in config/setup.yaml to null, its comment kept."""
     def blank(m):
         key, value, rest = m.group(1), m.group(2), m.group(3) or ""
-        if key in KEEP_IN_SETUP or value == "null":
+        if value == "null":
             return m.group(0)
         return f"{key}: null".ljust(len(f"{key}: {value}")) + rest
     return re.sub(r"(?m)^([a-z_]+): (\S+)([ \t]+#.*)?$", blank, text)
@@ -100,7 +99,7 @@ def release_codeowners(text):
     """Every owner to OWNER; the security paths' owners to OWNER and SECURITY_OWNER."""
     lines = []
     for line in text.splitlines():
-        if line.split(maxsplit=1)[:1] and line.split()[0] in SECURITY_PATHS:
+        if line.split()[:1] and line.split()[0] in SECURITY_PATHS:
             line = line.split()[0].ljust(len(line) - len(line.lstrip()) + 36) + f"{OWNER} {SECURITY_OWNER}"
         else:
             for owner in set(re.findall(r"@[\w.-]+(?:/[\w.-]+)?", line)) - {OWNER, SECURITY_OWNER}:

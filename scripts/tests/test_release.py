@@ -42,7 +42,7 @@ def module_dirs():
 
 
 def default_keys(path):
-    """Whether a dotted path (section.key[.key]) is in config/defaults/."""
+    """Whether a dotted path (key, section.key or section.key.key) is in config/defaults/."""
     parts = path.split(".")
     for f in (ROOT / "config/defaults").glob("*.yaml"):
         lines = [l for l in f.read_text().splitlines() if l.strip() and not l.lstrip().startswith("#")]
@@ -50,6 +50,8 @@ def default_keys(path):
             i = lines.index(next(l for l in lines if re.match(rf"^{parts[0]}:", l)))
         except StopIteration:
             continue
+        if len(parts) == 1:
+            return True                                    # a top-level key, like default_catalog
         block = []
         for l in lines[i + 1:]:
             if not l.startswith(" "):
@@ -107,6 +109,9 @@ with open(d / "calls.log", "a") as f:
     f.write(" ".join(args) + "\n")
 released = (d / "released.log").exists()
 if args[:2] == ["state", "list"]:
+    if (d / "state-error.txt").exists():
+        sys.stderr.write((d / "state-error.txt").read_text())
+        sys.exit(1)
     print((d / "state.txt").read_text(), end="")
 elif args[:2] == ["state", "rm"]:
     with open(d / "released.log", "a") as f:
@@ -222,6 +227,23 @@ class TfShRelease(unittest.TestCase):
             self.assertNotEqual(out.returncode, 0, cmd)
             self.assertIn(f"Refusing to {cmd} outside GitHub Actions", out.stdout)
             self.assertFalse((self.fake / "calls.log").exists(), f"{cmd}: terraform was not run")
+
+    def test_the_state_cannot_be_listed(self):
+        # A first apply has no state yet: nothing to release, and the apply goes on. Any other
+        # failure stops it, or a release would become a destroy.
+        for error, applies in (("No state file was found!\n", True), ("Error: failed to read state\n", False)):
+            with self.subTest(error=error.strip()):
+                (self.fake / "calls.log").write_text("")
+                (self.fake / "state-error.txt").write_text(error)
+                (self.fake / "plan.json").write_text(self.plan([], []))
+                env = {k: v for k, v in os.environ.items() if k != "GITHUB_ACTIONS"}
+                env.update(TERRAFORM=str(self.fake / "terraform"), FAKE_DIR=str(self.fake), CONFIRM_ENV="ws", ALLOW_LOCAL_APPLY="1")
+                out = subprocess.run([str(self.repo / "scripts/tf.sh"), "ws", "apply"], env=env, stdin=subprocess.DEVNULL,
+                                     capture_output=True, text=True, timeout=60)
+                ran = any(c.startswith("apply") for c in (self.fake / "calls.log").read_text().splitlines())
+                self.assertEqual(ran, applies, out.stdout + out.stderr)
+                if not applies:
+                    self.assertIn("Could not list the state", out.stdout)
 
     def test_break_glass_refuses_a_local_state(self):
         (self.repo / "config/backend.hcl").unlink()

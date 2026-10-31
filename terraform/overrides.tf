@@ -33,7 +33,7 @@ locals {
     "settings.enforce_user_isolation"                             = ["${local.wsc}[\"enforceUserIsolation\"]"]
     "settings.compliance_security_profile"                        = ["${local.ws}.databricks_compliance_security_profile_workspace_setting.this"]
     "settings.restrict_workspace_admins"                          = ["${local.ws}.databricks_restrict_workspace_admins_setting.this"]
-    "settings.personal_access_tokens"                             = ["${local.wsc}[\"enableTokensConfig\"]", "${local.wsc}[\"maxTokenLifetimeDays\"]"]
+    "settings.personal_access_tokens"                             = ["${local.wsc}[\"enableTokensConfig\"]", "${local.wsc}[\"maxTokenLifetimeDays\"]", "${local.ws}.databricks_permissions.tokens"]
     "settings.personal_access_tokens.enabled"                     = ["${local.wsc}[\"enableTokensConfig\"]"]
     "settings.personal_access_tokens.max_lifetime_days"           = ["${local.wsc}[\"maxTokenLifetimeDays\"]"]
     "settings.enhanced_security_monitoring"                       = ["${local.ws}.databricks_enhanced_security_monitoring_workspace_setting.this"]
@@ -63,21 +63,28 @@ locals {
     "cluster_policy.interactive"                                  = ["module.compute.databricks_cluster_policy.classic[\"interactive\"]"]
     "cluster_policy.jobs"                                         = ["module.compute.databricks_cluster_policy.classic[\"jobs\"]"]
     "cluster_policy.pipelines"                                    = ["module.compute.databricks_cluster_policy.classic[\"pipelines\"]"]
+    "default_catalog"                                             = ["${local.ws}.databricks_default_namespace_setting.this"]
   }
-  # Released when false (or null): serverless_policy.enabled.
+  # Released when false (or null): serverless_policy.enabled; and with tokens not enabled,
+  # their lifetime and who may create them are no longer managed (not reset).
   switch_addresses = {
-    "serverless_policy.enabled" = ["module.budget_policies"]
+    "serverless_policy.enabled"               = ["module.budget_policies"]
+    "settings.personal_access_tokens.enabled" = ["${local.wsc}[\"maxTokenLifetimeDays\"]", "${local.ws}.databricks_permissions.tokens"]
   }
 
+  # Whether the value at a path one to three keys deep is null (or missing), or true.
   setting_is_null = {
     for path in keys(local.setting_addresses) : path => (
-      length(split(".", path)) == 2
-      ? try(local.config[split(".", path)[0]][split(".", path)[1]], null) == null
-      : try(local.config[split(".", path)[0]][split(".", path)[1]][split(".", path)[2]], null) == null
+      length(split(".", path)) == 1 ? try(local.config[path], null) == null :
+      length(split(".", path)) == 2 ? try(local.config[split(".", path)[0]][split(".", path)[1]], null) == null :
+      try(local.config[split(".", path)[0]][split(".", path)[1]][split(".", path)[2]], null) == null
     )
   }
   switch_on = {
-    for path in keys(local.switch_addresses) : path => try(local.config[split(".", path)[0]][split(".", path)[1]], null) == true
+    for path in keys(local.switch_addresses) : path => (
+      length(split(".", path)) == 2 ? try(local.config[split(".", path)[0]][split(".", path)[1]], null) == true :
+      try(local.config[split(".", path)[0]][split(".", path)[1]][split(".", path)[2]], null) == true
+    )
   }
 
   released_addresses = sort(distinct(flatten(concat(

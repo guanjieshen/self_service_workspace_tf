@@ -27,6 +27,13 @@ run "bad_catalog_name" {
   expect_failures = [terraform_data.config_checks]
 }
 
+# catalog: null with the baseline's default catalog, which names the catalog not made
+run "catalog_null_default_kept" {
+  command = plan
+  variables { workspace = "catalog-null-default-kept" }
+  expect_failures = [terraform_data.config_checks]
+}
+
 # catalog: may only set
 run "catalog_unknown_field" {
   command = plan

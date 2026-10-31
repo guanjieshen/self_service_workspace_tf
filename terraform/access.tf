@@ -51,12 +51,19 @@ locals {
     name  = replace(replace(local.config.catalog.name, "{PREFIX}", local.prefix_upper), "{prefix}", local.prefix)
     owner = try(local.config.catalog.owner, null) == null ? null : lookup(local.group_names, local.config.catalog.owner, local.config.catalog.owner)
   })
-  catalog_grants = merge(
-    { for g in distinct(flatten(values(local.persona_groups))) : g => sort(try(local.config.catalog.persona_privileges, [])) },
-    { for g in local.platform_admins : g => sort(try(local.config.catalog.platform_admin_privileges, [])) },
+  # Each principal's privileges from every source, together: a persona group named in
+  # other_privileges keeps its persona privileges and gets the extra ones too.
+  catalog_grant_pairs = concat(
+    [for g in distinct(flatten(values(local.persona_groups))) : { principal = g, privileges = try(local.config.catalog.persona_privileges, []) }],
+    [for g in local.platform_admins : { principal = g, privileges = try(local.config.catalog.platform_admin_privileges, []) }],
     # Anyone else: an application ID or a group name, or a key of groups.
-    { for p, privs in coalesce(try(local.config.catalog.other_privileges, null), {}) : lookup(local.group_names, p, p) => sort(privs) },
+    [for p, privs in coalesce(try(local.config.catalog.other_privileges, null), {}) : { principal = lookup(local.group_names, p, p), privileges = privs }],
   )
+  catalog_grants = {
+    for principal in distinct([for x in local.catalog_grant_pairs : x.principal]) : principal => sort(distinct(flatten([
+      for x in local.catalog_grant_pairs : x.privileges if x.principal == principal
+    ])))
+  }
   default_catalog = try(replace(replace(local.config.default_catalog, "{PREFIX}", local.prefix_upper), "{prefix}", local.prefix), null)
 
   # ---- Genie Code: workspace instructions and skills ----

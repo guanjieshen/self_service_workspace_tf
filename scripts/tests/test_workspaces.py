@@ -183,7 +183,8 @@ class Affected(unittest.TestCase):
         self.assertEqual(self.affected()["workspaces"], ["gamma"])
 
     def test_the_baseline_or_terraform_concerns_every_workspace(self):
-        for f in ("config/defaults/settings.yaml", "terraform/main.tf"):
+        # And the scripts every plan and apply runs, this routing among them.
+        for f in ("config/defaults/settings.yaml", "terraform/main.tf", "scripts/tf.sh", "scripts/plan-guard.py", "scripts/workspaces.py"):
             with self.subTest(f=f):
                 self.change(f)
                 self.assertEqual(self.affected()["workspaces"], ["alpha", "beta", "gamma"])

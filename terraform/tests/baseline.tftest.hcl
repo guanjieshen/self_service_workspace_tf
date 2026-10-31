@@ -61,7 +61,15 @@ run "starter_warehouse" {
 
   override_data {
     target = data.databricks_sql_warehouses.starter[0]
-    values = { ids = ["starter-id"] }
+    values = { ids = ["starter-id", "other-id"] }
+  }
+  override_data {
+    target = data.databricks_sql_warehouse.starter["starter-id"]
+    values = { name = "Serverless Starter Warehouse" }
+  }
+  override_data {
+    target = data.databricks_sql_warehouse.starter["other-id"]
+    values = { name = "Serverless Starter Warehouse (finance)" }
   }
 
   assert {
@@ -71,6 +79,10 @@ run "starter_warehouse" {
   assert {
     condition     = toset([for a in module.compute.starter_warehouse_permissions["starter-id"] : a]) == toset(["tst-admins=CAN_MANAGE"])
     error_message = "Only the platform admins may use it."
+  }
+  assert {
+    condition     = keys(module.compute.starter_warehouse_permissions) == ["starter-id"]
+    error_message = "Only the warehouse named exactly so is restricted, not one whose name contains it."
   }
 }
 

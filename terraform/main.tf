@@ -50,6 +50,13 @@ data "databricks_sql_warehouses" "starter" {
   warehouse_name_contains = local.config.starter_warehouse.name
 }
 
+# The search matches part of a name: keep only the warehouse named exactly so, or a
+# warehouse that merely contains the name would become admins only too.
+data "databricks_sql_warehouse" "starter" {
+  for_each = toset(try(data.databricks_sql_warehouses.starter[0].ids, []))
+  id       = each.value
+}
+
 module "compute" {
   source = "./modules/compute"
 
@@ -60,7 +67,7 @@ module "compute" {
   sql_warehouse     = local.config.sql_warehouse
   cluster_policy    = local.config.cluster_policy
   warehouse_acl     = { for g, l in local.warehouse_acl : lookup(local.group, g, g) => l }
-  starter_warehouse = try(tolist(data.databricks_sql_warehouses.starter[0].ids), [])
+  starter_warehouse = [for id, w in data.databricks_sql_warehouse.starter : id if w.name == local.config.starter_warehouse.name]
   platform_admins   = [for g in local.platform_admins : lookup(local.group, g, g)]
 
   # Invalid input stops at the plain-language checks in checks.tf, not a crash inside a
@@ -71,7 +78,7 @@ module "compute" {
 
 module "budget_policies" {
   source    = "./modules/budget-policies"
-  count     = local.sp.enabled ? 1 : 0
+  count     = try(local.sp.enabled, null) == true ? 1 : 0
   providers = { databricks = databricks.account }
 
   account_id   = local.account_id

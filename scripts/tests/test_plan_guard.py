@@ -171,6 +171,33 @@ class Loosening(unittest.TestCase):
                           after={"allow_cluster_create": True}), "address": "module.personas.databricks_entitlements.users[0]"}
         self.flagged(users, "unrestricted cluster creation")
 
+    def test_access_removed_in_an_update(self):
+        cases = [
+            (change("databricks_entitlements", ["update"], before={"group_id": "builders", "workspace_access": True, "databricks_sql_access": True},
+                    after={"group_id": "builders", "workspace_access": False, "databricks_sql_access": True}),
+             "REMOVE entitlements from builders: workspace_access"),
+            (change("databricks_grants", ["update"], before={"catalog": "c", "grant": [{"principal": "g", "privileges": ["USE_CATALOG", "USE_SCHEMA"]}]},
+                    after={"catalog": "c", "grant": [{"principal": "g", "privileges": ["USE_CATALOG"]}]}),
+             "REMOVE USE_SCHEMA on c from g"),
+            (change("databricks_permissions", ["update"], before={"sql_endpoint_id": "w", "access_control": [{"group_name": "a", "permission_level": "CAN_USE"}, {"group_name": "b", "permission_level": "CAN_USE"}]},
+                    after={"sql_endpoint_id": "w", "access_control": [{"group_name": "a", "permission_level": "CAN_USE"}]}, name="default_warehouse"),
+             "REMOVE b's access (CAN_USE)"),
+        ]
+        for rc, text in cases:
+            with self.subTest(text=text):
+                code, out = run(rc)
+                self.assertEqual(code, 2)
+                self.assertIn(text, out)
+
+    def test_dashboard_embedding_widened(self):
+        pol = lambda t: {"aibi_dashboard_embedding_access_policy": [{"access_policy_type": t}]}
+        code, out = run(change("databricks_aibi_dashboard_embedding_access_policy_setting", ["update"], before=pol("ALLOW_APPROVED_DOMAINS"), after=pol("ALLOW_ALL_DOMAINS")))
+        self.assertIn("WIDEN dashboard embedding: ALLOW_APPROVED_DOMAINS -> ALLOW_ALL_DOMAINS", out)
+        dom = lambda *d: {"aibi_dashboard_embedding_approved_domains": [{"approved_domains": list(d)}]}
+        code, out = run(change("databricks_aibi_dashboard_embedding_approved_domains_setting", ["update"], before=dom("a.com"), after=dom("a.com", "b.com")))
+        self.assertIn("ALLOW dashboards to be embedded in b.com", out)
+        self.assertEqual(run(change("databricks_aibi_dashboard_embedding_access_policy_setting", ["update"], before=pol("ALLOW_ALL_DOMAINS"), after=pol("DENY")))[0], 0)
+
     def test_not_flagged(self):
         self.clean(
             # First-time management: there is no earlier value to weaken.
@@ -185,6 +212,10 @@ class Loosening(unittest.TestCase):
                    after={"authorization": "tokens", "access_control": [{"group_name": "a"}]}),
             # Grants to named groups, and deleting a setting that was not on.
             change("databricks_grants", ["update"], before={"catalog": "c", "grant": []}, after={"catalog": "c", "grant": [{"principal": "g"}]}),
+            # More access, or the same access.
+            change("databricks_entitlements", ["update"], before={"workspace_access": False}, after={"workspace_access": True}),
+            change("databricks_grants", ["update"], before={"catalog": "c", "grant": [{"principal": "g", "privileges": ["USE_CATALOG"]}]},
+                   after={"catalog": "c", "grant": [{"principal": "g", "privileges": ["USE_CATALOG", "USE_SCHEMA"]}]}),
             change("databricks_disable_legacy_access_setting", ["delete"], before={"disable_legacy_access": [{"value": False}]}),
         )
 

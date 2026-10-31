@@ -122,7 +122,15 @@ plan_and_guard() {
 # of the last plan against the state; prints what it released.
 release_unmanaged() {
   local state_list to_release
-  state_list="$("$terraform_bin" -chdir="$tf_dir" state list 2>/dev/null || true)"
+  # A state that cannot be listed would release nothing, and the apply would destroy what
+  # should be left alone: stop instead. A first apply has no state yet: nothing to release.
+  local err
+  if ! state_list="$("$terraform_bin" -chdir="$tf_dir" state list 2>"$root/.plans/$workspace.state-list.err")"; then
+    err="$(cat "$root/.plans/$workspace.state-list.err")"
+    [[ "$err" == *"No state file was found"* ]] ||
+      { echo "$err"; echo "Could not list the state to release what is left alone; stopping before apply."; exit 1; }
+    state_list=""
+  fi
   to_release="$(STATE_LIST="$state_list" python3 -c '
 import json, os, sys
 plan = json.load(open(sys.argv[1]))

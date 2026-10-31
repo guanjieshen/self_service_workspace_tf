@@ -25,7 +25,7 @@ class FakeApi:
                  empty_groups=(), billing_admins=("users/sp-terraform",), rule_set_error=None,
                  metastore_owner="uc-admins", catalog_owner="sp-terraform", metastore_rights=("CREATE_CATALOG",),
                  locations=(("catalogs", "abfss://catalogs@acct.dfs.core.windows.net/", "uc-admins"),),
-                 location_rights=("CREATE_MANAGED_STORAGE",), token_permissions=True):
+                 location_rights=("CREATE_MANAGED_STORAGE",), token_permissions=True, legacy_errors=()):
         self.me, self.account_groups, self.local_groups = me, set(account_groups), set(local_groups)
         self.empty_groups, self.billing_admins, self.rule_set_error = set(empty_groups), list(billing_admins), rule_set_error
         self.storage_root, self.catalog_exists, self.legacy_disabled = storage_root, catalog_exists, legacy_disabled
@@ -33,6 +33,7 @@ class FakeApi:
         self.metastore_owner, self.catalog_owner, self.metastore_rights = metastore_owner, catalog_owner, metastore_rights
         self.locations, self.location_rights = locations, location_rights
         self.token_permissions = token_permissions
+        self.legacy_errors = dict(legacy_errors)          # path prefix -> error
         self.paths = []
 
     def __call__(self, path):
@@ -64,6 +65,9 @@ class FakeApi:
             return ({"object_id": "authorization/tokens"}, None) if self.token_permissions else (None, "tokens tokens does not exist")
         if path == "/api/2.1/settings/disable_legacy_access":
             return {"disable_legacy_access": {"value": self.legacy_disabled}}, None
+        for prefix, error in self.legacy_errors.items():
+            if path.startswith(prefix):
+                return None, error
         if path.startswith("/api/2.1/unity-catalog/schemas?catalog_name=hive_metastore"):
             return {"schemas": [{"name": n} for n in self.hive]}, None
         if path.startswith("/api/2.0/dbfs/list"):
@@ -210,6 +214,15 @@ class Preflight(Base):
         for text in ("permanent after 30 days", "sales", "/mnt/raw", "old"):
             self.assertIn(text, warnings[0])
         self.assertNotIn("new", warnings[0].split("clusters")[1])
+
+    def test_a_legacy_check_that_fails_is_not_nothing_found(self):
+        # "nothing found" exempts a new workspace's one-way switch in the plan guard.
+        results = self.run_checks(FakeApi(legacy_errors={"/api/2.1/clusters/list": "403 Forbidden"}))
+        self.assertNotIn("nothing found that still uses legacy access (Hive metastore, DBFS mounts, legacy clusters)", self.levels(results, "ok"))
+        self.assertIn("could not check everything that still uses legacy access", " ".join(self.levels(results, "warning")))
+        results = self.run_checks(FakeApi(legacy_errors={"/api/2.0/dbfs/list": "RESOURCE_DOES_NOT_EXIST: No file or directory exists on path /mnt."}))
+        self.assertIn("nothing found that still uses legacy access (Hive metastore, DBFS mounts, legacy clusters)", self.levels(results, "ok"),
+                      "no /mnt folder means no mounts")
 
     def test_legacy_checks_skipped_once_disabled_or_left_alone(self):
         api = FakeApi(legacy_disabled=True, hive=["sales"])

@@ -23,7 +23,7 @@ Which workspaces a change concerns:
 | Change | Planned (pull request) | Applied (merge) |
 | --- | --- | --- |
 | `config/workspaces/<name>.yaml` | That workspace | That workspace (a deleted file: its state is removed) |
-| `config/defaults/`, `terraform/` (except `terraform/tests/`), `scripts/tf.sh`, `scripts/plan-guard.py` | Every workspace | Every workspace |
+| `config/defaults/`, `terraform/` (except `terraform/tests/`), `scripts/tf.sh`, `scripts/plan-guard.py`, `scripts/workspaces.py` | Every workspace | Every workspace |
 | What the plan comment shows: `scripts/preflight.py`, `scripts/ai-plan-review.py`, `.github/ai/`, `config/setup.yaml`, `deploy.yml` and what it uses | Every workspace | None |
 | Anything else: tests, docs, other scripts | None | None |
 
