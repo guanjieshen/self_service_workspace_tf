@@ -288,7 +288,7 @@ What each setting does is in the comment beside it, and in [config/README.md](..
 
 **Who:** the platform team. Repeat for every workspace. Step by step, with what you see at each point: [user-journeys.md](user-journeys.md), journey 1.
 
-Before you start: the workspace exists and the runners can reach it (its private endpoint and DNS), the pipeline's service principal is workspace admin there (step 6, item 2), and its persona groups exist in Entra ID (step 7).
+Before you start: the workspace exists and the runners can reach it (its private endpoint and DNS), the pipeline's service principal is workspace admin there (step 6, item 2), and its persona groups exist in Entra ID (step 7). In a **brand-new workspace**, a workspace admin also creates one personal access token (Settings > Developer > Access tokens > Generate new token) and revokes it straight away: Databricks creates the workspace's token permissions with the first token, and until then Terraform cannot set who may create tokens. Once per workspace; preflight says if it is needed.
 
 1. **Create its file:** copy `config/workspaces/_example.yaml` to `config/workspaces/fin-citizen-dev.yaml` and fill in `prefix`, `host` and `groups`. The file name is the workspace's name in this repository.
 2. **Set anything that differs from the baseline**, in the same file (for example `catalog.storage_root`, or `null` for `settings.disable_legacy_access`, `disable_dbfs_root_and_mounts` and `enforce_user_isolation` for an existing workspace that is not ready). Leave the rest out.
@@ -298,7 +298,7 @@ Before you start: the workspace exists and the runners can reach it (its private
    python3 scripts/preflight.py fin-citizen-dev
    ```
 
-   It checks the sign-in and admin rights, the metastore, that every group is an account group (and that the platform admins group has members), that the pipeline may create usage policies (Billing admin), the catalog's storage, and what still uses legacy access.
+   It checks the sign-in and admin rights, the metastore, that every group is an account group (and that the platform admins group has members), that the pipeline may create usage policies (Billing admin), that it may create the catalog (or owns it), the catalog's storage, that the workspace has token permissions, and what still uses legacy access.
 4. **Open a pull request.** The deploy workflow plans only this workspace and posts its plan: everything the first apply creates. Preflight problems are at the top of the comment.
 5. **Merge.** After the approval step (if `apply-approval` has reviewers), the workspace is deployed.
 6. **Verify:** the next pull request that touches it (or the Monday drift check) shows no changes. In the workspace: the persona groups under Settings > Identity and access, the `<PREFIX> Default Warehouse`, and the `{prefix}_citizen_dev` catalog.
@@ -364,6 +364,7 @@ State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (ste
 | Preflight: `the metastore has no storage root` | New catalogs have nowhere to store data | Set `catalog.storage_root` in the workspace's file to an external location URL |
 | Preflight: `cannot create catalog`, or the apply fails with `PERMISSION_DENIED` creating the catalog | The service principal lacks `CREATE CATALOG` on the metastore, or `CREATE MANAGED STORAGE` on the external location of `catalog.storage_root` | Step 6, item 5 |
 | Preflight: `does not own catalog`, or the apply fails with `PERMISSION_DENIED` updating the catalog or its grants | Someone else owns the catalog (it existed before, or `catalog.owner` handed it to a group the pipeline is not in) | A metastore admin runs `ALTER CATALOG <name> OWNER TO \`<pipeline_client_id>\``, and `catalog.owner` stays `null` |
+| Preflight: `never had a personal access token`, or the apply fails with `cannot create permissions: tokens tokens does not exist` | A brand-new workspace: Databricks creates its token permissions with the first token | A workspace admin creates one token and revokes it straight away (step 9), then re-run the plan or the apply. An apply that stopped here made everything before it; the re-run makes the rest |
 | A workspace was retired by mistake | Merging the deletion of its file deleted its Terraform state | Restore `citizen-dev/<name>.tfstate` from an earlier blob version in the state container (blob versioning, step 3: in the Azure portal, the container > Show deleted blobs > the blob > Versions > Make current version), then restore the workspace's file in a pull request |
 | Preflight: `cannot create the workspace's serverless usage policy`, or the apply fails with `missing CreateBudgetPolicyPermission` | The service principal lacks the account's **Billing admin** role (account admin alone is not enough) | Step 6, item 3, or `serverless_policy.enabled: false` |
 | `setup.py github` fails at branch protection: `Upgrade to GitHub Pro or make this repository public` | Branch protection on a private repository needs a paid GitHub plan | The rest of step 5 is done. Protect `main` by hand once the plan allows it; until then, merging is the only review |

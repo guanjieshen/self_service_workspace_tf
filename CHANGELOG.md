@@ -28,6 +28,10 @@ is left alone.
   the workspace, so the plan guard now flags setting the default for the first time too: the first
   plan of every workspace needs `allow-risky-changes`. Keep `null` in your baseline, or in a
   workspace's file, to leave the default alone.
+- **A brand-new workspace needs one personal access token, created and revoked**, before its first
+  apply: Databricks has no token permissions until the first token, and the apply failed with
+  `cannot create permissions: tokens tokens does not exist`. Preflight checks it and says what to
+  do (SETUP.md step 9).
 - The AI review of a **new workspace's first apply** gives one row to each thing people will use
   (the default warehouse, the usage (budget) policy and its tags, the classic cluster policies and
   their limits, the catalog, who gets which access), one row per baseline file in
