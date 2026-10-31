@@ -19,7 +19,7 @@ sql_warehouse:
   name: "{PREFIX} Default Warehouse"
   type: serverless             # serverless | pro | classic
   size: Small                  # 2X-Small | X-Small | Small | Medium | Large | X-Large | ...
-  auto_stop_minutes: 5         # stop after this many idle minutes
+  auto_stop_minutes: 10        # stop after this many idle minutes
   min_clusters: 1              # scaling range
   max_clusters: 5
   # true = this warehouse is selected by default for every user in SQL (the admin
