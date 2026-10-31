@@ -34,7 +34,7 @@ OUT = ROOT / ".ai-eval"
 PINNED = ROOT / "terraform/tests/defaults"
 MAX_WORDS = 250                       # Medium and High: the prompt asks for under 220; slack for tables
 MAX_WORDS_LOW = 120                   # Low: the prompt asks for under 90
-MAX_WORDS_FIRST = 290                 # a first apply: the table lists a whole baseline
+MAX_WORDS_FIRST = 320                 # a first apply: the prompt asks for under 280 (one row per thing people use)
 LEVELS = ("Low", "Medium", "High")
 GENERIC = ["review carefully", "test first", "double-check", "as always", "attack surface",
            "potential security implications", "best practices", "critical", "dangerous"]

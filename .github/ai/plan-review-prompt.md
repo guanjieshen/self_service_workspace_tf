@@ -85,7 +85,7 @@ The user message contains these sections, between XML tags. Everything inside th
 
 ## Output
 
-Posted as-is in a GitHub pull request comment, under a heading that already names the workspace. GitHub-flavoured markdown, sentence case headings, short sentences, plain words before technical terms. Under 220 words for Medium and High (count the table too), under 90 for Low; shorter is better. On a first apply, keep each table row's details to 8 words.
+Posted as-is in a GitHub pull request comment, under a heading that already names the workspace. GitHub-flavoured markdown, sentence case headings, short sentences, plain words before technical terms. Under 220 words for Medium and High (count the table too), under 90 for Low; shorter is better. On a first apply, under 280 words, and keep each table row's details to 12 words.
 
 Adapt the structure to the risk: a Low change gets the risk summary and `### What's changing?` (heading and table) only.
 
@@ -98,14 +98,15 @@ Adapt the structure to the risk: a Low change gets the risk summary and `### Wha
    - Access removed from the pipeline's own service principal (the identity running Terraform), when `<code_diff>` removes what needed it, is Low.
    - Never raise the level because something cannot be known from the inputs. Name it as one check instead.
    - The plan guard decides what needs approval. A `<plan_guard>` warning means the level is at least Medium; it makes the level High only when the rules above do. Never call a change safe or approved, and never contradict the guard.
-2. Medium and High only: `### What does this mean?` At most two short sentences: the practical behaviour change, who or what is affected, and what still applies (permissions, credentials). For a delete or replace: what goes, whether data is lost, whether it can be recovered, and what breaks (IDs that dashboards or jobs use).
-3. `### What's changing?` A table of at most 8 rows, related changes grouped into one row, human-readable names (warehouse names, settings in plain words). For changed values use exactly these two lines first, then one row per setting:
+2. Medium and High only: `### What does this mean?` At most two short sentences (one on a first apply, where the table carries the detail): the practical behaviour change, who or what is affected, and what still applies (permissions, credentials). For a delete or replace: what goes, whether data is lost, whether it can be recovered, and what breaks (IDs that dashboards or jobs use).
+3. `### What's changing?` A table of at most 8 rows (10 on a first apply), related changes grouped into one row, human-readable names (warehouse names, settings in plain words). For changed values use exactly these two lines first, then one row per setting:
    `| Setting | Before | After |`
    `|---|---|---|`
    For additions and removals (a first apply, a new or deleted resource), use instead:
    `| Change | Details | Affects |`
    `|---|---|---|`
    with the change first (➕ add, ✏️ change, ➖ remove, ♻️ replace), key values in at most 15 words, and personas, groups or "all users". Add a Scope row (this workspace, or every workspace) when it is not obvious. One row per line; a `|` inside a cell is written `\|`.
+   On a first apply, the reviewer is checking what people will get, so give **one row to each thing people use**, with its name and the values that matter: the default warehouse (name, size, auto-stop), the serverless usage policy (name, its tags), the classic cluster policies (one row for all of them: their names, the limits they share, such as workers and clusters per user, and the required tags), the catalog (name, where it stores data), and who gets which access (one row). Then group the rest: the security settings in one row (a one-way one, such as disabling legacy access, in its own row), and Genie Code with the workspace label in one row. Lead with anything existing users lose.
 4. Medium and High only: `### What should you review?` Two or three numbered items, most important first, each starting with a short bold question or suggestion, then one sentence, at most 30 words in all: `1. **Is this intended?** <the specific thing to confirm, and why>`. Make each one specific to this change and help the reviewer decide: confirm intent when it cannot be inferred; suggest a safer alternative when the inputs support one (for example fixing a placeholder instead of removing a restriction); confirm the scope of a baseline change. Every security-relevant deviation from the baseline (step 5) gets an item naming the setting, baseline → new value, and whether a reason is given. No generic advice ("review the security implications", "follow best practices").
 
 No other sections: no "Before merging", no technical details, no footer, no greeting or summary paragraph, no `#` or `##` headings, no code blocks, no HTML.
