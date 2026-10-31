@@ -18,6 +18,10 @@ is left alone.
 | `cost.yaml` | Rename the tag `APP_ID` to `APPID` in `tags:` and `classic_user_tags` |
 | every file | Placeholders `{bu}` / `{BU}` to `{prefix}` / `{PREFIX}` |
 
+- **A brand-new workspace needs one personal access token, created and revoked**, before its first
+  apply: Databricks has no token permissions until the first token, and the apply failed with
+  `cannot create permissions: tokens tokens does not exist`. Preflight checks it and says what to
+  do (SETUP.md step 9).
 - The AI review of a **new workspace's first apply** gives one row to each thing people will use
   (the default warehouse, the usage (budget) policy and its tags, the classic cluster policies and
   their limits, the catalog, who gets which access), one row per baseline file in

@@ -19,6 +19,7 @@ request; nothing reaches a workspace until it is merged. The one-time setup is i
 - The workspace exists, and the pipeline's runners can reach it (its private endpoint and DNS).
 - The pipeline's service principal is workspace admin there ([SETUP.md](SETUP.md), step 6).
 - Its persona groups exist in Entra ID and are synced to the Databricks account ([SETUP.md](SETUP.md), step 7).
+- A brand-new workspace: a workspace admin creates one personal access token and revokes it straight away, so the workspace has token permissions for Terraform to set ([SETUP.md](SETUP.md), step 9).
 
 **In the repository:**
 
