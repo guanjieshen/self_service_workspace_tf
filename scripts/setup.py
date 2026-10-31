@@ -101,7 +101,7 @@ APP_ID=$(az ad app list --display-name {name} --query "[0].appId" -o tsv)
 [ -n "$APP_ID" ] || APP_ID=$(az ad app create --display-name {name} --sign-in-audience AzureADMyOrg --query appId -o tsv)
 SP_ID=$(az ad sp list --filter "appId eq '$APP_ID'" --query "[0].id" -o tsv)
 [ -n "$SP_ID" ] || SP_ID=$(az ad sp create --id "$APP_ID" --query id -o tsv)
-# The repository's subject prefix: repositories created since July 2026 include numeric IDs.
+# The repository's subject prefix: repositories created or renamed since July 15, 2026 include numeric IDs.
 PREFIX=$(gh api repos/{repo}/actions/oidc/customization/sub --jq .sub_claim_prefix)
 [ -n "$PREFIX" ] || {{ echo "Could not read the OIDC subject prefix of {repo} (gh auth login?)"; exit 1; }}"""]
     for cred, subject, what in creds:
@@ -137,7 +137,9 @@ def github(a):
         "required_status_checks": {"strict": False, "contexts": REQUIRED_CHECKS},
         # Repository admins too: a push to main is an apply with workspace admin rights.
         "enforce_admins": True,
-        "required_pull_request_reviews": {"require_code_owner_reviews": True, "required_approving_review_count": 1},
+        # A push after an approval needs a new one: what merges is what was reviewed.
+        "required_pull_request_reviews": {"require_code_owner_reviews": True, "required_approving_review_count": 1,
+                                          "dismiss_stale_reviews": True},
         "restrictions": None,
     })
     return f"""# Repository settings for the workflows (docs/github-actions.md).

@@ -25,6 +25,11 @@ RETIRED = {
     "budget_policies (now serverless_policy)": re.compile(r"(^|\s|`)budget_policies:|budget_policies\.(enabled|policies)"),
     "required_tags (now tags)": re.compile(r"(^|\s|`)required_tags:"),
     "catalog.data_classification (manual now)": re.compile(r"(^|\s|`)data_classification:"),
+    "lob / {LOB} (now prefix)": re.compile(r"(^|\s|`)lob:|\{lob\}|\{LOB\}"),
+    "config/ai-review.yaml (now config/setup.yaml)": re.compile(r"config/ai-review\.yaml"),
+    "backend.hcl.example (written by setup.py)": re.compile(r"backend\.hcl\.example"),
+    "personal_schemas / shared_schemas (the self-service app)": re.compile(r"(^|\s|`)(personal_schemas|shared_schemas):"),
+    "workspaces.py new (copy _example.yaml)": re.compile(r"workspaces\.py new\b"),
 }
 
 

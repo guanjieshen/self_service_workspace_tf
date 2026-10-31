@@ -66,10 +66,10 @@ In that case, run these jobs on a runner inside an allowed network and set the r
 
 | Runner | Notes |
 | --- | --- |
-| Self-hosted runner in the Azure network (VM or container) | Register it to the repository or organization with a label such as `citizen-dev`, then set `TERRAFORM_RUNNER` to `"citizen-dev"`. Needs `bash`, `python3`, `git` and outbound access to GitHub and the workspace. |
+| Self-hosted runner in the Azure network (VM or container) | Register it to the repository or organization with a label such as `citizen-dev`, then set `TERRAFORM_RUNNER` to `"citizen-dev"`. Needs `bash`, `python3`, `git`, `node` (for `actions/github-script`), `curl`, `tar` and `sha256sum`, and the **Azure CLI** (the retire job). The jobs install Terraform and the Databricks CLI themselves. Outbound access to: GitHub (github.com, api.github.com, the Actions endpoints), the Terraform registry and releases (registry.terraform.io, releases.hashicorp.com, or your mirror), Entra ID (login.microsoftonline.com), the state storage account (`<account>.blob.core.windows.net`), the Databricks account console (accounts.azuredatabricks.net) and each workspace. |
 | GitHub-hosted runners with Azure private networking | GitHub Team or Enterprise; runners join an Azure VNet you provide. Set `TERRAFORM_RUNNER` to the runner group, for example `{"group": "my-runner-group", "labels": "linux-4core"}`. |
 
-The jobs that reach Databricks or the state use `TERRAFORM_RUNNER`. The checks and the routing step use `CHECKS_RUNNER` (default `ubuntu-latest`): set it too if your organization has no GitHub-hosted runners.
+The jobs that reach Databricks or the state use `TERRAFORM_RUNNER`. The checks and the routing step use `CHECKS_RUNNER` (default `ubuntu-latest`): set it too if your organization has no GitHub-hosted runners. They run a pull request's code before review, so in a public repository never point `CHECKS_RUNNER` at a self-hosted runner: a pull request from a fork would run on it.
 
 ## Hardening and noise
 

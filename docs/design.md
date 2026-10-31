@@ -50,11 +50,11 @@ default by setting the same top-level key as the baseline** (every key is define
 one file of `config/defaults/`). Maps merge key by key, a list or
 value replaces, and `null` means "Terraform leaves this alone". A key the baseline does
 not have fails the plan with its name, so a typo cannot silently do nothing. A few keys
-exist only in a workspace's file: `prefix`, `host`, `label`, `genie_code_instructions`.
+exist only in a workspace's file: `prefix`, `host`, `label`, `genie_code_instructions`, and rarely `auth` and `id`.
 See config/README.md for the files and a task table.
 
 **Leaving a setting alone releases it.** On a workspace that was already applied, a
-setting set to `null` (or a `manage` switch set to `false`) is removed from Terraform's
+setting set to `null` (or `serverless_policy.enabled: false`) is removed from Terraform's
 state before apply (`scripts/tf.sh`), so the workspace keeps its current value. It is
 never destroyed, because destroying a setting resets it: the provider erases a workspace
 configuration key that leaves Terraform (`enableTokensConfig` would become `false`,
@@ -63,11 +63,17 @@ platform default. `terraform/overrides.tf` maps each setting to what it owns.
 
 **Governance is in the pull request, not the code.** Any default can be changed for one
 workspace. What keeps that safe:
-- **Plan guard** (`scripts/plan-guard.py`) fails the check when a plan deletes or
-  replaces something people depend on (warehouses, cluster policies, usage policies,
-  permissions, grants, catalogs), or weakens security (a setting turned off,
-  deleted or loosened, a catalog opened to every workspace, a grant to everyone, more
-  token creators), until someone adds the label `allow-risky-changes`.
+- **Plan guard** (`scripts/plan-guard.py`) fails the check, until someone adds the label
+  `allow-risky-changes`, when a plan:
+  - deletes or replaces something people depend on (warehouses, cluster policies, usage
+    policies, permissions, grants, entitlements, catalogs);
+  - takes access away in an update (an entitlement, a catalog privilege, a permission), or
+    makes the Starter warehouse admins only;
+  - weakens security: a setting turned off, deleted or loosened, a catalog opened to every
+    workspace, a grant to everyone, more token creators, dashboard embedding widened;
+  - sets or changes the default catalog;
+  - is one-way: the compliance security profile, or disabling legacy access (not flagged on
+    a workspace where preflight found nothing that uses it).
 - **The AI review** in the plan comment lists every deviation from the baseline, old and
   new value, security-relevant ones first.
 - **Code owners** decide who approves which files.
@@ -83,7 +89,7 @@ workspace. What keeps that safe:
 | explorer (`groups.explorer`) | SQL access | Can use | User | By request (app) | USE CATALOG, USE SCHEMA |
 | builder (`groups.builder`) | Workspace and SQL access | Can use | User | By request (app) | same |
 | publisher (`groups.publisher`) | Workspace and SQL access | Can use | User | By request (app) | same |
-| platform admins (`{prefix}_platform_admins`) | Workspace admin | Manage | User, manager | Yes (workspace admins) | Owner; all privileges |
+| platform admins (`{prefix}_platform_admins`) | Workspace admin | Manage | User, manager | Yes (workspace admins) | All privileges, MANAGE (the pipeline owns it) |
 
 - Entitlements are tiers, each including the one before: Consumer access (Databricks One
   only) < SQL access (plus the SQL editor, queries, dashboards and Genie) < workspace
@@ -133,10 +139,11 @@ Terraform's: people get them from the self-service app.
 
 ## 6. Caveats
 
-1. **Disabling legacy access can become permanent** after 30 days. Before applying to an
-   existing workspace, check nothing uses Hive tables, DBFS mounts or No-isolation
-   clusters; until then set `disable_legacy_access`, `disable_dbfs_root_and_mounts` and
-   `enforce_user_isolation` to `null` under `settings:` in its file.
+1. **Disabling legacy access can become permanent** after 30 days (DBFS root and mounts,
+   and user isolation, stay reversible). Before applying to an existing workspace, check
+   nothing uses Hive tables, DBFS mounts or No-isolation clusters; until then set
+   `disable_legacy_access`, `disable_dbfs_root_and_mounts` and `enforce_user_isolation` to
+   `null` under `settings:` in its file.
 2. **Terraform owns what it manages.** Entitlements, permissions, grants and budget
    policy access are authoritative: changes made by hand are reverted on the next apply
    (the drift check reports them first).
@@ -167,7 +174,7 @@ Terraform's: people get them from the self-service app.
 | S3 | Verbose audit logs (only useful with A4)? | Not managed |
 | S4 | Interactive notebook results in the workspace's own storage? | Not managed |
 | P5 | Approved dashboard embedding domains? | None |
-| P7 | GitHub org URL for the Git allowlist? | Placeholder |
+| P7 | Narrow the Git allowlist to your GitHub organization (or add a GitHub Enterprise host)? | `https://github.com/`: every github.com repository |
 | P8 | The chargeback tag set (it will change; one list in `config/defaults/cost.yaml`)? | `BUSINESS_UNIT`, `APPID`, `COST_CATEGORY`; users fill in `APPID`, `TEAM`, `PROJECT` on classic |
 | P12 | Remove `users` from `/Workspace/Shared` so folder permissions mean something? | Organisation only |
 

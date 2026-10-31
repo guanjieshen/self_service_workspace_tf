@@ -13,6 +13,8 @@ From the committed files only (git archive of HEAD), the zip:
   - replaces the owners in .github/CODEOWNERS with @your-org/databricks-platform, and on the
     security settings (config/defaults/settings.yaml) with it and @your-org/security;
 
+  - adds VERSION, the release's name (an installation has no tags of this repository);
+
 then refuses to write the zip if any of this repository's identifiers is still in it (its tenant,
 subscription, storage, account, workspace hosts and storage roots, CODEOWNERS owners). Run it
 from a clean checkout of the commit to release.
@@ -129,6 +131,8 @@ def main(argv=None):
         raise SystemExit(f"version must look like v1.0.0, not {args.version!r}")
     files = committed_files()
     release = release_files(files)
+    # Which release an installation runs: git init after unzipping has no tags.
+    release["VERSION"] = (args.version + "\n").encode()
     found = leaks(release, own_identifiers(files))
     if found:
         for path, value in found:

@@ -293,6 +293,20 @@ class EverySecurityRule(unittest.TestCase):
                 self.assertEqual(code, 2)
                 self.assertIn(f"TURN OFF {name}", out)
 
+    def test_every_v2_security_setting_turned_off(self):
+        for name, (label, read, secure) in guard.SECURITY_SETTINGS_V2.items():
+            if name == "collaboration_platform_connectivity":
+                value = lambda v: {"collaboration_platform_connectivity": {"connectivity": v}}
+                loose = "ALLOW_ALL"
+            else:
+                value = lambda v: {"boolean_val": {"value": v}}
+                loose = not secure
+            with self.subTest(name=name):
+                code, out = run(change("databricks_workspace_setting_v2", ["update"],
+                                       before={"name": name, **value(secure)}, after={"name": name, **value(loose)}))
+                self.assertEqual(code, 2)
+                self.assertIn(f"TURN OFF {label}", out)
+
 
 if __name__ == "__main__":
     unittest.main()
