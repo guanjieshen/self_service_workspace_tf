@@ -47,6 +47,7 @@ catalog:
   other_privileges: {}
 
 
-# The workspace's default catalog (where unqualified table names resolve).
-# null = leave it alone. Set it to the catalog's name once the catalog exists.
-default_catalog: null
+# The workspace's default catalog (where unqualified table names resolve): its own
+# catalog, so `SELECT * FROM sales.orders` means {prefix}_citizen_dev.sales.orders.
+# On a first apply it is set after the catalog is created. null = leave it alone.
+default_catalog: "{prefix}_citizen_dev"

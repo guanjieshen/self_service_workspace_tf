@@ -177,10 +177,13 @@ def main(argv=None) -> int:
             elif "update" in actions and gone:
                 warnings.append(f"REMOVE access to the Starter warehouse for {', '.join(sorted(gone))}\n      " + addr)
 
-        if rtype == "databricks_default_namespace_setting" and ("update" in actions or "delete" in actions):
+        # Created too: the workspace already has a default (the catalog Databricks made with it).
+        if rtype == "databricks_default_namespace_setting" and actions != ["no-op"]:
+            ns = (rc["change"].get("after") or {}).get("namespace") or {}
+            to = (ns[0] if isinstance(ns, list) and ns else ns if isinstance(ns, dict) else {}).get("value")
             warnings.append(
-                "CHANGE the default catalog. Unqualified table names in notebooks, queries and jobs "
-                "resolve to a different catalog.\n      " + addr
+                f"CHANGE the default catalog{' to ' + to if to else ''}. Unqualified table names in notebooks, queries "
+                "and jobs resolve to a different catalog.\n      " + addr
             )
 
         if rtype == "databricks_compliance_security_profile_workspace_setting" and "create" in actions:

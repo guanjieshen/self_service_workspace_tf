@@ -58,7 +58,9 @@ class PlanGuard(unittest.TestCase):
         code, out = run(change("databricks_default_namespace_setting", ["update"]))
         self.assertEqual(code, 2)
         self.assertIn("CHANGE the default catalog", out)
-        self.assertEqual(run(change("databricks_default_namespace_setting", ["create"]))[0], 0)
+        code, out = run(change("databricks_default_namespace_setting", ["create"], after={"namespace": [{"value": "fin_citizen_dev"}]}))
+        self.assertEqual(code, 2, "the workspace already has a default: setting one changes it")
+        self.assertIn("CHANGE the default catalog to fin_citizen_dev", out)
 
     def test_the_starter_warehouse_made_admins_only(self):
         acl = lambda *gs: {"access_control": [{"group_name": g, "permission_level": "CAN_USE"} for g in gs]}

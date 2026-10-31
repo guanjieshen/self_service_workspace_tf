@@ -26,8 +26,9 @@ module "personas" {
 module "workspace_settings" {
   source = "./modules/workspace-settings"
 
-  settings                = local.settings
-  default_catalog         = local.default_catalog
+  settings = local.settings
+  # The workspace's own catalog comes from the module, so it exists before it becomes the default.
+  default_catalog         = local.catalog != null && local.default_catalog == try(local.catalog.name, null) ? module.catalog[0].name : local.default_catalog
   workspace_label         = try(local.workspace.label, null)
   genie_code_instructions = local.manage_genie_instructions ? local.genie_instructions : null
   genie_code_skills       = local.manage_genie_skills ? local.genie_skills : {}
