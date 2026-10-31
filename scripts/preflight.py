@@ -20,6 +20,8 @@ and checks what Terraform needs but cannot fix itself:
   - the identity may create the catalog (CREATE CATALOG on the metastore, and CREATE MANAGED
     STORAGE on the external location of catalog.storage_root), or, once it exists, owns it
     (later applies change the catalog and its grants);
+  - when the baseline manages who may create personal access tokens: the workspace's token
+    permissions exist (Databricks creates them with the first token; a new workspace has none);
   - before legacy access is disabled (one-way after 30 days): what still uses it.
 
 Changes nothing. Prints ok / warning / error lines and exits 1 if there is an error. The
@@ -156,6 +158,18 @@ def checks(ws, get):
         out.extend(catalog_rights(get, metastore, info["catalog"], existing if existing and existing.get("name") else None,
                                   storage_root, me, who))
 
+    # Who may create tokens: Databricks has no token permissions in a workspace until someone
+    # creates a first token, and Terraform cannot set them before that.
+    if tokens_enabled(f):
+        _, err = get("/api/2.0/permissions/authorization/tokens")
+        if err and "does not exist" in err:
+            out.append(("error", "this workspace has never had a personal access token, so Databricks has no token "
+                                 "permissions yet and Terraform cannot set who may create tokens: a workspace admin "
+                                 "creates one token (Settings > Developer > Access tokens > Generate new token) and "
+                                 "revokes it straight away, once (docs/SETUP.md, step 9)"))
+        elif err:
+            out.append(("warning", f"could not check the workspace's token permissions: {err}"))
+
     # Legacy access: once disabled for 30 days, the workspace is Unity Catalog only, for good.
     if wsf.setting(f, "settings", "disable_legacy_access") == "true":
         current, _ = get("/api/2.1/settings/disable_legacy_access")
@@ -164,6 +178,25 @@ def checks(ws, get):
         else:
             out.extend(legacy_uses(get))
     return out
+
+
+def tokens_enabled(f):
+    """settings.personal_access_tokens.enabled is true: the workspace's file, else the baseline's."""
+    for path in (f, wsf.defaults_file("settings")):
+        lines = wsf.block(path, "settings") if path else []
+        for i, l in enumerate(lines):
+            m = re.match(r"^\s{2}personal_access_tokens:\s*(.*)$", l)
+            if not m:
+                continue
+            if wsf.scalar(m.group(1).split("#")[0]) is None and m.group(1).split("#")[0].strip():
+                return False                                     # personal_access_tokens: null
+            for sub in lines[i + 1:]:
+                if not re.match(r"^\s{4}", sub):
+                    break
+                e = re.match(r"^\s{4}enabled:\s*([^#]*)", sub)
+                if e:
+                    return wsf.scalar(e.group(1)) == "true"
+    return False
 
 
 def legacy_uses(get):

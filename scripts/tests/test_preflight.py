@@ -25,13 +25,14 @@ class FakeApi:
                  empty_groups=(), billing_admins=("users/sp-terraform",), rule_set_error=None,
                  metastore_owner="uc-admins", catalog_owner="sp-terraform", metastore_rights=("CREATE_CATALOG",),
                  locations=(("catalogs", "abfss://catalogs@acct.dfs.core.windows.net/", "uc-admins"),),
-                 location_rights=("CREATE_MANAGED_STORAGE",)):
+                 location_rights=("CREATE_MANAGED_STORAGE",), token_permissions=True):
         self.me, self.account_groups, self.local_groups = me, set(account_groups), set(local_groups)
         self.empty_groups, self.billing_admins, self.rule_set_error = set(empty_groups), list(billing_admins), rule_set_error
         self.storage_root, self.catalog_exists, self.legacy_disabled = storage_root, catalog_exists, legacy_disabled
         self.hive, self.mounts, self.clusters = hive, mounts, clusters
         self.metastore_owner, self.catalog_owner, self.metastore_rights = metastore_owner, catalog_owner, metastore_rights
         self.locations, self.location_rights = locations, location_rights
+        self.token_permissions = token_permissions
         self.paths = []
 
     def __call__(self, path):
@@ -59,6 +60,8 @@ class FakeApi:
                     {"displayName": g, "members": [] if g in self.empty_groups else [{"value": "1"}]} for g in hit]}, None
         if path.startswith("/api/2.1/unity-catalog/catalogs/"):
             return ({"name": path.rsplit("/", 1)[1], "owner": self.catalog_owner}, None) if self.catalog_exists else (None, "does not exist")
+        if path == "/api/2.0/permissions/authorization/tokens":
+            return ({"object_id": "authorization/tokens"}, None) if self.token_permissions else (None, "tokens tokens does not exist")
         if path == "/api/2.1/settings/disable_legacy_access":
             return {"disable_legacy_access": {"value": self.legacy_disabled}}, None
         if path.startswith("/api/2.1/unity-catalog/schemas?catalog_name=hive_metastore"):
@@ -185,6 +188,17 @@ class Preflight(Base):
         self.assertIn("sp-terraform may store catalog fin_citizen_dev in external location catalogs", self.levels(results, "ok"))
         self.assertIn("CREATE MANAGED STORAGE", " ".join(self.levels(self.run_checks(FakeApi(location_rights=())), "warning")))
         self.assertIn("no external location covers", " ".join(self.levels(self.run_checks(FakeApi(locations=())), "error")))
+
+    def test_a_workspace_that_never_had_a_token(self):
+        errors = " ".join(self.levels(self.run_checks(FakeApi(token_permissions=False)), "error"))
+        self.assertIn("never had a personal access token", errors)
+        self.assertIn("revokes it straight away", errors)
+        self.set("settings", GIT + "  personal_access_tokens:\n    enabled: false\n")
+        api = FakeApi(token_permissions=False)
+        self.assertEqual(self.levels(self.run_checks(api), "error"), [], "tokens off: their permissions are not managed")
+        self.assertNotIn("/api/2.0/permissions/authorization/tokens", api.paths)
+        self.set("settings", GIT + "  personal_access_tokens: null\n")
+        self.assertEqual(self.levels(self.run_checks(FakeApi(token_permissions=False)), "error"), [], "left alone")
 
     def test_an_existing_catalog_needs_no_storage(self):
         self.assertEqual(self.levels(self.run_checks(FakeApi(storage_root=None, catalog_exists=True)), "error"), [])
