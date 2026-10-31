@@ -1,0 +1,53 @@
+# =============================================================================
+# CATALOG: the workspace's one Unity Catalog catalog.
+#
+# Each workspace gets one catalog, bound to it only. The schemas in it come from the
+# self-service app, not from Terraform: Terraform manages the catalog, its data
+# features and who may use it.
+# A workspace's file (config/workspaces/<name>.yaml) can change any key below (same name and shape).
+# =============================================================================
+
+catalog:
+  name: "{prefix}_citizen_dev"           # {prefix} = the workspace's prefix, lower case
+  comment: Citizen development catalog (managed by Terraform)
+  # Where managed tables are stored. null = the metastore's default storage; a
+  # metastore without one needs an external location here, for example
+  # abfss://catalogs@<storage account>.dfs.core.windows.net/<catalog>
+  storage_root: null
+  workspace_only: true               # true = only this workspace can use the catalog
+  # Owner of the catalog: a key of groups (config/defaults/access.yaml, or the workspace's groups:), or a group name.
+  # null = leave the owner alone: the pipeline, which creates the catalog, stays its owner.
+  # Keep it so: Terraform changes the catalog and its grants on every apply, which needs
+  # the owner (or metastore admin). The platform admins get MANAGE below instead.
+  owner: null
+
+  # Data features for everything in the catalog. true = on, false = off, null = leave alone.
+  # Predictive optimization: Databricks runs OPTIMIZE, VACUUM and ANALYZE on managed
+  # tables when worth it (serverless, billed). Set on the catalog; every schema inherits it.
+  predictive_optimization: true
+  # Data classification and data quality monitoring are turned on by hand, in Catalog
+  # Explorer (catalog > Details), not here (docs/SETUP.md, step 9).
+
+  # On the whole catalog, for every persona: enough to reach a schema and use what
+  # was shared with them, nothing more. USE SCHEMA does not show any data: a table
+  # owner still has to grant SELECT. No CREATE SCHEMA: schemas come from the
+  # self-service app.
+  persona_privileges:
+    - USE_CATALOG
+    - USE_SCHEMA
+  platform_admin_privileges:
+    - ALL_PRIVILEGES
+    - MANAGE
+  # Anyone else's privileges on the catalog: an application ID (a service principal), a
+  # group name or a key of groups => privileges. The grants are the whole list: a privilege
+  # granted on the catalog by hand is removed on the next apply, so add it here. For
+  # example, the self-service app's service principal, which creates the schemas:
+  #   other_privileges:
+  #     00000000-0000-0000-0000-000000000000: [USE_CATALOG, CREATE_SCHEMA]
+  other_privileges: {}
+
+
+# The workspace's default catalog (where unqualified table names resolve): its own
+# catalog, so `SELECT * FROM sales.orders` means {prefix}_citizen_dev.sales.orders.
+# On a first apply it is set after the catalog is created. null = leave it alone.
+default_catalog: "{prefix}_citizen_dev"

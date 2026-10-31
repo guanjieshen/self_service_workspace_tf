@@ -1,0 +1,65 @@
+# =============================================================================
+# ACCESS: the personas, the groups that hold them, and what each one gets.
+#
+# Everything is granted to groups, never to people. Who is in a group is managed
+# in Entra ID (synced to the Databricks account), for example through access
+# packages or a ticketing system: adding someone to a workspace's builder group gives them everything a builder gets, with
+# no change here. A workspace's file (config/workspaces/<name>.yaml) can change any key below for that
+# workspace only (same name and shape).
+#
+# Warehouse permission values (as shown in the Databricks UI):
+#   CAN_VIEW | CAN_MONITOR | CAN_USE | CAN_MANAGE; null = no access
+# =============================================================================
+
+# ---- The groups --------------------------------------------------------------
+# Account groups (Entra ID groups synced to the Databricks account): Unity Catalog
+# and serverless usage policies cannot use groups that exist only in a workspace.
+# Only the platform admins are named the same way everywhere ({prefix} = the workspace's
+# prefix, lower case). Each workspace names its own persona groups in its
+# file (groups:); a persona without a group is skipped: nobody gets it, and nothing fails.
+groups:
+  platform_admins: "{prefix}_platform_admins"   # workspace admins; MANAGE on the workspace catalog
+  users: null                               # everyone who may use the workspace (consumer access)
+  explorer: null
+  builder: null
+  publisher: null
+
+# ---- Everyone ----------------------------------------------------------------
+# The users group's access tier (see the personas below): consumer = Databricks One
+# only, where people find dashboards, Genie spaces and apps.
+users:
+  access: consumer
+
+# ---- The personas --------------------------------------------------------------
+# access is the tier, each including the one before:
+#   consumer   "Consumer access": Databricks One only
+#   sql        "Databricks SQL access": Databricks One, plus the SQL editor, queries,
+#              dashboards and Genie
+#   workspace  "Workspace access" and SQL access: the full workspace (notebooks, jobs, ...)
+# Nobody gets "Allow unrestricted cluster creation", and no persona is workspace
+# admin: persona groups join the workspace as users; only platform_admins are admins.
+# Every persona can use the workspace's serverless usage policy (config/defaults/cost.yaml)
+# and gets USE CATALOG and USE SCHEMA on the workspace catalog (config/defaults/catalog.yaml).
+# Classic compute is by request, through the self-service app: no persona can use the
+# classic cluster policies (config/defaults/compute.yaml) until the app grants them.
+personas:
+
+  # ---- Explorer: finds and analyzes trusted data (SQL, dashboards, Genie) ----
+  explorer:
+    access: sql
+    default_warehouse: CAN_USE         # permission on the default SQL warehouse
+    can_create_tokens: false           # may create personal access tokens
+
+  # ---- Builder: prototypes and builds in notebooks, jobs and pipelines -------
+  builder:
+    access: workspace
+    default_warehouse: CAN_USE
+    can_create_tokens: false
+
+  # ---- Publisher: shares finished work with the business unit ---------------
+  # The same as builder in this project; what makes a publisher different is
+  # handled outside it.
+  publisher:
+    access: workspace
+    default_warehouse: CAN_USE
+    can_create_tokens: false

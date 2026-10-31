@@ -1,0 +1,52 @@
+# On every pull request: formatting, validation, the cross-workspace checks and every test.
+# Required by branch protection on main ("Format and validate", "Tests"). The workspaces' plans
+# run in deploy.yml. CHECKS_RUNNER (a repository variable, JSON runs-on value) picks the runner,
+# for organizations without GitHub-hosted runners.
+name: Checks
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+# A newer push to the pull request replaces these checks.
+concurrency:
+  group: checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Format and validate
+    runs-on: ${{ fromJSON(vars.CHECKS_RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          sign-in: "false"
+      - run: terraform fmt -check -recursive terraform
+      # Across workspaces: unique hosts, ids and catalog names, budget policy names that do
+      # not collide on an account, and file names safe for workflow commands.
+      - run: python3 scripts/workspaces.py check
+      - run: terraform -chdir=terraform init -backend=false -input=false
+      - run: terraform -chdir=terraform validate
+
+  tests:
+    name: Tests
+    runs-on: ${{ fromJSON(vars.CHECKS_RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          sign-in: "false"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      # Mocked providers: no workspace, credentials or network. Same as bash scripts/test.sh locally.
+      - run: bash scripts/test.sh

@@ -1,0 +1,40 @@
+# =============================================================================
+# COST: the chargeback tags, and the workspace's serverless usage policy.
+#
+# Tags end up in billing records: changing a tag's value affects new usage only,
+# and renaming a key splits spend history. {PREFIX} = the workspace's prefix (upper case).
+# =============================================================================
+
+# The Databricks account (account console, top right). Usage policies are account-level, so
+# they need it; every workspace in one Entra tenant is in the same account.
+account_id: null
+
+# ---- The chargeback tags ----------------------------------------------------
+# On everything Terraform creates: the serverless usage policy, the default SQL
+# warehouse and every cluster created with a classic cluster policy. Add, remove or
+# rename a tag here; nothing else needs to change. A workspace changes a value (or
+# adds a tag) under tags: in its file; null there drops the tag in that workspace.
+tags:
+  BUSINESS_UNIT: "{PREFIX}"                 # the workspace's prefix, upper case
+  APPID: NONE                          # the workspace's default self-service application ID, if it has one
+  COST_CATEGORY: CITIZEN_SELF_SERVICE
+
+# Tags a user must fill in when creating a classic cluster: upper case letters, digits,
+# _ and - (for example RISK_CLASSIFICATION), so one value is always spelled one way.
+# A tag that is also under tags: above starts with that value, and the user may change it.
+# Serverless usage and the SQL warehouse carry only the tags above.
+classic_user_tags:
+  - APPID
+  - TEAM
+  - PROJECT
+
+# ---- Serverless usage policy ------------------------------------------------
+# One policy per workspace, for every persona and the platform admins: it tags their
+# serverless usage (notebooks, jobs, pipelines) with the tags above. Team and project
+# policies are requested through the self-service app, not set here.
+serverless_policy:
+  enabled: true                         # false = do not manage the usage policy at all
+  # When someone may use several policies and does not pick one, Databricks uses the
+  # first name alphabetically: the "0" makes this one the fallback, so usage is
+  # charged to a project only when someone picks that project's policy.
+  name: "{PREFIX}-0-SELF-SERVICE"

@@ -1,0 +1,68 @@
+{
+ "description": "The baseline stops restricting Git folders to an allowlist, with the reason in a comment (#37).",
+ "expected_risk": [
+  "Medium"
+ ],
+ "must_mention": [
+  [
+   "Git"
+  ],
+  [
+   "every workspace",
+   "all workspaces"
+  ]
+ ],
+ "must_not_mention": [
+  "data is lost"
+ ],
+ "state": "update",
+ "changed_files": "- CHANGELOG.md: code, workflows or docs (no direct workspace change)\n- config/defaults/settings.yaml: baseline (affects every workspace)",
+ "code_diff": "diff --git a/CHANGELOG.md b/CHANGELOG.md\nindex 90120e4..24e262f 100644\n--- a/CHANGELOG.md\n+++ b/CHANGELOG.md\n@@ -6,6 +6,10 @@ them for you: a setting missing from your baseline is left alone).\n \n ## Unreleased\n \n+- Git folders are not restricted by default (`settings.git.restrict_to_allowlist: false`, no\n+  URLs): the shipped placeholder allowlist (`https://github.com/<org>/`) allowed nothing. The\n+  first plan turns the allowlist off, which the plan guard flags. Preflight no longer warns\n+  about the placeholder.\n - Data classification and data quality monitoring are turned on by hand in Catalog Explorer\n   (`docs/SETUP.md`, step 9): removed `catalog.data_classification` and its checks. The\n   classification API needs a usage policy ID the Terraform provider cannot send, and\n",
+ "config_diff": "diff --git a/config/defaults/settings.yaml b/config/defaults/settings.yaml\nindex 1cf6ce6..03d6ba5 100644\n--- a/config/defaults/settings.yaml\n+++ b/config/defaults/settings.yaml\n@@ -102,10 +102,12 @@ settings:\n \n   # ---- Git folders ---------------------------------------------------------\n \n+  # No restriction for now: Git folders may use any Git URL. To restrict them, set\n+  # restrict_to_allowlist: true and list the allowed URL prefixes, for example\n+  # \"https://github.com/my-org/\".\n   git:\n-    restrict_to_allowlist: true        # only allow Git URLs in the list below\n-    allowed_urls:\n-      - \"https://github.com/<org>/\"    # replace with your GitHub organization\n+    restrict_to_allowlist: false\n+    allowed_urls: []\n \n   # ---- Dashboards ----------------------------------------------------------\n \n",
+ "workspace_file": "prefix: ss1\nhost: https://adb-1234567890123456.7.azuredatabricks.net\ngroups:\n  users: ss1-cd-users\n  explorer: ss1-cd-explorers\n  builder: ss1-cd-builders\n  publisher: null\ncatalog:\n  storage_root: abfss://catalogs@examplestorage.dfs.core.windows.net/self_service_1\nsql_warehouse:\n  size: X-Small",
+ "plan": [
+  {
+   "address": "module.workspace_settings.databricks_workspace_conf.key[\"enableProjectsAllowList\"]",
+   "mode": "managed",
+   "type": "databricks_workspace_conf",
+   "name": "key",
+   "change": {
+    "actions": [
+     "update"
+    ],
+    "before": {
+     "custom_config": {
+      "enableProjectsAllowList": "true"
+     }
+    },
+    "after": {
+     "custom_config": {
+      "enableProjectsAllowList": "false"
+     }
+    }
+   },
+   "index": "enableProjectsAllowList"
+  },
+  {
+   "address": "module.workspace_settings.databricks_workspace_conf.key[\"projectsAllowList\"]",
+   "mode": "managed",
+   "type": "databricks_workspace_conf",
+   "name": "key",
+   "change": {
+    "actions": [
+     "delete"
+    ],
+    "before": {
+     "custom_config": {
+      "projectsAllowList": "https://github.com/<org>/"
+     }
+    },
+    "after": null
+   },
+   "index": "projectsAllowList"
+  }
+ ],
+ "plan_guard": "Needs approval: 2 changes that are hard to undo or weaken security\n(a person adds the label allow-risky-changes once they have reviewed them):\n  - LOOSEN workspace setting enableProjectsAllowList: true -> false\n      module.workspace_settings.databricks_workspace_conf.key[\"enableProjectsAllowList\"]\n  - DELETE workspace configuration (enable*/enforce* keys reset to false)\n      module.workspace_settings.databricks_workspace_conf.key[\"projectsAllowList\"]",
+ "preflight": "ok: signed in as the pipeline, a workspace admin\nok: metastore primary\nok: account group ss1-cd-users (users)\nok: account group ss1-cd-explorers (explorer)\nok: account group ss1-cd-builders (builder)\nok: no publisher group: skipped (nobody gets it in this workspace)\nok: account group ss1_platform_admins (platform_admins)\nok: nothing found that still uses legacy access (Hive metastore, DBFS mounts, legacy clusters)",
+ "workspace": "self_service_1 (https://adb-1234567890123456.7.azuredatabricks.net)"
+}

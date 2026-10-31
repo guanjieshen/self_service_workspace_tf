@@ -1,0 +1,55 @@
+{
+ "description": "Journey 1: a new workspace's first apply. Preflight found nothing that uses legacy access; the plan guard flags the Starter warehouse becoming admins only. The table names what people will use.",
+ "expected_risk": [
+  "Medium",
+  "High"
+ ],
+ "must_mention": [
+  [
+   "legacy"
+  ],
+  [
+   "Starter"
+  ],
+  [
+   "budget"
+  ],
+  [
+   "cost.yaml"
+  ],
+  [
+   "compute.yaml"
+  ],
+  [
+   "access.yaml"
+  ],
+  [
+   "catalog.yaml"
+  ],
+  [
+   "settings.yaml"
+  ],
+  [
+   "SS1-0-SELF-SERVICE"
+  ],
+  [
+   "interactive"
+  ],
+  [
+   "ss1_citizen_dev"
+  ],
+  [
+   "Default Warehouse",
+   "X-Small"
+  ]
+ ],
+ "must_not_mention": [],
+ "state": "first",
+ "plan_file": "new-workspace.plan.json",
+ "plan_guard": "Needs approval: 1 change\n  - REMOVE everyone's access to the Starter warehouse but the platform admins': check nobody relies on it (queries, dashboards, alerts), or set starter_warehouse.admins_only: null\n      module.compute.databricks_permissions.starter_warehouse[\"2cd38f111de7ce99\"]\n\nNot flagged, with the evidence:\n  - DISABLE legacy access (Hive metastore), on a workspace where it is not managed yet. Preflight found nothing that still uses it (Hive metastore, DBFS mounts, legacy clusters), so it is not flagged. ONE-WAY after 30 days.\n      module.workspace_settings.databricks_disable_legacy_access_setting.this[0]",
+ "preflight": "ok: signed in as the pipeline, a workspace admin\nok: metastore primary\nok: account group ss1-cd-users (users)\nok: account group ss1-cd-explorers (explorer)\nok: account group ss1-cd-builders (builder)\nok: no publisher group: skipped (nobody gets it in this workspace)\nok: account group ss1_platform_admins (platform_admins)\nok: nothing found that still uses legacy access (Hive metastore, DBFS mounts, legacy clusters)",
+ "changed_files": "- config/workspaces/self_service_1.yaml: this workspace's file",
+ "config_diff": "diff --git a/config/workspaces/self_service_1.yaml b/config/workspaces/self_service_1.yaml\nnew file mode 100644\n+prefix: ss1\n+host: https://adb-1234567890123456.7.azuredatabricks.net\n+groups:\n+  users: ss1-cd-users\n+  explorer: ss1-cd-explorers\n+  builder: ss1-cd-builders\n+  publisher: null\n+catalog:\n+  storage_root: abfss://catalogs@examplestorage.dfs.core.windows.net/self_service_1\n+sql_warehouse:\n+  size: X-Small",
+ "workspace_file": "prefix: ss1\nhost: https://adb-1234567890123456.7.azuredatabricks.net\ngroups:\n  users: ss1-cd-users\n  explorer: ss1-cd-explorers\n  builder: ss1-cd-builders\n  publisher: null\ncatalog:\n  storage_root: abfss://catalogs@examplestorage.dfs.core.windows.net/self_service_1\nsql_warehouse:\n  size: X-Small",
+ "workspace": "self_service_1 (https://adb-1234567890123456.7.azuredatabricks.net)"
+}

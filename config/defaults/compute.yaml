@@ -1,0 +1,78 @@
+# =============================================================================
+# ADJUSTABLE: COMPUTE
+# The default SQL warehouse, and the classic cluster policies.
+#
+# Terraform creates what every workspace has and rarely changes. What a team or a
+# project requests (another warehouse, its own usage policy, access to classic
+# compute) comes from the self-service app.
+#
+# Sizes, scaling, timeouts, node types and names are updated in place. Changing the
+# warehouse `type` may recreate it with a new ID (dashboards and jobs pointing at the
+# old ID then need updating); the plan guard (scripts/plan-guard.py) flags that.
+# A single workspace can change any key below in its file (config/workspaces/<name>.yaml).
+# All of them carry the chargeback tags (tags: in config/defaults/cost.yaml).
+# =============================================================================
+
+# ---- Default SQL warehouse --------------------------------------------------
+# One warehouse every persona can use (see default_warehouse in config/defaults/access.yaml).
+sql_warehouse:
+  name: "{PREFIX} Default Warehouse"
+  type: serverless             # serverless | pro | classic
+  size: Small                  # 2X-Small | X-Small | Small | Medium | Large | X-Large | ...
+  auto_stop_minutes: 10        # stop after this many idle minutes
+  min_clusters: 1              # scaling range
+  max_clusters: 5
+  # true = this warehouse is selected by default for every user in SQL (the admin
+  # setting "Default warehouse"; users can still pick another). false = leave that setting alone.
+  workspace_default: true
+
+# ---- The Serverless Starter Warehouse ---------------------------------------
+# Databricks creates "Serverless Starter Warehouse" in a new workspace, usable by every
+# user. admins_only: true = only the platform admins may use it, so people use the default
+# warehouse above (sized and tagged here). Terraform manages only its permissions, never
+# the warehouse itself; a workspace without one gets nothing. null = leave its access alone
+# (it does not give access back once an apply removed it). The plan guard flags the first apply.
+starter_warehouse:
+  name: Serverless Starter Warehouse
+  admins_only: true
+
+# ---- Classic cluster policies -----------------------------------------------
+# Serverless first: classic compute is the exception. Three policies per workspace,
+# one per kind of cluster, so an approved person can have one interactive cluster and
+# one job cluster at the same time, but not two interactive ones. Each person's
+# clusters draw IP addresses from the workspace's subnets: at most
+# max_clusters_per_user x (1 + max_workers) nodes per policy, so keep these small.
+# For whoever the self-service app approves: Terraform creates the policies but does
+# not manage who may use them, so the app's grants stay. Workspace admins can always
+# use them. null for a kind (for example pipelines: null) means Terraform leaves it
+# alone: a new workspace gets no such policy, and an applied one keeps it, unmanaged
+# (delete it by hand if it should go).
+# On every cluster, the chargeback tags are fixed, except the ones in
+# classic_user_tags (config/defaults/cost.yaml), which the user must fill in.
+cluster_policy:
+  # Rules for all three.
+  runtime: lts_only               # lts_only = long-term-support runtimes only | any (pipelines pick their own)
+  access_modes:                   # STANDARD (shared, Unity Catalog) and/or DEDICATED (single user)
+    - STANDARD
+  node_types:                     # VM sizes users may choose; the first is the default
+    - Standard_E8_v3
+    - Standard_E16_v3
+    - Standard_E32_v3
+  max_workers: 4
+
+  # All-purpose clusters, for notebooks.
+  interactive:
+    name: "{PREFIX} Classic Interactive"
+    max_clusters_per_user: 1
+    max_autotermination_minutes: 60   # must stop after at most this many idle minutes
+
+  # Job clusters: created for a run and stopped when it ends. "Per user" is whoever the
+  # job runs as, so jobs that run as one service principal share its limit.
+  jobs:
+    name: "{PREFIX} Classic Jobs"
+    max_clusters_per_user: 1
+
+  # Pipeline (Lakeflow) clusters, for a pipeline that cannot run serverless.
+  pipelines:
+    name: "{PREFIX} Classic Pipelines"
+    max_clusters_per_user: 1

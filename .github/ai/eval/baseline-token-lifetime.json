@@ -1,0 +1,52 @@
+{
+ "description": "The baseline shortens the personal access token lifetime from 90 to 30 days, for every workspace.",
+ "expected_risk": [
+  "Medium"
+ ],
+ "must_mention": [
+  [
+   "every workspace",
+   "all workspaces"
+  ],
+  [
+   "keep their expiry",
+   "keep their current expiry",
+   "keep their expiration",
+   "existing tokens keep",
+   "only new tokens",
+   "new tokens only"
+  ]
+ ],
+ "must_not_mention": [],
+ "state": "update",
+ "changed_files": "- config/defaults/settings.yaml: baseline (affects every workspace)",
+ "config_diff": "--- a/config/defaults/settings.yaml\n+++ b/config/defaults/settings.yaml\n   personal_access_tokens:\n     enabled: true\n-    max_lifetime_days: 90\n+    max_lifetime_days: 30",
+ "workspace_file": "prefix: ss1\nhost: https://adb-1234567890123456.7.azuredatabricks.net\ngroups:\n  users: ss1-cd-users\n  explorer: ss1-cd-explorers\n  builder: ss1-cd-builders\n  publisher: null\ncatalog:\n  storage_root: abfss://catalogs@examplestorage.dfs.core.windows.net/self_service_1\nsql_warehouse:\n  size: X-Small",
+ "plan": [
+  {
+   "address": "module.workspace_settings.databricks_workspace_conf.key[\"maxTokenLifetimeDays\"]",
+   "mode": "managed",
+   "type": "databricks_workspace_conf",
+   "name": "key",
+   "change": {
+    "actions": [
+     "update"
+    ],
+    "before": {
+     "custom_config": {
+      "maxTokenLifetimeDays": "90"
+     }
+    },
+    "after": {
+     "custom_config": {
+      "maxTokenLifetimeDays": "30"
+     }
+    }
+   },
+   "index": "maxTokenLifetimeDays"
+  }
+ ],
+ "plan_guard": "",
+ "preflight": "ok: signed in as the pipeline, a workspace admin\nok: metastore primary\nok: account group ss1-cd-users (users)\nok: account group ss1-cd-explorers (explorer)\nok: account group ss1-cd-builders (builder)\nok: no publisher group: skipped (nobody gets it in this workspace)\nok: account group ss1_platform_admins (platform_admins)\nok: nothing found that still uses legacy access (Hive metastore, DBFS mounts, legacy clusters)",
+ "workspace": "self_service_1 (https://adb-1234567890123456.7.azuredatabricks.net)"
+}

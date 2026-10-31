@@ -1,0 +1,162 @@
+# =============================================================================
+# SETTINGS: admin console settings for every workspace.
+# null = Terraform leaves the setting alone.
+# =============================================================================
+
+settings:
+
+  # ---- Decide at onboarding ------------------------------------------------
+  # Switching these later on a busy workspace is disruptive, and
+  # disable_legacy_access becomes permanent. For a workspace that is not ready
+  # (for example still using Hive tables), set them to null under settings: in its
+  # file (config/workspaces/<name>.yaml) until it has migrated.
+
+  # true = turn OFF the Hive metastore and other legacy data access.
+  # ONE-WAY: after 30 days disabled, the workspace becomes Unity Catalog only, permanently.
+  disable_legacy_access: true
+
+  # true = turn OFF the DBFS root and DBFS mounts.
+  # Reversible, but anything still using DBFS paths breaks when this is switched on.
+  disable_dbfs_root_and_mounts: true
+
+  # true = remove the "No isolation shared" cluster access mode.
+  # Reversible, but existing No-isolation clusters can no longer start.
+  enforce_user_isolation: true
+
+  # Compliance security profile: hardened compute images, enhanced security
+  # monitoring and automatic cluster updates, with limits on compute options.
+  # ONE-WAY: once enabled it cannot be turned off. Part of the Enhanced Security
+  # and Compliance add-on, billed separately. Only for workspaces that must meet
+  # a compliance standard.
+  #   null       = leave alone (default)
+  #   [HIPAA]    = enable it for these standards (names as in the Databricks docs)
+  compliance_security_profile: null
+
+  # ---- Administrators ------------------------------------------------------
+
+  # true = workspace admins cannot change job owners or the identity jobs run as.
+  # Turning this on requires an ACCOUNT admin to run Terraform. false = leave the default.
+  restrict_workspace_admins: false
+
+  # ---- Personal access tokens (PATs) ---------------------------------------
+  # Which personas may create tokens is set in config/defaults/access.yaml (can_create_tokens).
+
+  personal_access_tokens:
+    enabled: true              # false = nobody can create or use PATs (breaks tools using them)
+    max_lifetime_days: 90      # applies to new tokens; existing tokens keep their expiry
+
+  # ---- Security monitoring and updates -------------------------------------
+  # null = leave alone, true = on, false = off.
+
+  # Monitoring agents on classic compute images (Enhanced Security and
+  # Compliance add-on, billed separately). The compliance profile turns it on.
+  enhanced_security_monitoring: null
+
+  # Patch classic compute in a monthly maintenance window (it restarts compute).
+  automatic_cluster_update: null
+
+  # Log the text of every notebook command and SQL query in the audit logs.
+  # Only useful when audit logs are delivered somewhere (docs/design.md open
+  # question A4); query text can contain sensitive values.
+  verbose_audit_logs: null
+
+  # ---- AI models -----------------------------------------------------------
+
+  # true = all foundation model traffic must go through Unity Gateway, so model
+  # access, AI budgets and security policies are managed centrally in Unity
+  # Catalog ("Enforce Unity Gateway"). The Databricks pay-per-token serving
+  # endpoints (databricks-*) are switched off; use the system.ai model services.
+  # While on, Knowledge Assistant and Multi-Agent Supervisor agents that need AI
+  # Search do not work, ai_query only takes system.ai models, and Databricks
+  # Apps using a serving endpoint resource must move to model services.
+  # null = leave alone (workspaces created recently have it on and hide it).
+  enforce_unity_gateway: true
+
+  # ---- Data leaving the workspace ------------------------------------------
+
+  data_handling:
+    results_download: true             # download notebook results
+    sql_results_download: true         # download results in the SQL editor and dashboards
+    mlflow_artifact_download: true     # download MLflow run and model artifacts in the UI
+    upload_data_ui: true               # upload files to a table from the UI (also Genie file uploads;
+                                       # Volumes uploads are governed by Volume privileges instead)
+    notebook_export: true              # export notebooks as files
+    notebook_table_clipboard: true     # copy result tables to the clipboard
+    web_terminal: null                 # shell access on clusters. Not managed: the API rejects turning
+                                       # it off; set it in the admin console.
+    dbfs_file_browser: false           # browse and upload files in DBFS
+    # true = keep interactive notebook results in the workspace's own storage
+    # account instead of the Databricks control plane. null = leave alone.
+    notebook_results_in_customer_storage: null
+
+  # ---- Collaboration platforms (Slack, Microsoft Teams) ---------------------
+  # null = leave alone.
+
+  collaboration_platforms:
+    # Which platforms workspace members can connect to:
+    #   ALLOW_ALL | ALLOW_SLACK | ALLOW_TEAMS | DENY_ALL
+    allowed: ALLOW_TEAMS               # Microsoft Teams only
+    # true = users may make bot answers visible to the channel; false = answers
+    # are always private to the person who asked.
+    public_messages: null
+
+  # ---- Git folders ---------------------------------------------------------
+
+  # Git folders may use repositories whose URL starts with one of these prefixes.
+  # https://github.com/ allows every github.com repository (any organization) and blocks
+  # other Git hosts. Add a GitHub Enterprise host the same way, for example
+  # "https://github.example.com/" (Enterprise Server) or "https://<name>.ghe.com/"; no wildcards.
+  git:
+    restrict_to_allowlist: true
+    allowed_urls:
+      - "https://github.com/"
+
+  # ---- Dashboards ----------------------------------------------------------
+
+  dashboard_embedding:
+    # Where published dashboards can be embedded:
+    #   ALLOW_ALL | ALLOW_APPROVED_DOMAINS | DENY_ALL
+    policy: ALLOW_APPROVED_DOMAINS
+    approved_domains: []               # for example: ["contoso.sharepoint.com"]
+
+  # ---- SQL -----------------------------------------------------------------
+
+  sql:
+    # Longest a single SQL statement can run on any warehouse (seconds). 14400 = 4 hours.
+    # Note: this manages the workspace-wide SQL configuration as a whole.
+    statement_timeout_seconds: 14400
+
+  # ---- Genie Code ----------------------------------------------------------
+  # The instructions and skills in config/defaults/genie-code/, for every workspace.
+  # A workspace's file can add instructions (genie_code_instructions, appended after
+  # the default ones); skills are the baseline's only. true = deploy, null = leave alone (Genie Code is managed elsewhere).
+
+  genie_code:
+    instructions: true
+    skills: true
+
+  # ---- Appearance: set by hand ---------------------------------------------
+  # Workspace settings > Appearance has no API or Terraform resource yet, so these are set
+  # in each workspace when it is onboarded (docs/SETUP.md, step 9). They are here so every
+  # workspace gets the same values; nothing reads them.
+  #
+  #   Workspace theme > Color palette > Categorical colors, in this order:
+  #     #FFB81C  brand yellow
+  #     #353535  dark gray
+  #     #555555  gray
+  #     #1A1A1A  near black
+  #     #EAEAED  light gray
+  #   (White, #FFFFFF, is left out: a white series does not show on a white canvas.)
+  #   Genie One customization > Color: #FFB81C, and a welcome message of your choice (none is shipped).
+
+  # ---- The built-in "users" group ------------------------------------------
+  # Every workspace user is in this group, so its entitlements apply to everyone,
+  # on top of their personas. Nothing here: access comes only from a persona
+  # (config/defaults/access.yaml). Granting workspace_access here would give every
+  # explorer the full workspace instead of consumer access.
+
+  users_group_entitlements:
+    workspace_access: false
+    workspace_consume: false
+    databricks_sql_access: false
+    allow_cluster_create: false        # "Allow unrestricted cluster creation"

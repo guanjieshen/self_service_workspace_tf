@@ -1,0 +1,16 @@
+# Test fixture: unmanaged (one workspace file).
+prefix: tst
+account_id: 00000000-0000-0000-0000-000000000000
+host: https://adb-1111111111111111.1.azuredatabricks.net
+id: 1111111111111111
+tags: {APPID: TST-APP}
+auth: {workspace_profile: null, account_profile: null}
+groups: {users: tst_users, explorer: tst-explorers, builder: tst-builders, publisher: tst-publishers, platform_admins: tst-admins}
+serverless_policy: {enabled: false}
+starter_warehouse: {admins_only: null}
+catalog: null
+default_catalog: null
+settings: {disable_legacy_access: null, disable_dbfs_root_and_mounts: null, enforce_user_isolation: null, compliance_security_profile: null,
+  restrict_workspace_admins: null, personal_access_tokens: null, enhanced_security_monitoring: null, automatic_cluster_update: null,
+  verbose_audit_logs: null, enforce_unity_gateway: null, data_handling: null, collaboration_platforms: null, git: null,
+  dashboard_embedding: null, sql: null, users_group_entitlements: null, genie_code: null}

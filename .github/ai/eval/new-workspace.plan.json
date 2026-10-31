@@ -1,0 +1,2043 @@
+{
+ "resource_changes": [
+  {
+   "address": "terraform_data.config_checks",
+   "mode": "managed",
+   "type": "terraform_data",
+   "name": "config_checks",
+   "provider_name": "terraform.io/builtin/terraform",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "input": null,
+     "output": null,
+     "store": null,
+     "triggers_replace": null
+    },
+    "after_unknown": {
+     "id": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {}
+   }
+  },
+  {
+   "address": "module.budget_policies[0].databricks_access_control_rule_set.this[\"self_service\"]",
+   "module_address": "module.budget_policies[0]",
+   "mode": "managed",
+   "type": "databricks_access_control_rule_set",
+   "name": "this",
+   "index": "self_service",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "api": null,
+     "grant_rules": [
+      {
+       "principals": [
+        "groups/ss1-cd-builders",
+        "groups/ss1-cd-explorers",
+        "groups/ss1_platform_admins"
+       ],
+       "role": "roles/budgetPolicy.user"
+      },
+      {
+       "principals": [
+        "groups/ss1_platform_admins"
+       ],
+       "role": "roles/budgetPolicy.manager"
+      }
+     ]
+    },
+    "after_unknown": {
+     "etag": true,
+     "grant_rules": [
+      {
+       "principals": [
+        false,
+        false,
+        false
+       ]
+      },
+      {
+       "principals": [
+        false
+       ]
+      }
+     ],
+     "id": true,
+     "name": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "grant_rules": [
+      {
+       "principals": [
+        false,
+        false,
+        false
+       ]
+      },
+      {
+       "principals": [
+        false
+       ]
+      }
+     ],
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.budget_policies[0].databricks_budget_policy.this[\"self_service\"]",
+   "module_address": "module.budget_policies[0]",
+   "mode": "managed",
+   "type": "databricks_budget_policy",
+   "name": "this",
+   "index": "self_service",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "binding_workspace_ids": [
+      1234567890123456
+     ],
+     "custom_tags": [
+      {
+       "key": "APPID",
+       "value": "NONE"
+      },
+      {
+       "key": "BUSINESS_UNIT",
+       "value": "SS1"
+      },
+      {
+       "key": "COST_CATEGORY",
+       "value": "CITIZEN_SELF_SERVICE"
+      }
+     ],
+     "policy_name": "SS1-0-SELF-SERVICE"
+    },
+    "after_unknown": {
+     "binding_workspace_ids": [
+      false
+     ],
+     "custom_tags": [
+      {},
+      {},
+      {}
+     ],
+     "policy_id": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "binding_workspace_ids": [
+      false
+     ],
+     "custom_tags": [
+      {},
+      {},
+      {}
+     ]
+    }
+   }
+  },
+  {
+   "address": "module.catalog[0].databricks_catalog.this",
+   "module_address": "module.catalog[0]",
+   "mode": "managed",
+   "type": "databricks_catalog",
+   "name": "this",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "browse_only": null,
+     "comment": "Citizen development catalog (managed by citizen_dev_terraform)",
+     "connection_name": null,
+     "custom_max_retention_hours": null,
+     "enable_predictive_optimization": "ENABLE",
+     "force_destroy": false,
+     "isolation_mode": "ISOLATED",
+     "managed_encryption_settings": [],
+     "name": "ss1_citizen_dev",
+     "options": null,
+     "owner": "ss1_platform_admins",
+     "properties": null,
+     "provider_name": null,
+     "share_name": null,
+     "storage_root": "abfss://catalogs@examplestorage.dfs.core.windows.net/self_service_1"
+    },
+    "after_unknown": {
+     "catalog_type": true,
+     "created_at": true,
+     "created_by": true,
+     "effective_predictive_optimization_flag": true,
+     "full_name": true,
+     "id": true,
+     "managed_encryption_settings": [],
+     "metastore_id": true,
+     "provider_config": true,
+     "provisioning_info": true,
+     "securable_type": true,
+     "storage_location": true,
+     "updated_at": true,
+     "updated_by": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "effective_predictive_optimization_flag": [],
+     "managed_encryption_settings": [],
+     "provider_config": [],
+     "provisioning_info": []
+    }
+   }
+  },
+  {
+   "address": "module.catalog[0].databricks_grants.catalog[0]",
+   "module_address": "module.catalog[0]",
+   "mode": "managed",
+   "type": "databricks_grants",
+   "name": "catalog",
+   "index": 0,
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "catalog": "ss1_citizen_dev",
+     "credential": null,
+     "external_location": null,
+     "foreign_connection": null,
+     "function": null,
+     "grant": [
+      {
+       "principal": "ss1-cd-builders",
+       "privileges": [
+        "USE_CATALOG",
+        "USE_SCHEMA"
+       ]
+      },
+      {
+       "principal": "ss1-cd-explorers",
+       "privileges": [
+        "USE_CATALOG",
+        "USE_SCHEMA"
+       ]
+      },
+      {
+       "principal": "ss1_platform_admins",
+       "privileges": [
+        "ALL_PRIVILEGES",
+        "MANAGE"
+       ]
+      }
+     ],
+     "mcp_service": null,
+     "metastore": null,
+     "model": null,
+     "model_provider_service": null,
+     "model_service": null,
+     "pipeline": null,
+     "recipient": null,
+     "schema": null,
+     "secret": null,
+     "share": null,
+     "storage_credential": null,
+     "table": null,
+     "volume": null
+    },
+    "after_unknown": {
+     "grant": [
+      {
+       "privileges": [
+        false,
+        false
+       ]
+      },
+      {
+       "privileges": [
+        false,
+        false
+       ]
+      },
+      {
+       "privileges": [
+        false,
+        false
+       ]
+      }
+     ],
+     "id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "grant": [
+      {
+       "privileges": [
+        false,
+        false
+       ]
+      },
+      {
+       "privileges": [
+        false,
+        false
+       ]
+      },
+      {
+       "privileges": [
+        false,
+        false
+       ]
+      }
+     ],
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.compute.databricks_cluster_policy.classic[\"interactive\"]",
+   "module_address": "module.compute",
+   "mode": "managed",
+   "type": "databricks_cluster_policy",
+   "name": "classic",
+   "index": "interactive",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "definition": "{\"autoscale.max_workers\":{\"maxValue\":4,\"type\":\"range\"},\"autotermination_minutes\":{\"defaultValue\":60,\"maxValue\":60,\"minValue\":10,\"type\":\"range\"},\"cluster_type\":{\"type\":\"fixed\",\"value\":\"all-purpose\"},\"custom_tags.APPID\":{\"defaultValue\":\"NONE\",\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.BUSINESS_UNIT\":{\"type\":\"fixed\",\"value\":\"SS1\"},\"custom_tags.COST_CATEGORY\":{\"type\":\"fixed\",\"value\":\"CITIZEN_SELF_SERVICE\"},\"custom_tags.PROJECT\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.TEAM\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"data_security_mode\":{\"defaultValue\":\"USER_ISOLATION\",\"type\":\"allowlist\",\"values\":[\"USER_ISOLATION\",\"DATA_SECURITY_MODE_STANDARD\"]},\"driver_node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"num_workers\":{\"maxValue\":4,\"type\":\"range\"},\"spark_version\":{\"defaultValue\":\"auto:latest-lts\",\"type\":\"allowlist\",\"values\":[\"auto:latest-lts\",\"auto:latest-lts-ml\"]}}",
+     "description": null,
+     "libraries": [],
+     "max_clusters_per_user": 1,
+     "name": "SS1 Classic Interactive",
+     "policy_family_definition_overrides": null,
+     "policy_family_id": null
+    },
+    "after_unknown": {
+     "id": true,
+     "libraries": [],
+     "policy_id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "libraries": [],
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.compute.databricks_cluster_policy.classic[\"jobs\"]",
+   "module_address": "module.compute",
+   "mode": "managed",
+   "type": "databricks_cluster_policy",
+   "name": "classic",
+   "index": "jobs",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "definition": "{\"autoscale.max_workers\":{\"maxValue\":4,\"type\":\"range\"},\"cluster_type\":{\"type\":\"fixed\",\"value\":\"job\"},\"custom_tags.APPID\":{\"defaultValue\":\"NONE\",\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.BUSINESS_UNIT\":{\"type\":\"fixed\",\"value\":\"SS1\"},\"custom_tags.COST_CATEGORY\":{\"type\":\"fixed\",\"value\":\"CITIZEN_SELF_SERVICE\"},\"custom_tags.PROJECT\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.TEAM\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"data_security_mode\":{\"defaultValue\":\"USER_ISOLATION\",\"type\":\"allowlist\",\"values\":[\"USER_ISOLATION\",\"DATA_SECURITY_MODE_STANDARD\"]},\"driver_node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"num_workers\":{\"maxValue\":4,\"type\":\"range\"},\"spark_version\":{\"defaultValue\":\"auto:latest-lts\",\"type\":\"allowlist\",\"values\":[\"auto:latest-lts\",\"auto:latest-lts-ml\"]}}",
+     "description": null,
+     "libraries": [],
+     "max_clusters_per_user": 1,
+     "name": "SS1 Classic Jobs",
+     "policy_family_definition_overrides": null,
+     "policy_family_id": null
+    },
+    "after_unknown": {
+     "id": true,
+     "libraries": [],
+     "policy_id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "libraries": [],
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.compute.databricks_cluster_policy.classic[\"pipelines\"]",
+   "module_address": "module.compute",
+   "mode": "managed",
+   "type": "databricks_cluster_policy",
+   "name": "classic",
+   "index": "pipelines",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "definition": "{\"autoscale.max_workers\":{\"maxValue\":4,\"type\":\"range\"},\"cluster_type\":{\"type\":\"fixed\",\"value\":\"dlt\"},\"custom_tags.APPID\":{\"defaultValue\":\"NONE\",\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.BUSINESS_UNIT\":{\"type\":\"fixed\",\"value\":\"SS1\"},\"custom_tags.COST_CATEGORY\":{\"type\":\"fixed\",\"value\":\"CITIZEN_SELF_SERVICE\"},\"custom_tags.PROJECT\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"custom_tags.TEAM\":{\"isOptional\":false,\"pattern\":\"^[A-Z0-9_-]+$\",\"type\":\"regex\"},\"data_security_mode\":{\"defaultValue\":\"USER_ISOLATION\",\"type\":\"allowlist\",\"values\":[\"USER_ISOLATION\",\"DATA_SECURITY_MODE_STANDARD\"]},\"driver_node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"node_type_id\":{\"defaultValue\":\"Standard_E8_v3\",\"type\":\"allowlist\",\"values\":[\"Standard_E8_v3\",\"Standard_E16_v3\",\"Standard_E32_v3\"]},\"num_workers\":{\"maxValue\":4,\"type\":\"range\"}}",
+     "description": null,
+     "libraries": [],
+     "max_clusters_per_user": 1,
+     "name": "SS1 Classic Pipelines",
+     "policy_family_definition_overrides": null,
+     "policy_family_id": null
+    },
+    "after_unknown": {
+     "id": true,
+     "libraries": [],
+     "policy_id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "libraries": [],
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.compute.databricks_permissions.default_warehouse[0]",
+   "module_address": "module.compute",
+   "mode": "managed",
+   "type": "databricks_permissions",
+   "name": "default_warehouse",
+   "index": 0,
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "access_control": [
+      {
+       "group_name": "ss1-cd-builders",
+       "permission_level": "CAN_USE",
+       "service_principal_name": "",
+       "user_name": ""
+      },
+      {
+       "group_name": "ss1-cd-explorers",
+       "permission_level": "CAN_USE",
+       "service_principal_name": "",
+       "user_name": ""
+      },
+      {
+       "group_name": "ss1_platform_admins",
+       "permission_level": "CAN_MANAGE",
+       "service_principal_name": "",
+       "user_name": ""
+      }
+     ],
+     "alert_v2_id": null,
+     "app_name": null,
+     "authorization": null,
+     "cluster_id": null,
+     "cluster_policy_id": null,
+     "dashboard_id": null,
+     "database_instance_name": null,
+     "database_project_name": null,
+     "directory_id": null,
+     "directory_path": null,
+     "experiment_id": null,
+     "instance_pool_id": null,
+     "job_id": null,
+     "knowledge_assistant_id": null,
+     "notebook_id": null,
+     "notebook_path": null,
+     "pipeline_id": null,
+     "registered_model_id": null,
+     "repo_id": null,
+     "repo_path": null,
+     "serving_endpoint_id": null,
+     "sql_alert_id": null,
+     "sql_dashboard_id": null,
+     "sql_query_id": null,
+     "supervisor_agent_id": null,
+     "vector_search_endpoint_id": null,
+     "workspace_file_id": null,
+     "workspace_file_path": null
+    },
+    "after_unknown": {
+     "access_control": [
+      {},
+      {},
+      {}
+     ],
+     "id": true,
+     "object_type": true,
+     "provider_config": true,
+     "sql_endpoint_id": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "access_control": [
+      {},
+      {},
+      {}
+     ],
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.compute.databricks_permissions.starter_warehouse[\"2cd38f111de7ce99\"]",
+   "module_address": "module.compute",
+   "mode": "managed",
+   "type": "databricks_permissions",
+   "name": "starter_warehouse",
+   "index": "2cd38f111de7ce99",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "access_control": [
+      {
+       "group_name": "ss1_platform_admins",
+       "permission_level": "CAN_MANAGE",
+       "service_principal_name": "",
+       "user_name": ""
+      }
+     ],
+     "alert_v2_id": null,
+     "app_name": null,
+     "authorization": null,
+     "cluster_id": null,
+     "cluster_policy_id": null,
+     "dashboard_id": null,
+     "database_instance_name": null,
+     "database_project_name": null,
+     "directory_id": null,
+     "directory_path": null,
+     "experiment_id": null,
+     "instance_pool_id": null,
+     "job_id": null,
+     "knowledge_assistant_id": null,
+     "notebook_id": null,
+     "notebook_path": null,
+     "pipeline_id": null,
+     "registered_model_id": null,
+     "repo_id": null,
+     "repo_path": null,
+     "serving_endpoint_id": null,
+     "sql_alert_id": null,
+     "sql_dashboard_id": null,
+     "sql_endpoint_id": "2cd38f111de7ce99",
+     "sql_query_id": null,
+     "supervisor_agent_id": null,
+     "vector_search_endpoint_id": null,
+     "workspace_file_id": null,
+     "workspace_file_path": null
+    },
+    "after_unknown": {
+     "access_control": [
+      {}
+     ],
+     "id": true,
+     "object_type": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "access_control": [
+      {}
+     ],
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.compute.databricks_sql_endpoint.default",
+   "module_address": "module.compute",
+   "mode": "managed",
+   "type": "databricks_sql_endpoint",
+   "name": "default",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "auto_stop_mins": 10,
+     "channel": [],
+     "cluster_size": "X-Small",
+     "enable_photon": true,
+     "enable_serverless_compute": true,
+     "instance_profile_arn": null,
+     "max_num_clusters": 5,
+     "min_num_clusters": 1,
+     "name": "SS1 Default Warehouse",
+     "no_wait": null,
+     "spot_instance_policy": "COST_OPTIMIZED",
+     "tags": [
+      {
+       "custom_tags": [
+        {
+         "key": "APPID",
+         "value": "NONE"
+        },
+        {
+         "key": "BUSINESS_UNIT",
+         "value": "SS1"
+        },
+        {
+         "key": "COST_CATEGORY",
+         "value": "CITIZEN_SELF_SERVICE"
+        }
+       ]
+      }
+     ],
+     "timeouts": null,
+     "warehouse_type": "PRO"
+    },
+    "after_unknown": {
+     "channel": [],
+     "creator_name": true,
+     "data_source_id": true,
+     "health": true,
+     "id": true,
+     "jdbc_url": true,
+     "num_active_sessions": true,
+     "num_clusters": true,
+     "odbc_params": true,
+     "provider_config": true,
+     "state": true,
+     "tags": [
+      {
+       "custom_tags": [
+        {},
+        {},
+        {}
+       ]
+      }
+     ]
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "channel": [],
+     "health": [],
+     "odbc_params": [],
+     "provider_config": [],
+     "tags": [
+      {
+       "custom_tags": [
+        {},
+        {},
+        {}
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "address": "module.compute.databricks_workspace_setting_v2.default_warehouse[0]",
+   "module_address": "module.compute",
+   "mode": "managed",
+   "type": "databricks_workspace_setting_v2",
+   "name": "default_warehouse",
+   "index": 0,
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "aibi_dashboard_embedding_access_policy": null,
+     "aibi_dashboard_embedding_approved_domains": null,
+     "allowed_apps_user_api_scopes": null,
+     "automatic_cluster_update_workspace": null,
+     "boolean_val": null,
+     "collaboration_platform_connectivity": null,
+     "effective_aibi_dashboard_embedding_access_policy": null,
+     "effective_aibi_dashboard_embedding_approved_domains": null,
+     "effective_automatic_cluster_update_workspace": null,
+     "effective_personal_compute": null,
+     "effective_restrict_workspace_admins": null,
+     "effective_workspace_label": null,
+     "integer_val": null,
+     "name": "default_warehouse_id",
+     "operational_email_custom_recipient": null,
+     "personal_compute": null,
+     "restrict_workspace_admins": null,
+     "string_val": {},
+     "workspace_label": null
+    },
+    "after_unknown": {
+     "effective_allowed_apps_user_api_scopes": true,
+     "effective_boolean_val": true,
+     "effective_collaboration_platform_connectivity": true,
+     "effective_integer_val": true,
+     "effective_operational_email_custom_recipient": true,
+     "effective_string_val": true,
+     "provider_config": true,
+     "string_val": {
+      "value": true
+     }
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "effective_allowed_apps_user_api_scopes": {},
+     "effective_boolean_val": {},
+     "effective_collaboration_platform_connectivity": {},
+     "effective_integer_val": {},
+     "effective_operational_email_custom_recipient": {},
+     "effective_string_val": {},
+     "provider_config": {},
+     "string_val": {}
+    }
+   }
+  },
+  {
+   "address": "module.personas.data.databricks_group.persona[\"ss1-cd-builders\"]",
+   "module_address": "module.personas",
+   "mode": "data",
+   "type": "databricks_group",
+   "name": "persona",
+   "index": "ss1-cd-builders",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "read"
+    ],
+    "before": null,
+    "after": {
+     "allow_cluster_create": null,
+     "allow_instance_pool_create": null,
+     "api": null,
+     "databricks_sql_access": null,
+     "display_name": "ss1-cd-builders",
+     "provider_config": [],
+     "recursive": null,
+     "workspace_access": null,
+     "workspace_consume": null
+    },
+    "after_unknown": {
+     "acl_principal_id": true,
+     "child_groups": true,
+     "external_id": true,
+     "groups": true,
+     "id": true,
+     "instance_profiles": true,
+     "members": true,
+     "provider_config": [],
+     "roles": true,
+     "service_principals": true,
+     "users": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "child_groups": [],
+     "groups": [],
+     "instance_profiles": [],
+     "members": [],
+     "provider_config": [],
+     "roles": [],
+     "service_principals": [],
+     "users": []
+    }
+   },
+   "action_reason": "read_because_dependency_pending"
+  },
+  {
+   "address": "module.personas.data.databricks_group.persona[\"ss1-cd-explorers\"]",
+   "module_address": "module.personas",
+   "mode": "data",
+   "type": "databricks_group",
+   "name": "persona",
+   "index": "ss1-cd-explorers",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "read"
+    ],
+    "before": null,
+    "after": {
+     "allow_cluster_create": null,
+     "allow_instance_pool_create": null,
+     "api": null,
+     "databricks_sql_access": null,
+     "display_name": "ss1-cd-explorers",
+     "provider_config": [],
+     "recursive": null,
+     "workspace_access": null,
+     "workspace_consume": null
+    },
+    "after_unknown": {
+     "acl_principal_id": true,
+     "child_groups": true,
+     "external_id": true,
+     "groups": true,
+     "id": true,
+     "instance_profiles": true,
+     "members": true,
+     "provider_config": [],
+     "roles": true,
+     "service_principals": true,
+     "users": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "child_groups": [],
+     "groups": [],
+     "instance_profiles": [],
+     "members": [],
+     "provider_config": [],
+     "roles": [],
+     "service_principals": [],
+     "users": []
+    }
+   },
+   "action_reason": "read_because_dependency_pending"
+  },
+  {
+   "address": "module.personas.data.databricks_group.persona[\"ss1-cd-users\"]",
+   "module_address": "module.personas",
+   "mode": "data",
+   "type": "databricks_group",
+   "name": "persona",
+   "index": "ss1-cd-users",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "read"
+    ],
+    "before": null,
+    "after": {
+     "allow_cluster_create": null,
+     "allow_instance_pool_create": null,
+     "api": null,
+     "databricks_sql_access": null,
+     "display_name": "ss1-cd-users",
+     "provider_config": [],
+     "recursive": null,
+     "workspace_access": null,
+     "workspace_consume": null
+    },
+    "after_unknown": {
+     "acl_principal_id": true,
+     "child_groups": true,
+     "external_id": true,
+     "groups": true,
+     "id": true,
+     "instance_profiles": true,
+     "members": true,
+     "provider_config": [],
+     "roles": true,
+     "service_principals": true,
+     "users": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "child_groups": [],
+     "groups": [],
+     "instance_profiles": [],
+     "members": [],
+     "provider_config": [],
+     "roles": [],
+     "service_principals": [],
+     "users": []
+    }
+   },
+   "action_reason": "read_because_dependency_pending"
+  },
+  {
+   "address": "module.personas.data.databricks_group.users[0]",
+   "module_address": "module.personas",
+   "mode": "data",
+   "type": "databricks_group",
+   "name": "users",
+   "index": 0,
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "read"
+    ],
+    "before": null,
+    "after": {
+     "allow_cluster_create": null,
+     "allow_instance_pool_create": null,
+     "api": null,
+     "databricks_sql_access": null,
+     "display_name": "users",
+     "provider_config": [],
+     "recursive": null,
+     "workspace_access": null,
+     "workspace_consume": null
+    },
+    "after_unknown": {
+     "acl_principal_id": true,
+     "child_groups": true,
+     "external_id": true,
+     "groups": true,
+     "id": true,
+     "instance_profiles": true,
+     "members": true,
+     "provider_config": [],
+     "roles": true,
+     "service_principals": true,
+     "users": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "child_groups": [],
+     "groups": [],
+     "instance_profiles": [],
+     "members": [],
+     "provider_config": [],
+     "roles": [],
+     "service_principals": [],
+     "users": []
+    }
+   },
+   "action_reason": "read_because_dependency_pending"
+  },
+  {
+   "address": "module.personas.databricks_entitlements.persona[\"ss1-cd-builders\"]",
+   "module_address": "module.personas",
+   "mode": "managed",
+   "type": "databricks_entitlements",
+   "name": "persona",
+   "index": "ss1-cd-builders",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "allow_cluster_create": false,
+     "allow_instance_pool_create": false,
+     "databricks_sql_access": true,
+     "service_principal_id": null,
+     "user_id": null,
+     "workspace_access": true,
+     "workspace_consume": false
+    },
+    "after_unknown": {
+     "group_id": true,
+     "id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.personas.databricks_entitlements.persona[\"ss1-cd-explorers\"]",
+   "module_address": "module.personas",
+   "mode": "managed",
+   "type": "databricks_entitlements",
+   "name": "persona",
+   "index": "ss1-cd-explorers",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "allow_cluster_create": false,
+     "allow_instance_pool_create": false,
+     "databricks_sql_access": true,
+     "service_principal_id": null,
+     "user_id": null,
+     "workspace_access": false,
+     "workspace_consume": false
+    },
+    "after_unknown": {
+     "group_id": true,
+     "id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.personas.databricks_entitlements.persona[\"ss1-cd-users\"]",
+   "module_address": "module.personas",
+   "mode": "managed",
+   "type": "databricks_entitlements",
+   "name": "persona",
+   "index": "ss1-cd-users",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "allow_cluster_create": false,
+     "allow_instance_pool_create": false,
+     "databricks_sql_access": false,
+     "service_principal_id": null,
+     "user_id": null,
+     "workspace_access": false,
+     "workspace_consume": true
+    },
+    "after_unknown": {
+     "group_id": true,
+     "id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.personas.databricks_entitlements.users[0]",
+   "module_address": "module.personas",
+   "mode": "managed",
+   "type": "databricks_entitlements",
+   "name": "users",
+   "index": 0,
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "allow_cluster_create": false,
+     "allow_instance_pool_create": false,
+     "databricks_sql_access": false,
+     "service_principal_id": null,
+     "user_id": null,
+     "workspace_access": false,
+     "workspace_consume": false
+    },
+    "after_unknown": {
+     "group_id": true,
+     "id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.personas.databricks_permission_assignment.this[\"ss1-cd-builders\"]",
+   "module_address": "module.personas",
+   "mode": "managed",
+   "type": "databricks_permission_assignment",
+   "name": "this",
+   "index": "ss1-cd-builders",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "group_name": "ss1-cd-builders",
+     "permissions": [
+      "USER"
+     ]
+    },
+    "after_unknown": {
+     "display_name": true,
+     "id": true,
+     "permissions": [
+      false
+     ],
+     "principal_id": true,
+     "provider_config": true,
+     "service_principal_name": true,
+     "user_name": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "permissions": [
+      false
+     ],
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.personas.databricks_permission_assignment.this[\"ss1-cd-explorers\"]",
+   "module_address": "module.personas",
+   "mode": "managed",
+   "type": "databricks_permission_assignment",
+   "name": "this",
+   "index": "ss1-cd-explorers",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "group_name": "ss1-cd-explorers",
+     "permissions": [
+      "USER"
+     ]
+    },
+    "after_unknown": {
+     "display_name": true,
+     "id": true,
+     "permissions": [
+      false
+     ],
+     "principal_id": true,
+     "provider_config": true,
+     "service_principal_name": true,
+     "user_name": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "permissions": [
+      false
+     ],
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.personas.databricks_permission_assignment.this[\"ss1-cd-users\"]",
+   "module_address": "module.personas",
+   "mode": "managed",
+   "type": "databricks_permission_assignment",
+   "name": "this",
+   "index": "ss1-cd-users",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "group_name": "ss1-cd-users",
+     "permissions": [
+      "USER"
+     ]
+    },
+    "after_unknown": {
+     "display_name": true,
+     "id": true,
+     "permissions": [
+      false
+     ],
+     "principal_id": true,
+     "provider_config": true,
+     "service_principal_name": true,
+     "user_name": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "permissions": [
+      false
+     ],
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.personas.databricks_permission_assignment.this[\"ss1_platform_admins\"]",
+   "module_address": "module.personas",
+   "mode": "managed",
+   "type": "databricks_permission_assignment",
+   "name": "this",
+   "index": "ss1_platform_admins",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "group_name": "ss1_platform_admins",
+     "permissions": [
+      "ADMIN"
+     ]
+    },
+    "after_unknown": {
+     "display_name": true,
+     "id": true,
+     "permissions": [
+      false
+     ],
+     "principal_id": true,
+     "provider_config": true,
+     "service_principal_name": true,
+     "user_name": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "permissions": [
+      false
+     ],
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_aibi_dashboard_embedding_access_policy_setting.this[0]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_aibi_dashboard_embedding_access_policy_setting",
+   "name": "this",
+   "index": 0,
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "aibi_dashboard_embedding_access_policy": [
+      {
+       "access_policy_type": "ALLOW_APPROVED_DOMAINS"
+      }
+     ]
+    },
+    "after_unknown": {
+     "aibi_dashboard_embedding_access_policy": [
+      {}
+     ],
+     "etag": true,
+     "id": true,
+     "provider_config": true,
+     "setting_name": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "aibi_dashboard_embedding_access_policy": [
+      {}
+     ],
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_aibi_dashboard_embedding_approved_domains_setting.this[0]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_aibi_dashboard_embedding_approved_domains_setting",
+   "name": "this",
+   "index": 0,
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "aibi_dashboard_embedding_approved_domains": [
+      {
+       "approved_domains": []
+      }
+     ]
+    },
+    "after_unknown": {
+     "aibi_dashboard_embedding_approved_domains": [
+      {
+       "approved_domains": []
+      }
+     ],
+     "etag": true,
+     "id": true,
+     "provider_config": true,
+     "setting_name": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "aibi_dashboard_embedding_approved_domains": [
+      {
+       "approved_domains": []
+      }
+     ],
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_disable_legacy_access_setting.this[0]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_disable_legacy_access_setting",
+   "name": "this",
+   "index": 0,
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "disable_legacy_access": [
+      {
+       "value": true
+      }
+     ]
+    },
+    "after_unknown": {
+     "disable_legacy_access": [
+      {}
+     ],
+     "etag": true,
+     "id": true,
+     "provider_config": true,
+     "setting_name": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "disable_legacy_access": [
+      {}
+     ],
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_disable_legacy_dbfs_setting.this[0]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_disable_legacy_dbfs_setting",
+   "name": "this",
+   "index": 0,
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "disable_legacy_dbfs": [
+      {
+       "value": true
+      }
+     ]
+    },
+    "after_unknown": {
+     "disable_legacy_dbfs": [
+      {}
+     ],
+     "etag": true,
+     "id": true,
+     "provider_config": true,
+     "setting_name": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "disable_legacy_dbfs": [
+      {}
+     ],
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_permissions.tokens[0]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_permissions",
+   "name": "tokens",
+   "index": 0,
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "access_control": [
+      {
+       "group_name": "ss1_platform_admins",
+       "permission_level": "CAN_USE",
+       "service_principal_name": "",
+       "user_name": ""
+      }
+     ],
+     "alert_v2_id": null,
+     "app_name": null,
+     "authorization": "tokens",
+     "cluster_id": null,
+     "cluster_policy_id": null,
+     "dashboard_id": null,
+     "database_instance_name": null,
+     "database_project_name": null,
+     "directory_id": null,
+     "directory_path": null,
+     "experiment_id": null,
+     "instance_pool_id": null,
+     "job_id": null,
+     "knowledge_assistant_id": null,
+     "notebook_id": null,
+     "notebook_path": null,
+     "pipeline_id": null,
+     "registered_model_id": null,
+     "repo_id": null,
+     "repo_path": null,
+     "serving_endpoint_id": null,
+     "sql_alert_id": null,
+     "sql_dashboard_id": null,
+     "sql_endpoint_id": null,
+     "sql_query_id": null,
+     "supervisor_agent_id": null,
+     "vector_search_endpoint_id": null,
+     "workspace_file_id": null,
+     "workspace_file_path": null
+    },
+    "after_unknown": {
+     "access_control": [
+      {}
+     ],
+     "id": true,
+     "object_type": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "access_control": [
+      {}
+     ],
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_sql_global_config.this[0]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_sql_global_config",
+   "name": "this",
+   "index": 0,
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "data_access_config": null,
+     "google_service_account": null,
+     "instance_profile_arn": null,
+     "security_policy": "DATA_ACCESS_CONTROL",
+     "sql_config_params": {
+      "STATEMENT_TIMEOUT": "14400"
+     }
+    },
+    "after_unknown": {
+     "enable_serverless_compute": true,
+     "id": true,
+     "provider_config": true,
+     "sql_config_params": {}
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "provider_config": [],
+     "sql_config_params": {}
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_workspace_conf.key[\"enableDbfsFileBrowser\"]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_workspace_conf",
+   "name": "key",
+   "index": "enableDbfsFileBrowser",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "custom_config": {
+      "enableDbfsFileBrowser": "false"
+     }
+    },
+    "after_unknown": {
+     "custom_config": {},
+     "id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "custom_config": {},
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_workspace_conf.key[\"enableExportNotebook\"]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_workspace_conf",
+   "name": "key",
+   "index": "enableExportNotebook",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "custom_config": {
+      "enableExportNotebook": "true"
+     }
+    },
+    "after_unknown": {
+     "custom_config": {},
+     "id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "custom_config": {},
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_workspace_conf.key[\"enableNotebookTableClipboard\"]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_workspace_conf",
+   "name": "key",
+   "index": "enableNotebookTableClipboard",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "custom_config": {
+      "enableNotebookTableClipboard": "true"
+     }
+    },
+    "after_unknown": {
+     "custom_config": {},
+     "id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "custom_config": {},
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_workspace_conf.key[\"enableProjectsAllowList\"]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_workspace_conf",
+   "name": "key",
+   "index": "enableProjectsAllowList",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "custom_config": {
+      "enableProjectsAllowList": "true"
+     }
+    },
+    "after_unknown": {
+     "custom_config": {},
+     "id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "custom_config": {},
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_workspace_conf.key[\"projectsAllowList\"]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_workspace_conf",
+   "name": "key",
+   "index": "projectsAllowList",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "custom_config": {
+      "projectsAllowList": "https://github.com/"
+     }
+    },
+    "after_unknown": {
+     "custom_config": {},
+     "id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "custom_config": {},
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_workspace_conf.key[\"enableResultsDownloading\"]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_workspace_conf",
+   "name": "key",
+   "index": "enableResultsDownloading",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "custom_config": {
+      "enableResultsDownloading": "true"
+     }
+    },
+    "after_unknown": {
+     "custom_config": {},
+     "id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "custom_config": {},
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_workspace_conf.key[\"enableTokensConfig\"]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_workspace_conf",
+   "name": "key",
+   "index": "enableTokensConfig",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "custom_config": {
+      "enableTokensConfig": "true"
+     }
+    },
+    "after_unknown": {
+     "custom_config": {},
+     "id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "custom_config": {},
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_workspace_conf.key[\"enableUploadDataUis\"]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_workspace_conf",
+   "name": "key",
+   "index": "enableUploadDataUis",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "custom_config": {
+      "enableUploadDataUis": "true"
+     }
+    },
+    "after_unknown": {
+     "custom_config": {},
+     "id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "custom_config": {},
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_workspace_conf.key[\"enforceUserIsolation\"]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_workspace_conf",
+   "name": "key",
+   "index": "enforceUserIsolation",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "custom_config": {
+      "enforceUserIsolation": "true"
+     }
+    },
+    "after_unknown": {
+     "custom_config": {},
+     "id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "custom_config": {},
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_workspace_conf.key[\"maxTokenLifetimeDays\"]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_workspace_conf",
+   "name": "key",
+   "index": "maxTokenLifetimeDays",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "custom_config": {
+      "maxTokenLifetimeDays": "90"
+     }
+    },
+    "after_unknown": {
+     "custom_config": {},
+     "id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "custom_config": {},
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_workspace_conf.key[\"mlflowRunArtifactDownloadEnabled\"]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_workspace_conf",
+   "name": "key",
+   "index": "mlflowRunArtifactDownloadEnabled",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "custom_config": {
+      "mlflowRunArtifactDownloadEnabled": "true"
+     }
+    },
+    "after_unknown": {
+     "custom_config": {},
+     "id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "custom_config": {},
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_workspace_file.genie_code_instructions[0]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_workspace_file",
+   "name": "genie_code_instructions",
+   "index": 0,
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "content_base64": "IyBEZWZhdWx0IGluc3RydWN0aW9ucwoKU2hhcmVkIGJ5IGV2ZXJ5IGNpdGl6ZW4gZGV2ZWxvcG1lbnQgd29ya3NwYWNlLgoKVGhpcyBpcyBhIGdvdmVybmVkIGNpdGl6ZW4gZGV2ZWxvcG1lbnQgd29ya3NwYWNlIGZvciB0aGUgU1MxIGJ1c2luZXNzIHVuaXQuIEZvbGxvdyB0aGVzZSBjb252ZW50aW9ucyBpbiBldmVyeXRoaW5nIHlvdSBzdWdnZXN0IG9yIGdlbmVyYXRlLgoKIyMgRGF0YQoKLSBXb3JrIHdpdGggZGF0YSBpbiBVbml0eSBDYXRhbG9nLiBUaGUgd29ya3NwYWNlJ3MgY2F0YWxvZyBpcyBgc3MxX2NpdGl6ZW5fZGV2YC4KLSBBbHdheXMgdXNlIHRocmVlLXBhcnQgbmFtZXMgKGBjYXRhbG9nLnNjaGVtYS50YWJsZWApLiBEbyBub3QgdXNlIHRoZSBIaXZlIG1ldGFzdG9yZSwgREJGUyBwYXRocyBvciBEQkZTIG1vdW50czsgdGhleSBhcmUgc3dpdGNoZWQgb2ZmIG9yIGJlaW5nIHJldGlyZWQuCi0gRG8gbm90IGNvcHkgZGF0YSBvdXQgb2YgVW5pdHkgQ2F0YWxvZyBpbnRvIGZpbGVzLCBub3RlYm9va3Mgb3IgcGVyc29uYWwgc3RvcmFnZS4gUmVhZCBpdCB3aGVyZSBpdCBpcy4KLSBOZXZlciBwdXQgY3JlZGVudGlhbHMsIHBhc3N3b3JkcywgdG9rZW5zIG9yIGtleXMgaW4gY29kZS4gVXNlIERhdGFicmlja3Mgc2VjcmV0cyBvciB0aGUgaWRlbnRpdHkgdGhlIGpvYiBydW5zIGFzLgoKIyMgQ29tcHV0ZQoKLSBGb3IgU1FMLCB1c2UgdGhlIGBTUzEgRGVmYXVsdCBXYXJlaG91c2VgIFNRTCB3YXJlaG91c2UuCi0gRm9yIG5vdGVib29rcywgam9icyBhbmQgcGlwZWxpbmVzLCBwcmVmZXIgc2VydmVybGVzcyBjb21wdXRlLgotIENsYXNzaWMgY29tcHV0ZSBpcyB0aGUgZXhjZXB0aW9uLiBXaGVuIGl0IGlzIG5lZWRlZCwgdXNlIHRoZSBjbGFzc2ljIGNsdXN0ZXIgcG9saWN5IGZvciB0aGUga2luZCBvZiBjbHVzdGVyOiBgU1MxIENsYXNzaWMgSW50ZXJhY3RpdmVgIGZvciBub3RlYm9va3MsIGBTUzEgQ2xhc3NpYyBKb2JzYCBmb3Igam9iIGNsdXN0ZXJzLCBgU1MxIENsYXNzaWMgUGlwZWxpbmVzYCBmb3IgcGlwZWxpbmVzIChhY2Nlc3MgaXMgcmVxdWVzdGVkIHRocm91Z2ggdGhlIHNlbGYtc2VydmljZSBhcHApLiBFYWNoIHNldHMgdGhlIHRhZ3MgYW5kIGxpbWl0cywgYW5kIGFza3MgZm9yIHRoZSB0YWdzIHlvdSBmaWxsIGluOyBlYWNoIGFsbG93cyBvbmUgY2x1c3RlciBwZXIgcGVyc29uLgotIEF2b2lkIHRoZSBQZXJzb25hbCBDb21wdXRlIHBvbGljeSBmb3Igc2hhcmVkIG9yIHNjaGVkdWxlZCB3b3JrOiBpdHMgY2x1c3RlcnMgZG8gbm90IGNhcnJ5IHRoZSBjaGFyZ2ViYWNrIHRhZ3MuCgojIyBDb3N0IGF0dHJpYnV0aW9uCgotIEV2ZXJ5IHdvcmtsb2FkIGlzIGNoYXJnZWQgYmFjayB3aXRoIHRoZSB0YWdzIGBBUFBfSURgLCBgQlVTSU5FU1NfVU5JVGAsIGBDT1NUX0NBVEVHT1JZYCwgYFRFQU1gLCBgUFJPSkVDVGAuIFNldCBmb3IgeW91OiBgQVBQX0lEYCA9IGBOT05FYCwgYEJVU0lORVNTX1VOSVRgID0gYFNTMWAsIGBDT1NUX0NBVEVHT1JZYCA9IGBDSVRJWkVOX1NFTEZfU0VSVklDRWAuIEtlZXAgdGhlIHRhZ3Mgb24gYW55IGNsdXN0ZXIgb3Igam9iIHlvdSBkZWZpbmUuCi0gRm9yIHNlcnZlcmxlc3Mgam9icywgcGlwZWxpbmVzIGFuZCBub3RlYm9va3MsIHNlbGVjdCBhIHNlcnZlcmxlc3MgdXNhZ2UgcG9saWN5OiBgU1MxLTAtU0VMRi1TRVJWSUNFYCBmb3IgZ2VuZXJhbCB3b3JrLCBvciB5b3VyIHByb2plY3QncyBwb2xpY3kgaWYgeW91IGhhdmUgb25lLgoKIyMgU2hhcmluZyB3b3JrCgotIEtlZXAgd29yayBpbiBwcm9ncmVzcyBpbiB5b3VyIG93biBmb2xkZXIuCi0gUHV0IGZpbmlzaGVkIHdvcmsgdGhhdCB5b3VyIHRlYW0gc2hvdWxkIHVzZSBpbiB5b3VyIHRlYW0ncyBmb2xkZXIgKGAvV29ya3NwYWNlLzx0ZWFtPmApLCBpZiBpdCBoYXMgb25lLgotIE5hbWUgbm90ZWJvb2tzLCBqb2JzIGFuZCBkYXNoYm9hcmRzIGFmdGVyIHdoYXQgdGhleSBkbywgYW5kIGFkZCBhIHNob3J0IGRlc2NyaXB0aW9uIG9mIHRoZWlyIHB1cnBvc2UgYW5kIG93bmVyLgo=",
+     "md5": "different",
+     "path": "/.assistant_workspace_instructions.md",
+     "source": null
+    },
+    "after_unknown": {
+     "id": true,
+     "object_id": true,
+     "provider_config": true,
+     "url": true,
+     "workspace_path": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_workspace_file.genie_code_skills[\"build-tagged-assets/SKILL.md\"]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_workspace_file",
+   "name": "genie_code_skills",
+   "index": "build-tagged-assets/SKILL.md",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "content_base64": "LS0tCm5hbWU6IGJ1aWxkLXRhZ2dlZC1hc3NldHMKZGVzY3JpcHRpb246IFVzZSB3aGVuIGNyZWF0aW5nIG9yIGNoYW5naW5nIGFueXRoaW5nIHRoYXQgcnVucyBvbiBjb21wdXRlLCBzdWNoIGFzIGEgam9iLCBwaXBlbGluZSwgY2x1c3Rlciwgc2VydmVybGVzcyBub3RlYm9vaywgbW9kZWwgc2VydmluZyBlbmRwb2ludCBvciBTUUwgd2FyZWhvdXNlLCBzbyB0aGF0IGl0IGNhcnJpZXMgdGhlIHRhZ3MgdXNlZCBmb3IgY2hhcmdlYmFjay4gQWxzbyB1c2Ugd2hlbiBhc2tlZCB3aHkgYW4gYXNzZXQgaXMgbWlzc2luZyB0YWdzIG9yIHdoaWNoIHRhZ3Mgb3IgdXNhZ2UgcG9saWN5IHRvIHVzZS4KLS0tCgojIEJ1aWxkIGFzc2V0cyB0aGF0IGNhcnJ5IHRoZSBjaGFyZ2ViYWNrIHRhZ3MKCkV2ZXJ5IGFzc2V0IHRoYXQgdXNlcyBjb21wdXRlIGluIHRoaXMgd29ya3NwYWNlIGlzIGNoYXJnZWQgYmFjayB0byB3aG9ldmVyIG93bnMgaXQsIHVzaW5nIHRoZXNlIHRhZ3M6IGBBUFBfSURgLCBgQlVTSU5FU1NfVU5JVGAsIGBDT1NUX0NBVEVHT1JZYCwgYFRFQU1gLCBgUFJPSkVDVGAuCgotIFNldCBmb3IgeW91IG9uIHNlcnZlcmxlc3MgdXNhZ2UsIHRoZSBTUUwgd2FyZWhvdXNlIGFuZCBjbGFzc2ljIGNsdXN0ZXJzOiBgQVBQX0lEYCA9IGBOT05FYCwgYEJVU0lORVNTX1VOSVRgID0gYFNTMWAsIGBDT1NUX0NBVEVHT1JZYCA9IGBDSVRJWkVOX1NFTEZfU0VSVklDRWAuCi0gT24gYSBjbGFzc2ljIGNsdXN0ZXIgdGhlIHVzZXIgYWxzbyBmaWxscyBpbiB0aGUgb3RoZXIgdGFncyAoZm9yIGV4YW1wbGUgdGhlaXIgdGVhbSBhbmQgcHJvamVjdCksIGluIHVwcGVyIGNhc2UuCgpVbnRhZ2dlZCB3b3JrIGNhbm5vdCBiZSBjaGFyZ2VkIGJhY2ssIHNvIHRyZWF0IHRoZSB0YWdzIGFzIHJlcXVpcmVkLCBub3Qgb3B0aW9uYWwuCgojIyBCZWZvcmUgeW91IGJ1aWxkCgoxLiBGaW5kIG91dCB0aGUgb3duZXIncyB2YWx1ZSBmb3IgZWFjaCB0YWcgdGhlIHVzZXIgbXVzdCBmaWxsIGluICh0ZWFtLCBwcm9qZWN0KS4gSWYgdGhlIHVzZXIgaGFzIG5vdCBzYWlkLCBhc2sgdGhlbS4gRG8gbm90IGd1ZXNzIG9yIG1ha2UgdXAgdmFsdWVzLgoyLiBWYWx1ZXMgYXJlIHVwcGVyIGNhc2UgbGV0dGVycywgZGlnaXRzLCBgX2AgYW5kIGAtYCwgZm9yIGV4YW1wbGUgYFJJU0tfQ0xBU1NJRklDQVRJT05gLgoKIyMgSG93IHRvIHRhZyBlYWNoIGtpbmQgb2YgYXNzZXQKCi0gKipTZXJ2ZXJsZXNzIG5vdGVib29rcywgam9icyBhbmQgcGlwZWxpbmVzKio6IHNlbGVjdCBhIHNlcnZlcmxlc3MgdXNhZ2UgcG9saWN5LiBJdCBhZGRzIHRoZSB0YWdzIGZvciB5b3UuIFVzZSB0aGUgcHJvamVjdCdzIHBvbGljeSBpZiB0aGUgdXNlciBoYXMgb25lLCBvdGhlcndpc2UgYFNTMS0wLVNFTEYtU0VSVklDRWAuIElmIG5vIHVzYWdlIHBvbGljeSBpcyBvZmZlcmVkLCB0YWcgdGhlIGpvYiBvciBwaXBlbGluZSBpdHNlbGYgYXMgYmVsb3cuCi0gKipKb2JzKio6IGFkZCB0aGUgdGFncyBpbiB0aGUgam9iJ3MgdGFncyAoYHRhZ3NgIGluIHRoZSBqb2IgZGVmaW5pdGlvbikuIEZvciBzZXJ2ZXJsZXNzIHRhc2tzLCBhbHNvIHNldCB0aGUgdXNhZ2UgcG9saWN5IChgYnVkZ2V0X3BvbGljeV9pZGAgaW4gdGhlIGpvYiBkZWZpbml0aW9uKS4KLSAqKkNsYXNzaWMgY2x1c3RlcnMgYW5kIGpvYiBjbHVzdGVycyoqOiBjcmVhdGUgdGhlbSBvbmx5IGZyb20gYFNTMSBDbGFzc2ljIEludGVyYWN0aXZlYCAoYWxsLXB1cnBvc2UgY2x1c3RlcnMpIG9yIGBTUzEgQ2xhc3NpYyBKb2JzYCAoam9iIGNsdXN0ZXJzKTsgdGhlIHVzZXIgcmVxdWVzdHMgYWNjZXNzIHRocm91Z2ggdGhlIHNlbGYtc2VydmljZSBhcHAuIFRoZSBwb2xpY3kgc2V0cyB0aGUgZml4ZWQgdGFncyBhbmQgYXNrcyBmb3IgdGhlIG90aGVyczsgZmlsbCBpbiB0aGUgb3duZXIncy4gRG8gbm90IHVzZSB0aGUgUGVyc29uYWwgQ29tcHV0ZSBwb2xpY3kgZm9yIHNoYXJlZCBvciBzY2hlZHVsZWQgd29yaywgYmVjYXVzZSBpdHMgY2x1c3RlcnMgZG8gbm90IGNhcnJ5IHRoZSB0YWdzLgotICoqUGlwZWxpbmVzIG9uIGNsYXNzaWMgY29tcHV0ZSoqOiBwdXQgdGhlIHRhZ3MgaW4gdGhlIGN1c3RvbSB0YWdzIG9mIHRoZSBwaXBlbGluZSdzIGNsdXN0ZXJzIGFuZCB1c2UgdGhlIGBTUzEgQ2xhc3NpYyBQaXBlbGluZXNgIGNsdXN0ZXIgcG9saWN5LgotICoqTW9kZWwgc2VydmluZyBlbmRwb2ludHMgYW5kIG90aGVyIGFzc2V0cyB0aGF0IG9mZmVyIHRhZ3Mgb3IgYSB1c2FnZSBwb2xpY3kqKjogc2V0IHRoZSB1c2FnZSBwb2xpY3kgaWYgb2ZmZXJlZCBhbmQgYWRkIHRoZSB0YWdzLgotICoqU1FMKio6IHVzZSB0aGUgZXhpc3RpbmcgYFNTMSBEZWZhdWx0IFdhcmVob3VzZWAgd2FyZWhvdXNlIChvciBhIHRlYW0ncyB3YXJlaG91c2UgZnJvbSB0aGUgc2VsZi1zZXJ2aWNlIGFwcCkgcmF0aGVyIHRoYW4gY3JlYXRpbmcgYSBuZXcgb25lOyB0aG9zZSB3YXJlaG91c2VzIGFyZSBhbHJlYWR5IHRhZ2dlZC4gRGFzaGJvYXJkcyBhbmQgR2VuaWUgc3BhY2VzIGFyZSBjaGFyZ2VkIHRocm91Z2ggdGhlIHdhcmVob3VzZSB0aGV5IHVzZS4KCiMjIENoZWNrIGJlZm9yZSB5b3UgZmluaXNoCgotIFNob3cgdGhlIHVzZXIgdGhlIHRhZ3MgYW5kIHVzYWdlIHBvbGljeSB5b3Ugc2V0IG9uIGVhY2ggYXNzZXQuCi0gV2hlbiB5b3UgY2hhbmdlIGFuIGV4aXN0aW5nIGFzc2V0LCBrZWVwIGl0cyB0YWdzLiBEbyBub3QgcmVtb3ZlIG9yIHJlbmFtZSB0aGVtLgotIElmIHlvdSBjYW5ub3Qgc2V0IGEgdGFnIChmb3IgZXhhbXBsZSwgdGhlIHBvbGljeSBkb2VzIG5vdCBvZmZlciB0aGUgdXNlcidzIHRlYW0pLCBzYXkgc28gYW5kIHN1Z2dlc3QgYXNraW5nIHRoZSB3b3Jrc3BhY2UncyBwbGF0Zm9ybSB0ZWFtLCByYXRoZXIgdGhhbiBsZWF2aW5nIHRoZSBhc3NldCB1bnRhZ2dlZC4K",
+     "md5": "different",
+     "path": "/.assistant/skills/build-tagged-assets/SKILL.md",
+     "source": null
+    },
+    "after_unknown": {
+     "id": true,
+     "object_id": true,
+     "provider_config": true,
+     "url": true,
+     "workspace_path": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_workspace_setting_v2.collaboration_connectivity[0]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_workspace_setting_v2",
+   "name": "collaboration_connectivity",
+   "index": 0,
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "aibi_dashboard_embedding_access_policy": null,
+     "aibi_dashboard_embedding_approved_domains": null,
+     "allowed_apps_user_api_scopes": null,
+     "automatic_cluster_update_workspace": null,
+     "boolean_val": null,
+     "collaboration_platform_connectivity": {
+      "connectivity": "ALLOW_TEAMS"
+     },
+     "effective_aibi_dashboard_embedding_access_policy": null,
+     "effective_aibi_dashboard_embedding_approved_domains": null,
+     "effective_automatic_cluster_update_workspace": null,
+     "effective_personal_compute": null,
+     "effective_restrict_workspace_admins": null,
+     "effective_workspace_label": null,
+     "integer_val": null,
+     "name": "collaboration_platform_connectivity",
+     "operational_email_custom_recipient": null,
+     "personal_compute": null,
+     "restrict_workspace_admins": null,
+     "string_val": null,
+     "workspace_label": null
+    },
+    "after_unknown": {
+     "collaboration_platform_connectivity": {},
+     "effective_allowed_apps_user_api_scopes": true,
+     "effective_boolean_val": true,
+     "effective_collaboration_platform_connectivity": true,
+     "effective_integer_val": true,
+     "effective_operational_email_custom_recipient": true,
+     "effective_string_val": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "collaboration_platform_connectivity": {},
+     "effective_allowed_apps_user_api_scopes": {},
+     "effective_boolean_val": {},
+     "effective_collaboration_platform_connectivity": {},
+     "effective_integer_val": {},
+     "effective_operational_email_custom_recipient": {},
+     "effective_string_val": {},
+     "provider_config": {}
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_workspace_setting_v2.enforce_unity_gateway[0]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_workspace_setting_v2",
+   "name": "enforce_unity_gateway",
+   "index": 0,
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "aibi_dashboard_embedding_access_policy": null,
+     "aibi_dashboard_embedding_approved_domains": null,
+     "allowed_apps_user_api_scopes": null,
+     "automatic_cluster_update_workspace": null,
+     "boolean_val": {
+      "value": true
+     },
+     "collaboration_platform_connectivity": null,
+     "effective_aibi_dashboard_embedding_access_policy": null,
+     "effective_aibi_dashboard_embedding_approved_domains": null,
+     "effective_automatic_cluster_update_workspace": null,
+     "effective_personal_compute": null,
+     "effective_restrict_workspace_admins": null,
+     "effective_workspace_label": null,
+     "integer_val": null,
+     "name": "enforce_ai_gateway_v3_only",
+     "operational_email_custom_recipient": null,
+     "personal_compute": null,
+     "restrict_workspace_admins": null,
+     "string_val": null,
+     "workspace_label": null
+    },
+    "after_unknown": {
+     "boolean_val": {},
+     "effective_allowed_apps_user_api_scopes": true,
+     "effective_boolean_val": true,
+     "effective_collaboration_platform_connectivity": true,
+     "effective_integer_val": true,
+     "effective_operational_email_custom_recipient": true,
+     "effective_string_val": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "boolean_val": {},
+     "effective_allowed_apps_user_api_scopes": {},
+     "effective_boolean_val": {},
+     "effective_collaboration_platform_connectivity": {},
+     "effective_integer_val": {},
+     "effective_operational_email_custom_recipient": {},
+     "effective_string_val": {},
+     "provider_config": {}
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_workspace_setting_v2.sql_results_download[0]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_workspace_setting_v2",
+   "name": "sql_results_download",
+   "index": 0,
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "aibi_dashboard_embedding_access_policy": null,
+     "aibi_dashboard_embedding_approved_domains": null,
+     "allowed_apps_user_api_scopes": null,
+     "automatic_cluster_update_workspace": null,
+     "boolean_val": {
+      "value": true
+     },
+     "collaboration_platform_connectivity": null,
+     "effective_aibi_dashboard_embedding_access_policy": null,
+     "effective_aibi_dashboard_embedding_approved_domains": null,
+     "effective_automatic_cluster_update_workspace": null,
+     "effective_personal_compute": null,
+     "effective_restrict_workspace_admins": null,
+     "effective_workspace_label": null,
+     "integer_val": null,
+     "name": "sql_results_download",
+     "operational_email_custom_recipient": null,
+     "personal_compute": null,
+     "restrict_workspace_admins": null,
+     "string_val": null,
+     "workspace_label": null
+    },
+    "after_unknown": {
+     "boolean_val": {},
+     "effective_allowed_apps_user_api_scopes": true,
+     "effective_boolean_val": true,
+     "effective_collaboration_platform_connectivity": true,
+     "effective_integer_val": true,
+     "effective_operational_email_custom_recipient": true,
+     "effective_string_val": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "boolean_val": {},
+     "effective_allowed_apps_user_api_scopes": {},
+     "effective_boolean_val": {},
+     "effective_collaboration_platform_connectivity": {},
+     "effective_integer_val": {},
+     "effective_operational_email_custom_recipient": {},
+     "effective_string_val": {},
+     "provider_config": {}
+    }
+   }
+  }
+ ]
+}
