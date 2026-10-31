@@ -19,9 +19,11 @@ is left alone.
 | every file | Placeholders `{bu}` / `{BU}` to `{prefix}` / `{PREFIX}` |
 
 - The AI review of a **new workspace's first apply** gives one row to each thing people will use
-  (the default warehouse, the usage policy and its tags, the classic cluster policies and their
-  limits, the catalog, who gets which access) and groups only the settings and Genie Code. The
-  evaluation's new-workspace case now matches the current baseline and checks for those rows.
+  (the default warehouse, the usage (budget) policy and its tags, the classic cluster policies and
+  their limits, the catalog, who gets which access), one row per baseline file in
+  `config/defaults/` with the file named, so a reviewer knows where to change it. What people lose
+  and one-way changes come first. The evaluation's new-workspace case now matches the current
+  baseline and checks for those rows.
 - The plan guard flags the first apply that makes the **Starter warehouse admins only** (and any
   later change that removes someone from it): everyone else loses it, with their queries,
   dashboards and alerts on it. The first plan of an existing workspace now needs
