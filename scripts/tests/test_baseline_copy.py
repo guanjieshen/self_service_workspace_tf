@@ -11,7 +11,7 @@ SHIPPED, PINNED = ROOT / "config/defaults", ROOT / "terraform/tests/defaults"
 ENVIRONMENT = re.compile(r"(?m)^account_id: .*$")
 
 
-@unittest.skipUnless((ROOT / "dev").is_dir(), "an installed copy: its config/defaults/ is its own")
+@unittest.skipUnless((ROOT / "dev/README.md").is_file(), "an installed copy: its config/defaults/ is its own")
 class BaselineCopy(unittest.TestCase):
     def test_the_pinned_baseline_is_the_shipped_one(self):
         shipped = sorted(p.relative_to(SHIPPED) for p in SHIPPED.rglob("*") if p.is_file() and p.name != ".DS_Store")

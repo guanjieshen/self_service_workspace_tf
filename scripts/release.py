@@ -147,7 +147,7 @@ def main(argv=None):
             info = zipfile.ZipInfo(f"{name}/{path}")
             info.external_attr = (0o755 if path.endswith((".sh", ".py")) and path.startswith("scripts/") else 0o644) << 16
             z.writestr(info, release[path])
-    print(f"{zip_path}: {len(release)} files (left out: {len(files) - len(release)})")
+    print(f"{zip_path}: {len(release)} files (left out: {len(set(files) - set(release))}; added: VERSION)")
     return 0
 
 
