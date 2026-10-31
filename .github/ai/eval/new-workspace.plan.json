@@ -591,7 +591,7 @@
      "enable_photon": true,
      "enable_serverless_compute": true,
      "instance_profile_arn": null,
-     "max_num_clusters": 2,
+     "max_num_clusters": 5,
      "min_num_clusters": 1,
      "name": "SS1 Default Warehouse",
      "no_wait": null,
@@ -1573,7 +1573,37 @@
     "before": null,
     "after": {
      "custom_config": {
-      "enableProjectsAllowList": "false"
+      "enableProjectsAllowList": "true"
+     }
+    },
+    "after_unknown": {
+     "custom_config": {},
+     "id": true,
+     "provider_config": true
+    },
+    "before_sensitive": false,
+    "after_sensitive": {
+     "custom_config": {},
+     "provider_config": []
+    }
+   }
+  },
+  {
+   "address": "module.workspace_settings.databricks_workspace_conf.key[\"projectsAllowList\"]",
+   "module_address": "module.workspace_settings",
+   "mode": "managed",
+   "type": "databricks_workspace_conf",
+   "name": "key",
+   "index": "projectsAllowList",
+   "provider_name": "registry.terraform.io/databricks/databricks",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "before": null,
+    "after": {
+     "custom_config": {
+      "projectsAllowList": "https://github.com/"
      }
     },
     "after_unknown": {
