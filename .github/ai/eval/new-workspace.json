@@ -12,12 +12,28 @@
    "Starter"
   ],
   [
-   "SS1-0-SELF-SERVICE",
-   "usage policy"
+   "budget"
   ],
   [
-   "interactive",
-   "cluster polic"
+   "cost.yaml"
+  ],
+  [
+   "compute.yaml"
+  ],
+  [
+   "access.yaml"
+  ],
+  [
+   "catalog.yaml"
+  ],
+  [
+   "settings.yaml"
+  ],
+  [
+   "SS1-0-SELF-SERVICE"
+  ],
+  [
+   "interactive"
   ],
   [
    "ss1_citizen_dev"
