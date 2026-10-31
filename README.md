@@ -12,7 +12,7 @@ Every onboarded workspace gets the same baseline, with workspace-specific settin
 
 | Area | What's included |
 | --- | --- |
-| **Security** | Standard workspace admin settings, including restrictions on legacy access, DBFS, downloads, personal access tokens, Git providers, and other workspace features. User isolation is enforced, and integrations such as Unity Gateway and Microsoft Teams are configured through the baseline. |
+| **Security** | Standard workspace admin settings, including restrictions on legacy access, DBFS (root, mounts and the file browser), personal access tokens, Git providers, and other workspace features. Downloads and exports stay allowed by default; each is one setting. User isolation is enforced, and integrations such as Unity Gateway and Microsoft Teams are configured through the baseline. |
 | **Access** | Three group-based personas: **Explorer** for SQL access, and **Builder** and **Publisher** for broader workspace access. Members of the workspace's users group get **Consumer** access through Databricks One (the simplified interface for business users: dashboards, Genie spaces and apps). Group membership is managed in Entra ID, not in this repository. |
 | **Compute** | A serverless-first setup with a default serverless SQL warehouse and the workspace's serverless usage policy, which tags serverless usage. Approved users can also request access to classic compute policies for interactive clusters, jobs, and pipelines through the self-service app. Each classic policy allows one cluster per user at a time. |
 | **Unity Catalog** | One catalog per workspace with predictive optimization enabled. The self-service app manages schemas within that catalog. |

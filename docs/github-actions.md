@@ -15,7 +15,7 @@ each, in parallel on the runners there are, each with its own log and Re-run but
 | --- | --- | --- |
 | `checks.yml` (**Format and validate**, **Tests**) | Every pull request | Formatting, `terraform validate`, the cross-workspace checks, every test. Required by branch protection |
 | `deploy.yml`, on a pull request | The workspaces the change concerns (below) | For each: preflight, plan, and a plan comment (the plan, the plan guard's warnings, an AI review) when the plan changes something. A plan with hard-to-undo or security-weakening changes fails until someone adds the label `allow-risky-changes` |
-| `deploy.yml`, on merge to `main` | The same workspaces, without the review-only changes | The approval step (`apply-approval`), then an apply for each. A deleted workspace file: its Terraform state is removed (the workspace is unchanged) |
+| `deploy.yml`, on merge to `main` | The same workspaces, without the review-only changes | The approval step (`apply-approval`), then for each workspace: preflight (an error stops it before anything changes), the `allow-risky-changes` check on the merged pull request, and the apply. A deleted workspace file: its Terraform state is removed (the workspace is unchanged) |
 | `deploy.yml`, every Monday (or Run workflow) | Every workspace | Drift check: plans each, and opens an issue labelled `drift` for each that no longer matches; closes it once clean |
 
 Which workspaces a change concerns:
@@ -23,7 +23,7 @@ Which workspaces a change concerns:
 | Change | Planned (pull request) | Applied (merge) |
 | --- | --- | --- |
 | `config/workspaces/<name>.yaml` | That workspace | That workspace (a deleted file: its state is removed) |
-| `config/defaults/`, `terraform/` (except `terraform/tests/`), `scripts/tf.sh`, `scripts/plan-guard.py`, `scripts/workspaces.py` | Every workspace | Every workspace |
+| `config/defaults/`, `terraform/` (except `terraform/tests/` and its `.md` guides), `scripts/tf.sh`, `scripts/plan-guard.py`, `scripts/workspaces.py` | Every workspace | Every workspace |
 | What the plan comment shows: `scripts/preflight.py`, `scripts/ai-plan-review.py`, `.github/ai/`, `config/setup.yaml`, `deploy.yml` and what it uses | Every workspace | None |
 | Anything else: tests, docs, other scripts | None | None |
 

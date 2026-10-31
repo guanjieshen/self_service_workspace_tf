@@ -24,7 +24,7 @@ workspaces, configured in YAML and deployed by GitHub Actions. Set up from scrat
 | Compute | A serverless default SQL warehouse; the Serverless Starter Warehouse for platform admins only; classic cluster policies for interactive, job and pipeline clusters (one cluster per user each, granted by the self-service app) |
 | Cost | One serverless usage policy per workspace, `{PREFIX}-0-SELF-SERVICE`, and one list of chargeback tags on serverless usage, the warehouse and classic clusters |
 | Catalog | One catalog per workspace, `{prefix}_citizen_dev`: bound to the workspace, owned by the pipeline, all privileges and `MANAGE` for the platform admins, `USE` for personas, predictive optimization on; the workspace's default catalog |
-| Settings | Legacy access, DBFS root and mounts disabled; user isolation; tokens for admins only, 90 days; downloads and exports restricted; Git limited to github.com; Unity Gateway enforced; Microsoft Teams only; SQL statement timeout; the workspace label |
+| Settings | Legacy access, DBFS root and mounts disabled; user isolation; tokens for admins only, 90 days; the DBFS file browser off (downloads and exports allowed, one setting each); Git limited to github.com; Unity Gateway enforced; Microsoft Teams only; SQL statement timeout; a label where a workspace sets one |
 | Genie Code | Workspace instructions (work in your personal schema, use the default warehouse, keep the chargeback tags) and skills |
 
 **How changes are made:** a pull request plans each workspace it concerns and posts the plan
