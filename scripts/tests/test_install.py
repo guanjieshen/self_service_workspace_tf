@@ -4,6 +4,7 @@ import importlib.util
 import pathlib
 import tempfile
 import unittest
+import unittest.mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location("copy_to_your_repo", ROOT / "install/copy_to_your_repo.py")
@@ -58,6 +59,18 @@ class Install(unittest.TestCase):
         self.assertEqual((self.target / ".git/config").read_text(), "[theirs]\n")
         self.assertTrue(all(a in ("same", "keep") for a in inst.plan(self.source, self.target).values()),
                         "a second run has nothing left to do")
+
+    def test_a_file_that_cannot_be_read_is_skipped_before_anything_is_written(self):
+        # In a Git folder this notebook is a workspace object, which cannot be read as bytes.
+        unreadable = self.source / "install/copy_to_your_repo"
+        write(self.source, {"install/copy_to_your_repo": "notebook"})
+        real = inst.readable
+        with unittest.mock.patch.object(inst, "readable", lambda p: p != unreadable and real(p)):
+            actions = inst.plan(self.source, self.target)
+            self.assertEqual(actions["install/copy_to_your_repo"], "skip")
+            inst.copy(self.source, self.target, actions)
+        self.assertFalse((self.target / "install/copy_to_your_repo").exists())
+        self.assertEqual((self.target / "VERSION").read_text(), "v1.0.0\n", "the rest is copied")
 
     def test_wrong_folders_are_refused(self):
         self.assertEqual(inst.check(self.source, self.target), [])
