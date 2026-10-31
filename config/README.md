@@ -58,7 +58,7 @@ settings:                                settings:
 - **A key that is neither in the baseline nor a workspace key fails the plan**, with its name, so a typo cannot silently do nothing.
 - **A key a workspace does not set keeps the baseline value**, so a change in `defaults/` reaches every workspace that has not changed that key.
 
-The workspace keys (not in the baseline):
+The keys a workspace file usually sets. `prefix`, `host`, `genie_code_instructions`, `label`, `auth` and `id` exist only in workspace files; `groups` and `account_id` are baseline keys a workspace changes like any other:
 
 | Key | |
 | --- | --- |
@@ -67,7 +67,8 @@ The workspace keys (not in the baseline):
 | `groups` | The group for each persona (a baseline key: the platform admins group comes from the baseline) |
 | `genie_code_instructions` | Genie Code instructions for this workspace (Markdown), after the baseline's |
 | `label` | A label and color next to the workspace name in the top bar |
-| `account_id`, `auth`, `id` | Rarely: another Databricks account than the baseline's; CLI profiles for local runs; the workspace ID when the host does not show it |
+| `auth`, `id` | Rarely: CLI profiles for local runs; the workspace ID when the host does not show it |
+| `account_id` | Rarely: a baseline key (`defaults/cost.yaml`), set here for a workspace in another Databricks account |
 
 ## Common tasks
 
@@ -103,7 +104,7 @@ Any default can be changed for one workspace, so differences from the baseline a
 
 - **Plan guard** (the plan check on every pull request) fails the check when a plan deletes or replaces something people depend on, or weakens security, until a person adds the label `allow-risky-changes`. What it looks for: [design.md](../docs/design.md), section 3.
 - **The AI review** in the plan comment calls out every value in a workspace file that differs from the baseline, with the old and new value, and flags security-relevant ones first.
-- **Code owners** (`.github/CODEOWNERS`) decide who must approve which files: the platform team for `defaults/` and everything outside `config/`, security for `defaults/settings.yaml`.
+- **Code owners** (`.github/CODEOWNERS`) decide who must approve which files: the platform team for `defaults/` and everything outside `config/`, security for `defaults/settings.yaml`. A workspace file can relax the same settings under `settings:` with only the platform team's approval; the plan guard and the AI review flag it. To make security approve those too, add `/config/workspaces/` with both teams to `.github/CODEOWNERS`.
 
 Put the reason for a difference in a comment next to it: the reviewer sees it in the diff.
 

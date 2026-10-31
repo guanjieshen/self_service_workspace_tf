@@ -60,10 +60,10 @@ Each topic has one home. Update that file; link to it from elsewhere instead of 
 
 | You change | Also change | Tests |
 | --- | --- | --- |
-| A baseline value in `config/defaults/` | The comment beside it; `CHANGELOG.md` if it changes what workspaces get | None, unless the shipped baseline changes: then the copy in `terraform/tests/defaults/` too |
+| A baseline value in `config/defaults/` | The comment beside it; the same value in `terraform/tests/defaults/` (the baseline as released); `CHANGELOG.md` if it changes what workspaces get, with a **Baseline edits** row | `scripts/tests/test_baseline_copy.py` fails until both copies match (in this repository only); an AI eval fixture whose plan shows the old value |
 | A new baseline key (an option) | The same key in `terraform/tests/defaults/`; its use in `terraform/`; `config/README.md` (task table) if operators set it; `CHANGELOG.md` (what the first plan shows) | A fixture under `terraform/tests/fixtures/` and an assertion (`agents/terraform.md`) |
 | A Databricks setting | Map it in `terraform/overrides.tf` (`setting_addresses`) so `null` releases it | `scripts/tests/test_release.py` checks the mapping |
-| A plan guard rule (what needs approval) | `PROTECTED`, `SECURITY_SETTINGS`, `SECURE_CONF` in `scripts/plan-guard.py`; the list in `docs/design.md`, section 3 | `scripts/tests/test_plan_guard.py` (`EverySecurityRule` covers each table entry) |
+| A plan guard rule (what needs approval) | `PROTECTED`, `SECURITY_SETTINGS`, `SECURITY_SETTINGS_V2`, `SECURE_CONF`, or a rule in `loosened()`, `removed_access()` or `main()` of `scripts/plan-guard.py`; the list in `docs/design.md`, section 3 | `scripts/tests/test_plan_guard.py` (`EverySecurityRule` covers each table entry; a rule outside the tables needs its own test) |
 | A Genie Code placeholder (`{CATALOG}`, ...) | `terraform/access.tf` (`genie_instructions`, `genie_skill_text`); the placeholder table in `config/README.md` | `baseline.tftest.hcl` (`genie_code_defaults`: no placeholder left unfilled) |
 | A persona, or what one gets | `personas` in `config/defaults/access.yaml` and `terraform/tests/defaults/access.yaml`; `groups` in `_example.yaml`; the persona tables in `docs/design.md` and the AI prompt | `baseline.tftest.hcl` (`personas`) |
 | A check (a wrong value fails the plan) | `terraform/checks.tf`: the message names the key, the file and what to do | A fixture under `terraform/tests/fixtures/invalid/` and a run in `validation.tftest.hcl` |
@@ -130,6 +130,9 @@ further step. When you add something:
 - `node`: the plan comment (`.github/scripts/tests/`).
 - `scaffold`: a workspace file copied from `_example.yaml` and filled in plans.
 
+No workspace or cloud credentials are needed. The first `terraform` run downloads the Databricks
+provider (registry.terraform.io, or your mirror); later runs reuse it from `.terraform/`.
+
 ## Releasing
 
 A release is a zip an organization installs ([SETUP.md](docs/SETUP.md), step 2). This repository holds a working installation (its tenant, state storage, account and workspaces) so every change is tested for real; the release must hold none of it.
@@ -142,7 +145,7 @@ A release is a zip an organization installs ([SETUP.md](docs/SETUP.md), step 2).
 | 4 | Build the zip: `python3 scripts/release.py v1.0.0` writes `dist/<repo>-v1.0.0.zip` |
 | 5 | Check it: unzip it, `git init`, commit, and run `./scripts/test.sh` there |
 
-`scripts/release.py` leaves out `dev/`, `config/backend.hcl` and every workspace file but `_example.yaml`, sets the values in `config/setup.yaml` and `account_id` to `null`, and replaces the CODEOWNERS owners. It **refuses to write the zip** if any of this repository's own identifiers (tenant, subscription, storage, account, workspace hosts, owners) is still in it. A value it does not know about yet (a new file holding an environment value) is your job: add it to the script and to `scripts/tests/test_release_zip.py`.
+`scripts/release.py` leaves out `dev/`, `config/backend.hcl` and every workspace file but `_example.yaml`, sets the values in `config/setup.yaml` and `account_id` to `null`, replaces the CODEOWNERS owners (`@your-org/databricks-platform`, and `@your-org/security` too on `config/defaults/settings.yaml`), and adds `VERSION`. It **refuses to write the zip** if any of this repository's own identifiers (tenant, subscription, storage, account, workspace hosts, owners) is still in it. A value it does not know about yet (a new file holding an environment value) is your job: add it to the script and to `scripts/tests/test_release_zip.py`.
 
 ## Writing style
 
@@ -177,7 +180,8 @@ In code:
 - **Local plans as a person** can show permission drift that CI does not (different
   identity). Trust CI's plan and drift check.
 - **Run tests through `scripts/test.sh`.** Plain `terraform test` in `terraform/` fails on a
-  missing provider; the script sets the plugin directory (TF_DATA_DIR).
+  missing provider; the script initializes into its own data directory (`TF_DATA_DIR`,
+  `.terraform/_test`), apart from the per-workspace ones `tf.sh` uses.
 - **GitHub's UI lags.** A job can show "in progress" after its steps finished, and Apply can
   sit queued for minutes after a merge. Wait (`gh run watch`).
 - Terraform and provider gotchas: `agents/terraform.md`.

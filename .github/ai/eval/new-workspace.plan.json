@@ -585,7 +585,7 @@
     ],
     "before": null,
     "after": {
-     "auto_stop_mins": 5,
+     "auto_stop_mins": 10,
      "channel": [],
      "cluster_size": "X-Small",
      "enable_photon": true,

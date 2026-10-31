@@ -9,6 +9,7 @@ groups: {users: tst_users, explorer: tst-explorers, builder: tst-builders, publi
 serverless_policy: {enabled: false}
 starter_warehouse: {admins_only: null}
 catalog: null
+default_catalog: null
 settings: {disable_legacy_access: null, disable_dbfs_root_and_mounts: null, enforce_user_isolation: null, compliance_security_profile: null,
   restrict_workspace_admins: null, personal_access_tokens: null, enhanced_security_monitoring: null, automatic_cluster_update: null,
   verbose_audit_logs: null, enforce_unity_gateway: null, data_handling: null, collaboration_platforms: null, git: null,

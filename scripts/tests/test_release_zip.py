@@ -53,6 +53,7 @@ class ReleaseZip(unittest.TestCase):
                 names = z.namelist()
         self.assertTrue(all(n.startswith(zip_path.stem + "/") for n in names))
         self.assertIn(f"{zip_path.stem}/README.md", names)
+        self.assertIn(f"{zip_path.stem}/VERSION", names, "an installation can tell which release it runs")
 
     def test_a_bad_version_is_refused(self):
         with self.assertRaises(SystemExit), redirect_stderr(io.StringIO()):

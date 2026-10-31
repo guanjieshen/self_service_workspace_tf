@@ -15,7 +15,7 @@ each, in parallel on the runners there are, each with its own log and Re-run but
 | --- | --- | --- |
 | `checks.yml` (**Format and validate**, **Tests**) | Every pull request | Formatting, `terraform validate`, the cross-workspace checks, every test. Required by branch protection |
 | `deploy.yml`, on a pull request | The workspaces the change concerns (below) | For each: preflight, plan, and a plan comment (the plan, the plan guard's warnings, an AI review) when the plan changes something. A plan with hard-to-undo or security-weakening changes fails until someone adds the label `allow-risky-changes` |
-| `deploy.yml`, on merge to `main` | The same workspaces, without the review-only changes | The approval step (`apply-approval`), then an apply for each. A deleted workspace file: its Terraform state is removed (the workspace is unchanged) |
+| `deploy.yml`, on merge to `main` | The same workspaces, without the review-only changes | The approval step (`apply-approval`), then for each workspace: preflight (an error stops it before anything changes), the `allow-risky-changes` check on the merged pull request, and the apply. A deleted workspace file: its Terraform state is removed (the workspace is unchanged) |
 | `deploy.yml`, every Monday (or Run workflow) | Every workspace | Drift check: plans each, and opens an issue labelled `drift` for each that no longer matches; closes it once clean |
 
 Which workspaces a change concerns:
@@ -23,7 +23,7 @@ Which workspaces a change concerns:
 | Change | Planned (pull request) | Applied (merge) |
 | --- | --- | --- |
 | `config/workspaces/<name>.yaml` | That workspace | That workspace (a deleted file: its state is removed) |
-| `config/defaults/`, `terraform/` (except `terraform/tests/`), `scripts/tf.sh`, `scripts/plan-guard.py` | Every workspace | Every workspace |
+| `config/defaults/`, `terraform/` (except `terraform/tests/` and its `.md` guides), `scripts/tf.sh`, `scripts/plan-guard.py`, `scripts/workspaces.py` | Every workspace | Every workspace |
 | What the plan comment shows: `scripts/preflight.py`, `scripts/ai-plan-review.py`, `.github/ai/`, `config/setup.yaml`, `deploy.yml` and what it uses | Every workspace | None |
 | Anything else: tests, docs, other scripts | None | None |
 
@@ -66,10 +66,10 @@ In that case, run these jobs on a runner inside an allowed network and set the r
 
 | Runner | Notes |
 | --- | --- |
-| Self-hosted runner in the Azure network (VM or container) | Register it to the repository or organization with a label such as `citizen-dev`, then set `TERRAFORM_RUNNER` to `"citizen-dev"`. Needs `bash`, `python3`, `git` and outbound access to GitHub and the workspace. |
+| Self-hosted runner in the Azure network (VM or container) | Register it to the repository or organization with a label such as `citizen-dev`, then set `TERRAFORM_RUNNER` to `"citizen-dev"`. Needs `bash`, `python3`, `git`, `node` (for `actions/github-script`), `curl`, `tar` and `sha256sum`, and the **Azure CLI** (the retire job). The jobs install Terraform and the Databricks CLI themselves. Outbound access to: GitHub (github.com, api.github.com, the Actions endpoints), the Terraform registry and releases (registry.terraform.io, releases.hashicorp.com, or your mirror), Entra ID (login.microsoftonline.com), the state storage account (`<account>.blob.core.windows.net`), the Databricks account console (accounts.azuredatabricks.net) and each workspace. |
 | GitHub-hosted runners with Azure private networking | GitHub Team or Enterprise; runners join an Azure VNet you provide. Set `TERRAFORM_RUNNER` to the runner group, for example `{"group": "my-runner-group", "labels": "linux-4core"}`. |
 
-The jobs that reach Databricks or the state use `TERRAFORM_RUNNER`. The checks and the routing step use `CHECKS_RUNNER` (default `ubuntu-latest`): set it too if your organization has no GitHub-hosted runners.
+The jobs that reach Databricks or the state use `TERRAFORM_RUNNER`. The checks and the routing step use `CHECKS_RUNNER` (default `ubuntu-latest`): set it too if your organization has no GitHub-hosted runners. They run a pull request's code before review, so in a public repository never point `CHECKS_RUNNER` at a self-hosted runner: a pull request from a fork would run on it.
 
 ## Hardening and noise
 

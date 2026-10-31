@@ -13,6 +13,8 @@ From the committed files only (git archive of HEAD), the zip:
   - replaces the owners in .github/CODEOWNERS with @your-org/databricks-platform, and on the
     security settings (config/defaults/settings.yaml) with it and @your-org/security;
 
+  - adds VERSION, the release's name (an installation has no tags of this repository);
+
 then refuses to write the zip if any of this repository's identifiers is still in it (its tenant,
 subscription, storage, account, workspace hosts and storage roots, CODEOWNERS owners). Run it
 from a clean checkout of the commit to release.
@@ -31,7 +33,6 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import workspaces as wsf  # noqa: E402  (the same YAML reading as the other scripts)
 
 LEFT_OUT = re.compile(r"^(dev/|config/backend\.hcl$|config/workspaces/(?!_example\.yaml$)[^/]+\.yaml$)")
-KEEP_IN_SETUP = set()
 # Blanked, but not identifiers: an Azure region is a common word, found in examples too.
 NOT_IDENTIFIERS = {"state_location"}
 OWNER = "@your-org/databricks-platform"
@@ -53,7 +54,7 @@ def own_identifiers(files):
     setup = files.get("config/setup.yaml", b"").decode()
     for line in setup.splitlines():
         m = re.match(r"^([a-z_]+):\s*(\S+)", line)
-        if m and m.group(1) not in KEEP_IN_SETUP | NOT_IDENTIFIERS and m.group(2) not in ("null", '""'):
+        if m and m.group(1) not in NOT_IDENTIFIERS and m.group(2) not in ("null", '""'):
             found.add(m.group(2).strip('"'))
     for value in re.findall(r'=\s*"([^"]+)"', files.get("config/backend.hcl", b"").decode()):
         found.add(value)
@@ -74,7 +75,7 @@ def blank_setup(text):
     """Every value in config/setup.yaml to null, its comment kept."""
     def blank(m):
         key, value, rest = m.group(1), m.group(2), m.group(3) or ""
-        if key in KEEP_IN_SETUP or value == "null":
+        if value == "null":
             return m.group(0)
         return f"{key}: null".ljust(len(f"{key}: {value}")) + rest
     return re.sub(r"(?m)^([a-z_]+): (\S+)([ \t]+#.*)?$", blank, text)
@@ -100,7 +101,7 @@ def release_codeowners(text):
     """Every owner to OWNER; the security paths' owners to OWNER and SECURITY_OWNER."""
     lines = []
     for line in text.splitlines():
-        if line.split(maxsplit=1)[:1] and line.split()[0] in SECURITY_PATHS:
+        if line.split()[:1] and line.split()[0] in SECURITY_PATHS:
             line = line.split()[0].ljust(len(line) - len(line.lstrip()) + 36) + f"{OWNER} {SECURITY_OWNER}"
         else:
             for owner in set(re.findall(r"@[\w.-]+(?:/[\w.-]+)?", line)) - {OWNER, SECURITY_OWNER}:
@@ -130,6 +131,8 @@ def main(argv=None):
         raise SystemExit(f"version must look like v1.0.0, not {args.version!r}")
     files = committed_files()
     release = release_files(files)
+    # Which release an installation runs: git init after unzipping has no tags.
+    release["VERSION"] = (args.version + "\n").encode()
     found = leaks(release, own_identifiers(files))
     if found:
         for path, value in found:
@@ -144,7 +147,7 @@ def main(argv=None):
             info = zipfile.ZipInfo(f"{name}/{path}")
             info.external_attr = (0o755 if path.endswith((".sh", ".py")) and path.startswith("scripts/") else 0o644) << 16
             z.writestr(info, release[path])
-    print(f"{zip_path}: {len(release)} files (left out: {len(files) - len(release)})")
+    print(f"{zip_path}: {len(release)} files (left out: {len(set(files) - set(release))}; added: VERSION)")
     return 0
 
 

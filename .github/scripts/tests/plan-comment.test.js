@@ -136,3 +136,14 @@ test('a retirement says what merging does, and is always posted', async () => {
   await postRetire({ github, context: { repo: { owner: 'o', repo: 'r' }, issue: { number: 1 } } }, 'hr');
   assert.deepStrictEqual(calls, [body]);
 });
+
+test('a plan touching hundreds of resources still fits in one GitHub comment', () => {
+  const many = (line, n) => Array.from({ length: n }, (_, i) => `${line} ${i}`).join('\n');
+  const body = buildBody('ws', 'm', plans({
+    '.txt': many('  # module.x will be destroyed', 4000), '.changes': '4000', '.guard': '2\n',
+    '.guard.txt': 'Needs approval: 4000 changes\n' + many('  - DELETE permissions\n      module.compute.databricks_permissions.x', 4000),
+    '.summary.md': many('| delete | `module.compute.databricks_permissions.x` |', 4000),
+  }));
+  assert.ok(body.length <= 65536, `${body.length} characters`);
+  assert.ok(body.includes('(cut; see the job log)'));
+});

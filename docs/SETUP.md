@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide takes the repository from a zip file to its first governed workspace. It is ordered by **who does what**: each step is one team's checklist, with the values it needs and the command it runs. Most steps happen once; onboarding each further workspace is step 9 only.
+This guide takes the repository from a zip file to its first governed workspace. It is ordered by **who does what**: each step is one team's checklist, with the values it needs and the command it runs. Most steps happen once. Onboarding each further workspace repeats step 6 (items 2 and 5), step 7 and step 9.
 
 | # | Step | Who | When |
 | - | --- | --- | --- |
@@ -18,7 +18,7 @@ This guide takes the repository from a zip file to its first governed workspace.
 | 10 | [Day to day](#10-day-to-day) | Platform team | Ongoing |
 | 11 | [Troubleshooting](#11-troubleshooting) | Anyone | When needed |
 
-Steps 3 to 8 can run in parallel once step 2 is done, except that step 4 needs the storage account from step 3, and steps 5 and 6 need the client ID from step 4.
+Steps 3 to 8 can run in parallel once step 2 is done, except that step 4 needs the storage account from step 3, and steps 5 and 6 need the client ID from step 4. **Push what steps 3 and 4 write (`config/backend.hcl`, the client ID in `config/setup.yaml`) to `main` before step 5:** step 5 protects `main`, and after it every change goes through a pull request with an approval.
 
 Steps 3 to 5 are commands that read their values from `config/setup.yaml`; step 6 is done by hand in the Databricks account console. Each command prints the script it would run, so you can read it first or send it to the team that owns the step; add `--run` to run it. Each one checks before it creates, so running it again is safe.
 
@@ -85,7 +85,7 @@ Two more things to know before you start; they live in their own files, not here
    git remote add origin https://github.com/<org>/<repo>.git && git push -u origin main
    ```
 
-3. **Push only what you want deployed.** Once step 5 is done, every push to `main` applies each workspace file in `config/workspaces/`. A release ships with none (only `_example.yaml`), so the first push deploys nothing.
+3. **Push only what you want deployed.** Once step 5 is done, every push to `main` applies the workspaces that push concerns: the `config/workspaces/` files it changes, or every workspace when it changes `config/defaults/` or the Terraform code ([github-actions.md](github-actions.md)). A release ships with none (only `_example.yaml`), so the first push deploys nothing.
 4. **Replace the owners in `.github/CODEOWNERS`** with your teams (for example `@my-org/databricks-platform` and `@my-org/security`) **before step 5**, in this push or a direct one after it. Step 5 turns on branch protection that requires code owners to review, so a placeholder owner would leave nobody able to approve.
 
 > **Note:** The repository's GitHub OIDC subject includes its numeric IDs, so create the repository with its final name before step 4. Renaming it later means recreating the two federated credentials (update `github_repo` and run step 4 again).
@@ -213,11 +213,11 @@ python3 scripts/setup.py github          # read it
 python3 scripts/setup.py github --run
 ```
 
-It sets the repository variables `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID`, creates the labels `allow-risky-changes` and `drift`, the environment `apply-approval` (deployments from `main` only; with `apply_approvers` set, that team must approve each apply), and protects `main`: pull requests only, the **Format and validate** and **Tests** checks must pass, and code owners must approve. The rule applies to **repository admins too**: a push to `main` is an apply with workspace admin rights, so nobody can skip the review. A pull request needs an approval from someone other than its author, so name at least two people in each code owner team.
+It sets the repository variables `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID`, creates the labels `allow-risky-changes` and `drift`, the environment `apply-approval` (deployments from `main` only; with `apply_approvers` set, that team must approve each apply), and protects `main`: pull requests only, the **Format and validate** and **Tests** checks must pass, and code owners must approve. The rule applies to **repository admins too**: a push to `main` is an apply with workspace admin rights, so nobody can skip the review. A pull request needs an approval from someone other than its author, so name at least two people in each code owner team. A push after an approval dismisses it, so what merges is what was reviewed.
 
 Then, if needed:
 
-- **Private networking.** If the workspaces use Private Link or an IP access list, GitHub-hosted runners cannot reach them. Register a self-hosted runner inside the network (or use GitHub's Azure private networking) and set the repository variable `TERRAFORM_RUNNER`, for example `"citizen-dev"` with the quotes ([docs/github-actions.md](github-actions.md)).
+- **Private networking.** If the workspaces use Private Link or an IP access list, GitHub-hosted runners cannot reach them. Register a self-hosted runner inside the network (or use GitHub's Azure private networking) and set the repository variable `TERRAFORM_RUNNER`, for example `"citizen-dev"` with the quotes; if your organization has no GitHub-hosted runners at all, set `CHECKS_RUNNER` too ([docs/github-actions.md](github-actions.md): what the runner needs and must reach).
 - **Write access.** Only the platform team should be able to push branches: a pull request's plan runs with the pipeline's workspace-admin rights before review ([docs/github-actions.md](github-actions.md), "Who can run code with the workspace credentials").
 
 > **Warning:** Required reviewers and branch protection need GitHub Team or Enterprise for private repositories. Without them, merging is the only approval and nothing stops a merge before its plan finishes: wait for every check first.
@@ -228,7 +228,7 @@ Then, if needed:
 
 1. **Add the service principal to the account:** User management > Service principals > Add service principal > **Microsoft Entra ID managed**, with the application ID `pipeline_client_id` and the name `pipeline_name` (default `sp-citizen-dev-terraform`).
 2. **Make it workspace admin** of each workspace this repository manages: Workspaces > the workspace > Permissions > Add permissions > the service principal, **Admin**.
-3. **Let it create budget policies** (serverless usage policies): in the account console, User management > Service principals > the service principal > Roles, turn on **Billing admin**. Account admin alone is not enough ("missing CreateBudgetPolicyPermission"). If you will not grant this, set `serverless_policy.enabled: false` in `config/defaults/cost.yaml` instead.
+3. **Let it create serverless usage policies** (their API still calls them budget policies): in the account console, User management > Service principals > the service principal > Roles, turn on **Billing admin**. Account admin alone is not enough ("missing CreateBudgetPolicyPermission"). If you will not grant this, set `serverless_policy.enabled: false` in `config/defaults/cost.yaml` instead.
 4. **Note the account ID** (account console, top right) for `account_id` in `config/defaults/cost.yaml` (step 8): usage policies belong to the account.
 5. **Let it create the workspace catalog.** A **metastore admin** of each workspace's metastore grants, in a SQL editor or Catalog Explorer (the metastore > Permissions):
 
@@ -238,7 +238,9 @@ Then, if needed:
 
    A workspace that Databricks enabled for Unity Catalog automatically may already give its workspace admins this privilege, and with it the pipeline (item 2); preflight tells you. The catalog also needs somewhere to keep its data: either the metastore has a storage root, or the workspace's file sets `catalog.storage_root` to an external location (the Unity Catalog team creates the storage credential and external location). In that case, also grant `CREATE MANAGED STORAGE` on that external location to the service principal.
 
-The service principal is never account admin or metastore admin: it needs workspace admin in the workspaces it manages, the budget policy permission and `CREATE CATALOG`. It owns the catalog it creates, which is what lets later applies change it; the platform admins group gets all privileges and `MANAGE` on it (`config/defaults/catalog.yaml`). `scripts/preflight.py` (step 9) confirms items 2, 3 and 5 for each workspace.
+   **A catalog that already exists** (from an earlier setup) must be owned by the service principal, or later applies cannot change it or its grants. If a group owns it, a metastore admin runs `ALTER CATALOG <name> OWNER TO \`<pipeline_client_id>\``; preflight names it.
+
+The service principal is never account admin or metastore admin: it needs workspace admin in the workspaces it manages, Billing admin (for the serverless usage policy) and `CREATE CATALOG`. It owns the catalog it creates, which is what lets later applies change it; the platform admins group gets all privileges and `MANAGE` on it (`config/defaults/catalog.yaml`). `scripts/preflight.py` (step 9) confirms items 2, 3 and 5 for each workspace.
 
 ## 7. Groups
 
@@ -265,7 +267,9 @@ The baseline in `config/defaults/` is what every workspace gets. Most of it is a
 
 | Decision | File and key | Shipped value | Notes |
 | --- | --- | --- | --- |
-| **Disable legacy access** (Hive metastore, DBFS root and mounts, No-isolation clusters) | `defaults/settings.yaml` `disable_legacy_access`, `disable_dbfs_root_and_mounts`, `enforce_user_isolation` | `true` | **One-way after 30 days.** Fine for new workspaces. For an existing one, `preflight.py` lists what still uses legacy access; set them to `null` under `settings:` in that workspace's file until it is migrated |
+| **Disable legacy access** (Hive metastore, No-isolation clusters) | `defaults/settings.yaml` `disable_legacy_access` | `true` | **One-way after 30 days.** Fine for new workspaces. For an existing one, `preflight.py` lists what still uses legacy access; set it to `null` under `settings:` in that workspace's file until it is migrated |
+| DBFS root and mounts off, user isolation enforced | `defaults/settings.yaml` `disable_dbfs_root_and_mounts`, `enforce_user_isolation` | `true` | Reversible, but they break the same legacy work: leave them `null` with `disable_legacy_access` for a workspace that is not migrated yet |
+| **Default catalog** | `defaults/catalog.yaml` `default_catalog` | `{prefix}_citizen_dev` (the workspace's own catalog) | Unqualified table names resolve to it instead of the catalog Databricks created with the workspace. The plan guard flags it on each workspace's first plan; `null` leaves the default alone |
 | Git URLs allowed in Git folders | `defaults/settings.yaml` `git.allowed_urls` | `https://github.com/` (every github.com repository; other Git hosts blocked) | Narrow it to your organization (`https://github.com/<your-org>/`), or add your GitHub Enterprise host |
 | Compliance security profile | `defaults/settings.yaml` `compliance_security_profile` | `null` (leave alone) | **One-way**, and billed. Only if your compliance team requires it |
 | Unity Gateway enforced | `defaults/settings.yaml` `enforce_unity_gateway` | `true` | Switches off the `databricks-` pay-per-token endpoints; model calls must use `system.ai` models |
@@ -278,6 +282,7 @@ The baseline in `config/defaults/` is what every workspace gets. Most of it is a
 | Serverless usage policy | `defaults/cost.yaml` `serverless_policy` | On, `{PREFIX}-0-SELF-SERVICE`, every persona | Needs an account-level permission for the pipeline (step 6); set `enabled: false` if you will not grant it. Data classification (turned on by hand, step 9) uses it |
 | Catalog name and features | `defaults/catalog.yaml` `catalog` | `{prefix}_citizen_dev`, predictive optimization on | `catalog.storage_root` is needed when the metastore has no storage root (preflight says so) |
 | Serverless Starter Warehouse | `defaults/compute.yaml` `starter_warehouse.admins_only` | `true` | Only the platform admins may use the Starter warehouse Databricks creates in a new workspace; on an existing one, **anyone using it loses access** on the first apply. `null` leaves its access alone |
+| `/Workspace/Shared` | Not managed | Databricks gives `users` Can manage | Anyone can read and change what is shared there; data access is still decided by Unity Catalog. Remove `users` by hand if folder permissions should mean something (`docs/design.md`, open question P12) |
 | Classic cluster node types | `defaults/compute.yaml` `cluster_policy.node_types` | `Standard_E8_v3`, `Standard_E16_v3`, `Standard_E32_v3` | Azure VM sizes: check they are offered in your workspaces' region and that the subscription has quota |
 | Restrict workspace admins | `defaults/settings.yaml` `restrict_workspace_admins` | `false` | Needs account admin to change; leave `false` |
 | AI review of each plan | `config/setup.yaml` `ai_review_host`, `ai_review_model` | Off until a host is set; then `system.ai.claude-sonnet-5-5` there | Advice in the plan comment only. One workspace that has the model reviews every plan; the pipeline's service principal needs to be in it, with `EXECUTE` on the model (account users have it on `system.ai` by default) |
@@ -300,10 +305,11 @@ Before you start: the workspace exists and the runners can reach it (its private
 
    It checks the sign-in and admin rights, the metastore, that every group is an account group (and that the platform admins group has members), that the pipeline may create usage policies (Billing admin), that it may create the catalog (or owns it), the catalog's storage, that the workspace has token permissions, and what still uses legacy access.
 4. **Open a pull request.** The deploy workflow plans only this workspace and posts its plan: everything the first apply creates. Preflight problems are at the top of the comment.
-5. **Merge.** After the approval step (if `apply-approval` has reviewers), the workspace is deployed.
-6. **Verify:** the next pull request that touches it (or the Monday drift check) shows no changes. In the workspace: the persona groups under Settings > Identity and access, the `<PREFIX> Default Warehouse`, and the `{prefix}_citizen_dev` catalog.
-7. **By hand, in Catalog Explorer** (`{prefix}_citizen_dev` > Details), as a member of `{prefix}_platform_admins`: turn on **Data Classification**, with the workspace's usage policy `<PREFIX>-0-SELF-SERVICE`, and **Data Quality Monitoring** for the schemas it lists. Terraform does not manage either (classification's API needs a usage policy the Terraform provider cannot send; monitoring is per schema, and schemas come from the self-service app). Turn monitoring on again for schemas created later.
-8. **By hand, in Workspace settings > Appearance:** the workspace theme's categorical colors and the Genie One color and welcome message, with the values in `config/defaults/settings.yaml` ("Appearance: set by hand"). There is no API for them yet.
+5. **Approve the first plan.** A new workspace's first plan is always flagged by the plan guard: it sets the default catalog and makes the Starter warehouse admins only. A platform team member who has read the plan comment adds the `allow-risky-changes` label (see **Approving a flagged change**, step 10); the plan check then re-runs and passes.
+6. **Merge only when every check is green, including Plan.** Only **Format and validate** and **Tests** are required by branch protection (the plan jobs' names change with the workspaces), so GitHub lets you merge past a red plan; the apply would then stop at the same problem: a preflight problem before anything changes, a problem only Terraform finds partway. After the approval step (if `apply-approval` has reviewers), the workspace is deployed.
+7. **Verify:** the next pull request that touches it (or the Monday drift check) shows no changes. In the workspace: the persona groups under Settings > Identity and access, the `<PREFIX> Default Warehouse`, and the `{prefix}_citizen_dev` catalog.
+8. **By hand, in Catalog Explorer** (`{prefix}_citizen_dev` > Details), as a member of `{prefix}_platform_admins`: turn on **Data Classification**, with the workspace's usage policy `<PREFIX>-0-SELF-SERVICE`, and **Data Quality Monitoring** for each schema the self-service app created. Terraform does not manage either (classification's API needs a usage policy the Terraform provider cannot send; monitoring is per schema, and schemas come from the self-service app). Turn monitoring on again for schemas created later.
+9. **By hand, in Workspace settings > Appearance:** the workspace theme's categorical colors and the Genie One (the Genie home page) color and welcome message, with the values in `config/defaults/settings.yaml` ("Appearance: set by hand"). There is no API for them yet.
 
 > **Warning:** Applying the baseline to an existing workspace changes its settings for everyone in it (downloads, tokens, Git folders, legacy access). Read the plan comment's settings changes with the workspace's owners before merging.
 
@@ -315,24 +321,36 @@ Before you start: the workspace exists and the runners can reach it (its private
 | Change one workspace | Pull request editing `config/workspaces/<name>.yaml`: only that workspace is planned and applied |
 | Change every workspace | Pull request editing `config/defaults/`: every workspace is planned, and applied, each in its own job (one that fails does not stop the others) |
 | Retire a workspace | Delete its file in a pull request: its Terraform state is removed on merge; the workspace itself is unchanged |
-| A plan is flagged as risky | Review the warning in the plan comment; if intended, a person adds the label `allow-risky-changes`. The apply checks it too: a flagged change merged without the label stops at apply. Add the label to the merged pull request, then re-run the apply. A new workspace's first apply is not flagged for disabling legacy access when preflight found nothing that still uses it |
+| A plan is flagged as risky | **Approving a flagged change**, below |
 | A `drift` issue opens | Someone changed a setting by hand: update the configuration to match, or re-apply to restore it |
 | Retry a failed apply | Fix the cause, then re-run the latest Apply run (it refuses if `main` has moved on) |
-| Plan locally | `./scripts/tf.sh <name> plan`, signed in with `az login`. You need **Storage Blob Data Reader** (or Contributor) on the state container, and Databricks access to the workspace. CI's plan is the one to trust |
+| Plan locally | `./scripts/tf.sh <name> plan`, signed in with `az login`. You need **Storage Blob Data Contributor** on the state container (a local plan takes the state lock, which writes), and Databricks access to the workspace. CI's plan is the one to trust |
 | Upgrade to a new release | Below: the pull request's plan shows what the new version changes in each workspace |
 
 More: [config/README.md](../config/README.md) (configuration tasks) and [github-actions.md](github-actions.md) (the workflows).
 
+### Approving a flagged change
+
+The plan guard flags changes that are hard to undo or that weaken security or take access away (the list: [design.md](design.md), section 3). A flagged plan fails its check until the pull request has the label `allow-risky-changes`.
+
+1. **Read the plan comment**: the guard's findings are under **Before merging** and **Technical details**. The AI review says what they mean for the workspace.
+2. **A platform team member other than the author** adds `allow-risky-changes` (the pull request's Labels, in the sidebar), only if the change is intended. The plan check re-runs and passes. The label records the approval; it does not make the change safer.
+3. **The apply checks it again:** a flagged change merged without the label stops at apply. Add the label to the merged pull request, then re-run the apply.
+
+> **Warning:** Anyone with write access can add a label, and GitHub cannot limit labels to a team. Keep write access to the platform team, and require code owner review (step 5). For a second pair of eyes on every deploy, set `apply_approvers` in `config/setup.yaml`: each apply then waits for that team in the `apply-approval` environment.
+
+A new workspace's first plan is always flagged (the default catalog, the Starter warehouse). Disabling legacy access is not flagged there when preflight found nothing that still uses it.
+
 ### Upgrade to a new release
 
-Releases are git tags (`v1.2.0`), with what changed in `CHANGELOG.md`.
+Each release is a zip named after its version (`v1.2.0`), with what changed in `CHANGELOG.md`. `VERSION` at the top of the repository says which release you run.
 
 Replace the framework files, keep your configuration. Unpack the new release next to your repository (for example as `../new`), then from your repository:
 
 ```bash
 FRAMEWORK="terraform scripts .github/workflows .github/actions .github/scripts .github/ai docs \
-  README.md CHANGELOG.md AGENTS.md CLAUDE.md agents config/README.md config/AGENTS.md \
-  config/workspaces/_example.yaml"
+  .github/dependabot.yml .github/pull_request_template.md README.md CHANGELOG.md AGENTS.md CLAUDE.md \
+  agents config/README.md config/AGENTS.md config/workspaces/_example.yaml VERSION"
 git rm -r -q --ignore-unmatch $FRAMEWORK             # also drops files the release removed
 (cd ../new && tar -cf - $FRAMEWORK) | tar -xf -      # the release's versions
 git add -A && git checkout -b upgrade-v1.3.0

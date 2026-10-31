@@ -17,7 +17,7 @@ request; nothing reaches a workspace until it is merged. The one-time setup is i
 **Before you start** (outside the repository, done once per workspace):
 
 - The workspace exists, and the pipeline's runners can reach it (its private endpoint and DNS).
-- The pipeline's service principal is workspace admin there ([SETUP.md](SETUP.md), step 6).
+- The pipeline's service principal is workspace admin there, and may create the catalog in its metastore (`CREATE CATALOG`, and `CREATE MANAGED STORAGE` on the external location if the catalog has its own storage) ([SETUP.md](SETUP.md), step 6, items 2 and 5).
 - Its persona groups exist in Entra ID and are synced to the Databricks account ([SETUP.md](SETUP.md), step 7).
 - A brand-new workspace: a workspace admin creates one personal access token and revokes it straight away, so the workspace has token permissions for Terraform to set ([SETUP.md](SETUP.md), step 9).
 
@@ -47,7 +47,11 @@ request; nothing reaches a workspace until it is merged. The one-time setup is i
   settings, the groups' access, the warehouse, the catalog, the policies.
 - If something outside the repository is missing (a group not in the account, the service
   principal not an admin, no storage for the catalog), the comment says so at the top.
-- **Merge**, and the workspace is deployed. From the next Monday it is in the drift check.
+- The first plan is **flagged by the plan guard** (it sets the default catalog and makes the
+  Starter warehouse admins only), so its check is red. A platform team member who has read the
+  comment adds the `allow-risky-changes` label, and the check passes.
+- **Merge when every check is green**, and the workspace is deployed. From the next Monday it
+  is in the drift check.
 
 ## 2. Change one workspace
 

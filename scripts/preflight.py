@@ -200,20 +200,31 @@ def tokens_enabled(f):
 
 
 def legacy_uses(get):
-    found = []
+    found, failed = [], []
     schemas, err = get("/api/2.1/unity-catalog/schemas?catalog_name=hive_metastore&max_results=50")
-    if not err:
+    if err and "does not exist" not in err:
+        failed.append(f"Hive metastore schemas ({err})")
+    elif not err:
         names = [s["name"] for s in schemas.get("schemas", []) if s.get("name") not in ("default", "information_schema")]
         if names:
             found.append(f"Hive metastore schemas: {', '.join(names[:10])}")
     mounts, err = get("/api/2.0/dbfs/list?path=/mnt")
-    if not err and mounts.get("files"):
+    if err and not any(t in err for t in ("does not exist", "RESOURCE_DOES_NOT_EXIST", "No file or directory")):   # no /mnt: no mounts
+        failed.append(f"DBFS mounts ({err})")
+    elif not err and mounts.get("files"):
         found.append(f"DBFS mounts: {', '.join(f['path'] for f in mounts['files'][:10])}")
-    clusters, _ = get("/api/2.1/clusters/list?page_size=100")
+    clusters, err = get("/api/2.1/clusters/list?page_size=100")
+    if err:
+        failed.append(f"clusters ({err})")
     legacy = [c.get("cluster_name", c.get("cluster_id")) for c in (clusters or {}).get("clusters", [])
               if c.get("data_security_mode") in ("NONE", "LEGACY_PASSTHROUGH", "LEGACY_TABLE_ACL", "LEGACY_SINGLE_USER")]
     if legacy:
         found.append(f"clusters without Unity Catalog access modes: {', '.join(legacy[:10])}")
+    # A check that could not run is not "nothing found": that line clears the one-way switch
+    # for a new workspace in the plan guard.
+    if failed and not found:
+        return [("warning", "could not check everything that still uses legacy access (" + "; ".join(failed) + "), so the "
+                            "plan guard asks for approval before disabling it, which is permanent after 30 days")]
     if not found:
         return [("ok", "nothing found that still uses legacy access (Hive metastore, DBFS mounts, legacy clusters)")]
     return [("warning", "the baseline disables legacy access, which becomes permanent after 30 days, and this "

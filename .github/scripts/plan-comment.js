@@ -55,12 +55,15 @@ function buildBody(ws, endpoint, dir = '.plans') {
       'If a person has reviewed it and approves, add the `allow-risky-changes` label; otherwise change the configuration. ' +
       'The label records the approval; it does not make the change safer.' : '',
   ];
+  // Each part is capped, so the comment always fits: a plan touching hundreds of resources
+  // makes a long guard list and summary table, and GitHub rejects a comment over the limit.
+  const cap = (text, max) => (text.length > max ? text.slice(0, max) + '\n... (cut; see the job log)' : text);
   const details = [
-    guard ? '**Plan guard**\n\n```\n' + guard + '\n```' : '',
-    summary ? '**Changed resources**\n\n' + summary : '',
+    guard ? '**Plan guard**\n\n```\n' + cap(guard, 15000) + '\n```' : '',
+    summary ? '**Changed resources**\n\n' + cap(summary, 15000) : '',
   ].filter(Boolean);
   const footer = ai ? `<sub>*AI-generated review (\`${endpoint}\`) based on the Terraform plan. Verify findings before merging.*</sub>` : '';
-  const room = MAX_COMMENT - sections.join('\n\n').length - details.join('\n\n').length - footer.length - 400;
+  const room = Math.max(0, MAX_COMMENT - sections.join('\n\n').length - details.join('\n\n').length - footer.length - 400);
   details.push(plan
     ? '**Full Terraform plan**\n\n```\n' + (plan.length > room ? '... (start of plan cut; see the job log)\n' + plan.slice(-room) : plan) + '\n```'
     : '_Plan failed; see the job log._');

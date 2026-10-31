@@ -116,6 +116,12 @@ class Scripts(unittest.TestCase):
             self.assertIn(check, names)
         self.assertIn('"contexts": ["Format and validate", "Tests"]', render("github"))
 
+    def test_main_is_protected_for_everyone_and_reviews_go_stale(self):
+        script = render("github")
+        self.assertIn('"enforce_admins": true', script, "a push to main is an apply: admins too go through a pull request")
+        self.assertIn('"dismiss_stale_reviews": true', script, "what merges is what was reviewed")
+        self.assertIn('"require_code_owner_reviews": true', script)
+
     def test_approvers_become_required_reviewers(self):
         script = render("github")
         self.assertNotIn('"reviewers"', script)

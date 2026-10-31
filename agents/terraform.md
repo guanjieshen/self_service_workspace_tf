@@ -44,7 +44,7 @@ One state per workspace. `scripts/tf.sh <workspace> plan` runs it (and the plan 
 The tests read `terraform/tests/defaults/`, a copy of `config/defaults/` as released, never
 the organization's own `config/defaults/`: an organization changing its baseline must not
 break the framework's tests. When you change a baseline file, change it in both places
-(the copy keeps the shipped values, for example `sql_warehouse.max_clusters: 2`).
+(the copy keeps the shipped values, for example `sql_warehouse.max_clusters: 5`; `scripts/tests/test_baseline_copy.py` fails here while the two differ).
 
 ## Provider and Terraform gotchas
 

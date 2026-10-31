@@ -18,6 +18,7 @@ catalog:
   owner: platform_admins
   other_privileges:
     11111111-2222-3333-4444-555555555555: [USE_CATALOG, CREATE_SCHEMA]
+    builder: [CREATE_SCHEMA]
 default_catalog: tst_citizen_dev
 settings:
   dashboard_embedding:

@@ -81,6 +81,52 @@ def token_groups(values):
     return {a.get("group_name") for a in (values or {}).get("access_control") or []}
 
 
+ENTITLEMENTS = ("workspace_access", "databricks_sql_access", "workspace_consume", "allow_cluster_create",
+                "allow_instance_pool_create")
+# Dashboard embedding, from the most to the least restrictive.
+EMBEDDING = ["DENY", "ALLOW_APPROVED_DOMAINS", "ALLOW_ALL_DOMAINS"]
+
+
+def privileges(values):
+    """principal => set of privileges, from a databricks_grants resource."""
+    return {g.get("principal"): set(g.get("privileges") or []) for g in (values or {}).get("grant") or []}
+
+
+def access_levels(values):
+    """principal => set of permission levels, from a databricks_permissions resource."""
+    return {a.get("group_name") or a.get("user_name") or a.get("service_principal_name"): {a.get("permission_level") or "access"}
+            for a in (values or {}).get("access_control") or []}
+
+
+def removed_access(rc):
+    """Plain-language warnings for an update that takes access away from someone: people lose
+    what they may be using (a delete is flagged as PROTECTED instead)."""
+    actions, rtype, addr = rc["change"]["actions"], rc["type"], rc["address"]
+    before, after = rc["change"].get("before") or {}, rc["change"].get("after") or {}
+    if actions != ["update"]:
+        return []
+    out = []
+    if rtype == "databricks_entitlements":
+        lost = [e for e in ENTITLEMENTS if before.get(e) and not after.get(e)]
+        if lost:
+            who = before.get("group_id") or addr.rsplit(".", 1)[-1]
+            out.append(f"REMOVE entitlements from {who}: {', '.join(lost)}")
+    if rtype == "databricks_grants":
+        b, a = privileges(before), privileges(after)
+        on = after.get("catalog") or after.get("schema") or "an object"
+        for principal in sorted(p for p in b if p):
+            lost = sorted(b[principal] - a.get(principal, set()))
+            if lost:
+                out.append(f"REMOVE {', '.join(lost)} on {on} from {principal}")
+    # Fewer token creators tightens security; the Starter warehouse has its own warning.
+    if rtype == "databricks_permissions" and rc.get("name") != "starter_warehouse" and after.get("authorization") != "tokens":
+        b, a = access_levels(before), access_levels(after)
+        for principal in sorted(p for p in b if p):
+            if principal not in a:
+                out.append(f"REMOVE {principal}'s access ({', '.join(sorted(b[principal]))})")
+    return out
+
+
 def loosened(rc):
     """Plain-language warnings for a change that weakens security (not for first-time creation)."""
     actions, rtype = rc["change"]["actions"], rc["type"]
@@ -113,6 +159,16 @@ def loosened(rc):
         new = token_groups(after) - token_groups(before)
         if new:
             out.append(f"WIDEN who may create personal access tokens: adds {', '.join(sorted(new))}")
+    if rtype == "databricks_aibi_dashboard_embedding_access_policy_setting" and actions == ["update"]:
+        b = one(before, "aibi_dashboard_embedding_access_policy").get("access_policy_type")
+        a = one(after, "aibi_dashboard_embedding_access_policy").get("access_policy_type")
+        if b in EMBEDDING and a in EMBEDDING and EMBEDDING.index(a) > EMBEDDING.index(b):
+            out.append(f"WIDEN dashboard embedding: {b} -> {a}")
+    if rtype == "databricks_aibi_dashboard_embedding_approved_domains_setting" and actions == ["update"]:
+        b = set(one(before, "aibi_dashboard_embedding_approved_domains").get("approved_domains") or [])
+        new = set(one(after, "aibi_dashboard_embedding_approved_domains").get("approved_domains") or []) - b
+        if new:
+            out.append(f"ALLOW dashboards to be embedded in {', '.join(sorted(new))}")
     if rtype == "databricks_entitlements" and rc["address"].endswith(".users[0]") and actions == ["update"]:
         if not before.get("allow_cluster_create") and after.get("allow_cluster_create"):
             out.append("GIVE every user unrestricted cluster creation (users group)")
@@ -161,7 +217,7 @@ def main(argv=None) -> int:
             releases.append(addr)
             continue
 
-        warnings.extend(f"{w}\n      {addr}" for w in loosened(rc))
+        warnings.extend(f"{w}\n      {addr}" for w in loosened(rc) + removed_access(rc))
 
         if "delete" in actions and rtype in PROTECTED:
             verb = "REPLACE" if "create" in actions else "DELETE"

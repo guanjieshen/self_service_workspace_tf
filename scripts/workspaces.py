@@ -45,7 +45,8 @@ DEV_WORKSPACES = ROOT / "dev/workspaces"
 NAME = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 
 # Paths whose change concerns every workspace: applied (EVERYTHING), or only planned (PLAN_ONLY).
-EVERYTHING = r"^(config/defaults/|terraform/(?!tests/)|scripts/tf\.sh$|scripts/plan-guard\.py$)"
+# This file is one: it decides what is planned and applied, and reads each workspace's host.
+EVERYTHING = r"^(config/defaults/|terraform/(?!tests/)|scripts/tf\.sh$|scripts/plan-guard\.py$|scripts/workspaces\.py$)"
 # Under those paths, files Terraform never reads: guidance for maintainers (terraform/**.md) and
 # loose files in the Genie Code skills folder (only skill folders are deployed, not its README).
 NOT_DEPLOYED = r"^(terraform/.*\.md$|config/defaults/genie-code/skills/[^/]+$)"

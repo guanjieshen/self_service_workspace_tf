@@ -147,7 +147,7 @@ settings:
   #     #1A1A1A  near black
   #     #EAEAED  light gray
   #   (White, #FFFFFF, is left out: a white series does not show on a white canvas.)
-  #   Genie One customization > Color: #FFB81C, and a short welcome message.
+  #   Genie One customization > Color: #FFB81C, and a welcome message of your choice (none is shipped).
 
   # ---- The built-in "users" group ------------------------------------------
   # Every workspace user is in this group, so its entitlements apply to everyone,
