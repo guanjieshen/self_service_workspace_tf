@@ -24,8 +24,8 @@ database:
 # The apps' service principals (application IDs). Empty until the hub's first deploy creates
 # the apps; then set them here, in a pull request, so every served workspace grants them.
 app_ids:
-  self_service: null       # the self-service app's
-  approvals: null          # the approvals app's
+  self_service: c8a1fb0a-e87a-4662-964e-54a7db2a8dbf   # the self-service app's
+  approvals: b8a68358-50f0-4176-95c0-e969717aa0be      # the approvals app's
 
 # Resources that already exist and the hub's bundle should take over instead of creating: their
 # names. The first deploy binds them; after that, these lines do nothing.

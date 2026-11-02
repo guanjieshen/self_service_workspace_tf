@@ -59,11 +59,11 @@ run "before_the_first_deploy" {
   command = plan
   variables {
     workspace        = "basic"
-    self_service_dir = "../config/self-service"
+    self_service_dir = "tests/self-service-empty"
   }
 
   assert {
     condition     = length(databricks_permission_assignment.self_service_app) == 0 && length(local.self_service_app_ids) == 0
-    error_message = "No app_ids yet (the repository's hub.yaml): nothing is assigned or granted."
+    error_message = "No app_ids yet: nothing is assigned or granted."
   }
 }

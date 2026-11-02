@@ -17,7 +17,8 @@ grants, workspace assignment, the usage policy) Terraform grants (terraform/self
    b. on a first install, deploy without the apps' database resource (an app cannot name a
       database that does not exist yet), then make the database;
    c. the database and its readers' roles if missing, then the migrations and grants, as the
-      deploying identity (it owns the database: run every deploy as the same one);
+      deploying identity: it must own the database or be a Lakebase superuser there (a first
+      install makes it the owner; run every deploy as the same one);
    d. deploy the bundle, then each app's new code, so new code never meets an old database.
 3. Each served workspace: its two jobs, which only the hub's two apps may run.
 """
