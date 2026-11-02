@@ -85,7 +85,8 @@ The keys a workspace file usually sets. `prefix`, `host`, `genie_code_instructio
 | Leave the Serverless Starter Warehouse's access alone (before the first apply: everyone keeps it) | `starter_warehouse.admins_only: null` in `defaults/compute.yaml` | the same in its file |
 | Let everyone use the Starter Warehouse again, after an apply made it admins only | Set `admins_only: null` as above, then in the workspace: SQL Warehouses > the warehouse > Permissions > add **users** with **Can use**. `null` only stops managing it; it does not undo the change | the same |
 | Change the classic cluster policies' limits | `cluster_policy` in `defaults/compute.yaml` (shared rules, then `interactive`, `jobs`, `pipelines`) | `cluster_policy.<key>` in its file; `cluster_policy.pipelines: null` to leave that policy alone (none on a new workspace) |
-| A team warehouse, a project usage policy, access to classic compute | | The self-service app, not this repository |
+| The self-service app: its settings, its hub, which workspaces it serves | `config/self-service/app.yaml`, `config/self-service/hub.yaml` | `self_service: false` in its file to leave a workspace out (for example the hub) |
+| A team warehouse, a project usage policy, access to classic compute | | The self-service app (not built yet) |
 | Resize the default warehouse | `sql_warehouse` in `defaults/compute.yaml` | `sql_warehouse.size` (etc.) in its file |
 | Change an admin setting | `settings.<key>` in `defaults/settings.yaml` | the same key in its file |
 | Not ready to switch off legacy access and DBFS | | `settings.disable_legacy_access`, `disable_dbfs_root_and_mounts` and `enforce_user_isolation`: `null` in its file |

@@ -10,7 +10,7 @@ import unittest
 
 from helpers import ROOT
 
-PATH = re.compile(r"(?<![\w./-])((?:config|docs|scripts|terraform|agents|\.github)/[A-Za-z0-9_./-]*[A-Za-z0-9_/])")
+PATH = re.compile(r"(?<![\w./-])((?:config|docs|scripts|terraform|agents|apps|bundle|\.github)/[A-Za-z0-9_./-]*[A-Za-z0-9_/])")
 # A baseline file named on its own reads as the workspace's own file, which does not exist.
 BARE_BASELINE = re.compile(r"(?<![\w/.-])(access|compute|cost|catalog|settings)\.yaml")
 GENERATED = {"config/backend.hcl"}           # written by scripts/setup.py

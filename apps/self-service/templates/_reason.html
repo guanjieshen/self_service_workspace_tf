@@ -1,0 +1,6 @@
+{#- What it is for: required on named schemas and folders; an approver reads it. -#}
+{% from "_components.html" import field %}
+{% call field("reason", "What will this " ~ ("folder" if check_kind == "folder" else "schema") ~ " be used for?", required=True) %}
+  <textarea id="reason" name="reason" rows="3" required minlength="10" maxlength="1000"
+            placeholder="{{ 'Briefly describe what you\'re working on and who will use this folder.' if check_kind == 'folder' else 'Briefly describe your project, the data you\'ll store, and who will use it.' }}">{{ reason or '' }}</textarea>
+{% endcall %}

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% from "_components.html" import empty_state, callout, filter_select %}
+{% from "approvals/_macros.html" import age, sla, notes, status %}
+{% block title %}{{ views[view][0] }} · Approvals · {{ config.title }}{% endblock %}
+{% block content %}
+{%- set waiting_col = view in ("review", "info") -%}
+<div class="page-head">
+  <h1>Pending approvals</h1>
+  <p class="lead">Requests that need approval. Any approver can respond; the first approval or rejection counts.</p>
+</div>
+
+{% if notice %}
+{%- set next_link -%}{% if upnext %}<a href="/approvals/{{ upnext.id }}?{{ {'back': query} | urlencode }}">Next: <span class="mono">{{ upnext.name }}</span> {{ icon("arrow", "icon icon-xs") }}</a>{% endif %}{%- endset -%}
+{% call callout("success", role="status", action=next_link if upnext else None) %}<span class="mono">{{ notice.id }}</span> · {{ notice.text }}{% endcall %}
+{% endif %}
+
+<nav class="tabs inbox-tabs" aria-label="Approval views">
+  {% for v, (label, _) in views.items() %}
+  {%- set q_ = {"view": v} -%}{%- for k, val in filters.items() %}{% set _ = q_.update({k: val}) %}{% endfor -%}
+  <a href="/approvals?{{ q_ | urlencode }}" {% if v == view %}aria-current="page"{% endif %}>{{ label }} <span class="count">{{ counts[v] }}</span></a>
+  {% endfor %}
+</nav>
+
+<form class="inbox-filters" method="get" action="/approvals" role="search">
+  <input type="hidden" name="view" value="{{ view }}">
+  <label class="search search-sm">
+    {{ icon("search", "icon search-icon") }}
+    <input type="search" name="q" value="{{ q }}" placeholder="Search names, people, reasons or IDs" aria-label="Search requests">
+  </label>
+  {{ filter_select("kind", [("", "All request types")] + (types.items() | list), kind, "Request type") }}
+  {{ filter_select("bu", [("", "All business units")] + (my_bus | map("pair") | list), bu, "Business unit") }}
+  {{ filter_select("sort", sorts.items() | selectattr(0, "ne", "waiting" if not waiting_col else "") | list, sort, "Sort") }}
+  <noscript><button type="submit" class="button">Apply</button></noscript>
+</form>
+
+<p class="inbox-summary meta">
+  {{ count }} {{ "request" if count == 1 else "requests" }}{% if filters %} match{{ "es" if count == 1 }} your filters · <a class="text-link" href="/approvals?view={{ view }}">Clear filters</a>{% endif %}
+</p>
+
+{% if not count %}
+  {% if filters %}
+  {{ empty_state("search", "No requests match", "Try other words, or clear the filters to see every request in this view.", "/approvals?view=" ~ view, "Clear filters") }}
+  {% else %}
+  {{ empty_state("check", {"review": "No pending approvals", "info": "No open questions", "decided": "No approvals yet", "all": "No requests yet"}[view],
+                 {"review": "Project and team schema requests show up here for an approver.",
+                  "info": "Requests you asked a question about wait here until the requester replies.",
+                  "decided": "Approved and rejected requests show up here, with their approver.",
+                  "all": "Every request in your business units shows up here, whatever happened to it."}[view]) }}
+  {% endif %}
+{% else %}
+{%- macro sort_link(key, label) -%}
+{%- set q_ = {"view": view, "sort": key} -%}{%- for k, val in filters.items() %}{% set _ = q_.update({k: val}) %}{% endfor -%}
+<a href="/approvals?{{ q_ | urlencode }}" class="sort {{ 'is-on' if sort == key }}" {% if sort == key %}aria-sort="{{ 'descending' if key == 'newest' else 'ascending' }}"{% endif %}>{{ label }}{% if sort == key %} <span aria-hidden="true">{{ "↓" if key == "newest" else "↑" }}</span>{% endif %}</a>
+{%- endmacro -%}
+<div class="inbox" role="table" aria-label="{{ views[view][0] }}">
+  <div class="inbox-row inbox-head" role="row">
+    <span role="columnheader">Request</span>
+    <span role="columnheader">Requested by</span>
+    <span role="columnheader">{{ sort_link("oldest" if sort == "newest" else "newest", "Submitted") }}</span>
+    <span role="columnheader">{% if waiting_col %}{{ sort_link("waiting", "Waiting") }}{% elif view == "decided" %}Approver{% else %}Approval{% endif %}</span>
+    <span role="columnheader">Status</span>
+  </div>
+  {% for label, rows in groups %}
+  {% if label %}<div class="inbox-day" role="row"><span role="cell">{{ label }} <span class="count">{{ rows | length }}</span></span></div>{% endif %}
+  {% for r in rows %}
+  <a class="inbox-row" role="row" href="/approvals/{{ r.id }}?{{ {'back': query} | urlencode }}">
+    <span class="cell-request" role="cell">
+      <span class="row-icon">{{ icon("folder" if r.kind == "folder" else "schema") }}</span>
+      <span class="cell-stack">
+        <span class="inbox-name mono">{{ r.name }}</span>
+        <span class="inbox-sub">{{ r.type }} · {{ r.bu }}{% if r.requested_by == user %} · Yours{% endif %}</span>
+        {% if waiting_col %}
+        {% if r.summary and r.summary.headline %}<span class="inbox-reason">{{ r.summary.headline }}</span>{% endif %}
+        {% endif %}
+        {% if waiting_col %}{{ notes(r) }}{% endif %}
+      </span>
+    </span>
+    <span class="cell-person" role="cell">
+      <span class="person" title="{{ r.requested_by }}">{{ r.requested_by.split("@")[0] }}</span>
+      {% if r.owner_group %}<span class="meta">{{ r.owner_group }}</span>{% endif %}
+    </span>
+    <span class="cell-time" role="cell">
+      {% if label %}<span>{{ r.submitted | local("time") }}</span>{% else %}<span>{{ r.submitted | local("date") }}</span><span class="meta">{{ r.submitted | local("time") }}</span>{% endif %}
+    </span>
+    <span class="cell-wait" role="cell">
+      {% if waiting_col %}<span class="age {{ sla(now, r.waiting_since or r.submitted) }}">{{ age(now, r.waiting_since or r.submitted, short=True) }}</span>
+      {% elif r.decision %}<span class="person" title="{{ r.decision.by }}">{{ r.decision.by.split("@")[0] }}</span><span class="meta">{{ r.decision.at | local("date") }}</span>
+      {% else %}<span class="meta">{{ "Needed" if view_of(r) in ("review", "info") else "Not needed" }}</span>{% endif %}
+    </span>
+    <span class="cell-status" role="cell">{{ status(r.status) }}</span>
+  </a>
+  {% endfor %}
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

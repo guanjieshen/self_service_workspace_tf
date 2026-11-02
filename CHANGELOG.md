@@ -24,6 +24,18 @@ that you may want to copy. A setting missing from your baseline is left alone.
   It keeps a short profile in the user's own folder (`.onboarding/profile.md`), only with their
   permission. The first plan adds the skill's file to every workspace.
 
+- **The self-service app moved into this repository** (`apps/self-service/`, from the archived
+  `self_service_app` repository at `final-before-merge`), deployed by Databricks Asset Bundles,
+  not Terraform:
+  - `bundle/hub/` (both apps and their Lakebase database, in the hub: `config/self-service/hub.yaml`);
+  - `bundle/jobs/` (the two jobs, in every workspace without `self_service: false`);
+  - `scripts/app_build.py` and `scripts/app_deploy.py` build and deploy them from
+    `config/self-service/app.yaml`, the workspace files and each workspace's Terraform output
+    `self_service`. Hub first, then the jobs.
+
+  The app's tests are a new suite, `scripts/test.sh app` (the Tests check installs the app's
+  packages). Nothing deploys the app from GitHub Actions yet.
+
 - **The self-service app's needs in the workspaces it serves** (`terraform/self_service.tf`), ahead
   of the app moving into this repository. Nothing changes until `app_ids` in
   `config/self-service/hub.yaml` are set:

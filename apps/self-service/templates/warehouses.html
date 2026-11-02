@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% from "_components.html" import empty_state %}
+
+{% block content %}
+{% set task_icon, task_name, task_text, task_category = "warehouses", "Manage SQL warehouses", "Create and manage SQL warehouses sized to your workload.", "Workspace & Compute" %}
+{% include "_task_header.html" %}
+{{ empty_state("warehouses", "Coming soon", "Until then, every persona can use the workspace's default SQL warehouse.") }}
+{% endblock %}

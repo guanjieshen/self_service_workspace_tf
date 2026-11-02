@@ -20,7 +20,7 @@ Every onboarded workspace gets the same baseline, with workspace-specific settin
 
 **This project does not create Databricks workspaces.** It applies and maintains the baseline on workspaces that already exist.
 
-**The self-service app is a separate project**, not included here. It handles what people request: schemas, team folders, project usage policies, and access to classic compute. Without it, workspace admins do those by hand; this baseline works either way.
+**The self-service app is in this repository too** (`apps/`, deployed by Databricks Asset Bundles from `bundle/`, separately from Terraform). It handles what people request: schemas and team folders today. Without it, workspace admins do those by hand; this baseline works either way ([design](docs/design.md), section 9).
 
 ## How it works
 

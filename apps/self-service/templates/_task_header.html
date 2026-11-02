@@ -1,0 +1,15 @@
+{#- The heading of a task page, like a request page's: back link, the task's icon and name, its
+    approval as a pill, what it does. With task_aside (the forms), the category and SOP are in the
+    "About this request" card instead (_task_aside.html). -#}
+{%- from "_icons.html" import icon -%}
+{%- from "_components.html" import back, status_badge -%}
+{{ back("/", "Catalog") }}
+<div class="request-head">
+  <div class="request-name">
+    <span class="request-icon">{{ icon("schema" if task_icon.endswith("schema") else task_icon, "icon icon-sm") }}</span>
+    <h1>{{ task_name }}</h1>
+  </div>
+  {% if approval.get(task_icon) %}{{ status_badge(approval_labels[approval.get(task_icon)], "approval-" ~ approval.get(task_icon), pill=True) }}{% endif %}
+</div>
+<p class="lead task-lead">{{ task_text }}</p>
+{% if not task_aside and links.sop and links.sop[task_icon] %}<p class="task-sop-line"><a class="text-link" href="{{ links.sop[task_icon] }}" target="_blank" rel="noopener">View the standard operating procedure {{ icon("external", "icon icon-xs") }}</a></p>{% endif %}

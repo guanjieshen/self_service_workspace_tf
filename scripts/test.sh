@@ -2,7 +2,7 @@
 # Run every test. No workspace, credentials or network needed (Terraform uses mocked providers).
 #
 #   ./scripts/test.sh              all suites
-#   ./scripts/test.sh terraform    one suite: terraform | python | node | scaffold
+#   ./scripts/test.sh terraform    one suite: terraform | python | node | scaffold | app
 #
 # CI runs the same suites in the "Tests" job of .github/workflows/checks.yml.
 # TERRAFORM=<path> picks the Terraform binary (default: terraform on the PATH).
@@ -27,6 +27,13 @@ fi
 if run node; then
   echo "== Node: .github/scripts/tests/*.test.js"
   node --test "$root"/.github/scripts/tests/*.test.js
+fi
+if run app; then
+  echo "== App: apps/*/tests/test_*.py (the self-service app, its build and its contract with the jobs)"
+  # The app's own packages, not the standard library: fail rather than skip without them.
+  python3 -c "import fastapi, httpx, jinja2, multipart, yaml" 2>/dev/null || {
+    echo "The app tests need: pip install -r apps/self-service/requirements.txt httpx pyyaml"; exit 1; }
+  for tests in "$root"/apps/*/tests; do python3 -m unittest discover -s "$tests" -t "$tests"; done
 fi
 if run scaffold; then
   echo "== Scaffold: a workspace file copied from _example.yaml"

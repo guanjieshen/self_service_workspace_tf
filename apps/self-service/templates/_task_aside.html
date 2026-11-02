@@ -1,0 +1,12 @@
+{#- The forms' side card: what this request needs and what happens after it. -#}
+{%- from "_icons.html" import icon -%}
+{%- from "_components.html" import kv, approval_label -%}
+<aside class="stack">
+  <section class="card card-body">
+    <div class="card-head"><h2 class="card-label">About this request</h2></div>
+    {%- set needs = approval.get(task_icon) == "required" -%}
+    {%- set sop -%}{% if links.sop and links.sop[task_icon] %}<a class="text-link" href="{{ links.sop[task_icon] }}" target="_blank" rel="noopener">Open SOP {{ icon("external", "icon icon-xs") }}</a>{% endif %}{%- endset -%}
+    <div class="kv-side">{{ kv([("Approval", approval_label(approval.get(task_icon), approval_labels)), ("Category", task_category),
+                               ("Ready in", "" if needs else "< 1 min"), ("SOP", sop | trim)]) }}</div>
+  </section>
+</aside>

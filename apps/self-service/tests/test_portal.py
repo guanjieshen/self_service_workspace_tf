@@ -1,0 +1,1132 @@
+"""portal.py and main.py: the self-service app, with a fake Databricks client.
+
+The page tests need the app's requirements (requirements.txt) and httpx. Run on their own
+they are skipped without them; ./scripts/test.sh app (and CI) fails instead.
+"""
+import io
+import json
+import pathlib
+import sys
+import types
+import unittest
+from unittest import mock
+
+APP = pathlib.Path(__file__).resolve().parent.parent
+ROOT = APP.parent.parent
+sys.path.insert(0, str(APP))
+import portal  # noqa: E402
+from databricks.sdk.errors import NotFound  # noqa: E402
+
+HOST = "https://adb-1.azuredatabricks.net"
+CONFIG = {"title": "Self-Service", "links": {}, "workspaces": [
+    {"name": "fin", "bu": "FIN", "host": HOST}, {"name": "down", "bu": "OPS", "host": "https://down"}]}
+ANA, BO = "ana@contoso.com", "bo@contoso.com"
+WHY = "Monthly reconciliation reports for the team."   # every named schema and folder needs a reason
+
+
+def ns(**kw):
+    return types.SimpleNamespace(**kw)
+
+
+def state(life, result=None, message=""):
+    return ns(life_cycle_state=ns(value=life), result_state=ns(value=result) if result else None, state_message=message)
+
+
+def run_of(run_id, job_id, params, life="TERMINATED", result="SUCCESS", output=None, error=None):
+    return ns(run_id=run_id, job_id=job_id, start_time=1_700_000_000_000 + run_id,
+              job_parameters=[ns(name=k, value=v, default="") for k, v in params.items()],
+              state=state(life, result), tasks=[ns(run_id=run_id * 10)], output=output, error=error)
+
+
+class FakeClient:
+    """The jobs (tagged as the bundle tags them), runs, users and groups of one workspace."""
+
+    def __init__(self):
+        self.jobs_ = [ns(job_id=1, settings=ns(tags={"cd_self_service": "personal_schema", "cd_catalog": "fin_citizen_dev", "cd_prefix": "cd_"})),
+                      ns(job_id=2, settings=ns(tags={"cd_self_service": "team_folder", "cd_root": "/Workspace"})),
+                      ns(job_id=3, settings=ns(tags={}))]
+        self.runs_ = {}
+        self.started, self.get_runs = [], 0
+        self.jobs = ns(list=lambda: self.jobs_, run_now=self.run_now, get_run=self.get_run,
+                       list_runs=self.list_runs,
+                       get_run_output=lambda task_run_id: next(
+                           ns(error=r.error, notebook_output=ns(result=r.output)) for r in self.runs_.values() if r.run_id * 10 == task_run_id))
+        self.users = ns(list=lambda filter, attributes, count=None: [
+            ns(user_name=ANA, groups=[ns(display="fin-data-eng"), ns(display="fin_builder")])] if ANA in filter or "sw" in filter else [])
+        self.groups = ns(list=lambda filter, attributes, count=None: [ns(display_name="fin-data-eng")])
+        self.schemas_ = set()          # schemas the app can see (BROWSE); None = it cannot see any
+        self.schemas = ns(get=self.get_schema)
+        self.folders_ = {}             # path -> "mine" or "theirs" (the app sees theirs as permission denied)
+        self.workspace = ns(get_status=self.get_status)
+        # AI Decide: the choice for each question (None = it cannot be reached), and what was asked.
+        self.decide, self.decided = dict(portal.checks.SAFE), []
+        self.api_client = ns(do=self.api)
+        # The BU lookup (SQL statements): person -> business unit; None = the warehouse cannot answer.
+        self.bus_, self.statements = {ANA: "FIN"}, []
+
+    def api(self, method, path, body=None):
+        if path == "/api/2.0/sql/statements":
+            self.statements.append(body)
+            if self.bus_ is None:
+                raise ConnectionError("warehouse unreachable")
+            return {"status": {"state": "SUCCEEDED"}, "result": {"data_array": [[self.bus_.get(body["parameters"][0]["value"])]]}}
+        return self.ai_decide(method, path, body)
+
+    def ai_decide(self, method, path, body=None):
+        if self.decide is None:
+            raise ConnectionError("AI Decide is not reachable")
+        self.decided.append(body)
+        return {"response": {"answers": {q: {"type": "choice", "choice": c} for q, c in self.decide.items()}}}
+
+    def get_status(self, path):
+        from databricks.sdk.errors import PermissionDenied
+        if path not in self.folders_:
+            raise NotFound(f"Path ({path}) doesn't exist.")
+        if self.folders_[path] == "theirs":
+            raise PermissionDenied("This user does not have permission")
+        return ns(object_id=1)
+
+    def get_schema(self, full_name):
+        if self.schemas_ is None:
+            raise PermissionError("User does not have USE CATALOG on Catalog")
+        if full_name not in self.schemas_:
+            raise NotFound(f"Schema '{full_name}' does not exist.")
+        return ns(full_name=full_name)
+
+    def list_runs(self, job_id, limit=None, expand_tasks=None, active_only=None):
+        return [r for r in self.runs_.values() if r.job_id == job_id
+                and (not active_only or r.state.life_cycle_state.value not in ("TERMINATED", "INTERNAL_ERROR", "SKIPPED"))]
+
+    def run_now(self, job_id, job_parameters):
+        run_id = 100 + len(self.started)
+        self.started.append((job_id, job_parameters))
+        self.runs_[run_id] = run_of(run_id, job_id, job_parameters, life="QUEUED", result=None)
+        return ns(run_id=run_id)
+
+    def get_run(self, run_id):
+        self.get_runs += 1
+        return self.runs_[run_id]
+
+
+def make(store=None):
+    """A portal on the fake client, and its requests database (FakeStore unless given)."""
+    fake = FakeClient()
+
+    def client(host):
+        if host != HOST:
+            raise ConnectionError("no route to host\nmore detail")
+        return fake
+    return portal.Portal(CONFIG, client, store=FakeStore() if store is None else store), fake
+
+
+class FakeStore:
+    """The app's database, in memory: the same methods as store.Store, and the same rules (a
+    run starts and ends once per request; history is only added to)."""
+
+    def __init__(self):
+        self.requests, self.events, self.fail = {}, [], None   # fail: "write" or "read"
+
+    def ping(self):
+        return True
+
+    def record_request(self, r):
+        if self.fail == "write":
+            raise ConnectionError("database unreachable")
+        self.requests[r["id"]] = dict(r, created_at=__import__("datetime").datetime(2026, 10, 21, 12, len(self.requests)))
+        self.events.append((r["id"], "submitted", {}))
+
+    def event(self, request_id, type_, data=None, actor=None, role=None, body=None):
+        if any(e[0] == request_id and e[1] == type_ for e in self.events) and type_ == "run_started":
+            return   # ON CONFLICT DO NOTHING
+        self.events.append((request_id, type_, {**(data or {}), **({"actor": actor} if actor else {}), **({"body": body} if body else {})}))
+
+    def events_of(self, request_id):
+        at = __import__("datetime").datetime(2026, 10, 21, 12, 0)
+        who = lambda rid, t: self.requests[rid]["requested_by"] if t == "submitted" else "self-service app"
+        return [{"at": at, "actor": d.get("actor", who(rid, t)), "role": "approver" if t in ("needs_info", "approved", "rejected") else "system",
+                 "type": t, "body": d.get("body"), "data": d} for rid, t, d in self.events if rid == request_id]
+
+    def summarized(self, request_id, summary, actor="AI summary"):
+        self.events.append((request_id, "reviewed", {"summary": summary}))
+
+    def run_started(self, request_id, workspace, run_id):
+        self.event(request_id, "run_started", {"workspace": workspace, "run_id": int(run_id)})
+
+    def start_failed(self, request_id, message):
+        self.events.append((request_id, "start_failed", {"body": message}))
+
+    def requests_of(self, user, limit=200):
+        if self.fail == "read":
+            raise ConnectionError("database unreachable")
+        out = []
+        for rid, r in self.requests.items():
+            if r["requested_by"] != user:
+                continue
+            mine = [e for e in self.events if e[0] == rid and e[1] not in ("reviewed", "commented")]
+            state, data = mine[-1][1], mine[-1][2]
+            run = next((e[2] for e in self.events if e[0] == rid and e[1] == "run_started"), {})
+            out.append({**r, "state": state, "state_data": data, "state_body": data.get("body"), "run_id": run.get("run_id")})
+        return sorted(out, key=lambda r: r["created_at"], reverse=True)[:limit]
+
+
+class Discovery(unittest.TestCase):
+    def test_finds_the_tagged_jobs_and_reports_unreachable_workspaces(self):
+        p, _ = make()
+        fin, down = p.workspaces()
+        self.assertEqual({k: j["id"] for k, j in fin.jobs.items()}, {"personal_schema": 1, "team_folder": 2})
+        self.assertEqual(fin.error, "")
+        self.assertEqual(down.jobs, {})
+        self.assertIn("not reachable: no route to host", down.error)
+        self.assertEqual([w.name for w in p.available("team_folder")], ["fin"])
+
+
+class Submitting(unittest.TestCase):
+    def test_schema_runs_the_job_with_the_user_and_the_workspace_catalog(self):
+        p, fake = make()
+        run_id = p.request_schema("fin", ANA)
+        job_id, params = fake.started[0]
+        self.assertEqual((run_id, job_id), (100, 1))
+        self.assertEqual((params["user"], params["catalog"]), (ANA, "fin_citizen_dev"))
+        self.assertRegex(params["request_id"], r"^ss-[0-9a-f]{8}$")
+
+    def test_folder_runs_the_job_with_the_permissions(self):
+        p, fake = make()
+        p.request_folder("fin", ANA, "fin-docs", "fin-data-eng", ["fin-data-eng", "fin_builder"], reason=WHY)
+        job_id, params = fake.started[0]
+        self.assertEqual((job_id, params["folder"], params["requested_by"]), (2, "fin-docs", ANA))
+        self.assertEqual(params["owner_group"], "fin-data-eng")
+
+    def test_bad_requests_are_refused_before_any_run(self):
+        p, fake = make()
+        for folder, owner in (("Fin Docs", ""), ("users", ""),
+                              ("fin-docs", "fin-finance"),   # not one of ana's groups
+                              ("fin-docs", 'x" or "1')):
+            with self.subTest(folder=folder, owner=owner), self.assertRaises(portal.RequestError):
+                p.request_folder("fin", ANA, folder, owner, ["fin-data-eng", "fin_builder"], reason=WHY)
+        with self.assertRaises(portal.RequestError):
+            p.request_schema("down", ANA)            # a workspace without the job
+        with self.assertRaises(portal.RequestError):
+            p.request_schema("fin", "not-an-email")
+        self.assertEqual(fake.started, [])
+
+
+class Status(unittest.TestCase):
+    def test_phases_follow_the_run(self):
+        p, fake = make()
+        run_id = p.request_schema("fin", ANA)
+        self.assertEqual((p.run("fin", run_id, ANA).status, p.run("fin", run_id, ANA).phase), ("In progress", "Starting"))
+        p.run_cache_seconds = 0
+        fake.runs_[run_id].state = state("RUNNING")
+        self.assertEqual(p.run("fin", run_id, ANA).phase, "Running")
+        fake.runs_[run_id].state = state("TERMINATED", "SUCCESS")
+        r = p.run("fin", run_id, ANA)
+        self.assertEqual((r.status, r.resource, r.link), ("Completed", "fin_citizen_dev.cd_ana", f"{HOST}/explore/data/fin_citizen_dev/cd_ana"))
+
+    def test_a_failed_run_says_why_in_the_jobs_words(self):
+        p, fake = make()
+        run_id = p.request_folder("fin", ANA, "fin-docs", reason=WHY)
+        fake.runs_[run_id].state = state("TERMINATED", "FAILED", "Workload failed")
+        fake.runs_[run_id].error = "ValueError: /Workspace/fin-docs already exists and is not managed by ana@contoso.com\nTraceback..."
+        r = p.run("fin", run_id, ANA)
+        self.assertEqual((r.status, r.message), ("Failed", "/Workspace/fin-docs already exists and is not managed by ana@contoso.com"))
+
+    def test_a_completed_folder_links_to_it(self):
+        p, fake = make()
+        run_id = p.request_folder("fin", ANA, "fin-docs", reason=WHY)
+        fake.runs_[run_id].state = state("TERMINATED", "SUCCESS")
+        fake.runs_[run_id].output = json.dumps({"path": "/Workspace/fin-docs", "object_id": 77})
+        self.assertEqual(p.run("fin", run_id, ANA).link, f"{HOST}/browse/folders/77")
+
+    def test_only_the_requester_sees_a_request(self):
+        p, _ = make()
+        run_id = p.request_schema("fin", ANA)
+        self.assertIsNotNone(p.run("fin", run_id, ANA))
+        self.assertIsNone(p.run("fin", run_id, BO), "another user cannot read the request by its run ID")
+        self.assertEqual(p.runs([f"fin/{run_id}"], BO), {})
+
+    def test_polling_shares_calls_and_a_finished_run_is_read_once(self):
+        p, fake = make()
+        run_id = p.request_schema("fin", ANA)
+        for _ in range(5):
+            p.run("fin", run_id, ANA)
+        self.assertEqual(fake.get_runs, 1, "polls within a few seconds share one Jobs API call")
+        p.run_cache_seconds = 0
+        fake.runs_[run_id].state = state("TERMINATED", "SUCCESS")
+        p.run("fin", run_id, ANA)
+        calls = fake.get_runs
+        for _ in range(5):
+            p.run("fin", run_id, ANA)
+        self.assertEqual(fake.get_runs, calls, "a finished run never changes, so it is not read again")
+
+
+class Schemas(unittest.TestCase):
+    def test_a_project_schema_runs_the_same_job_with_its_name(self):
+        p, fake = make()
+        run_id = p.request_schema("fin", ANA, schema="gtm_integrity", reason=WHY)
+        self.assertEqual((fake.started[0][1]["schema"], fake.started[0][1]["owner_group"]), ("gtm_integrity", ""))
+        self.assertEqual(p.run("fin", run_id, ANA).task, "Request a project schema")
+        self.assertEqual(p.run("fin", run_id, ANA).resource, "fin_citizen_dev.gtm_integrity")
+
+    def test_a_team_schema_is_also_its_groups(self):
+        p, fake = make()
+        groups = p.groups_of("fin", ANA)
+        run_id = p.request_schema("fin", ANA, schema="fin_reporting", owner_group="fin-data-eng", groups=groups, reason=WHY)
+        self.assertEqual(fake.started[0][1]["owner_group"], "fin-data-eng")
+        self.assertEqual(p.run("fin", run_id, ANA).task, "Request a team schema")
+        with self.assertRaisesRegex(portal.RequestError, "Choose one of your groups"):
+            p.request_schema("fin", ANA, schema="fin_other", owner_group="fin-finance", groups=groups, reason=WHY)
+        with self.assertRaisesRegex(portal.RequestError, "needs a name"):
+            p.request_schema("fin", ANA, owner_group="fin-data-eng", groups=groups)
+        self.assertEqual(len(fake.started), 1)
+
+    def test_named_schemas_and_folders_say_why_personal_schemas_need_not(self):
+        p, fake = make()
+        for call in (lambda r: p.request_schema("fin", ANA, schema="gtm_forecast", reason=r),
+                     lambda r: p.request_folder("fin", ANA, "fin-docs", reason=r)):
+            for r in ("", "because", "x" * 1001):
+                with self.subTest(reason=r[:20]), self.assertRaises(portal.RequestError):
+                    call(r)
+        self.assertEqual(fake.started, [])
+        p.request_schema("fin", ANA)   # a personal schema: no reason needed
+        run_id = p.request_schema("fin", ANA, schema="gtm_forecast", reason=WHY)
+        self.assertEqual(fake.started[-1][1]["reason"], WHY)
+        self.assertEqual(p.run("fin", run_id, ANA).params["reason"], WHY, "kept with the request")
+
+    def test_bad_custom_names_are_refused(self):
+        p, fake = make()
+        for name in ("GTM Integrity", "gtm-integrity", "cd_bo", "_x", "x" * 101):
+            with self.subTest(name=name), self.assertRaises(portal.RequestError):
+                p.request_schema("fin", ANA, schema=name, reason=WHY)
+        self.assertEqual(fake.started, [])
+
+    def test_one_personal_schema_per_person(self):
+        p, fake = make()
+        self.assertEqual(p.personal_schema("fin", ANA)["exists"], False)
+        fake.schemas_.add("fin_citizen_dev.cd_ana")
+        p._personal.clear()
+        found = p.personal_schema("fin", ANA)
+        self.assertEqual((found["exists"], found["name"]), (True, "fin_citizen_dev.cd_ana"))
+
+    def test_without_browse_it_is_unknown(self):
+        p, fake = make()
+        fake.schemas_ = None
+        listed = []
+        fake.jobs.list_runs = lambda **kw: listed.append(kw.get("active_only")) or []
+        self.assertIsNone(p.personal_schema("fin", ANA)["exists"], "unknown, not 0/1")
+        self.assertEqual(listed, [True], "only the running requests: no reading the history to guess")
+
+
+class Groups(unittest.TestCase):
+    def test_with_the_users_token_their_groups_come_from_scim_me(self):
+        p, _ = make()
+        seen = {}
+
+        class Response(io.BytesIO):
+            def __enter__(self): return self
+            def __exit__(self, *a): pass
+
+        def urlopen(request, timeout):
+            seen["url"], seen["auth"] = request.full_url, request.headers.get("Authorization")
+            return Response(json.dumps({"userName": seen.get("as", ANA),
+                                        "groups": [{"display": "fin-data-eng"}, {"display": "fin_builder"}]}).encode())
+        with mock.patch.object(portal.urllib.request, "urlopen", urlopen):
+            self.assertEqual(p.groups_of("fin", ANA, token="t0k"), ["fin-data-eng", "fin_builder"])
+            self.assertEqual((seen["url"], seen["auth"]), (f"{HOST}/api/2.0/preview/scim/v2/Me?attributes=userName,groups", "Bearer t0k"))
+            seen["as"] = BO
+            self.assertEqual(p.groups_of("fin", ANA, token="t0k"), [], "a token that is not the signed-in user's gives no groups")
+
+    def test_a_token_the_workspace_refuses_gives_no_groups_not_an_error(self):
+        p, _ = make()
+
+        def urlopen(request, timeout):
+            raise portal.urllib.error.HTTPError(request.full_url, 401, "Unauthorized", {}, None)
+        with mock.patch.object(portal.urllib.request, "urlopen", urlopen):
+            self.assertEqual(p.groups_of("fin", ANA, token="from-another-workspace"), [])
+
+    def test_without_a_token_the_app_looks_the_user_up(self):
+        p, _ = make()
+        self.assertEqual(p.groups_of("fin", ANA), ["fin-data-eng", "fin_builder"])
+
+
+class AICheck(unittest.TestCase):
+    """Validate: rules first, then one AI Decide call; advice for the requester, it decides nothing."""
+
+    def check(self, **kw):
+        p, fake = make()
+        args = {"ws_name": "fin", "kind": "project_schema", "name": "gtm_pipeline_forecast", "reason": WHY, **kw}
+        return p, fake, p.ai_check(**args)
+
+    def test_a_clear_request_passes_every_check_in_one_call(self):
+        p, fake, result = self.check()
+        self.assertEqual(result["rows"], [(True, "The schema name is available"), (True, "The schema name matches the reason given"),
+                                          (True, "The reason says what the work is, what it will hold and who will use it")],
+                         )
+        self.assertEqual(len(fake.decided), 1, "one call, four questions")
+        self.assertEqual(set(fake.decided[0]["questions"]), {"name", "work", "contents", "audience"}, "about the name and the reason only")
+        self.assertEqual(fake.decided[0]["questions"], portal.checks.questions("project_schema"), "the questions never contain what the person typed")
+        self.assertNotIn(WHY, json.dumps(fake.decided[0]["questions"]))
+        self.assertEqual(fake.decided[0]["state"]["why_needed"], WHY)
+        p.ai_check("fin", "project_schema", "gtm_pipeline_forecast", WHY)
+        self.assertEqual(len(fake.decided), 1, "asking again is answered from the cache")
+
+    def test_it_coaches_on_the_name_and_the_reason(self):
+        p, fake = make()
+        fake.decide.update(name="generic", contents="general", audience="none")
+        result = p.ai_check("fin", "project_schema", "gtm_data", WHY)
+        self.assertIn((False, "The schema name is too general to tell what it holds"), result["rows"])
+        self.assertIn((False, "Say what data it will hold, for example: weekly Salesforce opportunity snapshots by region"), result["rows"])
+        self.assertIn((False, "Say who will use it, for example: you alone, or the LPM integrity team"), result["rows"])
+        self.assertFalse(any("what work" in text for _, text in result["rows"]), "only the parts that are missing")
+
+    def test_a_folder_is_asked_what_it_will_hold_not_what_data(self):
+        p, fake = make()
+        fake.decide.update(contents="general")
+        rows = p.ai_check("fin", "folder", "fin-docs", WHY)["rows"]
+        self.assertIn((False, "Say what you will keep in it, for example: notebooks and dashboards for the integrity risk model"), rows)
+        self.assertIn("notebooks, dashboards", fake.decided[0]["questions"]["contents"]["criteria"]["named"])
+
+    def test_anyone_named_counts_as_who_will_use_it(self):
+        for who in ("self", "team", "role"):
+            p, fake = make()
+            fake.decide["audience"] = who
+            with self.subTest(audience=who):
+                self.assertTrue(all(ok for ok, _ in p.ai_check("fin", "project_schema", "gtm_pipeline_forecast", WHY)["rows"]))
+
+    def test_rules_come_first_and_cost_no_call(self):
+        p, fake = make()
+        result = p.ai_check("fin", "project_schema", "cd_bo", WHY)
+        self.assertEqual(fake.decided, [])
+        self.assertIn("can't start with cd_", result["rows"][0][1])
+        result = p.ai_check("fin", "folder", "fin-docs", "short")
+        self.assertEqual(result["rows"], [(False, "Describe what it will be used for in a sentence or two.")])
+        fake.schemas_.add("fin_citizen_dev.gtm_pipeline_forecast")
+        result = p.ai_check("fin", "project_schema", "gtm_pipeline_forecast", WHY)
+        self.assertEqual(result["rows"][0], (False, "The schema name is already taken (fine only if it is yours)"))
+
+    def test_a_folder_someone_else_owns_is_taken(self):
+        p, fake = make()
+        self.assertEqual(p.ai_check("fin", "folder", "fin-docs", WHY)["rows"][0], (True, "The folder name is available"))
+        fake.folders_["/Workspace/fin-ops"] = "theirs"
+        self.assertEqual(p.ai_check("fin", "folder", "fin-ops", WHY)["rows"][0], (False, "The folder name is already taken (fine only if it is yours)"))
+
+    def test_a_lookup_that_cannot_answer_never_says_the_name_is_free(self):
+        p, fake = make()
+        fake.schemas_ = None   # the app cannot see the catalog
+        result = p.ai_check("fin", "project_schema", "gtm_pipeline_forecast", WHY)
+        self.assertEqual(result["rows"][0], (False, "Could not confirm the schema name is available"))
+
+    def test_when_ai_decide_cannot_answer_it_says_so_and_decides_nothing(self):
+        p, fake = make()
+        fake.decide = None
+        result = p.ai_check("fin", "project_schema", "gtm_pipeline_forecast", WHY)
+        self.assertEqual(result["error"], "The AI check is unavailable (ConnectionError)")
+        fake.decide = dict(portal.checks.SAFE)
+        self.assertEqual(p.ai_check("fin", "project_schema", "gtm_pipeline_forecast", WHY)["error"], "", "a failure is not cached")
+
+
+class RequestsInTheDatabase(unittest.TestCase):
+    """With a database: every request is recorded before its job runs, and My requests reads it."""
+
+    def test_a_request_is_recorded_then_run_then_linked_to_its_run(self):
+        db = FakeStore()
+        p, fake = make(db)
+        run_id = p.request_schema("fin", ANA, schema="gtm_forecast", reason=WHY)
+        (rid, r), = db.requests.items()
+        self.assertEqual((r["kind"], r["name"], r["bu"], r["reason"]), ("project_schema", "gtm_forecast", "FIN", WHY))
+        self.assertEqual(fake.started[0][1]["request_id"], rid, "the job gets the request's ID")
+        self.assertEqual([e[1] for e in db.events], ["submitted", "run_started"], "no AI review is kept: approvers read the AI summary")
+        self.assertEqual(db.events[-1][2], {"workspace": "fin", "run_id": run_id})
+
+    def test_nothing_runs_when_the_request_cannot_be_recorded(self):
+        db = FakeStore()
+        db.fail = "write"
+        p, fake = make(db)
+        with self.assertRaisesRegex(portal.RequestError, "could not be recorded"):
+            p.request_folder("fin", ANA, "fin-docs", reason=WHY)
+        self.assertEqual(fake.started, [])
+
+    def test_a_job_that_cannot_start_is_recorded_as_failed(self):
+        db = FakeStore()
+        p, fake = make(db)
+        fake.jobs.run_now = lambda job_id, job_parameters: (_ for _ in ()).throw(ConnectionError("down"))
+        with self.assertRaises(ConnectionError):
+            p.request_folder("fin", ANA, "fin-docs", reason=WHY)
+        self.assertEqual(db.events[-1][1:], ("start_failed", {"body": "The job could not be started."}))
+        self.assertEqual([(r.status, r.message) for r in p.requests(ANA)], [("Failed", "The job could not be started.")])
+
+    def test_an_approved_request_runs_as_it_was_recorded(self):
+        """Portal.run_recorded: the approvals app runs the request's job with the request's own ID."""
+        db = FakeStore()
+        p, fake = make(db)
+        row = {"id": "ss-team1", "kind": "team_schema", "workspace": "fin", "requested_by": ANA, "name": "fin_reporting",
+               "owner_group": "fin-data-eng", "reason": WHY}
+        run_id = p.run_recorded(row)
+        job_id, params = fake.started[-1]
+        self.assertEqual(params, {"user": ANA, "catalog": "fin_citizen_dev", "schema": "fin_reporting",
+                                  "owner_group": "fin-data-eng", "reason": WHY, "request_id": "ss-team1"})
+        self.assertEqual(db.events[-1], ("ss-team1", "run_started", {"workspace": "fin", "run_id": run_id}))
+        p.run_recorded({**row, "id": "ss-f1", "kind": "folder", "name": "fin-docs"})
+        self.assertEqual(fake.started[-1][1], {"folder": "fin-docs", "requested_by": ANA, "owner_group": "fin-data-eng",
+                                               "reason": WHY, "request_id": "ss-f1"})
+
+    def test_a_runs_outcome_is_never_copied_into_the_database(self):
+        db = FakeStore()
+        p, fake = make(db)
+        p.run_cache_seconds = 0
+        run_id = p.request_folder("fin", ANA, "fin-docs", reason=WHY)
+        fake.runs_[run_id].state = state("TERMINATED", "SUCCESS")
+        self.assertEqual(p.run("fin", run_id, ANA).status, "Completed")
+        self.assertEqual([e[1] for e in db.events], ["submitted", "run_started"], "the Jobs API is the source of truth")
+
+    def test_an_expired_run_says_so_rather_than_guessing(self):
+        db = FakeStore()
+        p, fake = make(db)
+        p.request_folder("fin", ANA, "fin-docs", reason=WHY)
+        fake.jobs.get_run = lambda run_id: (_ for _ in ()).throw(ValueError(f"Run {run_id} does not exist."))
+        p._runs.clear()
+        (r,) = p.requests(ANA)
+        self.assertEqual((r.status, r.message), ("Finished", "Run details have expired (the Jobs API keeps 60 days)"))
+        fake.jobs.get_run = lambda run_id: (_ for _ in ()).throw(ConnectionError("timed out"))
+        p._runs.clear()
+        (r,) = p.requests(ANA)
+        self.assertEqual(r.status, "Unknown", "a network error is not an answer")
+
+    def test_my_requests_come_from_the_database_however_old(self):
+        db = FakeStore()
+        p, fake = make(db)
+        p.run_cache_seconds = 0
+        first = p.request_folder("fin", ANA, "fin-docs", reason=WHY)
+        p.request_schema("fin", ANA, schema="gtm_forecast", reason=WHY)
+        fake.runs_[first].state = state("TERMINATED", "SUCCESS")
+        for i in range(300):                        # far more runs by others than any one listing of a job's runs
+            fake.runs_[1000 + i] = run_of(1000 + i, 2, {"folder": f"x{i}", "requested_by": BO})
+        p._runs.clear()
+        calls = fake.get_runs
+        items = p.requests(ANA)
+        self.assertEqual([r.task for r in items], ["Request a project schema", "Request a workspace folder"])
+        self.assertEqual(items[1].status, "Completed")
+        self.assertEqual(fake.get_runs - calls, 2, "each request's status comes from its run")
+        self.assertEqual(p.requests(BO), [], "only the person's own")
+
+    def test_the_database_is_the_only_list_of_requests(self):
+        db = FakeStore()
+        p, fake = make(db)
+        p.request_folder("fin", ANA, "fin-docs", reason=WHY)
+        db.fail = "read"
+        with self.assertRaisesRegex(portal.RequestError, "cannot be read just now"):
+            p.requests(ANA)   # no second path: the job runs are not read instead
+        p.store = None
+        with self.assertRaisesRegex(portal.RequestError, "not set up"):
+            p.request_folder("fin", ANA, "fin-docs2", reason=WHY)
+        self.assertEqual(len(fake.started), 1, "nothing runs without a record")
+
+
+class BusinessUnitRouting(unittest.TestCase):
+    """app.yaml bu_lookup: requests go to the person's own business unit's workspace."""
+
+    def make(self, store=None):
+        p, fake = make(store)
+        p.config = {**p.config, "bu_lookup": {"function": "dir.people.business_unit_of", "warehouse_id": "wh1", "host": HOST}}
+        return p, fake
+
+    def test_ai_onboarding_opens_genie_in_the_persons_own_workspace(self):
+        p, _ = self.make()
+        self.assertEqual(p.onboarding_link(ANA, "Onboard me & show my data?"),
+                         "https://adb-1.azuredatabricks.net/one/chat?o=1&q=Onboard%20me%20%26%20show%20my%20data%3F")
+        self.assertIsNone(p.onboarding_link(BO, "Onboard me"), "the lookup does not know them: no card")
+        self.assertIsNone(p.onboarding_link(ANA, ""), "no prompt: no card")
+
+    def test_genie_one_needs_a_workspace_id_only_on_azure(self):
+        self.assertEqual(portal.genie_one_link("https://dbc-123.cloud.databricks.com/", "Onboard me"),
+                         "https://dbc-123.cloud.databricks.com/one/chat?q=Onboard%20me")
+
+    def test_without_the_lookup_every_workspace_is_offered(self):
+        p, fake = make()
+        self.assertEqual([w.name for w in p.workspaces_for(BO, "team_folder")], ["fin"])
+        self.assertEqual(fake.statements, [])
+
+    def test_a_person_is_offered_their_own_business_units_workspace(self):
+        p, fake = self.make()
+        self.assertEqual([w.name for w in p.workspaces_for(ANA, "team_folder")], ["fin"])
+        (st,) = fake.statements
+        self.assertEqual((st["warehouse_id"], st["statement"]), ("wh1", "SELECT `dir`.`people`.`business_unit_of`(:email)"))
+        self.assertEqual(st["parameters"], [{"name": "email", "value": ANA, "type": "STRING"}], "the email is a parameter, never pasted into SQL")
+        p.workspaces_for(ANA, "personal_schema")
+        self.assertEqual(len(fake.statements), 1, "kept: asked once")
+
+    def test_someone_the_lookup_does_not_know_is_sent_to_their_admin(self):
+        p, fake = self.make()
+        with self.assertRaisesRegex(portal.RequestError, "couldn't find your business unit.*platform admin"):
+            p.workspaces_for(BO, "team_folder")
+        with self.assertRaisesRegex(portal.RequestError, "couldn't find your business unit"):
+            p.request_folder("fin", BO, "fin-docs", reason=WHY)
+        self.assertEqual(fake.started, [])
+
+    def test_a_request_for_another_business_units_workspace_is_refused(self):
+        p, fake = self.make()
+        fake.bus_[BO] = "OPS"   # OPS's workspace cannot be reached in the fake
+        with self.assertRaisesRegex(portal.RequestError, "no workspace for this request|own business unit"):
+            p.request_folder("fin", BO, "fin-docs", reason=WHY)
+        self.assertEqual(fake.started, [])
+        p.request_folder("fin", ANA, "fin-docs", reason=WHY)
+        self.assertEqual(len(fake.started), 1)
+
+    def test_validate_never_looks_in_another_business_units_workspace(self):
+        p, fake = self.make()
+        fake.bus_[BO] = "OPS"
+        with self.assertRaisesRegex(portal.RequestError, "no workspace for this request|own business unit"):
+            p.ai_check("fin", "folder", "fin-docs", WHY, user=BO)
+        self.assertEqual(fake.decided, [], "nothing looked up, nothing asked")
+        self.assertTrue(p.ai_check("fin", "folder", "fin-docs", WHY, user=ANA)["rows"], "their own BU's: checked as before")
+
+    def test_a_lookup_that_cannot_answer_says_so(self):
+        p, fake = self.make()
+        fake.bus_ = None
+        with self.assertRaisesRegex(portal.RequestError, "can't be checked just now"):
+            p.workspaces_for(ANA, "team_folder")
+
+
+class RunLinks(unittest.TestCase):
+    def test_an_admin_gets_the_runs_page_in_its_workspace(self):
+        p, fake = make()
+        job = p.workspaces()[0].jobs["team_folder"]["id"]
+        self.assertEqual(p.run_link("fin", "folder", 42), f"{HOST}/jobs/{job}/runs/42")
+        self.assertIsNone(p.run_link("fin", "folder", None), "no run yet")
+        self.assertIsNone(p.run_link("nowhere", "folder", 42))
+
+
+class JobTags(unittest.TestCase):
+    """The jobs say where they put things (their tags); the app follows them."""
+
+    def test_a_personal_prefix_other_than_cd(self):
+        p, fake = make()
+        fake.jobs_[0].settings.tags["cd_prefix"] = "sb_"
+        first = p.request_schema("fin", ANA)
+        self.assertEqual(p.run("fin", first, ANA).resource, "fin_citizen_dev.sb_ana")
+        self.assertEqual(p.request_schema("fin", ANA), first, "still asked for: no second run")
+        self.assertEqual(p.personal_schema("fin", ANA)["exists"], "pending")
+
+    def test_a_folder_root_other_than_workspace(self):
+        p, fake = make()
+        fake.jobs_[1].settings.tags["cd_root"] = "/Workspace/Teams/"
+        first = p.request_folder("fin", ANA, "fin-docs", reason=WHY)
+        self.assertEqual(p.run("fin", first, ANA).resource, "/Workspace/Teams/fin-docs")
+        self.assertEqual(p.request_folder("fin", ANA, "fin-docs", reason=WHY), first, "still asked for: no second run")
+        with self.assertRaisesRegex(portal.RequestError, "Another request for this name is running"):
+            p.request_folder("fin", BO, "fin-docs", reason=WHY)
+
+
+class OneAtATime(unittest.TestCase):
+    def test_asking_again_while_running_returns_the_same_request(self):
+        p, fake = make()
+        first = p.request_schema("fin", ANA)
+        self.assertEqual(p.request_schema("fin", ANA), first, "no second run for the same schema")
+        self.assertEqual(len(fake.started), 1)
+        self.assertEqual(p.personal_schema("fin", ANA)["exists"], "pending")
+        fake.runs_[first].state = state("TERMINATED", "SUCCESS")
+        fake.schemas_.add("fin_citizen_dev.cd_ana")
+        p.run_cache_seconds = 0
+        p.run("fin", first, ANA)                                   # the status page sees it finish
+        self.assertEqual(p.personal_schema("fin", ANA)["exists"], True, "1/1 straight away, not after a minute")
+        self.assertNotEqual(p.request_schema("fin", ANA), first, "once done, asking again is a new (harmless) run")
+
+    def test_other_schemas_and_folders_are_separate(self):
+        p, fake = make()
+        a = p.request_schema("fin", ANA)
+        b = p.request_schema("fin", ANA, schema="gtm_integrity", reason=WHY)
+        self.assertNotEqual(a, b)
+        self.assertEqual(p.request_schema("fin", ANA, schema="gtm_integrity", reason=WHY), b)
+        f1 = p.request_folder("fin", ANA, "fin-docs", reason=WHY)
+        self.assertEqual(p.request_folder("fin", ANA, "fin-docs", reason=WHY), f1)
+        self.assertNotEqual(p.request_folder("fin", ANA, "fin-other", reason=WHY), f1)
+        self.assertEqual(len(fake.started), 4)
+
+    def test_requests_from_different_people_run_side_by_side(self):
+        p, fake = make()
+        p.request_folder("fin", ANA, "fin-docs", reason=WHY)
+        p.request_folder("fin", BO, "fin-reports", reason=WHY)
+        p.request_schema("fin", ANA)
+        p.request_schema("fin", BO)
+        self.assertEqual(len(fake.started), 4, "nobody waits for anyone else's request")
+
+    def test_a_name_someone_else_is_asking_for_is_refused_until_their_run_ends(self):
+        p, fake = make()
+        theirs = p.request_folder("fin", BO, "fin-docs", reason=WHY)
+        p.request_schema("fin", BO, schema="gtm_integrity", reason=WHY)
+        with self.assertRaisesRegex(portal.RequestError, "Another request for this name is running"):
+            p.request_folder("fin", ANA, "fin-docs", reason=WHY)
+        with self.assertRaisesRegex(portal.RequestError, "Another request for this name is running"):
+            p.request_schema("fin", ANA, schema="gtm_integrity", reason=WHY)
+        self.assertEqual(len(fake.started), 2, "never two runs racing for one folder or schema")
+        fake.runs_[theirs].state = state("TERMINATED", "SUCCESS")
+        p.request_folder("fin", ANA, "fin-docs", reason=WHY)   # then the job's own check decides (it is Bo's now)
+        self.assertEqual(len(fake.started), 3)
+
+
+class History(unittest.TestCase):
+    def test_lists_only_the_users_requests_newest_first(self):
+        p, fake = make()
+        a = p.request_schema("fin", ANA)
+        p.request_folder("fin", ANA, "fin-docs", reason=WHY)
+        fake.runs_[999] = run_of(999, 1, {"user": BO, "catalog": "fin_citizen_dev"})
+        items = p.requests(ANA)
+        self.assertEqual([r.task for r in items], ["Request a workspace folder", "Request a personal schema"])
+        self.assertTrue(all(r.run_id != 999 for r in items))
+        self.assertEqual(items[1].run_id, a)
+
+
+try:
+    from fastapi.testclient import TestClient
+except ImportError:
+    TestClient = None
+
+
+@unittest.skipIf(TestClient is None, "FastAPI is not installed")
+class Cards(unittest.TestCase):
+    """cards.py: the catalog's sections and cards."""
+
+    def test_every_card_is_in_a_section_with_its_own_key_and_an_icon(self):
+        import cards
+        sections = {k for k, _ in cards.SECTIONS}
+        keys = [c.key for c in cards.CARDS]
+        self.assertEqual(len(keys), len(set(keys)), "keys are unique")
+        icons = (APP / "templates/_icons.html").read_text()
+        for c in cards.CARDS:
+            with self.subTest(card=c.key):
+                self.assertIn(c.section, sections)
+                self.assertIn(f'name == "{c.icon or c.key}"', icons)
+                self.assertFalse(c.href and c.link, "a task or a link, not both")
+
+    def test_link_cards_wait_for_their_link_and_empty_sections_are_left_out(self):
+        import cards
+        shown = lambda groups: [c["card"].key for _, _, cs in groups for c in cs]
+        bare = shown(cards.groups({}))
+        self.assertNotIn("discover", bare)
+        self.assertNotIn("onboarding", bare)
+        full = cards.groups({"discover": "https://d", "review_requests": "https://r"}, onboarding="https://g")
+        self.assertIn("discover", shown(full))
+        self.assertEqual([c["href"] for _, _, cs in full for c in cs if c["card"].key == "onboarding"], ["https://g"])
+        only_data = [(k, t, [c for c in cs if c["card"].section == "data"]) for k, t, cs in cards.groups({})]
+        self.assertEqual([k for k, _, cs in cards.groups({}) if k == "data"], [], "Data has only link cards: hidden without links")
+
+    def test_every_section_has_an_faq_setting(self):
+        import cards
+        import settings
+        for key, title in cards.SECTIONS:
+            self.assertEqual(settings.FAQS[key], title)
+
+
+class Pages(unittest.TestCase):
+    def setUp(self):
+        import importlib
+        import os
+        import tempfile
+        self.cfg = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+        json.dump(CONFIG, self.cfg)
+        self.cfg.close()
+        os.environ["PORTAL_CONFIG"] = self.cfg.name
+        sys.modules.pop("main", None)
+        self.main = importlib.import_module("main")
+        self.main.PORTAL, self.fake = make()
+        self.http = TestClient(self.main.app)
+        self.as_ana = {"X-Forwarded-Email": ANA}
+
+    def test_every_page_renders(self):
+        for path in ("/", "/schema", "/schema/project", "/schema/team", "/folder", "/persona", "/warehouses", "/requests"):
+            with self.subTest(path=path):
+                r = self.http.get(path, headers=self.as_ana)
+                self.assertEqual(r.status_code, 200, r.text[:300])
+        self.assertIn('<option value="fin-data-eng"', self.http.get("/folder", headers=self.as_ana).text, "the requester's groups are offered as owner")
+
+    def test_tasks_say_how_they_are_approved(self):
+        page = self.http.get("/", headers=self.as_ana).text
+        self.assertEqual(page.count("Auto-approved"), 4, "personal, project and team schemas, folder")
+        self.assertEqual(page.count(">Approval required"), 1, "workspace access (approved in Entra)")
+        self.assertIn("Approval required", self.http.get("/persona", headers=self.as_ana).text)
+        self.assertIn("Auto-approved", self.http.get("/folder", headers=self.as_ana).text)
+
+    def test_not_signed_in(self):
+        self.assertEqual(self.http.get("/").status_code, 401)
+
+    def test_submit_goes_to_the_status_page_which_polls(self):
+        r = self.http.post("/schema", data={"workspace": "fin"}, headers=self.as_ana, follow_redirects=False)
+        self.assertEqual((r.status_code, r.headers["location"]), (303, "/requests/fin/100"))
+        page = self.http.get("/requests/fin/100", headers=self.as_ana).text
+        self.assertIn('data-poll="/api/requests/fin/100"', page)
+        self.assertIn("under a minute", page)
+        self.assertRegex(page, r'<h1 class="request-title">fin_citizen_dev\.cd_ana</h1>', "what was asked for leads the page")
+        self.assertIn('<span class="k">Can manage</span> You', page)
+        self.assertEqual(self.http.get("/api/requests/fin/100", headers=self.as_ana).json()["phase"], "Starting")
+        self.assertEqual(self.http.get("/api/requests/fin/100", headers={"X-Forwarded-Email": BO}).status_code, 404)
+
+    def test_the_catalog_shows_the_personal_schema_quota(self):
+        self.assertIn(">0/1<", self.http.get("/", headers=self.as_ana).text)
+        self.fake.schemas_.add("fin_citizen_dev.cd_ana")
+        self.main.PORTAL._personal.clear()
+        page = self.http.get("/", headers=self.as_ana).text
+        self.assertIn(">1/1<", page)
+        self.assertIn("Open schema", self.http.get("/schema", headers=self.as_ana).text, "the form, not the card, links to the schema")
+
+    def test_a_running_request_shows_as_requested(self):
+        self.http.post("/schema", data={"workspace": "fin"}, headers=self.as_ana)
+        self.assertIn(">Requested<", self.http.get("/", headers=self.as_ana).text)
+        form = self.http.get("/schema", headers=self.as_ana).text
+        self.assertIn("Your request is in progress", form)
+        self.assertIn('href="/requests/fin/100"', form)
+        self.assertNotIn(">Request personal schema<", form)
+        r = self.http.post("/schema", data={"workspace": "fin"}, headers=self.as_ana, follow_redirects=False)
+        self.assertEqual(r.headers["location"], "/requests/fin/100", "a second submit goes to the running request")
+        self.assertEqual(len(self.fake.started), 1)
+
+    def test_project_schema_form(self):
+        r = self.http.post("/schema/project", data={"reason": WHY, "workspace": "fin", "name": "cd_bo"}, headers=self.as_ana)
+        self.assertIn("can&#39;t start with cd_", r.text)
+        r = self.http.post("/schema/project", data={"reason": WHY, "workspace": "fin", "name": "gtm_integrity", "owner_group": "fin-data-eng"},
+                           headers=self.as_ana, follow_redirects=False)
+        self.assertEqual(r.status_code, 303)
+        self.assertEqual((self.fake.started[0][1]["schema"], self.fake.started[0][1]["owner_group"]), ("gtm_integrity", ""),
+                         "a project schema never takes a group, even if one is sent")
+
+    def test_team_schema_form(self):
+        self.fake.users = ns(list=lambda filter, attributes, count=None: [
+            ns(user_name=ANA, groups=[ns(display="fin-data-eng"), ns(display="admins")])])
+        page = self.http.get("/schema/team", headers=self.as_ana).text
+        self.assertIn('<option value="fin-data-eng"', page, "the requester's groups are offered as the team")
+        self.assertNotIn('<option value="admins"', page, "not the workspace's own groups: Unity Catalog cannot grant to them")
+        r = self.http.post("/schema/team", data={"reason": WHY, "workspace": "fin", "name": "fin_reporting"}, headers=self.as_ana)
+        self.assertIn("Choose the team", r.text)
+        r = self.http.post("/schema/team", data={"reason": WHY, "workspace": "fin", "name": "fin_reporting", "owner_group": "fin-finance"}, headers=self.as_ana)
+        self.assertIn("Choose one of your groups", r.text)
+        r = self.http.post("/schema/team", data={"reason": WHY, "workspace": "fin", "name": "fin_reporting", "owner_group": "admins"}, headers=self.as_ana)
+        self.assertIn("Choose one of your groups", r.text, "admins is theirs, but not one a schema can go to")
+        r = self.http.post("/schema/team", data={"reason": WHY, "workspace": "fin", "name": "fin_reporting", "owner_group": "fin-data-eng"},
+                           headers=self.as_ana, follow_redirects=False)
+        self.assertEqual(r.status_code, 303)
+        self.assertEqual(self.fake.started[0][1]["owner_group"], "fin-data-eng")
+        status = self.http.get(r.headers["location"], headers=self.as_ana).text
+        self.assertIn('<span class="k">Can manage</span> You and fin-data-eng', status)
+        self.assertEqual(self.http.get("/schema/other", headers=self.as_ana).status_code, 404)
+
+    def test_the_reason_is_asked_for_shown_and_kept_for_try_again(self):
+        self.assertIn('name="reason"', self.http.get("/schema/project", headers=self.as_ana).text)
+        self.assertIn('name="reason"', self.http.get("/folder", headers=self.as_ana).text)
+        self.assertNotIn('name="reason"', self.http.get("/schema", headers=self.as_ana).text, "not for a personal schema")
+        r = self.http.post("/folder", data={"workspace": "fin", "folder": "fin-docs", "reason": "short"}, headers=self.as_ana)
+        self.assertIn("Describe what it will be used for in a sentence or two.", r.text)
+        self.assertIn(">short</textarea>", r.text, "what they typed stays in the form")
+        r = self.http.post("/folder", data={"workspace": "fin", "folder": "fin-docs", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
+        status = self.http.get(r.headers["location"], headers=self.as_ana).text
+        self.assertIn(f'<dt>Why</dt><dd>{WHY}</dd>', status)
+        req = self.main.PORTAL.run("fin", int(r.headers["location"].rsplit("/", 1)[1]), ANA)
+        self.assertIn("reason=Monthly+reconciliation", self.main.retry_link(req))
+
+    def test_validate_on_the_forms(self):
+        self.main.CONFIG["ai_check"] = "on"
+        try:
+            self.assertIn('data-ai-check="team_schema"', self.http.get("/schema/team", headers=self.as_ana).text)
+            self.assertIn('data-ai-check="folder"', self.http.get("/folder", headers=self.as_ana).text)
+            r = self.http.post("/api/check", data={"kind": "project_schema", "workspace": "fin", "name": "gtm_forecast", "reason": WHY}, headers=self.as_ana)
+            self.assertNotIn("verdict", r.json(), "the checks only: no verdict")
+            self.assertEqual(r.json()["rows"][0], {"ok": True, "text": "The schema name is available"})
+            self.assertEqual(self.fake.started, [], "a check runs nothing")
+            r = self.http.post("/schema/project", data={"workspace": "fin", "name": "gtm_forecast", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
+            status = self.http.get(r.headers["location"], headers=self.as_ana).text
+            self.assertIn('Not needed', status, "without human_approval a project schema runs when asked")
+            self.assertNotIn('Name and reason: ', status, "the check is for the form, not the status page")
+        finally:
+            self.main.CONFIG.pop("ai_check")
+        self.assertNotIn("data-ai-check", self.http.get("/folder", headers=self.as_ana).text, "off: no check")
+        self.assertEqual(self.http.post("/api/check", data={"kind": "folder"}, headers=self.as_ana).status_code, 404)
+
+    def test_the_check_advises_and_never_stops_a_request(self):
+        for mode in ("on",):
+            self.main.CONFIG["ai_check"] = mode
+            try:
+                page = self.http.get("/schema/project", headers=self.as_ana).text
+                self.assertNotIn("data-required", page)
+                self.assertIn(">Validate</button>", page)
+                send = lambda name: self.http.post("/schema/project", data={"workspace": "fin", "name": name, "reason": WHY},
+                                                   headers=self.as_ana, follow_redirects=False)
+                self.fake.decide = {**portal.checks.SAFE, "contents": "general"}   # the check finds something
+                self.assertEqual(send(f"gtm_forecast_{mode}").status_code, 303, mode)
+                self.fake.decide = None                                            # AI Decide cannot answer
+                self.assertEqual(send(f"gtm_forecast_{mode}_two").status_code, 303, "sent anyway: the check is advice")
+            finally:
+                self.main.CONFIG.pop("ai_check")
+                self.fake.decide = dict(portal.checks.SAFE)
+        self.assertEqual(len(self.fake.started), 2)
+        self.main.CONFIG["ai_check"] = "maybe"   # only on and off: anything else is off
+        try:
+            self.assertNotIn(">Validate</button>", self.http.get("/schema/project", headers=self.as_ana).text)
+        finally:
+            self.main.CONFIG.pop("ai_check")
+
+    def test_the_persona_page_offers_every_persona_without_tracking_access(self):
+        page = self.http.get("/persona", headers=self.as_ana).text
+        self.assertNotIn("Current access", page, "what someone has is managed in ServiceNow, not shown here")
+        self.assertNotIn("Ask a platform admin", page, "no link, no button: nothing to say")
+
+    def test_a_task_page_links_its_sop(self):
+        self.main.CONFIG.setdefault("links", {})["sop"] = {"persona": "https://wiki.example.com/sop/access"}
+        try:
+            page = self.http.get("/persona", headers=self.as_ana).text
+        finally:
+            self.main.CONFIG["links"].pop("sop")
+        self.assertIn('href="https://wiki.example.com/sop/access"', page.split('class="options"')[0], "in the page's heading, not only on the catalog card")
+        self.assertIn("View the standard operating procedure", page)
+
+    def test_forms_route_by_business_unit_and_healthz_checks_the_lookup(self):
+        lookup = {"function": "dir.people.business_unit_of", "warehouse_id": "wh1", "host": HOST}
+        self.main.PORTAL.config = {**self.main.PORTAL.config, "bu_lookup": lookup}
+        self.main.CONFIG["bu_lookup"] = lookup
+        try:
+            self.assertNotIn("find your business unit", self.http.get("/folder", headers=self.as_ana).text)
+            page = self.http.get("/folder", headers={"X-Forwarded-Email": BO}).text
+            self.assertIn("find your business unit", page)
+            self.assertNotIn("No workspace offers folders yet", page, "one reason, not two")
+            self.assertEqual(self.http.get("/healthz").json()["bu_lookup"], "ok")
+            self.fake.bus_ = None
+            self.main.PORTAL._bus.clear()
+            r = self.http.get("/healthz")
+            self.assertEqual((r.status_code, r.json()["bu_lookup"]), (503, "warehouse unreachable"))
+        finally:
+            self.main.CONFIG.pop("bu_lookup")
+
+    def test_healthz_says_whether_the_app_can_do_its_job(self):
+        r = self.http.get("/healthz")
+        self.assertEqual((r.status_code, r.json()["ok"]), (200, True))
+        self.assertEqual(r.json()["workspaces"]["fin"], "2 self-service jobs")
+        self.main.PORTAL.store = type("S", (), {"ping": lambda self: (_ for _ in ()).throw(AttributeError("no postgres"))})()
+        try:
+            r = self.http.get("/healthz")
+        finally:
+            self.main.PORTAL.store = FakeStore()
+        self.assertEqual(r.status_code, 503)
+        self.assertEqual(r.json()["database"], "AttributeError: no postgres", "the reason a deploy is broken, as the app sees it")
+
+    def test_old_custom_schema_links_still_work(self):
+        r = self.http.get("/schema/custom?name=gtm_integrity", headers=self.as_ana, follow_redirects=False)
+        self.assertEqual((r.status_code, r.headers["location"]), (301, "/schema/project?name=gtm_integrity"))
+
+    def test_the_review_requests_tile_opens_catalog_explorer(self):
+        self.assertNotIn("Review data access requests", self.http.get("/", headers=self.as_ana).text)
+        link = "https://adb-1.azuredatabricks.net/explore/data?o=1&requestsView=audit"
+        self.main.CONFIG["links"]["review_requests"] = link
+        try:
+            page = self.http.get("/", headers=self.as_ana).text
+        finally:
+            self.main.CONFIG["links"].pop("review_requests")
+        self.assertIn(f'href="{link.replace("&", "&amp;")}" target="_blank" rel="noopener">Review data access requests</a>', page)
+
+    def test_ask_a_question_opens_genie_one_in_the_persons_workspace(self):
+        r = self.http.get("/ask", headers=self.as_ana, follow_redirects=False)
+        self.assertEqual((r.status_code, r.headers["location"]), (303, "https://adb-1.azuredatabricks.net/one/chat?o=1"))
+        with mock.patch.object(self.main.PORTAL, "genie_one", return_value=None):
+            page = self.http.get("/ask", headers=self.as_ana)
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("Contact your platform admin", page.text, "no workspace for them: where to go instead")
+
+    def test_the_catalog_has_a_quick_search_over_every_card(self):
+        page = self.http.get("/", headers=self.as_ana).text
+        self.assertIn('<input type="search" id="catalog-search"', page)
+        self.assertIn('id="catalog-search-box" hidden', page, "shown by the script: without it, no search box that does nothing")
+        self.assertEqual(page.count('class="card task'), page.count("data-search="), "every card can be found")
+        self.assertIn('data-search="request a workspace folder create a shared workspace folder', page)
+        self.assertIn('id="no-results" hidden', page)
+
+    def test_request_a_budget_policy_and_the_cost_dashboard_are_coming_soon(self):
+        page = self.http.get("/", headers=self.as_ana).text
+        compute = page[page.index("<h2>Compute &amp; cost"):]
+        for name in ("Request a budget policy", "View cost dashboard"):
+            with self.subTest(card=name):
+                card = compute[compute.rindex('<div class="card task', 0, compute.index(name)):][:1200]
+                self.assertIn("is-soon", card)
+                self.assertIn("Coming soon", card)
+                self.assertNotIn('class="stretched"', card, "not a link yet")
+
+    def test_the_discover_data_card_opens_the_discover_page(self):
+        self.assertNotIn("Discover data", self.http.get("/", headers=self.as_ana).text, "no link: no card")
+        self.main.CONFIG["links"]["discover"] = "https://adb-1.azuredatabricks.net/discover?o=1"
+        try:
+            page = self.http.get("/", headers=self.as_ana).text
+        finally:
+            self.main.CONFIG["links"].pop("discover")
+        data = page[page.index("<h2>Data<"):]
+        self.assertIn('href="https://adb-1.azuredatabricks.net/discover?o=1" target="_blank" rel="noopener">Discover data</a>', data, "in the Data section")
+
+    def test_the_genie_one_onboarding_card_asks_genie_the_prompt(self):
+        self.assertNotIn("Genie One Onboarding", self.http.get("/", headers=self.as_ana).text, "no prompt: no card")
+        self.main.CONFIG["onboarding"] = {"prompt": "Onboard me"}
+        try:
+            page = self.http.get("/", headers=self.as_ana).text
+        finally:
+            self.main.CONFIG.pop("onboarding")
+        self.assertIn('href="https://adb-1.azuredatabricks.net/one/chat?o=1&amp;q=Onboard%20me" target="_blank" rel="noopener">Genie One Onboarding</a>', page)
+
+    def test_each_section_links_its_faq_and_new_people_are_pointed_to_access(self):
+        self.main.CONFIG["links"]["discover"] = "https://adb-1.azuredatabricks.net/discover?o=1"   # Data has only link cards
+        try:
+            page = self.http.get("/", headers=self.as_ana).text
+        finally:
+            self.main.CONFIG["links"].pop("discover")
+        self.assertEqual([h for h in ("<h2>Get started<", "<h2>Data<", "<h2>Build<", "<h2>Compute &amp; cost<") if h in page],
+                         ["<h2>Get started<", "<h2>Data<", "<h2>Build<", "<h2>Compute &amp; cost<"])
+        self.assertNotIn('class="group-faq"', page, "no FAQ pages set, no FAQ links")
+        self.assertIn('New here? Start with <a href="/persona">Request workspace access</a> · <a href="/ask" target="_blank" rel="noopener">Ask a question', page)
+        self.main.CONFIG["faq"] = {"getting_started": "https://wiki.contoso.com/start", "access": "https://wiki.contoso.com/access",
+                                   "data": None, "workspace": "https://wiki.contoso.com/workspace"}
+        try:
+            page = self.http.get("/", headers=self.as_ana).text
+        finally:
+            self.main.CONFIG.pop("faq")
+        self.assertEqual(page.count('class="group-faq"'), 2, "access and workspace have FAQ pages; data does not")
+        self.assertIn('<a class="group-faq" href="https://wiki.contoso.com/access" target="_blank" rel="noopener">FAQ', page)
+        self.assertIn('<a href="https://wiki.contoso.com/start" target="_blank" rel="noopener">How it works', page)
+
+    def test_a_form_error_is_shown_on_the_form(self):
+        r = self.http.post("/folder", data={"reason": WHY, "workspace": "fin", "folder": "fin-docs", "owner_group": "fin-finance"}, headers=self.as_ana)
+        self.assertIn("Choose one of your groups as the owner", r.text)
+        self.assertEqual(self.fake.started, [])
+
+    def test_in_databricks_apps_only_its_sign_in_counts(self):
+        import importlib
+        with mock.patch.dict("os.environ", {"PORTAL_USER": ANA}):
+            sys.modules.pop("main", None)
+            local = importlib.import_module("main")
+            self.assertEqual(TestClient(local.app).get("/warehouses").status_code, 200, "locally, PORTAL_USER signs in")
+            with mock.patch.dict("os.environ", {"DATABRICKS_APP_NAME": "cd-self-service"}):
+                sys.modules.pop("main", None)
+                deployed = importlib.import_module("main")
+                self.assertEqual(TestClient(deployed.app).get("/warehouses").status_code, 401)
+        sys.modules.pop("main", None)
+
+    def test_the_favicon(self):
+        self.assertIn('href="/static/favicon.svg"', self.http.get("/", headers=self.as_ana).text)
+        self.assertEqual(self.http.get("/static/favicon.svg").headers["content-type"], "image/svg+xml")
+        r = self.http.get("/favicon.ico", follow_redirects=False)   # browsers ask for it anyway
+        self.assertEqual((r.status_code, r.headers["location"]), (301, "/static/favicon.svg"))
+
+
+
+@unittest.skipIf(TestClient is None, "FastAPI is not installed")
+class ApprovalRequests(unittest.TestCase):
+    """human_approval: project and team schemas wait for an approver; the requester follows them
+    on the request's page, answers questions there, and sees the decision."""
+
+    def setUp(self):
+        import importlib
+        import os
+        import tempfile
+        cfg = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+        json.dump({**CONFIG, "human_approval": ["project_schema", "team_schema"]}, cfg)
+        cfg.close()
+        os.environ["PORTAL_CONFIG"] = cfg.name
+        sys.modules.pop("main", None)
+        self.main = importlib.import_module("main")
+        self.db = FakeStore()
+        self.main.PORTAL, self.fake = make(self.db)
+        self.main.PORTAL.config = self.main.CONFIG
+        self.http = TestClient(self.main.app)
+        self.as_ana = {"X-Forwarded-Email": ANA}
+
+    def send(self, name="gtm_forecast"):
+        return self.http.post("/schema/project", data={"workspace": "fin", "name": name, "reason": WHY}, headers=self.as_ana, follow_redirects=False)
+
+    def test_a_project_schema_is_recorded_and_waits_nothing_runs(self):
+        r = self.send()
+        self.assertEqual(self.fake.started, [], "no job until an approver approves")
+        self.assertRegex(r.headers["location"], r"^/request/ss-[0-9a-f]{8}$")
+        page = self.http.get(r.headers["location"], headers=self.as_ana).text
+        self.assertIn("Waiting for an approver", page)
+        self.assertIn("Pending approval", page)
+        self.assertEqual(self.send().headers["location"], r.headers["location"], "asking again shows the one waiting")
+        self.assertIn("Pending approval", self.http.get("/requests", headers=self.as_ana).text)
+        self.assertIn(f'href="{r.headers["location"]}"', self.http.get("/requests", headers=self.as_ana).text)
+
+    def test_the_catalog_and_the_form_say_an_approver_decides(self):
+        self.assertEqual(self.http.get("/", headers=self.as_ana).text.count(">Approval required"), 3, "project and team schemas, and personas")
+        form = self.http.get("/schema/project", headers=self.as_ana).text
+        self.assertIn(">Submit request</button>", form)
+        self.assertIn("Your schema will be created once approved.", form)
+
+    def test_a_folder_that_needs_no_approver_says_create(self):
+        form = self.http.get("/folder", headers=self.as_ana).text
+        self.assertIn(">Create folder</button>", form)
+        self.assertIn("Your folder will be ready in under a minute.", form)
+        self.assertNotIn("Your team can manage this folder too", form.split('id="owner_group"')[1].split("</p>")[0].split("data-hint-group")[0],
+                         "with Only me chosen, the hint does not say a team manages it")
+
+    def test_the_requester_answers_a_question_and_sees_the_decision(self):
+        location = self.send().headers["location"]
+        rid = location.rsplit("/", 1)[1]
+        self.assertIn("Nobody is waiting for an answer", self.http.post(f"{location}/reply", data={"body": "Hi"}, headers=self.as_ana).text)
+        self.db.event(rid, "needs_info", actor="dana@contoso.com", body="Which regions?")
+        page = self.http.get(location, headers=self.as_ana).text
+        self.assertIn("An approver asked you a question", page)
+        self.assertIn("Which regions?", page)
+        self.assertIn("Reply needed", self.http.get("/requests", headers=self.as_ana).text)
+        r = self.http.post(f"{location}/reply", data={"body": "All of Canada."}, headers=self.as_ana, follow_redirects=False)
+        self.assertEqual(r.status_code, 303)
+        self.assertEqual(self.db.events[-1][1:], ("replied", {"actor": ANA, "body": "All of Canada."}))
+        self.assertIn("Waiting for an approver", self.http.get(location, headers=self.as_ana).text, "back with the approvers")
+        self.db.event(rid, "rejected", actor="dana@contoso.com", body="Use the shared forecast schema.")
+        page = self.http.get(location, headers=self.as_ana).text
+        self.assertIn("Rejected by dana@contoso.com", page)
+        self.assertIn("Use the shared forecast schema.", page)
+
+    def test_the_status_page_keeps_the_conversation(self):
+        rid = self.send().headers["location"].rsplit("/", 1)[1]
+        self.db.event(rid, "needs_info", actor="dana@contoso.com", body="Which regions?")
+        self.db.event(rid, "approved", actor="dana@contoso.com")
+        run_id = self.main.PORTAL.run_recorded(dict(self.db.requests[rid]))
+        page = self.http.get(f"/requests/fin/{run_id}", headers=self.as_ana).text
+        self.assertIn(">Conversation<", page, "once it runs, the requester still sees what was asked and answered")
+        self.assertIn("Which regions?", page)
+        self.assertIn('<span class="event-pill approved">Approved</span>', page, "a decision is a pill")
+
+    def test_my_requests_shows_how_many_need_a_reply(self):
+        rid = self.send().headers["location"].rsplit("/", 1)[1]
+        self.assertNotIn('class="nav-count"', self.http.get("/", headers=self.as_ana).text)
+        self.db.event(rid, "needs_info", actor="dana@contoso.com", body="Which regions?")
+        self.main.PORTAL._replies.clear()
+        self.assertIn('class="nav-count" title="1 request needs your reply">1<', self.http.get("/", headers=self.as_ana).text)
+
+    def test_the_summary_is_written_in_the_background_for_approvers(self):
+        import threading
+        self.main.PORTAL.config = {**self.main.CONFIG, "ai_summary": {"model": "system.ai.claude-sonnet-5-5"}}
+        self.fake.api_client = type("A", (), {"do": staticmethod(lambda method, path, body=None:
+            {"choices": [{"message": {"content": '{"headline": "Project schema for forecasts", "summary": "s", "concerns": [], "questions": []}'}}]})})()
+        rid = self.send().headers["location"].rsplit("/", 1)[1]
+        for t in threading.enumerate():
+            if t.daemon and t is not threading.current_thread():
+                t.join(timeout=5)
+        summaries = [d for r, t, d in self.db.events if r == rid and t == "reviewed" and "summary" in d]
+        self.assertEqual(summaries[0]["summary"]["headline"], "Project schema for forecasts")
+
+    def test_only_the_requester_sees_their_request(self):
+        location = self.send().headers["location"]
+        self.assertEqual(self.http.get(location, headers={"X-Forwarded-Email": "bo@contoso.com"}).status_code, 404)
+
+    def test_the_run_page_names_who_approved_it(self):
+        rid = self.send().headers["location"].rsplit("/", 1)[1]
+        self.db.event(rid, "approved", actor="dana@contoso.com")
+        run_id = self.main.PORTAL.run_recorded({**self.db.requests[rid], "id": rid})
+        page = self.http.get(f"/requests/fin/{run_id}", headers=self.as_ana).text
+        self.assertIn("Approved by dana@contoso.com", page)
+
+    def test_once_its_job_runs_the_request_page_hands_over_to_the_run(self):
+        location = self.send().headers["location"]
+        rid = location.rsplit("/", 1)[1]
+        self.db.event(rid, "approved", actor="dana@contoso.com")
+        self.db.run_started(rid, "fin", 77)
+        r = self.http.get(location, headers=self.as_ana, follow_redirects=False)
+        self.assertEqual(r.headers["location"], "/requests/fin/77")
+
+    def test_folders_and_personal_schemas_still_run_when_asked(self):
+        r = self.http.post("/folder", data={"workspace": "fin", "folder": "fin-docs", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
+        self.assertRegex(r.headers["location"], r"^/requests/fin/\d+$")
+        self.assertEqual(len(self.fake.started), 1)
+
+
+if __name__ == "__main__":
+    unittest.main()

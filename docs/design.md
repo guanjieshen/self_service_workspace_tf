@@ -116,8 +116,8 @@ workspace. What keeps that safe:
 | Request | Path |
 |---|---|
 | A persona (explorer, builder, publisher) | The person asks in Entra (for example an access package), which adds them to the group. No pull request |
-| A schema or a workspace folder | The self-service app, outside this repository |
-| A team warehouse, a project usage policy, classic compute | The self-service app, outside this repository |
+| A schema or a workspace folder | The self-service app's jobs (section 9) |
+| A team warehouse, a project usage policy, classic compute | The self-service app, not built yet |
 
 ## 5. The workspace catalog
 
@@ -186,7 +186,6 @@ Ideas that are not built. Each needs review and a decision before work starts; t
 | - | --- | --- | --- |
 | F1 | Combined mode | Creating the workspace itself | Network design (VNet, PrivateLink, DNS) |
 | F2 | Unity Catalog stream | Catalogs shared between workspaces, storage credentials, external locations | The Unity Catalog team |
-| F3 | The self-service app | Schemas and workspace folders on request | Its own repository; the catalog this repository creates |
 
 ### Combined mode (F1)
 
@@ -196,10 +195,45 @@ A second stack creates the workspace itself (Premium, VNet injection into an exi
 
 Catalogs shared between workspaces, storage credentials and external locations stay with the Unity Catalog team. This project manages only a workspace's own catalog (`config/defaults/catalog.yaml`) and expects the metastore and the rest to exist.
 
-### The self-service app (F3)
+## 9. The self-service app
 
-Schemas and workspace folders are requested through the self-service app, which lives in its own repository and deploys its own jobs. What it relies on here:
+What people request (personal, project and team schemas, workspace folders) comes from the
+self-service app, an approvals app for the requests that need a person, and two jobs in each
+workspace the app serves. They live in this repository (`apps/self-service/`, `bundle/`,
+`config/self-service/`) but are **not Terraform**: Databricks Asset Bundles deploy them
+(`scripts/app_deploy.py`), because Terraform cannot deploy an app's code or start it, and the
+app changes far more often than the baseline.
 
-- **The workspace catalog** (`{prefix}_citizen_dev`), owned by the pipeline; the platform admins group has all privileges and `MANAGE`. Personas have only `USE CATALOG` and `USE SCHEMA` on it; the app grants on the schemas it creates.
-- **Catalog grants are authoritative:** a privilege granted on the catalog outside this repository is removed on the next apply. The app's service principal needs privileges on the catalog (for example `USE CATALOG` and `CREATE SCHEMA`): add them under `other_privileges` in `config/defaults/catalog.yaml`, not by hand.
-- **The persona groups** each workspace names in its file.
+| Where | What | Deployed by |
+| --- | --- | --- |
+| **The hub** (`config/self-service/hub.yaml`) | Both apps and their Lakebase database | `bundle/hub/` |
+| **Each served workspace** (a workspace file without `self_service: false`) | The baseline, and the two self-service jobs | Terraform, and `bundle/jobs/` |
+
+**Every object has one owner.** Terraform's grants on catalogs, warehouses, usage policies and
+entitlements are authoritative, so anything the bundles granted there would be removed by the
+next apply. What the app needs on those, Terraform grants (`terraform/self_service.tf`):
+
+| Object | Owner | The other never |
+| --- | --- | --- |
+| Workspace settings, persona groups, entitlements, workspace assignment | Terraform | the bundles touch none |
+| The catalog `{prefix}_citizen_dev` and its grants, including the apps' `USE_CATALOG` and `BROWSE` | Terraform | the bundles and the jobs never grant on the catalog |
+| Schemas in the catalog and their grants; team folders `/Workspace/<team>` | The jobs, on request | Terraform never manages them |
+| The usage policy and who may use it (including the jobs' identity) | Terraform | the bundles only refer to its ID |
+| The apps' service principals' assignment to served workspaces | Terraform | the bundles do not assign |
+| The jobs, their notebooks and who may run them (the hub's two apps) | `bundle/jobs/` | Terraform never manages them |
+| Both apps, their permissions, the Lakebase project, its database and migrations | `bundle/hub/`, `app_deploy.py` | Terraform never manages them |
+
+**Configuration flows one way.** The app reads each served workspace's file and its Terraform
+output `self_service` (prefix, ID, host, catalog, usage policy), and never repeats them. One
+value flows back: the apps' service principals (`app_ids` in `hub.yaml`), set once after the
+hub's first deploy, which Terraform reads to grant them. Terraform loads nothing else from
+`config/self-service/`, so an app setting never plans Terraform.
+
+**A workspace's business unit is its prefix.** People are routed to their business unit's
+workspace by a lookup function (`bu_lookup`) when one exists. The jobs check every request
+again; they run as the pipeline's identity on the workspace's usage policy.
+
+**Deploys never overlap.** Terraform's state is per workspace in Azure Storage; the bundles'
+state is in the workspaces (`<admin_path>/bundle/hub`, `<admin_path>/bundle/jobs`). The hub
+deploys first (its apps must exist before the jobs can grant them), then each served
+workspace's jobs.

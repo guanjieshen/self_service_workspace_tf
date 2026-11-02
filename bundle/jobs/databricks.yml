@@ -1,0 +1,21 @@
+# The self-service jobs, as a Databricks Asset Bundle: in each workspace the app serves (a
+# workspace file without self_service: false), one target per workspace. Deploy with
+# scripts/app_deploy.py, which first runs scripts/app_build.py: it writes build/<workspace>/
+# (the notebooks, with their settings written in) and build/<workspace>/target.yml (the
+# target, from the workspace's Terraform output and config/self-service/).
+bundle:
+  name: self-service-jobs
+
+include:
+  - resources/*.yml
+  - build/*/target.yml
+
+variables:
+  business_unit:
+    description: The workspace's business unit, its prefix in upper case (in the job names).
+
+sync:
+  paths:
+    - build
+  include:
+    - build/**
