@@ -194,7 +194,7 @@ run "genie_code_defaults" {
     error_message = "Comments are removed and placeholders filled."
   }
   assert {
-    condition     = tolist(keys(local.genie_skills)) == tolist(["build-tagged-assets/SKILL.md"])
+    condition     = tolist(keys(local.genie_skills)) == tolist(["build-tagged-assets/SKILL.md", "onboard-me/SKILL.md"])
     error_message = "Every workspace inherits the default skills (and only skill folders, not the README). Got: ${jsonencode(keys(local.genie_skills))}"
   }
   assert {
@@ -203,6 +203,14 @@ run "genie_code_defaults" {
       strcontains(base64decode(local.genie_skills["build-tagged-assets/SKILL.md"]), "TST Default Warehouse")
     )
     error_message = "Placeholders in skills are filled ({WAREHOUSE} = the default warehouse's name)."
+  }
+  assert {
+    condition = (
+      length(regexall("\\{(PREFIX|prefix|TAGS|WORKSPACE_TAGS|CATALOG|WAREHOUSE)\\}", base64decode(local.genie_skills["onboard-me/SKILL.md"]))) == 0 &&
+      strcontains(base64decode(local.genie_skills["onboard-me/SKILL.md"]), "this workspace's catalog, `tst_citizen_dev`") &&
+      startswith(base64decode(local.genie_skills["onboard-me/SKILL.md"]), "---\nname: onboard-me\n")
+    )
+    error_message = "The onboard-me skill names the workspace's catalog, and its front matter comes first once the comment is removed."
   }
   assert {
     condition     = strcontains(base64decode(local.genie_skills["build-tagged-assets/SKILL.md"]), "`APPID`, `BUSINESS_UNIT`, `COST_CATEGORY`, `TEAM`, `PROJECT`")

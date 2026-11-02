@@ -157,7 +157,7 @@ class TfShRelease(unittest.TestCase):
         (self.fake / "plan-after.json").write_text(plan_after)
         env = {k: v for k, v in os.environ.items() if k != "GITHUB_ACTIONS"}
         env.update(TERRAFORM=str(self.fake / "terraform"), FAKE_DIR=str(self.fake), CONFIRM_ENV="ws", ALLOW_LOCAL_APPLY="1")
-        out = subprocess.run([str(self.repo / "scripts/tf.sh"), "ws", "apply"], env=env, stdin=subprocess.DEVNULL,
+        out = subprocess.run(["bash", str(self.repo / "scripts/tf.sh"), "ws", "apply"], env=env, stdin=subprocess.DEVNULL,
                              capture_output=True, text=True, timeout=60)
         calls = (self.fake / "calls.log").read_text().splitlines()
         released = (self.fake / "released.log").read_text().split() if (self.fake / "released.log").exists() else []
@@ -193,7 +193,7 @@ class TfShRelease(unittest.TestCase):
         (self.fake / "plan.json").write_text(self.plan([folder], ["module.personas.databricks_entitlements.users"]))
         env = {k: v for k, v in os.environ.items() if k not in ("GITHUB_ACTIONS", "CONFIRM_ENV")}
         env.update(TERRAFORM=str(self.fake / "terraform"), FAKE_DIR=str(self.fake), ALLOW_LOCAL_APPLY="1")
-        out = subprocess.run([str(self.repo / "scripts/tf.sh"), "ws", "apply"], env=env, stdin=subprocess.DEVNULL,
+        out = subprocess.run(["bash", str(self.repo / "scripts/tf.sh"), "ws", "apply"], env=env, stdin=subprocess.DEVNULL,
                              capture_output=True, text=True, timeout=60)
         self.assertNotEqual(out.returncode, 0)
         self.assertIn("Refusing to apply risky changes", out.stdout + out.stderr)
@@ -210,7 +210,7 @@ class TfShRelease(unittest.TestCase):
                 (self.fake / "plan-after.json").write_text(self.plan([folder], []))
                 env = {k: v for k, v in os.environ.items() if k != "CONFIRM_ENV"}
                 env.update(TERRAFORM=str(self.fake / "terraform"), FAKE_DIR=str(self.fake), GITHUB_ACTIONS="true", CONFIRM_ENV=confirm)
-                out = subprocess.run([str(self.repo / "scripts/tf.sh"), "ws", "apply"], env=env, stdin=subprocess.DEVNULL,
+                out = subprocess.run(["bash", str(self.repo / "scripts/tf.sh"), "ws", "apply"], env=env, stdin=subprocess.DEVNULL,
                                      capture_output=True, text=True, timeout=60)
                 ran = any(c.startswith("apply") for c in (self.fake / "calls.log").read_text().splitlines())
                 self.assertEqual(ran, applied, out.stdout + out.stderr)
@@ -222,7 +222,7 @@ class TfShRelease(unittest.TestCase):
         env = {k: v for k, v in os.environ.items() if k not in ("GITHUB_ACTIONS", "ALLOW_LOCAL_APPLY")}
         env.update(TERRAFORM=str(self.fake / "terraform"), FAKE_DIR=str(self.fake), CONFIRM_ENV="ws")
         for cmd in ("apply", "destroy"):
-            out = subprocess.run([str(self.repo / "scripts/tf.sh"), "ws", cmd], env=env, stdin=subprocess.DEVNULL,
+            out = subprocess.run(["bash", str(self.repo / "scripts/tf.sh"), "ws", cmd], env=env, stdin=subprocess.DEVNULL,
                                  capture_output=True, text=True, timeout=60)
             self.assertNotEqual(out.returncode, 0, cmd)
             self.assertIn(f"Refusing to {cmd} outside GitHub Actions", out.stdout)
@@ -238,7 +238,7 @@ class TfShRelease(unittest.TestCase):
                 (self.fake / "plan.json").write_text(self.plan([], []))
                 env = {k: v for k, v in os.environ.items() if k != "GITHUB_ACTIONS"}
                 env.update(TERRAFORM=str(self.fake / "terraform"), FAKE_DIR=str(self.fake), CONFIRM_ENV="ws", ALLOW_LOCAL_APPLY="1")
-                out = subprocess.run([str(self.repo / "scripts/tf.sh"), "ws", "apply"], env=env, stdin=subprocess.DEVNULL,
+                out = subprocess.run(["bash", str(self.repo / "scripts/tf.sh"), "ws", "apply"], env=env, stdin=subprocess.DEVNULL,
                                      capture_output=True, text=True, timeout=60)
                 ran = any(c.startswith("apply") for c in (self.fake / "calls.log").read_text().splitlines())
                 self.assertEqual(ran, applies, out.stdout + out.stderr)
@@ -250,7 +250,7 @@ class TfShRelease(unittest.TestCase):
         env = {k: v for k, v in os.environ.items() if k != "GITHUB_ACTIONS"}
         env.update(TERRAFORM=str(self.fake / "terraform"), FAKE_DIR=str(self.fake), CONFIRM_ENV="ws", ALLOW_LOCAL_APPLY="1")
         for cmd in ("apply", "destroy", "force-unlock"):
-            out = subprocess.run([str(self.repo / "scripts/tf.sh"), "ws", cmd], env=env, stdin=subprocess.DEVNULL,
+            out = subprocess.run(["bash", str(self.repo / "scripts/tf.sh"), "ws", cmd], env=env, stdin=subprocess.DEVNULL,
                                  capture_output=True, text=True, timeout=60)
             self.assertNotEqual(out.returncode, 0, cmd)
             self.assertIn(f"Refusing to {cmd} without config/backend.hcl", out.stdout)

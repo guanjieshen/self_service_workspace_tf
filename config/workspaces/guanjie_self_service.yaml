@@ -1,0 +1,29 @@
+# The guanjie_self_service workspace (journey 1: add a workspace), after the sandbox rebuild.
+prefix: gss
+host: https://adb-7405607317299160.0.azuredatabricks.net
+
+# Shown next to the workspace name in the top bar.
+label:
+  text: gss self service
+  color: lime
+
+groups:
+  users: gss-cd-users
+  explorer: gss-cd-explorers
+  builder: gss-cd-builders
+  publisher: null          # nobody gets this persona here
+
+# ---- Changes to the baseline, for this workspace only ----------------------
+
+# This workspace's default self-service application ID (a placeholder until it has one).
+tags:
+  APPID: GSS-SANDBOX
+
+# The metastore has no storage root, so the catalog keeps its data in our own storage,
+# in a folder of its own (the external location guanjie-catalogs-2026 covers this path).
+catalog:
+  storage_root: abfss://catalogs@guanjiecat2026.dfs.core.windows.net/guanjie_self_service
+
+# A small team for now: a smaller default warehouse (the baseline's auto-stop stays).
+sql_warehouse:
+  size: X-Small

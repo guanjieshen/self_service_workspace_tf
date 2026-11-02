@@ -40,7 +40,7 @@ The full walkthrough is in [docs/SETUP.md](docs/SETUP.md). Here's the setup proc
 | Step | What to do | Usually handled by |
 | --- | --- | --- |
 | 1 | Fill in [`config/setup.yaml`](config/setup.yaml) with the Azure tenant, Terraform state storage, and GitHub repository details. | Platform team |
-| 2 | Push this project to your GitHub repository, with your teams in `.github/CODEOWNERS`. | Platform team |
+| 2 | Put this project in your GitHub repository, with your teams in `.github/CODEOWNERS`: from a Databricks workspace (no git needed), or from the zip ([step 2](docs/SETUP.md#2-put-the-repository-in-your-github)). | Platform team |
 | 3 | Run `python3 scripts/setup.py state` to prepare Terraform state storage and its backend configuration. | Cloud team |
 | 4 | Run `python3 scripts/setup.py identity` to prepare the deployment identity: an Entra app registration with two GitHub federated credentials and no secrets ([what it needs](docs/SETUP.md#what-the-app-registration-needs)). | Entra admin |
 | 5 | Run `python3 scripts/setup.py github` to configure GitHub for deployments. | GitHub admin |
@@ -78,6 +78,7 @@ Changes to the Terraform modules, scripts, or workflows are **framework changes*
 | `scripts/` | Setup, workspace onboarding and validation, preflight checks, Terraform execution, plan review, and tests. |
 | `.github/` | GitHub Actions workflows (`deploy.yml` and `checks.yml`), `CODEOWNERS`, and the pull request checklist. |
 | `docs/` | Setup, design decisions, workflows, and operational guides. |
+| `install/` | `copy_to_your_repo`: a Databricks notebook that copies a release into your repository's Git folder (installing without git). |
 | `dev/` | Workspaces used to test the framework itself; not included in a release. |
 | `AGENTS.md`, `agents/`, `CLAUDE.md` | Contributor and coding-agent guidance. `AGENTS.md` is the main entry point. |
 

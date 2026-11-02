@@ -75,18 +75,39 @@ Two more things to know before you start; they live in their own files, not here
 
 > **On GitHub Enterprise?** Read [github-enterprise.md](github-enterprise.md) first: it covers the issuer and subject differences, self-hosted runners, and what to check.
 
-1. Create an **empty private repository** in your GitHub organization (no README, no license).
-2. Unzip the release and push it:
+**Your repository** can be empty, or created from your organization's template (with its README, license, workflows): nothing of yours is deleted. Create it with its **final name** (see the note at the end of this step).
 
-   ```bash
-   unzip <release>.zip && cd <release>
-   # config/setup.yaml filled in (step 1)
-   git init -b main && git add -A && git commit -m "Workspace baseline v1.0.0"
-   git remote add origin https://github.com/<org>/<repo>.git && git push -u origin main
-   ```
+### From a Databricks workspace (no git needed)
 
-3. **Push only what you want deployed.** Once step 5 is done, every push to `main` applies the workspaces that push concerns: the `config/workspaces/` files it changes, or every workspace when it changes `config/defaults/` or the Terraform code ([github-actions.md](github-actions.md)). A release ships with none (only `_example.yaml`), so the first push deploys nothing.
-4. **Replace the owners in `.github/CODEOWNERS`** with your teams (for example `@my-org/databricks-platform` and `@my-org/security`) **before step 5**, in this push or a direct one after it. Step 5 turns on branch protection that requires code owners to review, so a placeholder owner would leave nobody able to approve.
+You need a Databricks workspace you can use, with **serverless notebooks**, and a **Git credential for your GitHub** in it (your user settings > **Linked accounts** > Git integration). Databricks clones and pushes Git folders itself, so the notebook needs no network access; but if your GitHub only accepts known IP addresses, it must accept Databricks Git folders (or your workspace uses the Git server proxy).
+
+| # | Where | What |
+| --- | --- | --- |
+| 1 | Workspace > your folder > **Create > Git folder** | **This release:** the framework repository's URL (you were given it), branch **`release/<version>`**, for example `release/v1.0.0`. It is public: no credential needed |
+| 2 | The same | **Your repository:** its URL. Then, in that Git folder, create a **new branch** (for example `install-baseline`): your `main` may be protected |
+| 3 | In the release's Git folder, open `install/copy_to_your_repo` | Set `source` and `target` to the two Git folders' paths (each folder's ⋮ > **Copy path**; they start with `/Workspace/`), leave `mode` on `preview`, and **Run all** on serverless |
+| 4 | The notebook's output | What happens to each file: **new**; **replace** (yours is replaced by the release's: your `README.md`, your old `.github/CODEOWNERS`, printed so you can merge required owners); **merge** (`.gitignore`: both sets of lines); **keep** (yours only, never deleted; your own workflows keep running on pull requests) |
+| 5 | The notebook | Set `mode` to `copy` and **Run all** again |
+| 6 | Your repository's Git folder | Fill in `config/setup.yaml` (step 1), and put your teams in `.github/CODEOWNERS` (item 2 under "Either way") |
+| 7 | The same | **Commit & push** to the new branch, then open a pull request on GitHub and merge it |
+
+The release's Git folder can be deleted afterwards. Keep your repository's Git folder if you will edit the configuration from Databricks.
+
+### From the zip (with git)
+
+```bash
+unzip <release>.zip && cd <release>
+# config/setup.yaml filled in (step 1)
+git init -b main && git add -A && git commit -m "Workspace baseline v1.0.0"
+git remote add origin https://github.com/<org>/<repo>.git && git push -u origin main
+```
+
+This needs an **empty** repository. For one with template files, use the Databricks route above.
+
+### Either way
+
+1. **Push only what you want deployed.** Once step 5 is done, every push to `main` applies the workspaces that push concerns: the `config/workspaces/` files it changes, or every workspace when it changes `config/defaults/` or the Terraform code ([github-actions.md](github-actions.md)). A release ships with none (only `_example.yaml`), so the first push deploys nothing.
+2. **Replace the owners in `.github/CODEOWNERS`** with your teams (for example `@my-org/databricks-platform` and `@my-org/security`) **before step 5**. Step 5 turns on branch protection that requires code owners to review, so a placeholder owner would leave nobody able to approve.
 
 > **Note:** The repository's GitHub OIDC subject includes its numeric IDs, so create the repository with its final name before step 4. Renaming it later means recreating the two federated credentials (update `github_repo` and run step 4 again).
 

@@ -2,6 +2,12 @@
 """Build the release zip an organization installs: this repository without its own environment.
 
     scripts/release.py <version> [--out dist]     for example: scripts/release.py v1.0.0
+    scripts/release.py <version> --branch          the same files on the branch release/<version>
+
+The branch is how an organization installs from this repository on GitHub, without git on a
+laptop: a Databricks Git folder checks it out, and install/copy_to_your_repo.py copies it into
+their own repository's Git folder (docs/SETUP.md, step 2). Push it with
+`git push origin release/<version>`.
 
 The framework repository holds a working installation (its tenant, state storage, account,
 workspaces), so that every change is tested for real. A customer must not receive any of it.
@@ -12,20 +18,21 @@ From the committed files only (git archive of HEAD), the zip:
   - sets account_id in config/defaults/cost.yaml to null;
   - replaces the owners in .github/CODEOWNERS with @your-org/databricks-platform, and on the
     security settings (config/defaults/settings.yaml) with it and @your-org/security;
-
   - adds VERSION, the release's name (an installation has no tags of this repository);
 
-then refuses to write the zip if any of this repository's identifiers is still in it (its tenant,
+then refuses to write the zip (or the branch) if any of this repository's identifiers is still in it (its tenant,
 subscription, storage, account, workspace hosts and storage roots, CODEOWNERS owners). Run it
 from a clean checkout of the commit to release.
 """
 import argparse
 import io
+import os
 import pathlib
 import re
 import subprocess
 import sys
 import tarfile
+import tempfile
 import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -122,10 +129,40 @@ def leaks(files, identifiers):
     return out
 
 
+def mode(path):
+    """Executable for the scripts people and CI run; everything else a plain file."""
+    return 0o755 if path.endswith((".sh", ".py")) and path.startswith("scripts/") else 0o644
+
+
+def run_git(*args, env=None, data=None):
+    return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, check=True,
+                          env=env, input=data).stdout.decode().strip()
+
+
+def write_branch(release, version):
+    """Commit the release files to release/<version> without touching the working tree: a
+    temporary index, then write-tree and commit-tree (on top of the branch if it exists)."""
+    branch = f"refs/heads/release/{version}"
+    with tempfile.TemporaryDirectory() as tmp:
+        env = {**os.environ, "GIT_INDEX_FILE": os.path.join(tmp, "index")}
+        for path in sorted(release):
+            blob = run_git("hash-object", "-w", "--stdin", data=release[path])
+            kind = "100755" if mode(path) == 0o755 else "100644"
+            run_git("update-index", "--add", "--cacheinfo", f"{kind},{blob},{path}", env=env)
+        tree = run_git("write-tree", env=env)
+    parent = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--verify", "--quiet", branch],
+                            capture_output=True, text=True).stdout.strip()
+    head = run_git("rev-parse", "--short", "HEAD")
+    commit = run_git("commit-tree", tree, *(["-p", parent] if parent else []), "-m", f"Release {version} (from {head})")
+    run_git("update-ref", branch, commit)
+    return branch.removeprefix("refs/heads/"), commit
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("version", help="the release's name, for example v1.0.0")
     ap.add_argument("--out", default=str(ROOT / "dist"), help="folder for the zip (default: dist/)")
+    ap.add_argument("--branch", action="store_true", help="write the branch release/<version> instead of a zip")
     args = ap.parse_args(argv)
     if not re.fullmatch(r"v\d+\.\d+\.\d+", args.version):
         raise SystemExit(f"version must look like v1.0.0, not {args.version!r}")
@@ -138,6 +175,10 @@ def main(argv=None):
         for path, value in found:
             print(f"error: {path} still contains {value!r}, which belongs to this repository's environment", file=sys.stderr)
         return 1
+    if args.branch:
+        branch, commit = write_branch(release, args.version)
+        print(f"{branch} at {commit[:7]}: {len(release)} files. Push it: git push origin {branch}")
+        return 0
     name = f"{ROOT.name}-{args.version}"
     out = pathlib.Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -145,7 +186,7 @@ def main(argv=None):
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
         for path in sorted(release):
             info = zipfile.ZipInfo(f"{name}/{path}")
-            info.external_attr = (0o755 if path.endswith((".sh", ".py")) and path.startswith("scripts/") else 0o644) << 16
+            info.external_attr = mode(path) << 16
             z.writestr(info, release[path])
     print(f"{zip_path}: {len(release)} files (left out: {len(set(files) - set(release))}; added: VERSION)")
     return 0

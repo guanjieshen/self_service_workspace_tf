@@ -1,10 +1,13 @@
 """scripts/release.py: the zip a customer installs holds none of this repository's environment."""
 import io
+import os
 import pathlib
+import subprocess
 import tempfile
 import unittest
 import zipfile
 from contextlib import redirect_stderr, redirect_stdout
+from unittest import mock
 
 from helpers import load
 
@@ -54,6 +57,25 @@ class ReleaseZip(unittest.TestCase):
         self.assertTrue(all(n.startswith(zip_path.stem + "/") for n in names))
         self.assertIn(f"{zip_path.stem}/README.md", names)
         self.assertIn(f"{zip_path.stem}/VERSION", names, "an installation can tell which release it runs")
+
+    def test_the_release_branch_holds_the_release_with_script_modes(self):
+        # In a throwaway repository: the branch must not touch this one's refs.
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(rel, "ROOT", pathlib.Path(tmp)):
+            git = lambda *a: subprocess.run(["git", "-C", tmp, *a], capture_output=True, text=True, check=True).stdout
+            git("init", "--quiet")
+            git("-c", "user.email=t@example.com", "-c", "user.name=t", "commit", "--allow-empty", "--quiet", "-m", "start")
+            files = {"README.md": b"hello\n", "scripts/tf.sh": b"#!/usr/bin/env bash\n", "VERSION": b"v9.9.9\n"}
+            with mock.patch.dict(os.environ, {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
+                                              "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com"}):
+                branch, first = rel.write_branch(files, "v9.9.9")
+                _, second = rel.write_branch(files, "v9.9.9")
+            self.assertEqual(branch, "release/v9.9.9")
+            tree = git("ls-tree", "-r", branch)
+            self.assertRegex(tree, r"(?m)^100755 blob \w+\tscripts/tf\.sh$", "scripts stay executable")
+            self.assertRegex(tree, r"(?m)^100644 blob \w+\tREADME\.md$")
+            self.assertEqual(git("show", f"{branch}:VERSION"), "v9.9.9\n")
+            self.assertEqual(git("rev-parse", f"{second}^").strip(), first, "a rebuild goes on top of the branch")
+            self.assertEqual(git("status", "--porcelain"), "", "the working tree is untouched")
 
     def test_a_bad_version_is_refused(self):
         with self.assertRaises(SystemExit), redirect_stderr(io.StringIO()):

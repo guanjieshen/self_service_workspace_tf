@@ -142,8 +142,8 @@ A release is a zip an organization installs ([SETUP.md](docs/SETUP.md), step 2).
 | 1 | Merge everything for the release; `./scripts/test.sh` passes on `main` |
 | 2 | In `CHANGELOG.md`, rename **Unreleased** to the version, with what the first plan after an upgrade shows. Check its **Baseline edits** table lists every change to `config/defaults/` since the last release (`git diff <last tag> -- config/defaults/`): an upgrade never copies them |
 | 3 | Tag it: `git tag v1.0.0 && git push origin v1.0.0` |
-| 4 | Build the zip: `python3 scripts/release.py v1.0.0` writes `dist/<repo>-v1.0.0.zip` |
-| 5 | Check it: unzip it, `git init`, commit, and run `./scripts/test.sh` there |
+| 4 | Build the zip: `python3 scripts/release.py v1.0.0` writes `dist/<repo>-v1.0.0.zip`. Write the same files to the branch an organization installs from: `python3 scripts/release.py v1.0.0 --branch`, then `git push origin release/v1.0.0` |
+| 5 | Check it: unzip it, `git init`, commit, and run `./scripts/test.sh` there (the branch holds the same files) |
 
 `scripts/release.py` leaves out `dev/`, `config/backend.hcl` and every workspace file but `_example.yaml`, sets the values in `config/setup.yaml` and `account_id` to `null`, replaces the CODEOWNERS owners (`@your-org/databricks-platform`, and `@your-org/security` too on `config/defaults/settings.yaml`), and adds `VERSION`. It **refuses to write the zip** if any of this repository's own identifiers (tenant, subscription, storage, account, workspace hosts, owners) is still in it. A value it does not know about yet (a new file holding an environment value) is your job: add it to the script and to `scripts/tests/test_release_zip.py`.
 
