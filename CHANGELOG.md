@@ -24,6 +24,10 @@ that you may want to copy. A setting missing from your baseline is left alone.
   It keeps a short profile in the user's own folder (`.onboarding/profile.md`), only with their
   permission. The first plan adds the skill's file to every workspace.
 
+- **A first install of the self-service app** is two pull requests (the first creates the hub and
+  the jobs, the second sets `app_ids`, so Terraform assigns the apps and the deploy grants them
+  the jobs), and a deploy says how to clear a Lakebase project that was deleted but not purged.
+
 - **People choose their business unit in the self-service app** while there is no lookup
   function (`bu_lookup`): the catalog asks once (when the app serves more than one business
   unit), the choice is remembered (a new table, migration `005`), shown in the account chip at

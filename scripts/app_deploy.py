@@ -20,7 +20,9 @@ grants, workspace assignment, the usage policy) Terraform grants (terraform/self
       deploying identity: it must own the database or be a Lakebase superuser there (a first
       install makes it the owner; run every deploy as the same one);
    d. deploy the bundle, then each app's new code, so new code never meets an old database.
-3. Each served workspace: its two jobs, which only the hub's two apps may run.
+3. Each served workspace: its two jobs, which only the hub's two apps may run (app_ids in
+   hub.yaml, the ones Terraform assigned to the workspace). A first install has none yet: the
+   deploy prints them; set them in a pull request, whose deploy then grants them.
 """
 import argparse
 import json
@@ -104,6 +106,19 @@ def ensure_database(host, branch, owner, readers):
             print(f"created a read-only role for {reader}")
 
 
+def project_exists(host, project):
+    """Whether the Lakebase project exists. A deleted one is kept for a while (it can be
+    undeleted) and still answers: it stops the deploy, saying how to clear it."""
+    p = cli(host, "postgres", "get-project", f"projects/{project}", check=False)
+    if p is None:
+        return False
+    if p.get("delete_time"):
+        raise SystemExit(f"The Lakebase project {project} was deleted ({p['delete_time']}) and is kept until {p.get('purge_time')}: "
+                         f"undelete it (databricks postgres undelete-project projects/{project}), purge it "
+                         f"(databricks postgres delete-project projects/{project} --purge), or name another project_id.")
+    return True
+
+
 def deploy_hub(s, spokes, plan):
     """The hub; returns the apps' service principals' application IDs."""
     host, app = s["hub"]["host"], s["app"]
@@ -116,7 +131,7 @@ def deploy_hub(s, spokes, plan):
     branch = f"projects/{project}/branches/production"
     owner = cli(host, "current-user", "me")["userName"]
     readers = list(s["database"].get("readers") or [])
-    if cli(host, "postgres", "get-project", f"projects/{project}", check=False) is None:
+    if not project_exists(host, project):
         app_build.build_hub(s, spokes, database=False)
         run(host, HUB, "databricks", "bundle", "deploy", "-t", "hub", "--auto-approve")
     ensure_database(host, branch, owner, readers)
@@ -160,9 +175,12 @@ def main(argv=None):
     if a.only and not names:
         raise SystemExit(f"{a.only} is not a workspace the app serves: {', '.join(s['spokes']) or 'none'}.")
     spokes = app_build.served(s, json.loads(pathlib.Path(a.outputs).read_text()) if a.outputs else outputs(s["spokes"]))
-    app_ids = deploy_hub(s, spokes, a.plan)   # first: the jobs grant the apps it creates
+    deploy_hub(s, spokes, a.plan)   # first: the apps must exist before the jobs can grant them
+    # The jobs grant only the apps in hub.yaml: Terraform assigns exactly those to each served
+    # workspace, and a job cannot grant a service principal its workspace does not have.
+    app_ids = [i for i in s["app_ids"].values() if i]
     if not app_ids:
-        print("no apps yet (a first install's plan): the jobs' plans grant no one besides workspace admins")
+        print("app_ids are not set yet (a first install): the jobs grant no one besides workspace admins until they are")
     for w in spokes:
         if w["name"] in names:
             deploy_jobs(s, w, app_ids, a.plan)
