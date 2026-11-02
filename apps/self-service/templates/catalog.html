@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon %}
-{% from "_components.html" import approval_label, empty_state %}
+{% from "_components.html" import approval_label, callout, empty_state %}
 {% block content %}
 {#- The sections and cards come from cards.py (groups): add a card there, not here. Each section
     may have an FAQ page: self_service_app.faq.<section key>. -#}
@@ -12,6 +12,9 @@
 
 
 {#- Most people who open the app for the first time can only ask for access. -#}
+{#- Without a lookup function, people say which business unit they are in, once (changeable from the header). -#}
+{% set choose_bu %}<a class="button primary" href="/business-unit">Choose</a>{% endset %}
+{% if ask_bu %}{% call callout("info", action=choose_bu) %}<span class="strong">Which business unit are you in?</span> Your requests go to its workspace. You can change it any time from your name, top right.{% endcall %}{% endif %}
 <p class="new-here">New here? Start with <a href="/persona">Request workspace access</a>{% if faq.getting_started %} · <a href="{{ faq.getting_started }}" target="_blank" rel="noopener">How it works {{ icon("external", "icon icon-xs") }}</a>{% endif %} · <a href="/ask" target="_blank" rel="noopener">Ask a question {{ icon("external", "icon icon-xs") }}</a></p>
 
 {#- A quick filter of the cards below, as you type (app.js); hidden until the script shows it. -#}

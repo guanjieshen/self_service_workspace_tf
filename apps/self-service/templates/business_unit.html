@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_components.html" import back, callout %}
+{#- Which business unit the person is in, while there is no lookup function to say it (portal.choose_bu). -#}
+{% block title %}Your business unit · {{ config.title }}{% endblock %}
+{% block content %}
+{{ back("/", "Catalog") }}
+<div class="page-head">
+  <h1>Your business unit</h1>
+  <p class="lead">Your requests go to your business unit's workspace. You can change it any time.</p>
+</div>
+{% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
+<form class="panel bu-choice" method="post" action="/business-unit">
+  <fieldset class="panel-body">
+    <legend class="card-label">Business unit</legend>
+    {% for bu, workspaces in units %}
+    <label class="choice">
+      <input type="radio" name="bu" value="{{ bu }}" {{ 'checked' if bu == business_unit }} required>
+      <span class="strong">{{ bu }}</span>
+      <span class="meta">{{ workspaces | join(", ") }}</span>
+    </label>
+    {% endfor %}
+  </fieldset>
+  <div class="panel-foot">
+    <button type="submit" class="primary">Save</button>
+    <a class="button" href="/">Cancel</a>
+  </div>
+</form>
+{% endblock %}

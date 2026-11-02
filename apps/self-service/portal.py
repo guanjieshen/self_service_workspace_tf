@@ -228,6 +228,7 @@ class Portal:
         self._personal = {}   # (workspace, user) -> (time read, the personal schema card)
         self._checks = {}     # the request asked about -> (time, the AI check's result)
         self._bus = {}        # person -> (time read, their business unit or None), for the BU lookup
+        self._chosen = {}     # person -> (time read, the business unit they chose or None), without it
 
     # ---- Workspaces and their jobs ----
 
@@ -258,15 +259,55 @@ class Portal:
     def available(self, kind):
         return [w for w in self.workspaces() if kind in w.jobs]
 
-    # ---- The person's business unit (app.yaml bu_lookup) ----
+    # ---- The person's business unit: the lookup function (bu_lookup), or the one they chose ----
 
     NO_BU = "We couldn't find your business unit, so this request can't be sent. Contact your platform admin."
 
+    def business_units(self):
+        """The business units the app serves: each served workspace's prefix, upper case."""
+        return sorted({w["bu"].upper() for w in self.config["workspaces"]})
+
+    def chosen_bu(self, user):
+        """The business unit the person chose (without a lookup function), if it is still one the
+        app serves; None otherwise. Kept a minute: it changes only when they change it here."""
+        if not hasattr(self.store, "chosen_business_unit") or self.config.get("bu_lookup"):
+            return None
+        cached = self._chosen.get(user)
+        if cached and time.time() - cached[0] < 60:
+            return cached[1]
+        try:
+            bu = self.store.chosen_business_unit(user)
+        except Exception as e:
+            warn(f"reading {user}'s business unit", e)
+            return None
+        bu = bu if bu in self.business_units() else None
+        keep(self._chosen, user, bu)
+        return bu
+
+    def choose_bu(self, user, bu):
+        """Record the person's business unit. Only without a lookup function (it decides then)."""
+        if self.config.get("bu_lookup"):
+            raise RequestError("Your business unit comes from your organization's directory; it can't be changed here.")
+        bu = (bu or "").strip().upper()
+        if bu not in self.business_units():
+            raise RequestError("Choose one of the business units listed.")
+        self.store.choose_business_unit(user, bu)
+        keep(self._chosen, user, bu)
+
+    def needs_bu_choice(self, user):
+        """Whether to ask the person for their business unit: no lookup function, several to
+        choose from, and no choice yet."""
+        return hasattr(self.store, "chosen_business_unit") and not self.config.get("bu_lookup") and len(self.business_units()) > 1 \
+            and self.chosen_bu(user) is None
+
     def bu_of(self, user):
-        """The person's business unit from the lookup function (run on the host's warehouse as
-        the app), or None when it does not know them. Kept an hour (ten minutes for "not known").
-        RequestError when the lookup cannot answer."""
+        """The person's business unit: from the lookup function (run on the host's warehouse as
+        the app), or None when it does not know them, kept an hour (ten minutes for "not known");
+        without one, the business unit they chose (or None). RequestError when the lookup cannot
+        answer."""
         lookup = self.config.get("bu_lookup")
+        if not lookup:
+            return self.chosen_bu(user)
         cached = self._bus.get(user)
         if cached and time.time() - cached[0] < (3600 if cached[1] else 600):
             return cached[1]
@@ -291,7 +332,11 @@ class Portal:
         the lookup does not know them, or their BU has none."""
         offered = self.available(kind)
         if not self.config.get("bu_lookup"):
-            return offered
+            chosen = self.chosen_bu(user)   # the one they chose; until then, every workspace
+            mine = [w for w in offered if w.bu.upper() == chosen] if chosen else offered
+            if not mine:
+                raise RequestError(f"Your business unit ({chosen}) has no workspace for this request yet. Choose another, or contact your platform admin.")
+            return mine
         bu = self.bu_of(user)
         if bu is None:
             raise RequestError(self.NO_BU)
@@ -308,11 +353,11 @@ class Portal:
         """Genie One in the person's own workspace (their BU's, with the BU lookup), with a first
         question if one is given; None when there is no workspace for them."""
         mine = self.config["workspaces"]
-        if self.config.get("bu_lookup"):
-            try:
-                bu = self.bu_of(user)
-            except RequestError:
-                return None
+        try:
+            bu = self.bu_of(user)
+        except RequestError:
+            return None
+        if bu or self.config.get("bu_lookup"):
             mine = [w for w in mine if w["bu"].upper() == bu]
         return genie_one_link(mine[0]["host"], prompt) if mine else None
 
