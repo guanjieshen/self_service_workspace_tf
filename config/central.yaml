@@ -13,7 +13,7 @@ host: null                 # the central workspace's URL. null = ai_review_host 
 # product, in estimated $ and in DBUs. Each person sees only the workspaces they belong to
 # (through their persona or platform admins group), whatever page they open.
 cost_dashboard:
-  enabled: true
+  enabled: false
   name: Citizen development costs
   # The catalog that holds the cost view: an existing catalog in the central workspace,
   # NOT a workspace catalog this repository manages ({prefix}_citizen_dev: its grants are

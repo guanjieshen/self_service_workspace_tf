@@ -219,14 +219,10 @@ def names():
     return [f.stem for f in files()]
 
 
-def central_enabled():
-    """Whether config/central.yaml turns the central target on (its cost dashboard)."""
-    return CENTRAL_FILE.is_file() and nested(CENTRAL_FILE, "cost_dashboard", "enabled") == "true"
-
-
 def targets():
-    """Everything planned and applied: the workspaces, and "central" while it is enabled."""
-    return names() + (["central"] if central_enabled() else [])
+    """Everything planned and applied: the workspaces, and "central" while config/central.yaml
+    exists (turned off, its plan removes what it made)."""
+    return names() + (["central"] if CENTRAL_FILE.is_file() else [])
 
 
 def affected(base, head, plan=False):
