@@ -1,6 +1,6 @@
 # What the self-service app needs in a workspace it serves (a spoke), granted here because
-# Terraform owns these objects, authoritatively: the bundle (bundle/) deploys the app and its
-# jobs and never grants on them itself (docs/design.md, "Who owns what").
+# Terraform owns these objects, authoritatively: the app's own deploy (a Databricks Asset
+# Bundle) deploys the app and its jobs and never grants on them itself.
 #
 #   - its two service principals (config/self-service/hub.yaml app_ids) are assigned to the
 #     workspace, and may see the catalog (USE CATALOG, BROWSE: the app checks whether a
@@ -36,7 +36,7 @@ resource "databricks_permission_assignment" "self_service_app" {
   depends_on = [terraform_data.config_checks]
 }
 
-# What the self-service app's deploy reads (scripts/app_deploy.py), so it never repeats a value
+# What the self-service app's deploy reads, so it never repeats a value
 # this workspace's configuration already has.
 output "self_service" {
   value = {
