@@ -24,6 +24,7 @@ Which workspaces a change concerns:
 | --- | --- | --- |
 | `config/workspaces/<name>.yaml` | That workspace | That workspace (a deleted file: its state is removed) |
 | `config/defaults/`, `terraform/` (except `terraform/tests/` and its `.md` guides), `scripts/tf.sh`, `scripts/plan-guard.py`, `scripts/workspaces.py` | Every workspace | Every workspace |
+| `config/central.yaml`, `terraform/central/`, and whatever changes who sees which costs (a workspace file, `config/defaults/access.yaml` or `config/defaults/cost.yaml`, `config/setup.yaml`) | `central`, when its dashboard is enabled | `central` |
 | What the plan comment shows: `scripts/preflight.py`, `scripts/ai-plan-review.py`, `.github/ai/`, `config/setup.yaml`, `deploy.yml` and what it uses | Every workspace | None |
 | Anything else: tests, docs, other scripts | None | None |
 

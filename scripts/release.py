@@ -15,7 +15,8 @@ From the committed files only (git archive of HEAD), the zip:
 
   - leaves out dev/, config/backend.hcl and every workspace file but _example.yaml;
   - sets the values in config/setup.yaml to null (the comments stay: they are the instructions);
-  - sets account_id in config/defaults/cost.yaml to null;
+  - sets account_id in config/defaults/cost.yaml to null, and in config/central.yaml the cost
+    dashboard's catalog and warehouse to null and its discount to 0;
   - replaces the owners in .github/CODEOWNERS with @your-org/databricks-platform, and on the
     security settings (config/defaults/settings.yaml) with it and @your-org/security;
   - adds VERSION, the release's name (an installation has no tags of this repository);
@@ -95,6 +96,12 @@ def release_files(files):
             continue
         if path == "config/setup.yaml":
             data = blank_setup(data.decode()).encode()
+        elif path == "config/central.yaml":
+            # The organization's catalog, warehouse and negotiated discount, not ours.
+            text = data.decode()
+            for key, value in (("catalog", "null"), ("warehouse_id", "null"), ("discount_percent", "0")):
+                text = re.sub(rf"(?m)^(  {key}:) \S+", rf"\g<1> {value}", text)
+            data = text.encode()
         elif path == "config/defaults/cost.yaml":
             data = re.sub(r"(?m)^account_id: .*$", "account_id: null   # the Databricks account ID (account console, top right)",
                           data.decode()).encode()

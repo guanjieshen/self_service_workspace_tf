@@ -1,0 +1,38 @@
+WITH
+  workspaces (workspace_id, workspace) AS (VALUES ${workspaces}),
+  access (workspace_id, group_name) AS (VALUES ${access}),
+  policies (policy_id, policy_name) AS (VALUES ${policies})
+SELECT
+  u.usage_date,
+  DATE_TRUNC('MONTH', u.usage_date) AS month,
+  w.workspace,
+  coalesce(pn.policy_name,
+           CASE WHEN coalesce(u.usage_metadata.usage_policy_id, u.usage_metadata.budget_policy_id) IS NULL
+                THEN 'No usage policy' ELSE 'Another usage policy' END) AS usage_policy,
+  coalesce(u.custom_tags['APPID'], 'Not set') AS project,
+  CASE u.billing_origin_product
+    WHEN 'SQL' THEN 'SQL'
+    WHEN 'JOBS' THEN 'Jobs'
+    WHEN 'DLT' THEN 'Pipelines'
+    WHEN 'INTERACTIVE' THEN 'Notebooks'
+    WHEN 'ALL_PURPOSE' THEN 'Notebooks'
+    WHEN 'MODEL_SERVING' THEN 'AI and model serving'
+    WHEN 'AI_GATEWAY' THEN 'AI and model serving'
+    WHEN 'VECTOR_SEARCH' THEN 'AI and model serving'
+    WHEN 'AGENT_BRICKS' THEN 'AI and model serving'
+    WHEN 'APPS' THEN 'Apps'
+    WHEN 'LAKEBASE' THEN 'Lakebase'
+    ELSE 'Other'
+  END AS product,
+  u.identity_metadata.run_as AS run_as,
+  CASE WHEN u.usage_unit = 'DBU' THEN u.usage_quantity ELSE 0 END AS dbus,
+  u.usage_quantity * coalesce(p.pricing.effective_list.default, 0) AS list_cost,
+  u.usage_quantity * coalesce(p.pricing.effective_list.default, 0) * (1 - ${discount} / 100) AS cost
+FROM system.billing.usage u
+JOIN workspaces w ON u.workspace_id = w.workspace_id
+LEFT JOIN system.billing.list_prices p
+  ON u.sku_name = p.sku_name AND u.cloud = p.cloud AND u.usage_unit = p.usage_unit
+ AND u.usage_end_time >= p.price_start_time AND (p.price_end_time IS NULL OR u.usage_end_time < p.price_end_time)
+LEFT JOIN policies pn ON pn.policy_id = coalesce(u.usage_metadata.usage_policy_id, u.usage_metadata.budget_policy_id)
+-- Each viewer sees only the workspaces whose groups they are in (evaluated as the viewer).
+WHERE EXISTS (SELECT 1 FROM access a WHERE a.workspace_id = u.workspace_id AND is_account_group_member(a.group_name))

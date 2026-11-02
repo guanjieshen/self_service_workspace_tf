@@ -24,6 +24,9 @@ and checks what Terraform needs but cannot fix itself:
     permissions exist (Databricks creates them with the first token; a new workspace has none);
   - before legacy access is disabled (one-way after 30 days): what still uses it.
 
+For "central" (config/central.yaml): the sign-in and admin rights in the central workspace, the
+cost view's catalog, the pipeline's access to system.billing, and a given warehouse.
+
 Changes nothing. Prints ok / warning / error lines and exits 1 if there is an error. The
 workspace's workflow runs it before every plan; run it yourself before onboarding a workspace.
 """
@@ -310,6 +313,46 @@ def billing_admin(get, account, me, who):
                    "account admin alone is not enough), docs/SETUP.md step 6, or set serverless_policy.enabled: false")
 
 
+def central_checks(get):
+    """[(level, message)] for the central target (config/central.yaml): what its Terraform needs."""
+    central = wsf.ROOT / "config/central.yaml"
+    if wsf.nested(central, "cost_dashboard", "enabled") != "true":
+        return [("ok", "the cost dashboard is off (config/central.yaml): nothing to check")]
+    out = []
+    me, err = get("/api/2.0/preview/scim/v2/Me")
+    if err:
+        return [("error", f"cannot sign in to the central workspace {wsf.central_host()}: {err.rstrip('.')}. The pipeline's service "
+                          "principal must be workspace admin there (docs/SETUP.md, step 6)")]
+    who = me.get("userName") or me.get("displayName") or "this identity"
+    admin = "admins" in {g.get("display") for g in me.get("groups", [])}
+    out.append(("ok" if admin else "error", f"signed in as {who}" + (", a workspace admin" if admin else
+                ", not a workspace admin of the central workspace: make it one (docs/SETUP.md, step 6)")))
+    catalog = wsf.nested(central, "cost_dashboard", "catalog")
+    if not catalog:
+        out.append(("error", "config/central.yaml cost_dashboard.catalog: name an existing catalog in the central workspace"))
+    else:
+        found, err = get(f"/api/2.1/unity-catalog/catalogs/{urllib.parse.quote(catalog)}")
+        out.append(("ok", f"catalog {catalog} exists") if found and found.get("name") else
+                   ("error", f"catalog {catalog} (config/central.yaml) does not exist in the central workspace, or {who} cannot see it"))
+    principal = me.get("applicationId") or me.get("userName") or ""
+    rights, err = get(f"/api/2.1/unity-catalog/effective-permissions/schema/system.billing?principal={urllib.parse.quote(principal)}")
+    held = {p.get("privilege") for a in (rights or {}).get("privilege_assignments", []) for p in a.get("privileges", [])}
+    level = "error" if os.environ.get("GITHUB_ACTIONS") == "true" else "warning"
+    if err:
+        out.append(("warning", f"could not check {who}'s access to system.billing: {err}"))
+    elif {"SELECT", "ALL_PRIVILEGES"} & held and {"USE_SCHEMA", "ALL_PRIVILEGES"} & held:
+        out.append(("ok", f"{who} may read system.billing"))
+    else:
+        out.append((level, f"{who} cannot read system.billing, which the cost view reads: a metastore admin grants "
+                           f"USE SCHEMA and SELECT ON SCHEMA system.billing to `{principal}` (docs/SETUP.md, the cost dashboard)"))
+    warehouse = wsf.nested(central, "cost_dashboard", "warehouse_id")
+    if warehouse:
+        found, err = get(f"/api/2.0/sql/warehouses/{urllib.parse.quote(warehouse)}")
+        out.append(("ok", f"warehouse {found.get('name')} ({warehouse})") if found and found.get("id") else
+                   ("error", f"warehouse {warehouse} (config/central.yaml cost_dashboard.warehouse_id) not found: {err}"))
+    return out
+
+
 def main(argv):
     out_file = None
     if len(argv) == 3 and argv[1] == "--out":
@@ -318,12 +361,17 @@ def main(argv):
         print(__doc__.split("\n\n")[1], file=sys.stderr)
         return 2
     ws = argv[0]
-    f = wsf.ws_file(ws)
     in_ci = os.environ.get("GITHUB_ACTIONS") == "true"
-    profile = None if in_ci else wsf.nested(f, "auth", "workspace_profile")
-    if not profile and not os.environ.get("DATABRICKS_HOST"):
-        os.environ["DATABRICKS_HOST"] = wsf.workspace_info(f)["host"]
-    results = checks(ws, cli_get(profile))
+    if ws == "central":
+        if not os.environ.get("DATABRICKS_HOST") and wsf.central_host():
+            os.environ["DATABRICKS_HOST"] = wsf.central_host()
+        results = central_checks(cli_get(None))
+    else:
+        f = wsf.ws_file(ws)
+        profile = None if in_ci else wsf.nested(f, "auth", "workspace_profile")
+        if not profile and not os.environ.get("DATABRICKS_HOST"):
+            os.environ["DATABRICKS_HOST"] = wsf.workspace_info(f)["host"]
+        results = checks(ws, cli_get(profile))
     for level, message in results:
         if in_ci and level != "ok":
             print(f"::{level}::{ws}: {message}")

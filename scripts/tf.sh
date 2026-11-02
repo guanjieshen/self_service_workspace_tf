@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Run Terraform for one workspace (or all of them).
 #
-#   ./scripts/tf.sh <workspace|all> <validate|plan|apply|destroy|output|force-unlock> [extra terraform args]
+#   ./scripts/tf.sh <workspace|central|all> <validate|plan|apply|destroy|output|force-unlock> [extra terraform args]
 #
 # <workspace> is a file name, without .yaml, in config/workspaces/ (or dev/workspaces/, the
-# workspaces that test the framework itself).
+# workspaces that test the framework itself). "central" is what lives once, in the central
+# workspace (config/central.yaml, terraform/central/): the cost dashboard.
 #
 # Examples:
 #   ./scripts/tf.sh fin-citizen-dev plan
@@ -46,7 +47,13 @@ if [[ "$workspace" == "all" ]]; then
 fi
 
 ws_root=""
+if [[ "$workspace" == "central" ]]; then
+  # One root module for the central workspace; it reads every workspace's file.
+  tf_dir="$root/terraform/central"
+  ws_root="$root/config/workspaces"
+fi
 for r in "${ws_roots[@]}"; do
+  [[ "$workspace" != "central" ]] || break
   [[ -f "$r/$workspace.yaml" ]] || continue
   [[ -z "$ws_root" ]] || { echo "$workspace is in both config/workspaces/ and dev/workspaces/: keep one."; exit 1; }
   ws_root="$r"
@@ -95,6 +102,7 @@ fi
 
 # 2. Run the command.
 vars=(-var "workspace=$workspace" -var "workspaces_dir=$ws_root")
+[[ "$workspace" != "central" ]] || vars=(-var "workspaces_dir=$ws_root")
 plan_file="$root/.plans/$workspace.tfplan"
 
 # Plan to a file, then check it for changes that are hard to undo.

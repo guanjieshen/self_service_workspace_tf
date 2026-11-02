@@ -33,6 +33,8 @@ PROTECTED = {
     "databricks_workspace_conf": "workspace configuration (enable*/enforce* keys reset to false)",
     "databricks_catalog": "catalog (and every table, view and volume in it)",
     "databricks_schema": "schema (and every table, view and volume in it)",
+    "databricks_sql_table": "view or table (queries and dashboards using it break)",
+    "databricks_dashboard": "dashboard (its link and its viewers' bookmarks break)",
     "databricks_grants": "catalog or schema grants (everyone listed loses that access)",
     "databricks_permissions": "permissions (everyone listed loses that access)",
 }
