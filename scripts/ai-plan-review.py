@@ -170,8 +170,6 @@ def load_settings():
 def ws_file(workspace):
     """The workspace's file: config/workspaces/<name>.yaml, or dev/workspaces/<name>.yaml for
     the workspaces that test the framework (the same rule as scripts/workspaces.py)."""
-    if workspace == "central":
-        return ROOT / "config/central.yaml"   # what lives in the central workspace
     found = [f for f in (ROOT / "config/workspaces" / f"{workspace}.yaml", ROOT / "dev/workspaces" / f"{workspace}.yaml")
              if f.exists()]
     return found[0] if found else ROOT / "config/workspaces" / f"{workspace}.yaml"

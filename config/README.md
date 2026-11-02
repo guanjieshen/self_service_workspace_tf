@@ -95,7 +95,6 @@ The keys a workspace file usually sets. `prefix`, `host`, `genie_code_instructio
 | Add a Genie Code skill | a folder in `defaults/genie-code/skills/` | (every workspace gets the baseline's skills) |
 | Leave Genie Code alone (managed elsewhere) | `settings.genie_code` in `defaults/settings.yaml` | `settings.genie_code: null` in its file |
 | Show a label next to the workspace name | | `label` in its file |
-| Show people what their workspaces cost (a dashboard in the central workspace) | `cost_dashboard` in `config/central.yaml`: the discount, the view's catalog, the warehouse ([SETUP.md](../docs/SETUP.md), step 10) | (one dashboard for all) |
 
 After an edit: open a pull request. Its plan comments show what changes in each workspace it concerns. Locally: `./scripts/tf.sh <name> plan`, or `./scripts/tf.sh all plan` after changing `defaults/`. More examples: [docs/user-journeys.md](../docs/user-journeys.md).
 

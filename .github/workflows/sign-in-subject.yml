@@ -1,0 +1,35 @@
+# Shows the two subjects the pipeline signs in with, for the federated credentials of
+# docs/SETUP.md, step 4, without a terminal: Actions > Show the sign-in subject > Run workflow.
+# A repository created or renamed since July 15, 2026 has numeric IDs in its subject, which
+# GitHub's web pages do not show. It reads its own OIDC token's subject and prints only that,
+# never the token. It signs in to nothing.
+name: Show the sign-in subject
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  subject:
+    name: Sign-in subjects
+    runs-on: ${{ fromJSON(vars.CHECKS_RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 5
+    permissions:
+      id-token: write   # to read the subject of the token GitHub issues to this repository
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const token = await core.getIDToken('api://AzureADTokenExchange');
+            const sub = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString()).sub;
+            // The prefix is everything before what names the trigger (here, the branch it ran on).
+            const prefix = sub.replace(/:(ref|pull_request|environment|job_workflow_ref)(:.*)?$/, '');
+            const rows = [
+              ['Federated credential', 'Subject'],
+              ['github-pull-requests', `${prefix}:pull_request`],
+              ['github-main', `${prefix}:ref:refs/heads/main`],
+            ];
+            await core.summary.addHeading('Sign-in subjects').addTable(rows)
+              .addRaw('Enter these exactly in docs/SETUP.md, step 4 (Edit (optional) under the subject).').write();
+            core.info(rows.slice(1).map((r) => `${r[0]}: ${r[1]}`).join('\n'));

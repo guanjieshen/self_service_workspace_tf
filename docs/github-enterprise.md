@@ -32,11 +32,7 @@ What changes is **where GitHub's OIDC tokens come from** (the issuer) and **what
 | **GitHub Enterprise Cloud with data residency** (`<name>.ghe.com`) | A `ghe.com` issuer, not the github.com one | Create the credentials by hand with your issuer. Also add `https://<name>.ghe.com/` to the Git allowlist |
 | **GitHub Enterprise Server** (self-hosted) | Your server's own issuer (`https://<your-host>/_services/token`) | Create the credentials by hand with your issuer. Your server must be reachable from Entra for it to read the issuer's keys. Point `gh` at your host (`GH_HOST`) for `setup.py github`, and add your host to the Git allowlist |
 
-In every case the subjects keep the same shape: `<prefix>:pull_request` for plans and `<prefix>:ref:refs/heads/main` for applies, drift checks and retirements. Read your prefix with:
-
-```bash
-gh api repos/<org>/<repo>/actions/oidc/customization/sub --jq .sub_claim_prefix
-```
+In every case the subjects keep the same shape: `<prefix>:pull_request` for plans and `<prefix>:ref:refs/heads/main` for applies, drift checks and retirements. Read your exact subjects in your repository: **Actions > Show the sign-in subject > Run workflow** (SETUP.md, step 4). With a terminal: `gh api repos/<org>/<repo>/actions/oidc/customization/sub --jq .sub_claim_prefix`.
 
 ## Self-hosted runners
 

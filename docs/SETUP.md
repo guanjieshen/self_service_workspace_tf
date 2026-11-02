@@ -60,7 +60,7 @@ pipeline_client_id: null
 | `pipeline_name` | Display name of the service principal CI signs in as. Default `sp-citizen-dev-terraform` | Entra admin | 4, 6 |
 | `apply_approvers` | `<org>/<team>` that must approve each apply in GitHub. Default: none, merging approves | Platform team | 5 |
 | `ai_review_host`, `ai_review_model` | The URL (`https://adb-<id>.<n>.azuredatabricks.net`, not a custom URL) of the workspace whose model reviews every plan, and the model. Any workspace the pipeline's service principal can sign in to; it need not be one this repository manages. Default: no AI review; the model `system.ai.claude-sonnet-5-5` | Platform team | any time |
-| `pipeline_client_id` | The service principal's client ID: step 4 creates it and writes it here | | 5, 6 (by hand) |
+| `pipeline_client_id` | The service principal's client ID: copy it here at the end of step 4 | | 5, 6 |
 
 Two more things to know before you start; they live in their own files, not here:
 
@@ -115,22 +115,15 @@ This needs an **empty** repository. For one with template files, use the Databri
 
 **Who:** the cloud team, with Contributor on the subscription (or the resource group).
 
-Terraform keeps one state file per workspace in an Azure Storage container. CI reads and writes it with its Entra identity (step 4), so no storage key is ever used.
+Terraform keeps one state file per workspace in an Azure Storage container. CI reads and writes it with its Entra identity (step 4), so no storage key is ever used. **Done in the Azure portal**; an existing account and container work too ([below](#using-an-existing-storage-account-and-container)).
 
-> **Storage account and container already exist?** Skip the script and [do it by hand](#using-an-existing-storage-account-and-container): it is one small file.
-
-To create them, use the setup script. It uses `tenant_id`, `subscription_id` and the `state_*` values from `config/setup.yaml`:
-
-```bash
-python3 scripts/setup.py state          # prints the script: read it
-python3 scripts/setup.py state --run    # runs it
-```
-
-It creates a storage account with no public blob access and no shared keys (Entra sign-in only), with versioning and 30 days of soft delete, a private container, and `config/backend.hcl`. An account that already exists is left as it is. Commit `config/backend.hcl`: it holds names, not secrets. Run outside the repository, the script prints the file's content instead, to send to the platform team.
-
-### Using an existing storage account and container
-
-Create `config/backend.hcl` (or overwrite the one in the repository) with your names, and commit it:
+| # | Azure portal | What |
+| --- | --- | --- |
+| 1 | **Storage accounts > Create** | Your resource group, a name (3 to 24 lowercase letters and digits), your region, **Standard** performance, the redundancy your policy requires |
+| 2 | Its **Advanced** tab | Turn **off** "Allow enabling anonymous access on individual containers" and "Enable storage account key access" (Entra sign-in only) |
+| 3 | Its **Data protection** tab | Turn **on** "Enable versioning for blobs" and "Enable soft delete for blobs" (30 days): they let you recover a state file |
+| 4 | **Create**, then the account > **Containers > + Container** | A name (for example `tfstate`), anonymous access level **Private** |
+| 5 | Your repository (its Git folder in Databricks, or the GitHub web editor) | Write the names into `config/backend.hcl` (below) and into `state_resource_group`, `state_storage_account` and `state_container` in `config/setup.yaml` |
 
 ```hcl
 # Shared Terraform state in Azure Storage (Entra sign-in only).
@@ -141,7 +134,11 @@ container_name       = "<container>"
 use_azuread_auth     = true
 ```
 
-Then check the account against this list:
+> **Tip:** With a terminal (Azure CLI and Python), `python3 scripts/setup.py state` prints a script that does all of this, and `--run` runs it.
+
+### Using an existing storage account and container
+
+Do item 5 above with its names, then check the account against this list:
 
 | Setting | Required? | Why |
 | --- | --- | --- |
@@ -155,18 +152,11 @@ Fill in `state_resource_group`, `state_storage_account` and `state_container` in
 
 ## 4. The pipeline identity
 
-**Who:** an Entra admin who can create app registrations and assign roles on the storage account (Owner or User Access Administrator), signed in to `gh` with read access to the repository.
+**Who:** an Entra admin who can create app registrations and assign roles on the storage account (Owner or User Access Administrator).
 
 GitHub Actions signs in as one Entra service principal, for every workspace and for the Terraform state. **No client secret is stored anywhere.** On each run, GitHub issues a short-lived OIDC token, Entra checks it against a *federated credential* on the app registration, and hands back an access token for the service principal. That token is then used for the state storage (step 3) and for Databricks (step 6).
 
-The quickest way is the setup script. It uses `tenant_id`, `subscription_id`, the `state_*` values, `github_repo` and `pipeline_name`:
-
-```bash
-python3 scripts/setup.py identity          # shows the commands it would run
-python3 scripts/setup.py identity --run    # runs them
-```
-
-It writes the client ID (`pipeline_client_id`) into `config/setup.yaml` for the next steps. Commit the file.
+**Done in the Azure portal** ([Setting it up in the Azure portal](#setting-it-up-in-the-azure-portal)). With a terminal (Azure CLI, `gh` and Python), `python3 scripts/setup.py identity` does the same, and `--run` runs it.
 
 ### What the app registration needs
 
@@ -181,13 +171,7 @@ Whether you run the script or set it up by hand, this is everything on the Entra
 
 Both federated credentials use the issuer `https://token.actions.githubusercontent.com` and the audience `api://AzureADTokenExchange` (the defaults).
 
-`<prefix>` is your repository's subject prefix. Read it with:
-
-```bash
-gh api repos/<org>/<repo>/actions/oidc/customization/sub --jq .sub_claim_prefix
-```
-
-For example `repo:my-org@123456/my-repo@456789`. Repositories created or renamed since July 15, 2026 include numeric IDs.
+`<prefix>` is your repository's subject prefix, for example `repo:my-org@123456/my-repo@456789`: repositories created or renamed since July 15, 2026 include numeric IDs, which GitHub's web pages do not show. **To read both subjects without a terminal:** in your repository, **Actions > Show the sign-in subject > Run workflow** (on `main`), then open the run: its summary lists the two subjects to enter. It reads only the subject of its own token and signs in to nothing.
 
 **Not needed:** client secrets or certificates, API permissions (Microsoft Graph or others), redirect URIs, or one credential per workspace. Adding a workspace later needs nothing in Entra.
 
@@ -195,25 +179,20 @@ For example `repo:my-org@123456/my-repo@456789`. Repositories created or renamed
 
 ### Setting it up in the Azure portal
 
-If your team does not run the script, do this by hand:
-
-1. **Create the app registration:** Microsoft Entra ID > App registrations > New registration. Leave the redirect URI empty.
-2. **Add the first federated credential:** the app > Certificates & secrets > Federated credentials > Add credential > **GitHub Actions deploying Azure resources**.
+1. **Read the two subjects:** in your repository, Actions > **Show the sign-in subject** > Run workflow; open the run's summary.
+2. **Create the app registration:** Microsoft Entra ID > App registrations > New registration. Leave the redirect URI empty.
+3. **Add the first federated credential:** the app > Certificates & secrets > Federated credentials > Add credential > **GitHub Actions deploying Azure resources**.
    - Organization and Repository: your repository.
    - Entity type: **Pull request**.
    - Name: `github-pull-requests`.
-3. **Add the second:** the same, with Entity type **Branch** and branch `main`. Name: `github-main`.
-4. **Check both subjects** match `<prefix>:pull_request` and `<prefix>:ref:refs/heads/main`. If your repository's prefix includes numeric IDs, use **Edit (optional)** under the subject to enter it exactly.
-5. **Grant the role:** the storage account > Containers > the state container > Access control (IAM) > Add role assignment > **Storage Blob Data Contributor** > the app's service principal.
-6. **Copy the Application (client) ID** into `pipeline_client_id` in `config/setup.yaml`.
+4. **Add the second:** the same, with Entity type **Branch** and branch `main`. Name: `github-main`.
+5. **Make both subjects exactly** the ones from item 1: use **Edit (optional)** under the subject, because the portal fills it in without the numeric IDs.
+6. **Grant the role:** the storage account > Containers > the state container > Access control (IAM) > Add role assignment > **Storage Blob Data Contributor** > the app's service principal.
+7. **Copy the Application (client) ID** into `pipeline_client_id` in `config/setup.yaml` (in your repository's Git folder, or the GitHub web editor).
 
 ### Checking it
 
-```bash
-az ad app federated-credential list --id <application-id> --query "[].{name:name, subject:subject}" -o table
-```
-
-You should see exactly the two credentials above, with your repository's prefix. Credentials for other repositories can stay; they do not affect this one.
+The app > **Certificates & secrets > Federated credentials** lists exactly the two credentials above, with your repository's prefix. Credentials for other repositories can stay; they do not affect this one.
 
 | If a run fails with | It means |
 | --- | --- |
@@ -225,16 +204,18 @@ The Databricks side of the same identity (account, workspace admin, Billing admi
 
 ## 5. Repository settings
 
-**Who:** a GitHub organization admin (or a repository admin), signed in to `gh`.
+**Who:** a GitHub organization admin (or a repository admin). **Done in the GitHub web UI**, in your repository:
 
-Uses `tenant_id`, `subscription_id`, `github_repo`, `apply_approvers`, and `pipeline_client_id` from step 4.
+| # | Where | What |
+| --- | --- | --- |
+| 1 | **Settings > Secrets and variables > Actions > Variables > New repository variable** | `AZURE_CLIENT_ID` = `pipeline_client_id` (step 4), `AZURE_TENANT_ID` = `tenant_id`, `AZURE_SUBSCRIPTION_ID` = `subscription_id`. Variables, not secrets: none of them is a secret |
+| 2 | **Issues > Labels > New label** | `allow-risky-changes` ("A person reviewed the plan's hard-to-undo or security-weakening changes") and `drift` ("A workspace no longer matches its configuration") |
+| 3 | **Settings > Environments > New environment** | `apply-approval`. Deployment branches and tags: **Selected branches and tags**, add `main`. Optional: **Required reviewers**, your `apply_approvers` team, to approve each apply |
+| 4 | **Settings > Branches > Add classic branch protection rule**, for `main` | **Require a pull request before merging**, with **1 approval**, **Dismiss stale pull request approvals when new commits are pushed** and **Require review from Code Owners**; **Require status checks to pass**: `Format and validate` and `Tests`; **Do not allow bypassing the above settings** |
 
-```bash
-python3 scripts/setup.py github          # read it
-python3 scripts/setup.py github --run
-```
+The rule applies to **repository admins too**: a push to `main` is an apply with workspace admin rights, so nobody can skip the review. A pull request needs an approval from someone other than its author, so name at least two people in each code owner team. A push after an approval dismisses it, so what merges is what was reviewed.
 
-It sets the repository variables `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID`, creates the labels `allow-risky-changes` and `drift`, the environment `apply-approval` (deployments from `main` only; with `apply_approvers` set, that team must approve each apply), and protects `main`: pull requests only, the **Format and validate** and **Tests** checks must pass, and code owners must approve. The rule applies to **repository admins too**: a push to `main` is an apply with workspace admin rights, so nobody can skip the review. A pull request needs an approval from someone other than its author, so name at least two people in each code owner team. A push after an approval dismisses it, so what merges is what was reviewed.
+> **Tip:** With a terminal (`gh` and Python), `python3 scripts/setup.py github` prints the same settings as commands, and `--run` applies them.
 
 Then, if needed:
 
@@ -245,7 +226,7 @@ Then, if needed:
 
 ## 6. Databricks account (by hand)
 
-**Who:** a Databricks account admin, in the account console (https://accounts.azuredatabricks.net). Once, before the first workspace; items 2 and 5 again for each new workspace (item 5 needs a metastore admin). You need the service principal's client ID, `pipeline_client_id` in `config/setup.yaml` (step 4 writes it).
+**Who:** a Databricks account admin, in the account console (https://accounts.azuredatabricks.net). Once, before the first workspace; items 2 and 5 again for each new workspace (item 5 needs a metastore admin). You need the service principal's client ID, `pipeline_client_id` in `config/setup.yaml` (from step 4).
 
 1. **Add the service principal to the account:** User management > Service principals > Add service principal > **Microsoft Entra ID managed**, with the application ID `pipeline_client_id` and the name `pipeline_name` (default `sp-citizen-dev-terraform`).
 2. **Make it workspace admin** of each workspace this repository manages: Workspaces > the workspace > Permissions > Add permissions > the service principal, **Admin**.
@@ -318,7 +299,7 @@ Before you start: the workspace exists and the runners can reach it (its private
 
 1. **Create its file:** copy `config/workspaces/_example.yaml` to `config/workspaces/fin-citizen-dev.yaml` and fill in `prefix`, `host` and `groups`. The file name is the workspace's name in this repository.
 2. **Set anything that differs from the baseline**, in the same file (for example `catalog.storage_root`, or `null` for `settings.disable_legacy_access`, `disable_dbfs_root_and_mounts` and `enforce_user_isolation` for an existing workspace that is not ready). Leave the rest out.
-3. **Check it is ready** (optional; the pull request runs it too). It uses the Databricks CLI: sign in with `az login` (used automatically for Azure workspaces), or set a Databricks CLI profile in the workspace's file (`auth.workspace_profile`):
+3. **Check it is ready:** the pull request runs these checks (preflight) and posts any problem at the top of its plan comment. Optional, with a terminal: run them yourself first, signed in with `az login` (or a Databricks CLI profile in the workspace's file, `auth.workspace_profile`):
 
    ```bash
    python3 scripts/preflight.py fin-citizen-dev
@@ -362,21 +343,6 @@ The plan guard flags changes that are hard to undo or that weaken security or ta
 
 A new workspace's first plan is always flagged (the default catalog, the Starter warehouse). Disabling legacy access is not flagged there when preflight found nothing that still uses it.
 
-### The cost dashboard (optional)
-
-One AI/BI dashboard in the **central workspace** (the one that serves the AI review's model, or `host` in `config/central.yaml`) shows what each workspace's usage costs: by usage policy, project (the `APPID` tag) and product, in estimated **$** and in **DBUs**, with a page for each person's own usage. **Everyone sees only the workspaces they belong to**, through their persona or platform admins group, on every page.
-
-| # | Who | What |
-| --- | --- | --- |
-| 1 | Metastore admin | Let the pipeline read the billing system tables: `GRANT USE SCHEMA, SELECT ON SCHEMA system.billing TO \`<pipeline_client_id>\`` |
-| 2 | Databricks account admin | The service principal is workspace admin of the central workspace (step 6, item 2) |
-| 3 | Platform team | In `config/central.yaml` under `cost_dashboard`: `catalog` (an existing catalog in the central workspace for the view, not a `{prefix}_citizen_dev` one), and your negotiated `discount_percent` (0 to 100). Optional: `warehouse_id` of an existing warehouse; without it, Terraform creates a small one |
-| 4 | Platform team | Open a pull request: it plans **central** like a workspace (preflight checks items 1 to 3) |
-
-Terraform makes a `cost` schema with the view `usage_cost`, the warehouse, the dashboard (in `/Workspace/Shared/Citizen development`), and access: the persona groups of the other workspaces get consumer access to the central workspace, and every group may run the dashboard. It runs with each viewer's own credentials, which is what limits them to their workspaces' rows.
-
-**Estimated $** is list price (`system.billing.list_prices`) less `discount_percent`; it is not the invoice. `enabled: false` stops managing it.
-
 ### Upgrade to a new release
 
 Each release is a zip named after its version (`v1.2.0`), with what changed in `CHANGELOG.md`. `VERSION` at the top of the repository says which release you run.
@@ -398,7 +364,7 @@ It touches nothing else: not `config/defaults/`, your workspaces, `config/setup.
 
 ### State and teardown
 
-State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (step 3 writes it); then each workspace has its own state file in Azure Storage, which CI requires.
+State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (step 3); then each workspace has its own state file in Azure Storage, which CI requires.
 
 **To stop managing a workspace, retire it** (delete its file in a pull request): Terraform forgets it, and nothing in the workspace changes.
 
@@ -419,8 +385,6 @@ State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (ste
 | Preflight: `cannot create catalog`, or the apply fails with `PERMISSION_DENIED` creating the catalog | The service principal lacks `CREATE CATALOG` on the metastore, or `CREATE MANAGED STORAGE` on the external location of `catalog.storage_root` | Step 6, item 5 |
 | Preflight: `does not own catalog`, or the apply fails with `PERMISSION_DENIED` updating the catalog or its grants | Someone else owns the catalog (it existed before, or `catalog.owner` handed it to a group the pipeline is not in) | A metastore admin runs `ALTER CATALOG <name> OWNER TO \`<pipeline_client_id>\``, and `catalog.owner` stays `null` |
 | Preflight: `never had a personal access token`, or the apply fails with `cannot create permissions: tokens tokens does not exist` | A brand-new workspace: Databricks creates its token permissions with the first token | A workspace admin creates one token and revokes it straight away (step 9), then re-run the plan or the apply. An apply that stopped here made everything before it; the re-run makes the rest |
-| Preflight (central): `cannot read system.billing` | The pipeline has no access to the billing system tables | A metastore admin grants it `USE SCHEMA` and `SELECT` on `system.billing` (**The cost dashboard**, step 10) |
-| The cost dashboard shows no rows | The viewer is in none of the workspaces' groups, or the workspaces have had no usage yet | Check the viewer's groups (step 7); usage appears in the system tables within a few hours |
 | A workspace was retired by mistake | Merging the deletion of its file deleted its Terraform state | Restore `citizen-dev/<name>.tfstate` from an earlier blob version in the state container (blob versioning, step 3: in the Azure portal, the container > Show deleted blobs > the blob > Versions > Make current version), then restore the workspace's file in a pull request |
 | Preflight: `cannot create the workspace's serverless usage policy`, or the apply fails with `missing CreateBudgetPolicyPermission` | The service principal lacks the account's **Billing admin** role (account admin alone is not enough) | Step 6, item 3, or `serverless_policy.enabled: false` |
 | `setup.py github` fails at branch protection: `Upgrade to GitHub Pro or make this repository public` | Branch protection on a private repository needs a paid GitHub plan | The rest of step 5 is done. Protect `main` by hand once the plan allows it; until then, merging is the only review |

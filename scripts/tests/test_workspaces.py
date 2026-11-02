@@ -148,8 +148,7 @@ class Affected(unittest.TestCase):
         self.git("commit", "-q", "-m", "base")
         self.base = self.git("rev-parse", "HEAD").strip()
         patches = [mock.patch.object(ws, "ROOT", self.repo), mock.patch.object(ws, "WORKSPACES", self.repo / "config/workspaces"),
-                   mock.patch.object(ws, "DEV_WORKSPACES", self.repo / "dev/workspaces"),
-                   mock.patch.object(ws, "CENTRAL_FILE", self.repo / "config/central.yaml")]   # off unless a test writes it
+                   mock.patch.object(ws, "DEV_WORKSPACES", self.repo / "dev/workspaces")]
         for p in patches:
             p.start()
             self.addCleanup(p.stop)
@@ -206,35 +205,6 @@ class Affected(unittest.TestCase):
         self.change("config/setup.yaml")
         self.assertEqual(self.affected(plan=True)["workspaces"], ["alpha", "beta", "gamma"])
         self.assertEqual(self.affected(plan=False)["workspaces"], [])
-
-    def central_on(self):
-        (self.repo / "config/central.yaml").write_text("host: null\ncost_dashboard:\n  enabled: true\n")
-        self.git("add", "-A")
-        self.git("commit", "-q", "-m", "central on")
-        self.base = self.git("rev-parse", "HEAD").strip()
-
-    def test_central_is_planned_when_who_sees_what_changes(self):
-        self.central_on()
-        self.assertIn("central", ws.targets(), "listed (drift) while it is enabled")
-        for f in ("config/central.yaml", "terraform/central/main.tf", "config/workspaces/beta.yaml", "config/defaults/access.yaml"):
-            with self.subTest(f=f):
-                self.change(f)
-                self.assertIn("central", self.affected()["workspaces"])
-        self.base = self.git("rev-parse", "HEAD").strip()
-        self.change("terraform/central/main.tf")
-        self.assertEqual(self.affected()["workspaces"], ["central"], "central's own code plans only central")
-        self.base = self.git("rev-parse", "HEAD").strip()
-        self.change("docs/x.md")
-        self.assertNotIn("central", self.affected()["workspaces"])
-
-    def test_central_is_nothing_while_it_is_off(self):
-        self.change("config/workspaces/beta.yaml")
-        self.assertEqual(self.affected()["workspaces"], ["beta"])
-        self.assertNotIn("central", ws.targets())
-
-    def test_a_workspace_cannot_be_named_central(self):
-        (self.repo / "config/workspaces/central.yaml").write_text("prefix: c\nhost: https://adb-1.1.azuredatabricks.net\n")
-        self.assertTrue(any("central is reserved" in p for p in ws.check()[1]))
 
     def test_a_deleted_workspace_file_is_removed_not_planned(self):
         self.change(delete=["config/workspaces/beta.yaml"])
