@@ -185,7 +185,7 @@ endpoint. Your branch role needs `DATABRICKS_SUPERUSER` there. `APP_MODE=approva
 `"mode": "approvals"` in `config.json`) runs the approvals app on the same database.
 
 A local `config.json` has the same shape as the one the build writes
-(`python3 scripts/app_build.py hub --outputs <json>`: `bundle/hub/build/self-service/config.json`). Running locally uses your
+(`python3 scripts/app_build.py hub --outputs <json>` writes it under `bundle/hub/`, in `build/self-service/`). Running locally uses your
 own identity, so it sees what you can see, not what the app's service principal can.
 
 ## Deploying
