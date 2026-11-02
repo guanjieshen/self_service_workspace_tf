@@ -155,6 +155,12 @@ class FakeStore:
     def start_failed(self, request_id, message):
         self.events.append((request_id, "start_failed", {"body": message}))
 
+    def chosen_business_unit(self, email):
+        return getattr(self, "chosen", {}).get(email.lower())
+
+    def choose_business_unit(self, email, bu):
+        self.chosen = {**getattr(self, "chosen", {}), email.lower(): bu.upper()}
+
     def requests_of(self, user, limit=200):
         if self.fail == "read":
             raise ConnectionError("database unreachable")
@@ -519,6 +525,41 @@ class RequestsInTheDatabase(unittest.TestCase):
         with self.assertRaisesRegex(portal.RequestError, "not set up"):
             p.request_folder("fin", ANA, "fin-docs2", reason=WHY)
         self.assertEqual(len(fake.started), 1, "nothing runs without a record")
+
+
+class ChosenBusinessUnit(unittest.TestCase):
+    """Without a lookup function, people choose their business unit once, and may change it."""
+
+    def test_they_are_asked_until_they_choose_then_requests_go_there(self):
+        p, _ = make()
+        self.assertEqual(p.business_units(), ["FIN", "OPS"])
+        self.assertTrue(p.needs_bu_choice(ANA))
+        self.assertIsNone(p.bu_of(ANA))
+        p.choose_bu(ANA, "fin")
+        self.assertFalse(p.needs_bu_choice(ANA))
+        self.assertEqual(p.bu_of(ANA), "FIN")
+        self.assertEqual([w.name for w in p.workspaces_for(ANA, "team_folder")], ["fin"])
+        self.assertTrue(p.genie_one(ANA).startswith(HOST), "Genie One opens in their business unit's workspace")
+
+    def test_they_can_change_it(self):
+        p, _ = make()
+        p.choose_bu(ANA, "FIN")
+        p.choose_bu(ANA, "OPS")
+        self.assertEqual(p.bu_of(ANA), "OPS")
+        with self.assertRaises(portal.RequestError):
+            p.workspaces_for(ANA, "team_folder")   # OPS's workspace is unreachable here: no workspace for it
+
+    def test_only_a_business_unit_the_app_serves(self):
+        p, _ = make()
+        with self.assertRaises(portal.RequestError):
+            p.choose_bu(ANA, "HR")
+
+    def test_the_lookup_function_decides_when_there_is_one(self):
+        p, _ = make()
+        p.config = {**p.config, "bu_lookup": {"function": "dir.people.business_unit_of", "warehouse_id": "wh1", "host": HOST}}
+        self.assertFalse(p.needs_bu_choice(ANA))
+        with self.assertRaises(portal.RequestError):
+            p.choose_bu(ANA, "FIN")
 
 
 class BusinessUnitRouting(unittest.TestCase):
@@ -933,6 +974,21 @@ class Pages(unittest.TestCase):
         self.assertEqual(page.count('class="card task'), page.count("data-search="), "every card can be found")
         self.assertIn('data-search="request a workspace folder create a shared workspace folder', page)
         self.assertIn('id="no-results" hidden', page)
+
+    def test_people_choose_their_business_unit_and_see_it_in_the_header(self):
+        page = self.http.get("/", headers=self.as_ana).text
+        self.assertIn("Which business unit are you in?", page)
+        self.assertIn('href="/business-unit"', page)
+        form = self.http.get("/business-unit", headers=self.as_ana).text
+        self.assertIn('value="FIN"', form)
+        self.assertIn('value="OPS"', form)
+        r = self.http.post("/business-unit", data={"bu": "FIN"}, headers=self.as_ana, follow_redirects=False)
+        self.assertEqual((r.status_code, r.headers["location"]), (303, "/"))
+        page = self.http.get("/", headers=self.as_ana).text
+        self.assertNotIn("Which business unit are you in?", page)
+        self.assertIn('<span class="account-bu">FIN</span>', page, "shown in the account chip")
+        self.assertIn('<a class="account" href="/business-unit"', page, "and changeable from there")
+        self.assertIn("Choose one of the business units", self.http.post("/business-unit", data={"bu": "HR"}, headers=self.as_ana).text)
 
     def test_request_a_budget_policy_and_the_cost_dashboard_are_coming_soon(self):
         page = self.http.get("/", headers=self.as_ana).text

@@ -29,7 +29,10 @@
       {% endif %}
       <div class="topbar-end">
         {% if links.wiki %}<a class="toplink" href="{{ links.wiki }}" target="_blank" rel="noopener">Docs</a>{% endif %}
-        <span class="account" title="Signed in as {{ user }}"><span class="avatar" aria-hidden="true">{{ user[:1] | upper }}</span><span class="account-email">{{ user }}</span></span>
+        {#- The business unit sits in the account chip: a link to change it when the person chose it. -#}
+        {% set bu_label %}{% if business_unit %}<span class="account-bu">{{ business_unit }}</span>{% endif %}{% endset %}
+        {% if bu_changeable %}<a class="account" href="/business-unit" title="Signed in as {{ user }}{{ ', business unit ' ~ business_unit if business_unit }}. Change your business unit"><span class="avatar" aria-hidden="true">{{ user[:1] | upper }}</span>{{ bu_label }}<span class="account-email">{{ user }}</span></a>
+        {% else %}<span class="account" title="Signed in as {{ user }}{{ ', business unit ' ~ business_unit if business_unit }}"><span class="avatar" aria-hidden="true">{{ user[:1] | upper }}</span>{{ bu_label }}<span class="account-email">{{ user }}</span></span>{% endif %}
       </div>
     </div>
   </header>

@@ -100,7 +100,19 @@ def page(request, template, **context):
     return templates.TemplateResponse(request, template, {
         "config": config, "links": config.get("links", {}), "user": user_of(request), "tasks": portal.TASKS,
         "approval": portal.approval_of(CONFIG), "approval_labels": portal.APPROVAL_LABELS, "mode": MODE, "ai_mode": ai_mode(),
-        "replies_needed": PORTAL.replies_needed(user_of(request)) if MODE != "approvals" else 0, **context})
+        "replies_needed": PORTAL.replies_needed(user_of(request)) if MODE != "approvals" else 0,
+        **(business_unit(user_of(request)) if MODE != "approvals" else {}), **context})
+
+
+def business_unit(user):
+    """The person's business unit for the header: shown when known, changeable (a link) when they
+    chose it (no lookup function, several to choose from)."""
+    try:
+        bu = PORTAL.bu_of(user)
+    except portal.RequestError:
+        bu = None
+    choosing = not CONFIG.get("bu_lookup") and len(PORTAL.business_units()) > 1 and PORTAL.store is not None
+    return {"business_unit": bu, "bu_changeable": choosing}
 
 
 def offered(user, kind):
@@ -154,7 +166,7 @@ def catalog(request: Request):
         return RedirectResponse("/approvals", status_code=303)
     user = user_of(request)
     shown = settings.apply(CONFIG, SETTINGS())   # the links and the onboarding prompt, as admins set them
-    return page(request, "catalog.html", nav="catalog", personal=personal_schema(user),
+    return page(request, "catalog.html", nav="catalog", personal=personal_schema(user), ask_bu=PORTAL.needs_bu_choice(user),
                 groups=cards.groups(shown.get("links"), PORTAL.onboarding_link(user, shown["onboarding"]["prompt"])))
 
 
@@ -164,6 +176,26 @@ def schema_form(request: Request, error: str = ""):
     workspaces, why = offered(user, "personal_schema")
     return page(request, "schema.html", nav="catalog", workspaces=workspaces,
                 schema=portal.schema_name(user), personal=personal_schema(user), error=error or why)
+
+
+@app.get("/business-unit", response_class=HTMLResponse)
+def business_unit_form(request: Request, error: str = ""):
+    """Which business unit the person is in, while there is no lookup function to say it."""
+    if CONFIG.get("bu_lookup") or MODE == "approvals":
+        return RedirectResponse("/", status_code=303)
+    names = {}
+    for w in CONFIG["workspaces"]:
+        names.setdefault(w["bu"].upper(), []).append(w["name"])
+    return page(request, "business_unit.html", nav="catalog", units=[(bu, names[bu]) for bu in PORTAL.business_units()], error=error)
+
+
+@app.post("/business-unit")
+def business_unit_submit(request: Request, bu: str = Form("")):
+    try:
+        PORTAL.choose_bu(user_of(request), bu)
+    except portal.RequestError as e:
+        return business_unit_form(request, error=str(e))
+    return RedirectResponse("/", status_code=303)
 
 
 @app.post("/schema")

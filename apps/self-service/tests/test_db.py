@@ -57,6 +57,11 @@ class Files(unittest.TestCase):
         self.assertNotIn("UPDATE", statements)
         self.assertNotIn("DELETE", statements)
 
+    def test_the_business_unit_choices_are_append_only_for_the_app(self):
+        statements = [s for s, _ in migrate.grant_statements({"self_service": "a", "approvals": "b"})]
+        self.assertIn("GRANT SELECT, INSERT ON self_service.business_unit_choices TO {self_service};", statements)
+        self.assertFalse([s for s in statements if "business_unit_choices" in s and "{approvals}" in s], "the approvals app never records one")
+
     def test_unknown_roles_are_refused(self):
         with self.assertRaises(SystemExit):
             migrate.main(["--dsn", "x", "--grant", "admin=someone"])

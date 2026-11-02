@@ -230,7 +230,9 @@ hub's first deploy, which Terraform reads to grant them. Terraform loads nothing
 `config/self-service/`, so an app setting never plans Terraform.
 
 **A workspace's business unit is its prefix.** People are routed to their business unit's
-workspace by a lookup function (`bu_lookup`) when one exists. The jobs check every request
+workspace by a lookup function (`bu_lookup`) when one exists; until then, each person chooses
+theirs once in the app (remembered, shown in the header, changeable), and their requests go
+there. The jobs check every request
 again; they run as the pipeline's identity on the workspace's usage policy.
 
 **Deploys never overlap.** Terraform's state is per workspace in Azure Storage; the bundles'

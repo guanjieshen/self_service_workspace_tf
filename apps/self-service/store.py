@@ -157,6 +157,18 @@ class Store:
         return [{"at": r[0], "actor": r[1], "role": r[2], "type": r[3], "body": r[4],
                  "data": r[5] if isinstance(r[5], dict) else json.loads(r[5] or "{}")} for r in rows]
 
+    # ---- The business unit people chose (without a lookup function) ----
+
+    def chosen_business_unit(self, email):
+        """The business unit this person last chose, or None."""
+        with self._conn() as c:
+            row = c.execute("SELECT bu FROM self_service.chosen_business_units WHERE email = %s", (email.lower(),)).fetchone()
+        return row[0] if row else None
+
+    def choose_business_unit(self, email, bu):
+        with self._conn() as c:
+            c.execute("INSERT INTO self_service.business_unit_choices (email, bu) VALUES (%s, %s)", (email.lower(), bu.upper()))
+
     # ---- Settings (settings.py): app.yaml's values, overridden from the approvals app ----
 
     def settings(self):

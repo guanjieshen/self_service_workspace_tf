@@ -24,6 +24,12 @@ that you may want to copy. A setting missing from your baseline is left alone.
   It keeps a short profile in the user's own folder (`.onboarding/profile.md`), only with their
   permission. The first plan adds the skill's file to every workspace.
 
+- **People choose their business unit in the self-service app** while there is no lookup
+  function (`bu_lookup`): the catalog asks once (when the app serves more than one business
+  unit), the choice is remembered (a new table, migration `005`), shown in the account chip at
+  the top right, and changeable from there. Their requests, Genie One Onboarding and Ask a
+  question follow it. With a lookup function, it decides and the choice is not offered.
+
 - **The deploy workflow deploys the self-service app** (`deploy.yml`, **App plan** and **Deploy the
   app**): on a pull request, what a deploy would change; after a merge, once the workspaces'
   applies passed, the hub and then each served workspace's jobs. A change to
