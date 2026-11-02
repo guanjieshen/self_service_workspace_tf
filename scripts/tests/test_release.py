@@ -156,7 +156,7 @@ class TfShRelease(unittest.TestCase):
         (self.fake / "plan.json").write_text(plan)
         (self.fake / "plan-after.json").write_text(plan_after)
         env = {k: v for k, v in os.environ.items() if k != "GITHUB_ACTIONS"}
-        env.update(TERRAFORM=str(self.fake / "terraform"), FAKE_DIR=str(self.fake), CONFIRM_ENV="ws", ALLOW_LOCAL_APPLY="1")
+        env.update(TERRAFORM=str(self.fake / "terraform"), FAKE_DIR=str(self.fake), ALLOW_LOCAL_APPLY="1")
         out = subprocess.run(["bash", str(self.repo / "scripts/tf.sh"), "ws", "apply"], env=env, stdin=subprocess.DEVNULL,
                              capture_output=True, text=True, timeout=60)
         calls = (self.fake / "calls.log").read_text().splitlines()
@@ -187,40 +187,36 @@ class TfShRelease(unittest.TestCase):
         self.assertEqual(released, [])
         self.assertEqual(sum(c.startswith("plan") for c in calls), 1)
 
-    def test_a_delete_that_is_not_released_still_needs_confirmation(self):
+    def test_a_delete_that_is_not_released_is_listed_not_released(self):
+        # Only what the workspace leaves alone is released; any other delete stays a delete,
+        # and the plan guard lists it for the reviewer.
         folder = 'module.folders.databricks_directory.team["a"]'
         (self.fake / "state.txt").write_text(folder + "\n")
         (self.fake / "plan.json").write_text(self.plan([folder], ["module.personas.databricks_entitlements.users"]))
-        env = {k: v for k, v in os.environ.items() if k not in ("GITHUB_ACTIONS", "CONFIRM_ENV")}
+        env = {k: v for k, v in os.environ.items() if k != "GITHUB_ACTIONS"}
         env.update(TERRAFORM=str(self.fake / "terraform"), FAKE_DIR=str(self.fake), ALLOW_LOCAL_APPLY="1")
         out = subprocess.run(["bash", str(self.repo / "scripts/tf.sh"), "ws", "apply"], env=env, stdin=subprocess.DEVNULL,
                              capture_output=True, text=True, timeout=60)
-        self.assertNotEqual(out.returncode, 0)
-        self.assertIn("Refusing to apply risky changes", out.stdout + out.stderr)
-        self.assertFalse(any(c.startswith("apply") for c in (self.fake / "calls.log").read_text().splitlines()))
+        self.assertIn("To review: 1 change", out.stdout)
+        self.assertFalse((self.fake / "released.log").exists(), "not removed from the state")
 
-    def test_in_ci_a_flagged_apply_needs_the_approval_label(self):
-        # The apply job sets CONFIRM_ENV only when the merged pull request has allow-risky-changes.
+    def test_in_ci_a_flagged_apply_goes_ahead(self):
+        # The plan guard lists hard-to-undo changes for the reviewer; it never blocks an apply.
         folder = 'module.folders.databricks_directory.team["a"]'
-        for confirm, applied in (("", False), ("ws", True)):
-            with self.subTest(label=bool(confirm)):
-                (self.fake / "calls.log").write_text("")
-                (self.fake / "state.txt").write_text(folder + "\n")
-                (self.fake / "plan.json").write_text(self.plan([folder], []))
-                (self.fake / "plan-after.json").write_text(self.plan([folder], []))
-                env = {k: v for k, v in os.environ.items() if k != "CONFIRM_ENV"}
-                env.update(TERRAFORM=str(self.fake / "terraform"), FAKE_DIR=str(self.fake), GITHUB_ACTIONS="true", CONFIRM_ENV=confirm)
-                out = subprocess.run(["bash", str(self.repo / "scripts/tf.sh"), "ws", "apply"], env=env, stdin=subprocess.DEVNULL,
-                                     capture_output=True, text=True, timeout=60)
-                ran = any(c.startswith("apply") for c in (self.fake / "calls.log").read_text().splitlines())
-                self.assertEqual(ran, applied, out.stdout + out.stderr)
-                if not applied:
-                    self.assertNotEqual(out.returncode, 0)
-                    self.assertIn("no allow-risky-changes label", out.stdout + out.stderr)
+        (self.fake / "calls.log").write_text("")
+        (self.fake / "state.txt").write_text(folder + "\n")
+        (self.fake / "plan.json").write_text(self.plan([folder], []))
+        (self.fake / "plan-after.json").write_text(self.plan([folder], []))
+        env = {**os.environ, "TERRAFORM": str(self.fake / "terraform"), "FAKE_DIR": str(self.fake), "GITHUB_ACTIONS": "true"}
+        out = subprocess.run(["bash", str(self.repo / "scripts/tf.sh"), "ws", "apply"], env=env, stdin=subprocess.DEVNULL,
+                             capture_output=True, text=True, timeout=60)
+        ran = any(c.startswith("apply") for c in (self.fake / "calls.log").read_text().splitlines())
+        self.assertTrue(ran, out.stdout + out.stderr)
+        self.assertIn("To review: 1 change", out.stdout)
 
     def test_apply_and_destroy_refuse_outside_github_actions(self):
         env = {k: v for k, v in os.environ.items() if k not in ("GITHUB_ACTIONS", "ALLOW_LOCAL_APPLY")}
-        env.update(TERRAFORM=str(self.fake / "terraform"), FAKE_DIR=str(self.fake), CONFIRM_ENV="ws")
+        env.update(TERRAFORM=str(self.fake / "terraform"), FAKE_DIR=str(self.fake))
         for cmd in ("apply", "destroy"):
             out = subprocess.run(["bash", str(self.repo / "scripts/tf.sh"), "ws", cmd], env=env, stdin=subprocess.DEVNULL,
                                  capture_output=True, text=True, timeout=60)
@@ -237,7 +233,7 @@ class TfShRelease(unittest.TestCase):
                 (self.fake / "state-error.txt").write_text(error)
                 (self.fake / "plan.json").write_text(self.plan([], []))
                 env = {k: v for k, v in os.environ.items() if k != "GITHUB_ACTIONS"}
-                env.update(TERRAFORM=str(self.fake / "terraform"), FAKE_DIR=str(self.fake), CONFIRM_ENV="ws", ALLOW_LOCAL_APPLY="1")
+                env.update(TERRAFORM=str(self.fake / "terraform"), FAKE_DIR=str(self.fake), ALLOW_LOCAL_APPLY="1")
                 out = subprocess.run(["bash", str(self.repo / "scripts/tf.sh"), "ws", "apply"], env=env, stdin=subprocess.DEVNULL,
                                      capture_output=True, text=True, timeout=60)
                 ran = any(c.startswith("apply") for c in (self.fake / "calls.log").read_text().splitlines())
@@ -248,7 +244,7 @@ class TfShRelease(unittest.TestCase):
     def test_break_glass_refuses_a_local_state(self):
         (self.repo / "config/backend.hcl").unlink()
         env = {k: v for k, v in os.environ.items() if k != "GITHUB_ACTIONS"}
-        env.update(TERRAFORM=str(self.fake / "terraform"), FAKE_DIR=str(self.fake), CONFIRM_ENV="ws", ALLOW_LOCAL_APPLY="1")
+        env.update(TERRAFORM=str(self.fake / "terraform"), FAKE_DIR=str(self.fake), ALLOW_LOCAL_APPLY="1")
         for cmd in ("apply", "destroy", "force-unlock"):
             out = subprocess.run(["bash", str(self.repo / "scripts/tf.sh"), "ws", cmd], env=env, stdin=subprocess.DEVNULL,
                                  capture_output=True, text=True, timeout=60)

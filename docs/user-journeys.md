@@ -47,9 +47,8 @@ request; nothing reaches a workspace until it is merged. The one-time setup is i
   settings, the groups' access, the warehouse, the catalog, the policies.
 - If something outside the repository is missing (a group not in the account, the service
   principal not an admin, no storage for the catalog), the comment says so at the top.
-- The first plan is **flagged by the plan guard** (it sets the default catalog and makes the
-  Starter warehouse admins only), so its check is red. A platform team member who has read the
-  comment adds the `allow-risky-changes` label, and the check passes.
+- The comment lists, under **Before merging**, what the first plan does that is hard to undo
+  (it sets the default catalog and makes the Starter warehouse admins only): check it is intended.
 - **Merge when every check is green**, and the workspace is deployed. From the next Monday it
   is in the drift check.
 
@@ -82,8 +81,7 @@ Any baseline key can be set this way, with the same name and shape as in `config
    others.
 
 A workspace whose file sets its own value keeps it. A change that weakens security (a
-setting turned off or loosened) fails the plan check until a person adds the label
-`allow-risky-changes`.
+setting turned off or loosened) is listed under **Before merging** in the plan comment.
 
 ## 4. Give someone access
 

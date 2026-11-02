@@ -8,6 +8,12 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **The plan guard no longer blocks.** It still lists hard-to-undo, security-weakening and
+  access-removing changes under **Before merging** in the plan comment, but no check fails and no
+  label is needed: the `allow-risky-changes` label and its checks on plan and apply are gone.
+  Code owner review (and `apply_approvers`, if set) is the approval. You can delete the label.
+- `tf.sh`: the plan guard now runs on macOS's bash too (an empty argument list skipped it there).
+
 - **Setup needs no terminal.** SETUP.md steps 3 to 5 are done in the Azure portal and the GitHub web
   UI; `scripts/setup.py` stays as an optional shortcut. A new workflow, **Show the sign-in subject**
   (Actions > Run workflow), prints the two subjects for the federated credentials, which include
@@ -36,9 +42,8 @@ workspaces, configured in YAML and deployed by GitHub Actions. Set up from scrat
 | Genie Code | Workspace instructions (work in your personal schema, use the default warehouse, keep the chargeback tags) and skills |
 
 **How changes are made:** a pull request plans each workspace it concerns and posts the plan
-with an AI impact review. A plan guard requires the `allow-risky-changes` label for changes
-that are hard to undo, weaken security or take access away, and the apply checks the label
-again. Merging applies; a weekly drift check opens an issue when a workspace no longer
+with an AI impact review. A plan guard lists changes that are hard to undo, weaken security or
+take access away, for the reviewer. Merging applies; a weekly drift check opens an issue when a workspace no longer
 matches; deleting a workspace's file retires it. A setting set to `null` is left alone,
 never reset.
 

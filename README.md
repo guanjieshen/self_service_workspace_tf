@@ -47,7 +47,7 @@ The full walkthrough is in [docs/SETUP.md](docs/SETUP.md). Here's the setup proc
 | 6 | In the Databricks account console, add the deployment service principal, grant it workspace admin access to the target workspaces, and give it the **Billing admin** role so it can create serverless usage policies. A metastore admin grants it `CREATE CATALOG` ([step 6](docs/SETUP.md#6-databricks-account-by-hand)). | Databricks account and metastore admins |
 | 7 | Create the persona groups in Entra ID and sync them to the Databricks account. | Identity team |
 | 8 | Review the baseline YAML files in `config/defaults/` with the platform and security teams, and set the Databricks `account_id` in `config/defaults/cost.yaml`. | Platform and security teams |
-| 9 | Copy [`config/workspaces/_example.yaml`](config/workspaces/_example.yaml) to `config/workspaces/<name>.yaml`, update the workspace details, and open a pull request. Its first plan needs the `allow-risky-changes` label; a brand-new workspace first needs one personal access token created and revoked ([step 9](docs/SETUP.md#9-onboard-a-workspace)). | Platform team |
+| 9 | Copy [`config/workspaces/_example.yaml`](config/workspaces/_example.yaml) to `config/workspaces/<name>.yaml`, update the workspace details, and open a pull request. Read its plan comment before merging; a brand-new workspace first needs one personal access token created and revoked ([step 9](docs/SETUP.md#9-onboard-a-workspace)). | Platform team |
 
 **Every step is done in a web UI** (the Azure portal, GitHub, the Databricks account console): nothing needs a terminal or Python on a laptop. With one, `scripts/setup.py` can do steps 3 to 5 for you. Follow the setup guide for prerequisites and the full sequence.
 

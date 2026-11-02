@@ -209,7 +209,7 @@ The Databricks side of the same identity (account, workspace admin, Billing admi
 | # | Where | What |
 | --- | --- | --- |
 | 1 | **Settings > Secrets and variables > Actions > Variables > New repository variable** | `AZURE_CLIENT_ID` = `pipeline_client_id` (step 4), `AZURE_TENANT_ID` = `tenant_id`, `AZURE_SUBSCRIPTION_ID` = `subscription_id`. Variables, not secrets: none of them is a secret |
-| 2 | **Issues > Labels > New label** | `allow-risky-changes` ("A person reviewed the plan's hard-to-undo or security-weakening changes") and `drift` ("A workspace no longer matches its configuration") |
+| 2 | **Issues > Labels > New label** | `drift` ("A workspace no longer matches its configuration"): the drift check labels its issues with it |
 | 3 | **Settings > Environments > New environment** | `apply-approval`. Deployment branches and tags: **Selected branches and tags**, add `main`. Optional: **Required reviewers**, your `apply_approvers` team, to approve each apply |
 | 4 | **Settings > Branches > Add classic branch protection rule**, for `main` | **Require a pull request before merging**, with **1 approval**, **Dismiss stale pull request approvals when new commits are pushed** and **Require review from Code Owners**; **Require status checks to pass**: `Format and validate` and `Tests`; **Do not allow bypassing the above settings** |
 
@@ -307,7 +307,7 @@ Before you start: the workspace exists and the runners can reach it (its private
 
    It checks the sign-in and admin rights, the metastore, that every group is an account group (and that the platform admins group has members), that the pipeline may create usage policies (Billing admin), that it may create the catalog (or owns it), the catalog's storage, that the workspace has token permissions, and what still uses legacy access.
 4. **Open a pull request.** The deploy workflow plans only this workspace and posts its plan: everything the first apply creates. Preflight problems are at the top of the comment.
-5. **Approve the first plan.** A new workspace's first plan is always flagged by the plan guard: it sets the default catalog and makes the Starter warehouse admins only. A platform team member who has read the plan comment adds the `allow-risky-changes` label (see **Approving a flagged change**, step 10); the plan check then re-runs and passes.
+5. **Read the plan comment.** A new workspace's first plan lists, under **Before merging**, what is hard to undo (it sets the default catalog and makes the Starter warehouse admins only). Check that each is intended.
 6. **Merge only when every check is green, including Plan.** Only **Format and validate** and **Tests** are required by branch protection (the plan jobs' names change with the workspaces), so GitHub lets you merge past a red plan; the apply would then stop at the same problem: a preflight problem before anything changes, a problem only Terraform finds partway. After the approval step (if `apply-approval` has reviewers), the workspace is deployed.
 7. **Verify:** the next pull request that touches it (or the Monday drift check) shows no changes. In the workspace: the persona groups under Settings > Identity and access, the `<PREFIX> Default Warehouse`, and the `{prefix}_citizen_dev` catalog.
 8. **By hand, in Catalog Explorer** (`{prefix}_citizen_dev` > Details), as a member of `{prefix}_platform_admins`: turn on **Data Classification**, with the workspace's usage policy `<PREFIX>-0-SELF-SERVICE`, and **Data Quality Monitoring** for each schema the self-service app created. Terraform does not manage either (classification's API needs a usage policy the Terraform provider cannot send; monitoring is per schema, and schemas come from the self-service app). Turn monitoring on again for schemas created later.
@@ -323,7 +323,7 @@ Before you start: the workspace exists and the runners can reach it (its private
 | Change one workspace | Pull request editing `config/workspaces/<name>.yaml`: only that workspace is planned and applied |
 | Change every workspace | Pull request editing `config/defaults/`: every workspace is planned, and applied, each in its own job (one that fails does not stop the others) |
 | Retire a workspace | Delete its file in a pull request: its Terraform state is removed on merge; the workspace itself is unchanged |
-| A plan is flagged as risky | **Approving a flagged change**, below |
+| The plan comment says **Before merging** | **Changes the plan guard points out**, below |
 | A `drift` issue opens | Someone changed a setting by hand: update the configuration to match, or re-apply to restore it |
 | Retry a failed apply | Fix the cause, then re-run the latest Apply run (it refuses if `main` has moved on) |
 | Plan locally | `./scripts/tf.sh <name> plan`, signed in with `az login`. You need **Storage Blob Data Contributor** on the state container (a local plan takes the state lock, which writes), and Databricks access to the workspace. CI's plan is the one to trust |
@@ -331,17 +331,14 @@ Before you start: the workspace exists and the runners can reach it (its private
 
 More: [config/README.md](../config/README.md) (configuration tasks) and [github-actions.md](github-actions.md) (the workflows).
 
-### Approving a flagged change
+### Changes the plan guard points out
 
-The plan guard flags changes that are hard to undo or that weaken security or take access away (the list: [design.md](design.md), section 3). A flagged plan fails its check until the pull request has the label `allow-risky-changes`.
+The plan guard lists changes that are hard to undo, weaken security or take access away (the list: [design.md](design.md), section 3). They appear in the plan comment under **Before merging**, with the details under **Technical details**, and the AI review says what they mean for the workspace. **Nothing is blocked:** merging applies the plan.
 
-1. **Read the plan comment**: the guard's findings are under **Before merging** and **Technical details**. The AI review says what they mean for the workspace.
-2. **A platform team member other than the author** adds `allow-risky-changes` (the pull request's Labels, in the sidebar), only if the change is intended. The plan check re-runs and passes. The label records the approval; it does not make the change safer.
-3. **The apply checks it again:** a flagged change merged without the label stops at apply. Add the label to the merged pull request, then re-run the apply.
+1. **Read the list** with the workspace's owners: check each change is intended.
+2. **Merge, or change the configuration.** Code owner review (step 5) is the approval.
 
-> **Warning:** Anyone with write access can add a label, and GitHub cannot limit labels to a team. Keep write access to the platform team, and require code owner review (step 5). For a second pair of eyes on every deploy, set `apply_approvers` in `config/setup.yaml`: each apply then waits for that team in the `apply-approval` environment.
-
-A new workspace's first plan is always flagged (the default catalog, the Starter warehouse). Disabling legacy access is not flagged there when preflight found nothing that still uses it.
+> **Tip:** For a second pair of eyes on every deploy, set `apply_approvers` in `config/setup.yaml`: each apply then waits for that team in the `apply-approval` environment.
 
 ### Upgrade to a new release
 
@@ -388,7 +385,6 @@ State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (ste
 | A workspace was retired by mistake | Merging the deletion of its file deleted its Terraform state | Restore `citizen-dev/<name>.tfstate` from an earlier blob version in the state container (blob versioning, step 3: in the Azure portal, the container > Show deleted blobs > the blob > Versions > Make current version), then restore the workspace's file in a pull request |
 | Preflight: `cannot create the workspace's serverless usage policy`, or the apply fails with `missing CreateBudgetPolicyPermission` | The service principal lacks the account's **Billing admin** role (account admin alone is not enough) | Step 6, item 3, or `serverless_policy.enabled: false` |
 | `setup.py github` fails at branch protection: `Upgrade to GitHub Pro or make this repository public` | Branch protection on a private repository needs a paid GitHub plan | The rest of step 5 is done. Protect `main` by hand once the plan allows it; until then, merging is the only review |
-| Apply: `the merged pull request has no allow-risky-changes label` | The plan guard flagged the change, and it was merged without the label | If a person approves it, add the label to the merged pull request and re-run the apply; otherwise revert the change in a new pull request |
 | A local plan shows permission changes that CI does not | Local plans run as you, not the pipeline: the owner entry differs | Trust the CI plan and the drift check |
 | The plan comment has no AI review | `ai_review_host` is not set, the service principal is not in that workspace, or the model is unavailable to it there (region, Unity Gateway, missing EXECUTE) | Set `ai_review_host` to a workspace that has the model, add the service principal to it, or change `ai_review_model`; the review is advice only |
 | Apply ran straight after the merge, without approval | `apply-approval` has no required reviewers (or the GitHub plan does not support them) | Add reviewers to the environment (`apply_approvers`, then step 5 again) |

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Flag changes in a Terraform plan that are hard or impossible to undo, or that weaken security.
+"""List the changes in a Terraform plan that are hard or impossible to undo, weaken security or
+take access away, for the person reviewing the pull request. It never blocks anything.
 
-Reads `terraform show -json <plan>` on stdin. Prints a warning for each risky
-change and exits 2 if there is any, 0 otherwise.
+Reads `terraform show -json <plan>` on stdin. Prints one line for each such change and exits 2
+if there is any, 0 otherwise (the plan comment shows them under "Before merging").
 
     scripts/plan-guard.py [--preflight .plans/<workspace>.preflight-all.txt] < plan.json
 
@@ -277,8 +278,8 @@ def main(argv=None) -> int:
         return 0
 
     one = len(warnings) == 1
-    print(f"\nNeeds approval: {len(warnings)} change{'' if one else 's'} that {'is' if one else 'are'} hard to undo or weaken{'s' if one else ''} security")
-    print("(a person adds the label allow-risky-changes once they have reviewed them):")
+    print(f"\nTo review: {len(warnings)} change{'' if one else 's'} that {'is' if one else 'are'} hard to undo, "
+          f"weaken{'s' if one else ''} security or take{'s' if one else ''} access away:")
     for w in warnings:
         print(f"  - {w}")
     print()

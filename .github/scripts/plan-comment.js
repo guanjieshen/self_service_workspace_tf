@@ -34,14 +34,14 @@ function buildBody(ws, endpoint, dir = '.plans') {
   };
   const plan = read('.txt');
   const guard = read('.guard.txt').trim();
-  // Guard output with status 0 is only releases or notes; anything else (or no status) needs approval.
+  // Guard output with status 0 is only releases or notes; anything else (or no status) is to review.
   const flagged = Boolean(guard) && read('.guard').trim() !== '0';
   const changes = read('.changes').trim() || '?';
   const summary = read('.summary.md').trim();
   const ai = read('.ai.md').trim();
   const preflight = read('.preflight.txt').trim();
   // The guard's own count: its output also lists releases and notes, which need no approval.
-  const findings = Number((guard.match(/^Needs approval: (\d+) change/m) || [])[1] || 0);
+  const findings = Number((guard.match(/^To review: (\d+) change/m) || [])[1] || 0);
 
   const sections = [
     marker(ws),
@@ -51,9 +51,9 @@ function buildBody(ws, endpoint, dir = '.plans') {
       : '> [!NOTE]\n> Preflight warnings for this workspace (`scripts/preflight.py`). They do not stop the plan.') + '\n\n```\n' + preflight + '\n```' : '',
     ai,
     flagged ? '### Before merging\n\n' +
-      `The plan guard flagged ${findings || 'some'} change${findings === 1 ? '' : 's'} that ${findings === 1 ? 'is' : 'are'} hard to undo or weaken${findings === 1 ? 's' : ''} security, so this needs explicit approval. ` +
-      'If a person has reviewed it and approves, add the `allow-risky-changes` label; otherwise change the configuration. ' +
-      'The label records the approval; it does not make the change safer.' : '',
+      `The plan guard found ${findings || 'some'} change${findings === 1 ? '' : 's'} that ${findings === 1 ? 'is' : 'are'} hard to undo, ` +
+      `weaken${findings === 1 ? 's' : ''} security or take${findings === 1 ? 's' : ''} access away (listed under Technical details). ` +
+      'Check that each is intended before merging; merging applies it.' : '',
   ];
   // Each part is capped, so the comment always fits: a plan touching hundreds of resources
   // makes a long guard list and summary table, and GitHub rejects a comment over the limit.

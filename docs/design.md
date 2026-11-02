@@ -63,8 +63,8 @@ platform default. `terraform/overrides.tf` maps each setting to what it owns.
 
 **Governance is in the pull request, not the code.** Any default can be changed for one
 workspace. What keeps that safe:
-- **Plan guard** (`scripts/plan-guard.py`) fails the check, until someone adds the label
-  `allow-risky-changes`, when a plan:
+- **Plan guard** (`scripts/plan-guard.py`) lists, in the plan comment under **Before merging**,
+  each change of a plan that (it never blocks):
   - deletes or replaces something people depend on (warehouses, cluster policies, usage
     policies, permissions, grants, entitlements, catalogs);
   - takes access away in an update (an entitlement, a catalog privilege, a permission), or

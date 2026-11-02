@@ -14,8 +14,8 @@ each, in parallel on the runners there are, each with its own log and Re-run but
 | Workflow | Runs on | Does |
 | --- | --- | --- |
 | `checks.yml` (**Format and validate**, **Tests**) | Every pull request | Formatting, `terraform validate`, the cross-workspace checks, every test. Required by branch protection |
-| `deploy.yml`, on a pull request | The workspaces the change concerns (below) | For each: preflight, plan, and a plan comment (the plan, the plan guard's warnings, an AI review) when the plan changes something. A plan with hard-to-undo or security-weakening changes fails until someone adds the label `allow-risky-changes` |
-| `deploy.yml`, on merge to `main` | The same workspaces, without the review-only changes | The approval step (`apply-approval`), then for each workspace: preflight (an error stops it before anything changes), the `allow-risky-changes` check on the merged pull request, and the apply. A deleted workspace file: its Terraform state is removed (the workspace is unchanged) |
+| `deploy.yml`, on a pull request | The workspaces the change concerns (below) | For each: preflight, plan, and a plan comment (the plan, the plan guard's warnings, an AI review) when the plan changes something. Hard-to-undo, security-weakening and access-removing changes are listed under **Before merging**; nothing blocks |
+| `deploy.yml`, on merge to `main` | The same workspaces, without the review-only changes | The approval step (`apply-approval`), then for each workspace: preflight (an error stops it before anything changes) and the apply. A deleted workspace file: its Terraform state is removed (the workspace is unchanged) |
 | `deploy.yml`, every Monday (or Run workflow) | Every workspace | Drift check: plans each, and opens an issue labelled `drift` for each that no longer matches; closes it once clean |
 | `sign-in-subject.yml` (**Show the sign-in subject**) | Run workflow, by hand | Prints the two subjects for the federated credentials (SETUP.md, step 4), from its own token's subject. Signs in to nothing |
 
@@ -79,22 +79,20 @@ The jobs that reach Databricks or the state use `TERRAFORM_RUNNER`. The checks a
 - **No token left in the checkout** (`persist-credentials: false`), except in the apply job, which asks the remote whether `main` moved on before a re-run.
 - **Time limits** on every job, so a hung self-hosted runner does not hold a workspace's apply for hours.
 - **Plans do not lock the state** (`-lock=false`: a plan never writes it), so a plan never fails because an apply is running. A newer push to a pull request cancels its older plans and checks.
-- **The approval label is checked twice.** On the pull request, the plan check fails until a person adds `allow-risky-changes`. At apply, a flagged change goes ahead only if the merged pull request carries the label, so merging past a failed plan check does not apply it. Branch protection cannot require the per-workspace plan jobs (their names change with the workspaces), so the apply-time check is what enforces it on every GitHub plan.
-- **Adding or removing `allow-risky-changes` re-runs the plan check**, so the approval takes effect without a new push. Other labels do not re-run anything.
 - **Pull requests from forks are not planned:** GitHub gives them no OIDC token, so the plan could only fail.
 - **Plan comments** appear only for a plan that changes something, failed, or hit a preflight error. Preflight warnings alone (a placeholder still in the baseline, say) are shown with the next plan that changes something, and in the job's annotations, instead of a new comment on every pull request.
 - **Drift issues** get a new comment only when the drift changed; the same drift found again next Monday does not notify anyone again. The issue closes itself when the drift is gone.
 
 ## The plan comment
 
-Each affected workspace gets one comment on the pull request, updated on every push, written to be read in about 30 seconds. The plan guard decides what needs approval; the AI review only explains.
+Each affected workspace gets one comment on the pull request, updated on every push, written to be read in about 30 seconds. The plan guard lists what is hard to undo; the AI review explains. Neither blocks anything.
 
 | Section | Source | Notes |
 | --- | --- | --- |
 | Title | Plan | Number of resource changes |
 | Preflight | `scripts/preflight.py` | When it found a problem: what is missing, and what to do |
 | Risk summary, What does this mean?, What's changing?, What should you review? | `scripts/ai-plan-review.py` | When `ai_review_host` is set. Adapts to the risk: a Low change gets the summary and the table only. It never mentions the approval label or resource addresses |
-| Before merging | `scripts/plan-guard.py` (its status) | Only when the plan guard flagged something: approval is needed, and what the `allow-risky-changes` label means. Never written by the AI |
+| Before merging | `scripts/plan-guard.py` (its status) | Only when the plan guard listed something: check each change is intended before merging. Never written by the AI |
 | Technical details | Plan guard, [tf-summarize](https://github.com/dineshba/tf-summarize), plan | Collapsed: the guard's findings with resource addresses, every changed resource, the full plan (its start cut if the comment would exceed GitHub's size limit) |
 | Footer | | *AI-generated review based on the Terraform plan. Verify findings before merging.* (only with an AI review) |
 

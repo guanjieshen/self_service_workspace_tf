@@ -63,7 +63,7 @@ Each topic has one home. Update that file; link to it from elsewhere instead of 
 | A baseline value in `config/defaults/` | The comment beside it; the same value in `terraform/tests/defaults/` (the baseline as released); `CHANGELOG.md` if it changes what workspaces get, with a **Baseline edits** row | `scripts/tests/test_baseline_copy.py` fails until both copies match (in this repository only); an AI eval fixture whose plan shows the old value |
 | A new baseline key (an option) | The same key in `terraform/tests/defaults/`; its use in `terraform/`; `config/README.md` (task table) if operators set it; `CHANGELOG.md` (what the first plan shows) | A fixture under `terraform/tests/fixtures/` and an assertion (`agents/terraform.md`) |
 | A Databricks setting | Map it in `terraform/overrides.tf` (`setting_addresses`) so `null` releases it | `scripts/tests/test_release.py` checks the mapping |
-| A plan guard rule (what needs approval) | `PROTECTED`, `SECURITY_SETTINGS`, `SECURITY_SETTINGS_V2`, `SECURE_CONF`, or a rule in `loosened()`, `removed_access()` or `main()` of `scripts/plan-guard.py`; the list in `docs/design.md`, section 3 | `scripts/tests/test_plan_guard.py` (`EverySecurityRule` covers each table entry; a rule outside the tables needs its own test) |
+| A plan guard rule (what the plan comment points out) | `PROTECTED`, `SECURITY_SETTINGS`, `SECURITY_SETTINGS_V2`, `SECURE_CONF`, or a rule in `loosened()`, `removed_access()` or `main()` of `scripts/plan-guard.py`; the list in `docs/design.md`, section 3 | `scripts/tests/test_plan_guard.py` (`EverySecurityRule` covers each table entry; a rule outside the tables needs its own test) |
 | A Genie Code placeholder (`{CATALOG}`, ...) | `terraform/access.tf` (`genie_instructions`, `genie_skill_text`); the placeholder table in `config/README.md` | `baseline.tftest.hcl` (`genie_code_defaults`: no placeholder left unfilled) |
 | A persona, or what one gets | `personas` in `config/defaults/access.yaml` and `terraform/tests/defaults/access.yaml`; `groups` in `_example.yaml`; the persona tables in `docs/design.md` and the AI prompt | `baseline.tftest.hcl` (`personas`) |
 | A check (a wrong value fails the plan) | `terraform/checks.tf`: the message names the key, the file and what to do | A fixture under `terraform/tests/fixtures/invalid/` and a run in `validation.tftest.hcl` |
@@ -113,9 +113,9 @@ further step. When you add something:
    destroying a Databricks setting resets it. Keep that property in anything you add.
 6. **Every change ships with tests.** A new option comes with a fixture and an assertion;
    a new check with a fixture that fails it.
-7. **The plan guard** (`scripts/plan-guard.py`) fails a plan with hard-to-undo or
-   security-weakening changes until a person adds the label `allow-risky-changes`. Never
-   add that label yourself; say what the plan does and let a person decide.
+7. **The plan guard** (`scripts/plan-guard.py`) lists hard-to-undo, security-weakening and
+   access-removing changes in the plan comment; it blocks nothing. When it lists something,
+   say what the plan does and let a person decide whether to merge.
 
 ## Tests
 

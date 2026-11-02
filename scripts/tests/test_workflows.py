@@ -74,22 +74,12 @@ class Workflows(unittest.TestCase):
             if "tf.sh" in line and " apply " in line:
                 self.assertNotIn("-lock=false", line)
 
-
-    def test_the_approval_label_re_runs_the_check(self):
-        # Without labeled/unlabeled, adding allow-risky-changes leaves the check red until a push.
-        deploy = (ROOT / ".github/workflows/deploy.yml").read_text()
-        self.assertRegex(deploy, r"(?m)^    types: \[[^\]]*\blabeled\b[^\]]*\bunlabeled\b")
-        self.assertIn("github.event.label.name == 'allow-risky-changes'", jobs(ROOT / ".github/workflows/deploy.yml")["route"],
-                      "other labels do not re-run the plans")
-
-
-    def test_a_flagged_apply_needs_the_label_on_the_merged_pull_request(self):
-        # The approval is checked at apply time: a pull request can be merged with a failed plan.
-        apply = jobs(ROOT / ".github/workflows/deploy.yml")["apply"]
-        self.assertIn("allow-risky-changes", apply)
-        self.assertIn("listPullRequestsAssociatedWithCommit", apply)
-        self.assertRegex(apply, r"CONFIRM_ENV: \$\{\{ steps\.approval\.outputs\.approved == 'true' && matrix\.workspace \|\| '' \}\}")
-        self.assertNotRegex(apply, r"(?m)^      CONFIRM_ENV:", "never set for the whole job")
+    def test_nothing_waits_for_a_label(self):
+        # The plan guard is advice in the plan comment: no step reads a label or fails on its findings.
+        text = (ROOT / ".github/workflows/deploy.yml").read_text()
+        self.assertNotIn("allow-risky-changes", text)
+        self.assertNotIn("CONFIRM_ENV", text)
+        self.assertNotIn("labeled", text, "a label change runs nothing")
 
 
 if __name__ == "__main__":

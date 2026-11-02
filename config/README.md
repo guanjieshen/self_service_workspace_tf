@@ -102,7 +102,7 @@ After an edit: open a pull request. Its plan comments show what changes in each 
 
 Any default can be changed for one workspace, so differences from the baseline are caught in the pull request rather than forbidden by the code:
 
-- **Plan guard** (the plan check on every pull request) fails the check when a plan deletes or replaces something people depend on, or weakens security, until a person adds the label `allow-risky-changes`. What it looks for: [design.md](../docs/design.md), section 3.
+- **Plan guard** points out, in the plan comment under **Before merging**, a plan that deletes or replaces something people depend on, weakens security or takes access away. It never blocks: code owner review is the approval. What it looks for: [design.md](../docs/design.md), section 3.
 - **The AI review** in the plan comment calls out every value in a workspace file that differs from the baseline, with the old and new value, and flags security-relevant ones first.
 - **Code owners** (`.github/CODEOWNERS`) decide who must approve which files: the platform team for `defaults/` and everything outside `config/`, security for `defaults/settings.yaml`. A workspace file can relax the same settings under `settings:` with only the platform team's approval; the plan guard and the AI review flag it. To make security approve those too, add `/config/workspaces/` with both teams to `.github/CODEOWNERS`.
 
