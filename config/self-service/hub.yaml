@@ -15,22 +15,18 @@ hub:
   approvals_group: null        # may open the approvals app; null = workspace admins only
   warehouse_id: null           # the SQL warehouse the business unit lookup runs on
 
-# The apps' database (Lakebase). host: its production endpoint; null on a first install (the
-# deploy looks it up and says what to set). readers: people who may read the data, by email.
+# The apps' database (Lakebase; the deploy finds its endpoint). readers: people who may read
+# the data, by email.
 database:
-  host: ep-weathered-voice-e6qhbbt1.database.canadacentral.azuredatabricks.net
   readers: [guanjie.shen@databricks.com]
 
 # The apps' service principals (application IDs). Empty until the hub's first deploy creates
 # the apps; then set them here, in a pull request, so every served workspace grants them.
 app_ids:
-  self_service: c8a1fb0a-e87a-4662-964e-54a7db2a8dbf   # the self-service app's
-  approvals: b8a68358-50f0-4176-95c0-e969717aa0be      # the approvals app's
+  self_service: null       # the self-service app's
+  approvals: null          # the approvals app's
 
 # Resources that already exist and the hub's bundle should take over instead of creating: the
 # apps' names, and the database project's resource name (projects/<project ID>). The first
 # deploy binds them; after that, these lines do nothing.
-adopt:
-  self_service: cd-self-service
-  approvals: cd-approvals
-  database: projects/cd-self-service
+adopt: {}

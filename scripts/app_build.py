@@ -75,7 +75,6 @@ def check(s):
         need(re.fullmatch(r"[0-9a-f]+", str(hub.get("warehouse_id") or "")), "hub.yaml hub.warehouse_id: the SQL warehouse the business unit lookup runs on.")
     # The readers' emails go on the migrations' command line: plain addresses only.
     need(all(re.fullmatch(EMAIL, r) for r in db.get("readers") or []), "hub.yaml database.readers: plain email addresses.")
-    need(db.get("host") is None or re.fullmatch(r"[a-z0-9.-]+", db["host"]), "hub.yaml database.host: the Lakebase production endpoint's host, or null on a first install.")
     need(all(v is None or re.fullmatch(r"[0-9a-f-]{36}", str(v)) for v in s["app_ids"].values()), "hub.yaml app_ids: the apps' service principals' application IDs, or null.")
     need(s["adopt"].get("database") is None or re.fullmatch(r"projects/[a-z0-9-]+", str(s["adopt"]["database"])),
          "hub.yaml adopt.database: the project's resource name, projects/<project ID> (for example projects/cd-self-service).")
@@ -189,7 +188,8 @@ def jobs_target(s, w, app_ids):
 
 
 def build_hub(s, spokes, database_host=None, database=True, root=None):
-    """bundle/hub/build/: each app's code and config.json, and target.yml."""
+    """bundle/hub/build/: each app's code and config.json, and target.yml. database_host: the
+    database's endpoint, which app_deploy.py looks up (it is never stored)."""
     if database_host:
         s = {**s, "database": {**s["database"], "host": database_host}}
     out = (root or ROOT) / "bundle/hub/build"
