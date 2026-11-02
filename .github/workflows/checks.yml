@@ -48,5 +48,5 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-      # Mocked providers: no workspace, credentials or network. Same as ./scripts/test.sh locally.
-      - run: ./scripts/test.sh
+      # Mocked providers: no workspace, credentials or network. Same as bash scripts/test.sh locally.
+      - run: bash scripts/test.sh

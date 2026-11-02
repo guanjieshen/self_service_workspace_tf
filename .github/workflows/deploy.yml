@@ -105,7 +105,7 @@ jobs:
       # A plan never writes the state, so it does not take the lock: it cannot collide with an
       # apply or another plan ("state blob is already locked"). Applies still lock.
       - name: Plan
-        run: ./scripts/tf.sh "$WORKSPACE" plan -no-color -input=false -lock=false
+        run: bash scripts/tf.sh "$WORKSPACE" plan -no-color -input=false -lock=false
 
       # A table of every resource the plan adds, changes or removes (github.com/dineshba/tf-summarize).
       - name: Summarize the plan
@@ -128,12 +128,12 @@ jobs:
       - name: AI review settings
         id: ai
         if: always()
-        run: ./scripts/ai-plan-review.py --settings >> "$GITHUB_OUTPUT"
+        run: python3 scripts/ai-plan-review.py --settings >> "$GITHUB_OUTPUT"
       - name: AI impact review
         if: always() && steps.ai.outputs.enabled == 'true' && hashFiles(format('.plans/{0}.json', matrix.workspace)) != ''
         env:
           BASE_REF: ${{ github.base_ref }}
-        run: ./scripts/ai-plan-review.py "$WORKSPACE" --base "origin/$BASE_REF" > ".plans/$WORKSPACE.ai.md"
+        run: python3 scripts/ai-plan-review.py "$WORKSPACE" --base "origin/$BASE_REF" > ".plans/$WORKSPACE.ai.md"
 
       # One comment per workspace, updated on every push; none for a plan without changes
       # (unless preflight found an error).
@@ -254,7 +254,7 @@ jobs:
       - name: Apply
         env:
           CONFIRM_ENV: ${{ steps.approval.outputs.approved == 'true' && matrix.workspace || '' }}
-        run: ./scripts/tf.sh "$WORKSPACE" apply -no-color -input=false
+        run: bash scripts/tf.sh "$WORKSPACE" apply -no-color -input=false
       # The summary is shown on the run's page, which GitHub does not mask: redacted like comments.
       - name: Summary
         if: always()
@@ -332,7 +332,7 @@ jobs:
         with:
           workspace: ${{ matrix.workspace }}
       - name: Plan
-        run: ./scripts/tf.sh "$WORKSPACE" plan -no-color -input=false -lock=false
+        run: bash scripts/tf.sh "$WORKSPACE" plan -no-color -input=false -lock=false
       # One issue per workspace. A new comment only when the drift itself changed: the same
       # drift found again on Monday does not notify anyone again.
       - name: Open, update or close the drift issue
