@@ -1,0 +1,7 @@
+host: null
+cost_dashboard:
+  enabled: true
+  catalog: hub_shared
+  schema: cost
+  warehouse_id: abc123
+  discount_percent: 0

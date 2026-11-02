@@ -1,0 +1,7 @@
+host: null
+cost_dashboard:
+  enabled: false
+  catalog: null
+  schema: cost
+  warehouse_id: null
+  discount_percent: 0

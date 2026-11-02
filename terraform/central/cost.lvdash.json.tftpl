@@ -1,0 +1,934 @@
+{
+ "datasets": [
+  {
+   "name": "ds_cost",
+   "displayName": "Cost by day",
+   "queryLines": [
+    "SELECT usage_date, month, workspace, usage_policy, project, product, sum(dbus) AS dbus, sum(cost) AS cost FROM ${view} WHERE usage_date >= add_months(date_trunc('MONTH', current_date()), -5) GROUP BY usage_date, month, workspace, usage_policy, project, product"
+   ]
+  },
+  {
+   "name": "ds_months",
+   "displayName": "This month and last",
+   "queryLines": [
+    "SELECT workspace, sum(CASE WHEN month = date_trunc('MONTH', current_date()) THEN cost ELSE 0 END) AS this_month, sum(CASE WHEN month = add_months(date_trunc('MONTH', current_date()), -1) THEN cost ELSE 0 END) AS last_month, sum(CASE WHEN month = date_trunc('MONTH', current_date()) THEN dbus ELSE 0 END) AS this_month_dbus FROM ${view} WHERE usage_date >= add_months(date_trunc('MONTH', current_date()), -1) GROUP BY workspace"
+   ]
+  },
+  {
+   "name": "ds_mine",
+   "displayName": "My usage",
+   "queryLines": [
+    "SELECT usage_date, workspace, product, sum(dbus) AS dbus, sum(cost) AS cost FROM ${view} WHERE personal AND run_as = current_user() AND usage_date >= add_months(date_trunc('MONTH', current_date()), -5) GROUP BY usage_date, workspace, product"
+   ]
+  }
+ ],
+ "pages": [
+  {
+   "name": "overview",
+   "displayName": "Overview",
+   "pageType": "PAGE_TYPE_CANVAS",
+   "layout": [
+    {
+     "widget": {
+      "name": "ov_title",
+      "multilineTextboxSpec": {
+       "lines": [
+        "## What your workspaces cost"
+       ]
+      }
+     },
+     "position": {
+      "x": 0,
+      "y": 0,
+      "width": 6,
+      "height": 1
+     }
+    },
+    {
+     "widget": {
+      "name": "ov_note",
+      "multilineTextboxSpec": {
+       "lines": [
+        "*Estimated cost: list price less your organization's negotiated discount (${discount}%). DBUs are Databricks' unit of compute. Usage policies tag usage; they do not cap it. You see only the workspaces you belong to.*"
+       ]
+      }
+     },
+     "position": {
+      "x": 0,
+      "y": 1,
+      "width": 6,
+      "height": 1
+     }
+    },
+    {
+     "widget": {
+      "name": "ov_this_month",
+      "queries": [
+       {
+        "name": "main_query",
+        "query": {
+         "datasetName": "ds_months",
+         "fields": [
+          {
+           "name": "sum(this_month)",
+           "expression": "SUM(`this_month`)"
+          }
+         ],
+         "disaggregated": false
+        }
+       }
+      ],
+      "spec": {
+       "version": 2,
+       "widgetType": "counter",
+       "encodings": {
+        "value": {
+         "fieldName": "sum(this_month)",
+         "displayName": "Estimated cost this month ($)"
+        }
+       },
+       "frame": {
+        "showTitle": true,
+        "title": "Estimated cost this month ($)"
+       }
+      }
+     },
+     "position": {
+      "x": 0,
+      "y": 2,
+      "width": 2,
+      "height": 3
+     }
+    },
+    {
+     "widget": {
+      "name": "ov_last_month",
+      "queries": [
+       {
+        "name": "main_query",
+        "query": {
+         "datasetName": "ds_months",
+         "fields": [
+          {
+           "name": "sum(last_month)",
+           "expression": "SUM(`last_month`)"
+          }
+         ],
+         "disaggregated": false
+        }
+       }
+      ],
+      "spec": {
+       "version": 2,
+       "widgetType": "counter",
+       "encodings": {
+        "value": {
+         "fieldName": "sum(last_month)",
+         "displayName": "Last month ($)"
+        }
+       },
+       "frame": {
+        "showTitle": true,
+        "title": "Last month ($)"
+       }
+      }
+     },
+     "position": {
+      "x": 2,
+      "y": 2,
+      "width": 2,
+      "height": 3
+     }
+    },
+    {
+     "widget": {
+      "name": "ov_dbus",
+      "queries": [
+       {
+        "name": "main_query",
+        "query": {
+         "datasetName": "ds_months",
+         "fields": [
+          {
+           "name": "sum(this_month_dbus)",
+           "expression": "SUM(`this_month_dbus`)"
+          }
+         ],
+         "disaggregated": false
+        }
+       }
+      ],
+      "spec": {
+       "version": 2,
+       "widgetType": "counter",
+       "encodings": {
+        "value": {
+         "fieldName": "sum(this_month_dbus)",
+         "displayName": "DBUs this month"
+        }
+       },
+       "frame": {
+        "showTitle": true,
+        "title": "DBUs this month"
+       }
+      }
+     },
+     "position": {
+      "x": 4,
+      "y": 2,
+      "width": 2,
+      "height": 3
+     }
+    },
+    {
+     "widget": {
+      "name": "ov_by_month",
+      "queries": [
+       {
+        "name": "main_query",
+        "query": {
+         "datasetName": "ds_cost",
+         "fields": [
+          {
+           "name": "monthly(usage_date)",
+           "expression": "DATE_TRUNC(\"MONTH\", `usage_date`)"
+          },
+          {
+           "name": "sum(cost)",
+           "expression": "SUM(`cost`)"
+          },
+          {
+           "name": "product",
+           "expression": "`product`"
+          }
+         ],
+         "disaggregated": false
+        }
+       }
+      ],
+      "spec": {
+       "version": 3,
+       "widgetType": "bar",
+       "encodings": {
+        "x": {
+         "fieldName": "monthly(usage_date)",
+         "scale": {
+          "type": "temporal"
+         },
+         "displayName": "Month"
+        },
+        "y": {
+         "fieldName": "sum(cost)",
+         "scale": {
+          "type": "quantitative"
+         },
+         "displayName": "Estimated cost ($)"
+        },
+        "color": {
+         "fieldName": "product",
+         "scale": {
+          "type": "categorical"
+         },
+         "displayName": "Product"
+        }
+       },
+       "frame": {
+        "showTitle": true,
+        "title": "Cost by month, by product"
+       }
+      }
+     },
+     "position": {
+      "x": 0,
+      "y": 5,
+      "width": 3,
+      "height": 6
+     }
+    },
+    {
+     "widget": {
+      "name": "ov_by_policy",
+      "queries": [
+       {
+        "name": "main_query",
+        "query": {
+         "datasetName": "ds_cost",
+         "fields": [
+          {
+           "name": "usage_policy",
+           "expression": "`usage_policy`"
+          },
+          {
+           "name": "sum(cost)",
+           "expression": "SUM(`cost`)"
+          }
+         ],
+         "disaggregated": false
+        }
+       }
+      ],
+      "spec": {
+       "version": 3,
+       "widgetType": "bar",
+       "encodings": {
+        "x": {
+         "fieldName": "usage_policy",
+         "scale": {
+          "type": "categorical",
+          "sort": {
+           "by": "y-reversed"
+          }
+         },
+         "displayName": "Usage policy"
+        },
+        "y": {
+         "fieldName": "sum(cost)",
+         "scale": {
+          "type": "quantitative"
+         },
+         "displayName": "Estimated cost ($)"
+        }
+       },
+       "frame": {
+        "showTitle": true,
+        "title": "Cost by usage policy"
+       }
+      }
+     },
+     "position": {
+      "x": 3,
+      "y": 5,
+      "width": 3,
+      "height": 6
+     }
+    },
+    {
+     "widget": {
+      "name": "ov_policy_table",
+      "queries": [
+       {
+        "name": "main_query",
+        "query": {
+         "datasetName": "ds_cost",
+         "fields": [
+          {
+           "name": "workspace",
+           "expression": "`workspace`"
+          },
+          {
+           "name": "usage_policy",
+           "expression": "`usage_policy`"
+          },
+          {
+           "name": "product",
+           "expression": "`product`"
+          },
+          {
+           "name": "sum(cost)",
+           "expression": "SUM(`cost`)"
+          },
+          {
+           "name": "sum(dbus)",
+           "expression": "SUM(`dbus`)"
+          }
+         ],
+         "disaggregated": false
+        }
+       }
+      ],
+      "spec": {
+       "version": 2,
+       "widgetType": "table",
+       "encodings": {
+        "columns": [
+         {
+          "fieldName": "workspace",
+          "displayName": "Workspace"
+         },
+         {
+          "fieldName": "usage_policy",
+          "displayName": "Usage policy"
+         },
+         {
+          "fieldName": "product",
+          "displayName": "Product"
+         },
+         {
+          "fieldName": "sum(cost)",
+          "displayName": "Estimated cost ($)"
+         },
+         {
+          "fieldName": "sum(dbus)",
+          "displayName": "DBUs"
+         }
+        ]
+       },
+       "frame": {
+        "showTitle": true,
+        "title": "By workspace, usage policy and product"
+       }
+      }
+     },
+     "position": {
+      "x": 0,
+      "y": 11,
+      "width": 6,
+      "height": 6
+     }
+    }
+   ]
+  },
+  {
+   "name": "projects",
+   "displayName": "Projects",
+   "pageType": "PAGE_TYPE_CANVAS",
+   "layout": [
+    {
+     "widget": {
+      "name": "pr_title",
+      "multilineTextboxSpec": {
+       "lines": [
+        "## Projects"
+       ]
+      }
+     },
+     "position": {
+      "x": 0,
+      "y": 0,
+      "width": 6,
+      "height": 1
+     }
+    },
+    {
+     "widget": {
+      "name": "pr_note",
+      "multilineTextboxSpec": {
+       "lines": [
+        "*A project is the APPID tag on the usage. \"Not set\" means usage with no project.*"
+       ]
+      }
+     },
+     "position": {
+      "x": 0,
+      "y": 1,
+      "width": 6,
+      "height": 1
+     }
+    },
+    {
+     "widget": {
+      "name": "pr_top",
+      "queries": [
+       {
+        "name": "main_query",
+        "query": {
+         "datasetName": "ds_cost",
+         "fields": [
+          {
+           "name": "project",
+           "expression": "`project`"
+          },
+          {
+           "name": "sum(cost)",
+           "expression": "SUM(`cost`)"
+          }
+         ],
+         "disaggregated": false
+        }
+       }
+      ],
+      "spec": {
+       "version": 3,
+       "widgetType": "bar",
+       "encodings": {
+        "x": {
+         "fieldName": "project",
+         "scale": {
+          "type": "categorical",
+          "sort": {
+           "by": "y-reversed"
+          }
+         },
+         "displayName": "Project"
+        },
+        "y": {
+         "fieldName": "sum(cost)",
+         "scale": {
+          "type": "quantitative"
+         },
+         "displayName": "Estimated cost ($)"
+        }
+       },
+       "frame": {
+        "showTitle": true,
+        "title": "Top projects by cost"
+       }
+      }
+     },
+     "position": {
+      "x": 0,
+      "y": 2,
+      "width": 6,
+      "height": 6
+     }
+    },
+    {
+     "widget": {
+      "name": "pr_table",
+      "queries": [
+       {
+        "name": "main_query",
+        "query": {
+         "datasetName": "ds_cost",
+         "fields": [
+          {
+           "name": "project",
+           "expression": "`project`"
+          },
+          {
+           "name": "usage_policy",
+           "expression": "`usage_policy`"
+          },
+          {
+           "name": "workspace",
+           "expression": "`workspace`"
+          },
+          {
+           "name": "sum(cost)",
+           "expression": "SUM(`cost`)"
+          },
+          {
+           "name": "sum(dbus)",
+           "expression": "SUM(`dbus`)"
+          }
+         ],
+         "disaggregated": false
+        }
+       }
+      ],
+      "spec": {
+       "version": 2,
+       "widgetType": "table",
+       "encodings": {
+        "columns": [
+         {
+          "fieldName": "project",
+          "displayName": "Project"
+         },
+         {
+          "fieldName": "usage_policy",
+          "displayName": "Usage policy"
+         },
+         {
+          "fieldName": "workspace",
+          "displayName": "Workspace"
+         },
+         {
+          "fieldName": "sum(cost)",
+          "displayName": "Estimated cost ($)"
+         },
+         {
+          "fieldName": "sum(dbus)",
+          "displayName": "DBUs"
+         }
+        ]
+       },
+       "frame": {
+        "showTitle": true,
+        "title": "By project and usage policy"
+       }
+      }
+     },
+     "position": {
+      "x": 0,
+      "y": 8,
+      "width": 6,
+      "height": 6
+     }
+    }
+   ]
+  },
+  {
+   "name": "my_usage",
+   "displayName": "My usage",
+   "pageType": "PAGE_TYPE_CANVAS",
+   "layout": [
+    {
+     "widget": {
+      "name": "me_title",
+      "multilineTextboxSpec": {
+       "lines": [
+        "## My usage"
+       ]
+      }
+     },
+     "position": {
+      "x": 0,
+      "y": 0,
+      "width": 6,
+      "height": 1
+     }
+    },
+    {
+     "widget": {
+      "name": "me_note",
+      "multilineTextboxSpec": {
+       "lines": [
+        "*What ran as you: serverless notebooks, Genie, and the jobs and pipelines that run as you. SQL warehouses, apps and other shared compute are charged to the resource, so they count in your workspace's totals, not here.*"
+       ]
+      }
+     },
+     "position": {
+      "x": 0,
+      "y": 1,
+      "width": 6,
+      "height": 1
+     }
+    },
+    {
+     "widget": {
+      "name": "me_cost",
+      "queries": [
+       {
+        "name": "main_query",
+        "query": {
+         "datasetName": "ds_mine",
+         "fields": [
+          {
+           "name": "sum(cost)",
+           "expression": "SUM(`cost`)"
+          }
+         ],
+         "disaggregated": false
+        }
+       }
+      ],
+      "spec": {
+       "version": 2,
+       "widgetType": "counter",
+       "encodings": {
+        "value": {
+         "fieldName": "sum(cost)",
+         "displayName": "My estimated cost ($)"
+        }
+       },
+       "frame": {
+        "showTitle": true,
+        "title": "My estimated cost ($)"
+       }
+      }
+     },
+     "position": {
+      "x": 0,
+      "y": 2,
+      "width": 3,
+      "height": 3
+     }
+    },
+    {
+     "widget": {
+      "name": "me_dbus",
+      "queries": [
+       {
+        "name": "main_query",
+        "query": {
+         "datasetName": "ds_mine",
+         "fields": [
+          {
+           "name": "sum(dbus)",
+           "expression": "SUM(`dbus`)"
+          }
+         ],
+         "disaggregated": false
+        }
+       }
+      ],
+      "spec": {
+       "version": 2,
+       "widgetType": "counter",
+       "encodings": {
+        "value": {
+         "fieldName": "sum(dbus)",
+         "displayName": "My DBUs"
+        }
+       },
+       "frame": {
+        "showTitle": true,
+        "title": "My DBUs"
+       }
+      }
+     },
+     "position": {
+      "x": 3,
+      "y": 2,
+      "width": 3,
+      "height": 3
+     }
+    },
+    {
+     "widget": {
+      "name": "me_by_product",
+      "queries": [
+       {
+        "name": "main_query",
+        "query": {
+         "datasetName": "ds_mine",
+         "fields": [
+          {
+           "name": "product",
+           "expression": "`product`"
+          },
+          {
+           "name": "sum(cost)",
+           "expression": "SUM(`cost`)"
+          }
+         ],
+         "disaggregated": false
+        }
+       }
+      ],
+      "spec": {
+       "version": 3,
+       "widgetType": "bar",
+       "encodings": {
+        "x": {
+         "fieldName": "product",
+         "scale": {
+          "type": "categorical",
+          "sort": {
+           "by": "y-reversed"
+          }
+         },
+         "displayName": "Product"
+        },
+        "y": {
+         "fieldName": "sum(cost)",
+         "scale": {
+          "type": "quantitative"
+         },
+         "displayName": "Estimated cost ($)"
+        }
+       },
+       "frame": {
+        "showTitle": true,
+        "title": "By product"
+       }
+      }
+     },
+     "position": {
+      "x": 0,
+      "y": 5,
+      "width": 3,
+      "height": 6
+     }
+    },
+    {
+     "widget": {
+      "name": "me_by_day",
+      "queries": [
+       {
+        "name": "main_query",
+        "query": {
+         "datasetName": "ds_mine",
+         "fields": [
+          {
+           "name": "daily(usage_date)",
+           "expression": "DATE_TRUNC(\"DAY\", `usage_date`)"
+          },
+          {
+           "name": "sum(cost)",
+           "expression": "SUM(`cost`)"
+          }
+         ],
+         "disaggregated": false
+        }
+       }
+      ],
+      "spec": {
+       "version": 3,
+       "widgetType": "line",
+       "encodings": {
+        "x": {
+         "fieldName": "daily(usage_date)",
+         "scale": {
+          "type": "temporal"
+         },
+         "displayName": "Day"
+        },
+        "y": {
+         "fieldName": "sum(cost)",
+         "scale": {
+          "type": "quantitative"
+         },
+         "displayName": "Estimated cost ($)"
+        }
+       },
+       "frame": {
+        "showTitle": true,
+        "title": "By day"
+       }
+      }
+     },
+     "position": {
+      "x": 3,
+      "y": 5,
+      "width": 3,
+      "height": 6
+     }
+    }
+   ]
+  },
+  {
+   "name": "filters",
+   "displayName": "Filters",
+   "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+   "layout": [
+    {
+     "widget": {
+      "name": "f_workspace",
+      "queries": [
+       {
+        "name": "ds_cost_workspace",
+        "query": {
+         "datasetName": "ds_cost",
+         "fields": [
+          {
+           "name": "workspace",
+           "expression": "`workspace`"
+          }
+         ],
+         "disaggregated": false
+        }
+       },
+       {
+        "name": "ds_months_workspace",
+        "query": {
+         "datasetName": "ds_months",
+         "fields": [
+          {
+           "name": "workspace",
+           "expression": "`workspace`"
+          }
+         ],
+         "disaggregated": false
+        }
+       },
+       {
+        "name": "ds_mine_workspace",
+        "query": {
+         "datasetName": "ds_mine",
+         "fields": [
+          {
+           "name": "workspace",
+           "expression": "`workspace`"
+          }
+         ],
+         "disaggregated": false
+        }
+       }
+      ],
+      "spec": {
+       "version": 2,
+       "widgetType": "filter-multi-select",
+       "encodings": {
+        "fields": [
+         {
+          "fieldName": "workspace",
+          "displayName": "Workspace",
+          "queryName": "ds_cost_workspace"
+         },
+         {
+          "fieldName": "workspace",
+          "displayName": "Workspace",
+          "queryName": "ds_months_workspace"
+         },
+         {
+          "fieldName": "workspace",
+          "displayName": "Workspace",
+          "queryName": "ds_mine_workspace"
+         }
+        ]
+       },
+       "frame": {
+        "showTitle": true,
+        "title": "Workspace"
+       }
+      }
+     },
+     "position": {
+      "x": 0,
+      "y": 0,
+      "width": 2,
+      "height": 2
+     }
+    },
+    {
+     "widget": {
+      "name": "f_dates",
+      "queries": [
+       {
+        "name": "ds_cost_usage_date",
+        "query": {
+         "datasetName": "ds_cost",
+         "fields": [
+          {
+           "name": "usage_date",
+           "expression": "`usage_date`"
+          }
+         ],
+         "disaggregated": false
+        }
+       },
+       {
+        "name": "ds_mine_usage_date",
+        "query": {
+         "datasetName": "ds_mine",
+         "fields": [
+          {
+           "name": "usage_date",
+           "expression": "`usage_date`"
+          }
+         ],
+         "disaggregated": false
+        }
+       }
+      ],
+      "spec": {
+       "version": 2,
+       "widgetType": "filter-date-range-picker",
+       "encodings": {
+        "fields": [
+         {
+          "fieldName": "usage_date",
+          "displayName": "Dates",
+          "queryName": "ds_cost_usage_date"
+         },
+         {
+          "fieldName": "usage_date",
+          "displayName": "Dates",
+          "queryName": "ds_mine_usage_date"
+         }
+        ]
+       },
+       "frame": {
+        "showTitle": true,
+        "title": "Dates"
+       }
+      }
+     },
+     "position": {
+      "x": 0,
+      "y": 2,
+      "width": 2,
+      "height": 2
+     }
+    }
+   ]
+  }
+ ],
+ "uiSettings": {
+  "theme": {
+   "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+  }
+ }
+}

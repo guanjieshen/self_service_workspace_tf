@@ -32,6 +32,9 @@ class ReleaseZip(unittest.TestCase):
                 self.assertRegex(setup, rf"(?m)^{key}: null\b")
         self.assertIn("# ---- REQUIRED", setup, "the comments stay: they are the instructions")
         self.assertRegex(out["config/defaults/cost.yaml"].decode(), r"(?m)^account_id: null\b")
+        central = out["config/central.yaml"].decode()
+        for key, value in (("catalog", "null"), ("warehouse_id", "null"), ("discount_percent", "0")):
+            self.assertRegex(central, rf"(?m)^  {key}: {value}\b", f"cost_dashboard.{key} is the organization's to set")
         owners = out[".github/CODEOWNERS"].decode()
         self.assertRegex(owners, r"(?m)^\*\s+@your-org/databricks-platform$")
         self.assertRegex(owners, r"(?m)^/config/defaults/settings\.yaml\s+@your-org/databricks-platform @your-org/security$",

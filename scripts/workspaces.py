@@ -46,7 +46,11 @@ NAME = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 
 # Paths whose change concerns every workspace: applied (EVERYTHING), or only planned (PLAN_ONLY).
 # This file is one: it decides what is planned and applied, and reads each workspace's host.
-EVERYTHING = r"^(config/defaults/|terraform/(?!tests/)|scripts/tf\.sh$|scripts/plan-guard\.py$|scripts/workspaces\.py$)"
+EVERYTHING = r"^(config/defaults/|terraform/(?!tests/|central/)|scripts/tf\.sh$|scripts/plan-guard\.py$|scripts/workspaces\.py$)"
+# The central target (config/central.yaml, terraform/central/): also whatever changes who sees
+# which workspace's costs (any workspace file, the groups, the account) or where it runs.
+CENTRAL = r"^(config/central\.yaml$|terraform/central/|(config|dev)/workspaces/[^/_][^/]*\.yaml$|config/defaults/(access|cost)\.yaml$|config/setup\.yaml$)"
+CENTRAL_FILE = ROOT / "config/central.yaml"
 # Under those paths, files Terraform never reads: guidance for maintainers (terraform/**.md) and
 # loose files in the Genie Code skills folder (only skill folders are deployed, not its README).
 NOT_DEPLOYED = r"^(terraform/.*\.md$|config/defaults/genie-code/skills/[^/]+$)"
@@ -138,7 +142,19 @@ def ws_file(ws):
     return found[0]
 
 
+def central_host():
+    """The central workspace: host in config/central.yaml, else ai_review_host in config/setup.yaml."""
+    setup = ROOT / "config/setup.yaml"
+    return (top_level(CENTRAL_FILE).get("host") if CENTRAL_FILE.is_file() else None) or \
+        (top_level(setup).get("ai_review_host") if setup.is_file() else None)
+
+
 def field(ws, key):
+    if ws == "central" and key == "host":
+        host = central_host()
+        if not host:
+            raise SystemExit("no central workspace: set host in config/central.yaml, or ai_review_host in config/setup.yaml")
+        return host
     f = ws_file(ws)
     value = top_level(f).get(key)
     if value is None:
@@ -173,6 +189,10 @@ def check(*dirs):
             problems.append(f"{f.name}: workspace file names must be lowercase letters, digits, dashes and "
                             "underscores (they are used in workflow commands and state file names)")
             continue
+        if f.stem == "central":
+            problems.append(f"{f.name}: central is reserved for what lives in the central workspace "
+                            "(config/central.yaml): rename the workspace file")
+            continue
         other = seen.setdefault(("name", f.stem), f)
         if other != f:
             where = lambda x: f"{x.parent.parent.name}/{x.parent.name}/"
@@ -199,11 +219,21 @@ def names():
     return [f.stem for f in files()]
 
 
+def central_enabled():
+    """Whether config/central.yaml turns the central target on (its cost dashboard)."""
+    return CENTRAL_FILE.is_file() and nested(CENTRAL_FILE, "cost_dashboard", "enabled") == "true"
+
+
+def targets():
+    """Everything planned and applied: the workspaces, and "central" while it is enabled."""
+    return names() + (["central"] if central_enabled() else [])
+
+
 def affected(base, head, plan=False):
     """{"workspaces": what to plan or apply, "removed": workspaces whose file was deleted}."""
     def git(*args):
         return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True)
-    current = names()
+    current = targets()
     if git("rev-parse", "--quiet", "--verify", f"{base}^{{commit}}").returncode != 0:
         return {"workspaces": current, "removed": []}   # no usable base (first push, force push): everything
     prefix = git("rev-parse", "--show-prefix").stdout.strip()
@@ -212,11 +242,12 @@ def affected(base, head, plan=False):
     workspace_file = re.compile(r"^(config|dev)/workspaces/([^/_][^/]*)\.yaml$")
     removed = sorted({m.group(2) for status, p in paths for m in [workspace_file.match(p)]
                       if m and status == "D" and m.group(2) not in current})
+    central = ["central"] if "central" in current and any(re.match(CENTRAL, p) for _, p in paths) else []
     every = lambda p: re.match(EVERYTHING, p) and not re.match(NOT_DEPLOYED, p)
     if any(every(p) or (plan and re.match(PLAN_ONLY, p)) for _, p in paths):
         return {"workspaces": current, "removed": removed}
     touched = {m.group(2) for _, p in paths for m in [workspace_file.match(p)] if m}
-    return {"workspaces": sorted(touched & set(current)), "removed": removed}
+    return {"workspaces": sorted((touched & set(current)) | set(central)), "removed": removed}
 
 
 def main(argv):
@@ -230,7 +261,7 @@ def main(argv):
         print(json.dumps(affected(rest[0], rest[1], plan)))
         return 0
     if argv == ["list"]:
-        print(json.dumps(names()))
+        print(json.dumps(targets()))
         return 0
     if argv == ["check"]:
         found, problems = check()

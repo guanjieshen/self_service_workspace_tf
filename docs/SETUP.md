@@ -362,6 +362,21 @@ The plan guard flags changes that are hard to undo or that weaken security or ta
 
 A new workspace's first plan is always flagged (the default catalog, the Starter warehouse). Disabling legacy access is not flagged there when preflight found nothing that still uses it.
 
+### The cost dashboard (optional)
+
+One AI/BI dashboard in the **central workspace** (the one that serves the AI review's model, or `host` in `config/central.yaml`) shows what each workspace's usage costs: by usage policy, project (the `APPID` tag) and product, in estimated **$** and in **DBUs**, with a page for each person's own usage. **Everyone sees only the workspaces they belong to**, through their persona or platform admins group, on every page.
+
+| # | Who | What |
+| --- | --- | --- |
+| 1 | Metastore admin | Let the pipeline read the billing system tables: `GRANT USE SCHEMA, SELECT ON SCHEMA system.billing TO \`<pipeline_client_id>\`` |
+| 2 | Databricks account admin | The service principal is workspace admin of the central workspace (step 6, item 2) |
+| 3 | Platform team | In `config/central.yaml` under `cost_dashboard`: `catalog` (an existing catalog in the central workspace for the view, not a `{prefix}_citizen_dev` one), and your negotiated `discount_percent` (0 to 100). Optional: `warehouse_id` of an existing warehouse; without it, Terraform creates a small one |
+| 4 | Platform team | Open a pull request: it plans **central** like a workspace (preflight checks items 1 to 3) |
+
+Terraform makes a `cost` schema with the view `usage_cost`, the warehouse, the dashboard (in `/Workspace/Shared/Citizen development`), and access: the persona groups of the other workspaces get consumer access to the central workspace, and every group may run the dashboard. It runs with each viewer's own credentials, which is what limits them to their workspaces' rows.
+
+**Estimated $** is list price (`system.billing.list_prices`) less `discount_percent`; it is not the invoice. `enabled: false` stops managing it.
+
 ### Upgrade to a new release
 
 Each release is a zip named after its version (`v1.2.0`), with what changed in `CHANGELOG.md`. `VERSION` at the top of the repository says which release you run.
@@ -404,6 +419,8 @@ State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (ste
 | Preflight: `cannot create catalog`, or the apply fails with `PERMISSION_DENIED` creating the catalog | The service principal lacks `CREATE CATALOG` on the metastore, or `CREATE MANAGED STORAGE` on the external location of `catalog.storage_root` | Step 6, item 5 |
 | Preflight: `does not own catalog`, or the apply fails with `PERMISSION_DENIED` updating the catalog or its grants | Someone else owns the catalog (it existed before, or `catalog.owner` handed it to a group the pipeline is not in) | A metastore admin runs `ALTER CATALOG <name> OWNER TO \`<pipeline_client_id>\``, and `catalog.owner` stays `null` |
 | Preflight: `never had a personal access token`, or the apply fails with `cannot create permissions: tokens tokens does not exist` | A brand-new workspace: Databricks creates its token permissions with the first token | A workspace admin creates one token and revokes it straight away (step 9), then re-run the plan or the apply. An apply that stopped here made everything before it; the re-run makes the rest |
+| Preflight (central): `cannot read system.billing` | The pipeline has no access to the billing system tables | A metastore admin grants it `USE SCHEMA` and `SELECT` on `system.billing` (**The cost dashboard**, step 10) |
+| The cost dashboard shows no rows | The viewer is in none of the workspaces' groups, or the workspaces have had no usage yet | Check the viewer's groups (step 7); usage appears in the system tables within a few hours |
 | A workspace was retired by mistake | Merging the deletion of its file deleted its Terraform state | Restore `citizen-dev/<name>.tfstate` from an earlier blob version in the state container (blob versioning, step 3: in the Azure portal, the container > Show deleted blobs > the blob > Versions > Make current version), then restore the workspace's file in a pull request |
 | Preflight: `cannot create the workspace's serverless usage policy`, or the apply fails with `missing CreateBudgetPolicyPermission` | The service principal lacks the account's **Billing admin** role (account admin alone is not enough) | Step 6, item 3, or `serverless_policy.enabled: false` |
 | `setup.py github` fails at branch protection: `Upgrade to GitHub Pro or make this repository public` | Branch protection on a private repository needs a paid GitHub plan | The rest of step 5 is done. Protect `main` by hand once the plan allows it; until then, merging is the only review |

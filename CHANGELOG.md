@@ -8,6 +8,12 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **Cost dashboard** (optional, `config/central.yaml`): one AI/BI dashboard in the central workspace
+  showing what each workspace's usage costs, by usage policy, project and product, in estimated $
+  (list price less `discount_percent`) and DBUs. Each person sees only the workspaces they belong
+  to. Planned and applied as the target **central** (`terraform/central/`). Needs `SELECT` on
+  `system.billing` for the pipeline (SETUP.md step 10). `warehouse_id` reuses an existing warehouse.
+
 - A new default Genie Code skill, **`onboard-me`** (`config/defaults/genie-code/skills/onboard-me/`): the
   first time someone says "onboard me", it introduces the workspace, lists the data they can see,
   suggests three first questions and asks what they want to achieve; later sessions coach them.
