@@ -14,9 +14,9 @@ resource "databricks_access_control_rule_set" "this" {
   name     = "accounts/${var.account_id}/budgetPolicies/${databricks_budget_policy.this[each.key].policy_id}/ruleSets/default"
 
   dynamic "grant_rules" {
-    for_each = length(each.value.groups) > 0 ? [1] : []
+    for_each = length(each.value.groups) + length(try(each.value.principals, [])) > 0 ? [1] : []
     content {
-      principals = [for g in each.value.groups : "groups/${g}"]
+      principals = concat([for g in each.value.groups : "groups/${g}"], try(each.value.principals, []))
       role       = "roles/budgetPolicy.user"
     }
   }

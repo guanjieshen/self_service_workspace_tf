@@ -39,7 +39,7 @@ locals {
   ws_file = "${coalesce(var.workspaces_dir, "${local.project_root}/config/workspaces")}/${var.workspace}.yaml"
   ws_all  = try({ for k, v in yamldecode(file(local.ws_file)) : k => v }, {})
   # Keys only a workspace has, besides the baseline's own sections.
-  workspace_keys = ["prefix", "host", "id", "label", "auth", "genie_code_instructions"]
+  workspace_keys = ["prefix", "host", "id", "label", "auth", "genie_code_instructions", "self_service"]
   workspace      = { for k in setsubtract(local.workspace_keys, ["genie_code_instructions"]) : k => local.ws_all[k] if contains(keys(local.ws_all), k) }
   # Keys that are neither a baseline section nor a workspace key (usually a typo).
   unknown_keys = [for k in keys(local.ws_all) : k if !contains(concat(local.defaults_sections, local.workspace_keys), k)]

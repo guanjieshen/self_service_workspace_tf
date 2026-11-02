@@ -20,6 +20,12 @@ variable "workspaces_dir" {
   default     = ""
 }
 
+variable "self_service_dir" {
+  description = "Folder holding the self-service app's settings (hub.yaml: the apps' service principal IDs). Empty = config/self-service/. The tests point it at their fixtures."
+  type        = string
+  default     = ""
+}
+
 variable "use_cli_profiles" {
   description = "Use the Databricks CLI profiles from the workspace file (auth:). scripts/tf.sh sets this to false in CI."
   type        = bool
