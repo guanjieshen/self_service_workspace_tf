@@ -15,10 +15,10 @@
    ]
   },
   {
-   "name": "ds_mine",
-   "displayName": "My usage",
+   "name": "ds_people",
+   "displayName": "By person",
    "queryLines": [
-    "SELECT usage_date, workspace, product, sum(dbus) AS dbus, sum(cost) AS cost FROM ${view} WHERE personal AND run_as = current_user() AND usage_date >= add_months(date_trunc('MONTH', current_date()), -5) GROUP BY usage_date, workspace, product"
+    "SELECT usage_date, run_as, workspace, product, sum(dbus) AS dbus, sum(cost) AS cost FROM ${view} WHERE personal AND run_as IS NOT NULL AND usage_date >= add_months(date_trunc('MONTH', current_date()), -5) GROUP BY usage_date, run_as, workspace, product"
    ]
   }
  ],
@@ -549,16 +549,16 @@
    ]
   },
   {
-   "name": "my_usage",
-   "displayName": "My usage",
+   "name": "people",
+   "displayName": "By person",
    "pageType": "PAGE_TYPE_CANVAS",
    "layout": [
     {
      "widget": {
-      "name": "me_title",
+      "name": "pp_title",
       "multilineTextboxSpec": {
        "lines": [
-        "## My usage"
+        "## By person"
        ]
       }
      },
@@ -571,10 +571,10 @@
     },
     {
      "widget": {
-      "name": "me_note",
+      "name": "pp_note",
       "multilineTextboxSpec": {
        "lines": [
-        "*What ran as you: serverless notebooks, Genie, and the jobs and pipelines that run as you. SQL warehouses, apps and other shared compute are charged to the resource, so they count in your workspace's totals, not here.*"
+        "*Serverless notebooks, Genie, and the jobs and pipelines that ran as each person. Shared compute (warehouses, apps, serving) is charged to the resource, not a person.*"
        ]
       }
      },
@@ -587,53 +587,29 @@
     },
     {
      "widget": {
-      "name": "me_cost",
+      "name": "pp_table",
       "queries": [
        {
         "name": "main_query",
         "query": {
-         "datasetName": "ds_mine",
+         "datasetName": "ds_people",
          "fields": [
+          {
+           "name": "run_as",
+           "expression": "`run_as`"
+          },
+          {
+           "name": "workspace",
+           "expression": "`workspace`"
+          },
+          {
+           "name": "product",
+           "expression": "`product`"
+          },
           {
            "name": "sum(cost)",
            "expression": "SUM(`cost`)"
-          }
-         ],
-         "disaggregated": false
-        }
-       }
-      ],
-      "spec": {
-       "version": 2,
-       "widgetType": "counter",
-       "encodings": {
-        "value": {
-         "fieldName": "sum(cost)",
-         "displayName": "My estimated cost ($)"
-        }
-       },
-       "frame": {
-        "showTitle": true,
-        "title": "My estimated cost ($)"
-       }
-      }
-     },
-     "position": {
-      "x": 0,
-      "y": 2,
-      "width": 3,
-      "height": 3
-     }
-    },
-    {
-     "widget": {
-      "name": "me_dbus",
-      "queries": [
-       {
-        "name": "main_query",
-        "query": {
-         "datasetName": "ds_mine",
-         "fields": [
+          },
           {
            "name": "sum(dbus)",
            "expression": "SUM(`dbus`)"
@@ -645,135 +621,42 @@
       ],
       "spec": {
        "version": 2,
-       "widgetType": "counter",
+       "widgetType": "table",
        "encodings": {
-        "value": {
-         "fieldName": "sum(dbus)",
-         "displayName": "My DBUs"
-        }
+        "columns": [
+         {
+          "fieldName": "run_as",
+          "displayName": "Person"
+         },
+         {
+          "fieldName": "workspace",
+          "displayName": "Workspace"
+         },
+         {
+          "fieldName": "product",
+          "displayName": "Product"
+         },
+         {
+          "fieldName": "sum(cost)",
+          "displayName": "Estimated cost ($)"
+         },
+         {
+          "fieldName": "sum(dbus)",
+          "displayName": "DBUs"
+         }
+        ]
        },
        "frame": {
         "showTitle": true,
-        "title": "My DBUs"
-       }
-      }
-     },
-     "position": {
-      "x": 3,
-      "y": 2,
-      "width": 3,
-      "height": 3
-     }
-    },
-    {
-     "widget": {
-      "name": "me_by_product",
-      "queries": [
-       {
-        "name": "main_query",
-        "query": {
-         "datasetName": "ds_mine",
-         "fields": [
-          {
-           "name": "product",
-           "expression": "`product`"
-          },
-          {
-           "name": "sum(cost)",
-           "expression": "SUM(`cost`)"
-          }
-         ],
-         "disaggregated": false
-        }
-       }
-      ],
-      "spec": {
-       "version": 3,
-       "widgetType": "bar",
-       "encodings": {
-        "x": {
-         "fieldName": "product",
-         "scale": {
-          "type": "categorical",
-          "sort": {
-           "by": "y-reversed"
-          }
-         },
-         "displayName": "Product"
-        },
-        "y": {
-         "fieldName": "sum(cost)",
-         "scale": {
-          "type": "quantitative"
-         },
-         "displayName": "Estimated cost ($)"
-        }
-       },
-       "frame": {
-        "showTitle": true,
-        "title": "By product"
+        "title": "Who ran what"
        }
       }
      },
      "position": {
       "x": 0,
-      "y": 5,
-      "width": 3,
-      "height": 6
-     }
-    },
-    {
-     "widget": {
-      "name": "me_by_day",
-      "queries": [
-       {
-        "name": "main_query",
-        "query": {
-         "datasetName": "ds_mine",
-         "fields": [
-          {
-           "name": "daily(usage_date)",
-           "expression": "DATE_TRUNC(\"DAY\", `usage_date`)"
-          },
-          {
-           "name": "sum(cost)",
-           "expression": "SUM(`cost`)"
-          }
-         ],
-         "disaggregated": false
-        }
-       }
-      ],
-      "spec": {
-       "version": 3,
-       "widgetType": "line",
-       "encodings": {
-        "x": {
-         "fieldName": "daily(usage_date)",
-         "scale": {
-          "type": "temporal"
-         },
-         "displayName": "Day"
-        },
-        "y": {
-         "fieldName": "sum(cost)",
-         "scale": {
-          "type": "quantitative"
-         },
-         "displayName": "Estimated cost ($)"
-        }
-       },
-       "frame": {
-        "showTitle": true,
-        "title": "By day"
-       }
-      }
-     },
-     "position": {
-      "x": 3,
-      "y": 5,
-      "width": 3,
-      "height": 6
+      "y": 2,
+      "width": 6,
+      "height": 8
      }
     }
    ]
@@ -814,9 +697,9 @@
         }
        },
        {
-        "name": "ds_mine_workspace",
+        "name": "ds_people_workspace",
         "query": {
-         "datasetName": "ds_mine",
+         "datasetName": "ds_people",
          "fields": [
           {
            "name": "workspace",
@@ -845,7 +728,7 @@
          {
           "fieldName": "workspace",
           "displayName": "Workspace",
-          "queryName": "ds_mine_workspace"
+          "queryName": "ds_people_workspace"
          }
         ]
        },
@@ -880,9 +763,9 @@
         }
        },
        {
-        "name": "ds_mine_usage_date",
+        "name": "ds_people_usage_date",
         "query": {
-         "datasetName": "ds_mine",
+         "datasetName": "ds_people",
          "fields": [
           {
            "name": "usage_date",
@@ -906,7 +789,7 @@
          {
           "fieldName": "usage_date",
           "displayName": "Dates",
-          "queryName": "ds_mine_usage_date"
+          "queryName": "ds_people_usage_date"
          }
         ]
        },

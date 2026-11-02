@@ -1,0 +1,305 @@
+{
+ "datasets": [
+  {
+   "name": "ds_mine",
+   "displayName": "My usage",
+   "queryLines": [
+    "SELECT usage_date, workspace, product, sum(dbus) AS dbus, sum(cost) AS cost FROM ${view} WHERE personal AND run_as = current_user() AND usage_date >= add_months(date_trunc('MONTH', current_date()), -5) GROUP BY usage_date, workspace, product"
+   ]
+  },
+  {
+   "name": "ds_mine_months",
+   "displayName": "My months",
+   "queryLines": [
+    "SELECT sum(CASE WHEN month = date_trunc('MONTH', current_date()) THEN cost ELSE 0 END) AS this_month, sum(CASE WHEN month = add_months(date_trunc('MONTH', current_date()), -1) THEN cost ELSE 0 END) AS last_month FROM ${view} WHERE personal AND run_as = current_user() AND usage_date >= add_months(date_trunc('MONTH', current_date()), -1)"
+   ]
+  }
+ ],
+ "pages": [
+  {
+   "name": "my_costs",
+   "displayName": "My costs",
+   "pageType": "PAGE_TYPE_CANVAS",
+   "layout": [
+    {
+     "widget": {
+      "name": "me_title",
+      "multilineTextboxSpec": {
+       "lines": [
+        "## My Databricks costs"
+       ]
+      }
+     },
+     "position": {
+      "x": 0,
+      "y": 0,
+      "width": 6,
+      "height": 1
+     }
+    },
+    {
+     "widget": {
+      "name": "me_note",
+      "multilineTextboxSpec": {
+       "lines": [
+        "*Estimated cost of what ran as you: serverless notebooks, Genie, and your own jobs and pipelines. List price less your organization's negotiated discount (${discount}%). Shared compute (SQL warehouses, apps) is not counted per person.*"
+       ]
+      }
+     },
+     "position": {
+      "x": 0,
+      "y": 1,
+      "width": 6,
+      "height": 1
+     }
+    },
+    {
+     "widget": {
+      "name": "me_this_month",
+      "queries": [
+       {
+        "name": "main_query",
+        "query": {
+         "datasetName": "ds_mine_months",
+         "fields": [
+          {
+           "name": "sum(this_month)",
+           "expression": "SUM(`this_month`)"
+          }
+         ],
+         "disaggregated": false
+        }
+       }
+      ],
+      "spec": {
+       "version": 2,
+       "widgetType": "counter",
+       "encodings": {
+        "value": {
+         "fieldName": "sum(this_month)",
+         "displayName": "This month ($)"
+        }
+       },
+       "frame": {
+        "showTitle": true,
+        "title": "This month ($)"
+       }
+      }
+     },
+     "position": {
+      "x": 0,
+      "y": 2,
+      "width": 3,
+      "height": 3
+     }
+    },
+    {
+     "widget": {
+      "name": "me_last_month",
+      "queries": [
+       {
+        "name": "main_query",
+        "query": {
+         "datasetName": "ds_mine_months",
+         "fields": [
+          {
+           "name": "sum(last_month)",
+           "expression": "SUM(`last_month`)"
+          }
+         ],
+         "disaggregated": false
+        }
+       }
+      ],
+      "spec": {
+       "version": 2,
+       "widgetType": "counter",
+       "encodings": {
+        "value": {
+         "fieldName": "sum(last_month)",
+         "displayName": "Last month ($)"
+        }
+       },
+       "frame": {
+        "showTitle": true,
+        "title": "Last month ($)"
+       }
+      }
+     },
+     "position": {
+      "x": 3,
+      "y": 2,
+      "width": 3,
+      "height": 3
+     }
+    },
+    {
+     "widget": {
+      "name": "me_by_product",
+      "queries": [
+       {
+        "name": "main_query",
+        "query": {
+         "datasetName": "ds_mine",
+         "fields": [
+          {
+           "name": "product",
+           "expression": "`product`"
+          },
+          {
+           "name": "sum(cost)",
+           "expression": "SUM(`cost`)"
+          }
+         ],
+         "disaggregated": false
+        }
+       }
+      ],
+      "spec": {
+       "version": 3,
+       "widgetType": "bar",
+       "encodings": {
+        "x": {
+         "fieldName": "product",
+         "scale": {
+          "type": "categorical",
+          "sort": {
+           "by": "y-reversed"
+          }
+         },
+         "displayName": "Product"
+        },
+        "y": {
+         "fieldName": "sum(cost)",
+         "scale": {
+          "type": "quantitative"
+         },
+         "displayName": "Estimated cost ($)"
+        }
+       },
+       "frame": {
+        "showTitle": true,
+        "title": "By product"
+       }
+      }
+     },
+     "position": {
+      "x": 0,
+      "y": 5,
+      "width": 3,
+      "height": 6
+     }
+    },
+    {
+     "widget": {
+      "name": "me_by_day",
+      "queries": [
+       {
+        "name": "main_query",
+        "query": {
+         "datasetName": "ds_mine",
+         "fields": [
+          {
+           "name": "daily(usage_date)",
+           "expression": "DATE_TRUNC(\"DAY\", `usage_date`)"
+          },
+          {
+           "name": "sum(cost)",
+           "expression": "SUM(`cost`)"
+          }
+         ],
+         "disaggregated": false
+        }
+       }
+      ],
+      "spec": {
+       "version": 3,
+       "widgetType": "line",
+       "encodings": {
+        "x": {
+         "fieldName": "daily(usage_date)",
+         "scale": {
+          "type": "temporal"
+         },
+         "displayName": "Day"
+        },
+        "y": {
+         "fieldName": "sum(cost)",
+         "scale": {
+          "type": "quantitative"
+         },
+         "displayName": "Estimated cost ($)"
+        }
+       },
+       "frame": {
+        "showTitle": true,
+        "title": "By day"
+       }
+      }
+     },
+     "position": {
+      "x": 3,
+      "y": 5,
+      "width": 3,
+      "height": 6
+     }
+    }
+   ]
+  },
+  {
+   "name": "filters",
+   "displayName": "Filters",
+   "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+   "layout": [
+    {
+     "widget": {
+      "name": "f_dates",
+      "queries": [
+       {
+        "name": "ds_mine_usage_date",
+        "query": {
+         "datasetName": "ds_mine",
+         "fields": [
+          {
+           "name": "usage_date",
+           "expression": "`usage_date`"
+          }
+         ],
+         "disaggregated": false
+        }
+       }
+      ],
+      "spec": {
+       "version": 2,
+       "widgetType": "filter-date-range-picker",
+       "encodings": {
+        "fields": [
+         {
+          "fieldName": "usage_date",
+          "displayName": "Dates",
+          "queryName": "ds_mine_usage_date"
+         }
+        ]
+       },
+       "frame": {
+        "showTitle": true,
+        "title": "Dates"
+       }
+      }
+     },
+     "position": {
+      "x": 0,
+      "y": 0,
+      "width": 2,
+      "height": 2
+     }
+    }
+   ]
+  }
+ ],
+ "uiSettings": {
+  "theme": {
+   "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+  }
+ }
+}

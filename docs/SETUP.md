@@ -364,7 +364,14 @@ A new workspace's first plan is always flagged (the default catalog, the Starter
 
 ### The cost dashboard (optional)
 
-One AI/BI dashboard in the **central workspace** (the one that serves the AI review's model, or `host` in `config/central.yaml`) shows what each workspace's usage costs: by usage policy, project (the `APPID` tag) and product, in estimated **$** and in **DBUs**, with a page for each person's own usage. **Everyone sees only the workspaces they belong to**, through their persona or platform admins group, on every page.
+Two AI/BI dashboards in the **central workspace** (the one that serves the AI review's model, or `host` in `config/central.yaml`), in estimated **$** and **DBUs**:
+
+| Dashboard | Who opens it | What it shows |
+| --- | --- | --- |
+| **My Databricks costs** (`users_name`) | Everyone in a persona group | Only their own usage: serverless notebooks, Genie, and the jobs and pipelines that ran as them; this month, last month, by product and by day. Nothing to choose but dates |
+| **Citizen development costs** (`name`) | Each workspace's platform admins | Their workspaces: totals, by month and product, by usage policy, by project (the `APPID` tag) and by person. A workspace filter |
+
+Shared compute (SQL warehouses, apps, serving) is charged to the resource, not to a person, so it counts in the workspace's totals only.
 
 | # | Who | What |
 | --- | --- | --- |
@@ -373,7 +380,7 @@ One AI/BI dashboard in the **central workspace** (the one that serves the AI rev
 | 3 | Platform team | In `config/central.yaml` under `cost_dashboard`: `catalog` (an existing catalog in the central workspace for the view, not a `{prefix}_citizen_dev` one), and your negotiated `discount_percent` (0 to 100). Optional: `warehouse_id` of an existing warehouse; without it, Terraform creates a small one |
 | 4 | Platform team | Open a pull request: it plans **central** like a workspace (preflight checks items 1 to 3) |
 
-Terraform makes a `cost` schema with the view `usage_cost`, the warehouse, the dashboard (in `/Workspace/Shared/Citizen development`), and access: the persona groups of the other workspaces get consumer access to the central workspace, and every group may run the dashboard. It runs with each viewer's own credentials, which is what limits them to their workspaces' rows.
+Terraform makes a `cost` schema with the view `usage_cost`, the warehouse, both dashboards (in `/Workspace/Shared/Citizen development`), and access: the persona groups of the other workspaces get consumer access to the central workspace. The dashboards run with each viewer's own credentials: the view shows a person only their workspaces' rows, and names people only to themselves and to their workspace's platform admins.
 
 **Estimated $** is list price (`system.billing.list_prices`) less `discount_percent`; it is not the invoice. `enabled: false` stops managing it.
 

@@ -1,6 +1,6 @@
-# The cost dashboard in the central workspace (config/central.yaml, cost_dashboard):
-# a schema and a view over the billing system tables, a warehouse, the dashboard, and who may
-# open it. Each person sees only the workspaces they belong to: the view filters its rows by
+# The cost dashboards in the central workspace (config/central.yaml, cost_dashboard): a schema
+# and a view over the billing system tables, a warehouse, two dashboards (everyone's own usage;
+# the platform admins' view of their workspaces), and who may open them. Each person sees only the workspaces they belong to: the view filters its rows by
 # the viewer's groups, and the dashboard runs with the viewer's own credentials.
 
 locals {
@@ -136,9 +136,36 @@ resource "databricks_dashboard" "cost" {
   depends_on        = [databricks_sql_table.usage_cost]
 }
 
+# The platform admins' dashboard: their workspaces, by usage policy, project and person.
 resource "databricks_permissions" "dashboard" {
-  count        = local.enabled && length(local.viewer_groups) > 0 ? 1 : 0
+  count        = local.enabled && length(local.admin_groups) > 0 ? 1 : 0
   dashboard_id = databricks_dashboard.cost[0].id
+  dynamic "access_control" {
+    for_each = toset(local.admin_groups)
+    content {
+      group_name       = access_control.value
+      permission_level = "CAN_RUN"
+    }
+  }
+}
+
+# Everyone's dashboard: only their own usage.
+resource "databricks_dashboard" "mine" {
+  count        = local.n
+  display_name = local.users_dashboard
+  parent_path  = databricks_directory.folder[0].path
+  warehouse_id = local.warehouse_id
+  serialized_dashboard = templatefile("${path.module}/my_costs.lvdash.json.tftpl", {
+    view     = local.view_name
+    discount = local.discount_percent
+  })
+  embed_credentials = false
+  depends_on        = [databricks_sql_table.usage_cost]
+}
+
+resource "databricks_permissions" "mine" {
+  count        = local.enabled && length(local.viewer_groups) > 0 ? 1 : 0
+  dashboard_id = databricks_dashboard.mine[0].id
   dynamic "access_control" {
     for_each = toset(local.viewer_groups)
     content {

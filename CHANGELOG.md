@@ -8,6 +8,12 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- The cost dashboard is now two: **My Databricks costs** for everyone (only their own usage: serverless
+  notebooks, Genie, their own jobs and pipelines; no workspace to pick) and **Citizen development
+  costs** for platform admins only (their workspaces, adding a **By person** page). The first plan
+  adds the users' dashboard and narrows the admins' one to the platform admins groups (flagged:
+  access removed).
+
 - **Cost dashboard** (optional, `config/central.yaml`): one AI/BI dashboard in the central workspace
   showing what each workspace's usage costs, by usage policy, project and product, in estimated $
   (list price less `discount_percent`) and DBUs. Each person sees only the workspaces they belong

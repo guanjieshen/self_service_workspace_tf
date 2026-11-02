@@ -14,7 +14,8 @@ host: null                 # the central workspace's URL. null = ai_review_host 
 # (through their persona or platform admins group), whatever page they open.
 cost_dashboard:
   enabled: true
-  name: Citizen development costs
+  name: Citizen development costs        # the platform admins' dashboard: their workspaces, by person
+  users_name: My Databricks costs         # everyone's dashboard: only their own usage
   # The catalog that holds the cost view: an existing catalog in the central workspace,
   # NOT a workspace catalog this repository manages ({prefix}_citizen_dev: its grants are
   # authoritative). Required while enabled.

@@ -1,6 +1,9 @@
-output "dashboard" {
-  description = "The cost dashboard's path in the central workspace."
-  value       = try("${databricks_dashboard.cost[0].parent_path}/${databricks_dashboard.cost[0].display_name}", null)
+output "dashboards" {
+  description = "The cost dashboards in the central workspace: everyone's, and the platform admins'."
+  value = local.enabled ? {
+    users  = "${local.folder}/${local.users_dashboard}"
+    admins = "${local.folder}/${local.dashboard_name}"
+  } : null
 }
 
 output "view" {

@@ -19,6 +19,7 @@ locals {
   schema           = coalesce(try(local.cd.schema, null), "cost")
   discount_percent = coalesce(try(local.cd.discount_percent, null), 0)
   dashboard_name   = coalesce(try(local.cd.name, null), "Citizen development costs")
+  users_dashboard  = coalesce(try(local.cd.users_name, null), "My Databricks costs")
   folder           = coalesce(try(local.cd.folder, null), "/Workspace/Shared/Citizen development")
   warehouse_size   = coalesce(try(local.cd.warehouse_size, null), "2X-Small")
   given_warehouse  = try(local.cd.warehouse_id, null)
@@ -48,6 +49,7 @@ locals {
   # The groups that open the dashboard. Those of the central workspace itself are already
   # in it (its own baseline manages them); the others get consumer access to it here.
   viewer_groups   = sort(distinct([for a in local.access : a.group]))
+  admin_groups    = sort(distinct([for m in values(local.members) : m.admins if m.admins != "-"]))
   central_ids     = [for name, m in local.members : m.id if trimsuffix(m.host, "/") == trimsuffix(coalesce(local.host, "-"), "/")]
   external_groups = sort(distinct([for a in local.access : a.group if !contains(local.central_ids, a.workspace_id)]))
 

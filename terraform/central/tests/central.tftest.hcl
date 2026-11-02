@@ -55,7 +55,7 @@ run "the_view_filters_rows_and_applies_the_discount" {
     condition = (
       strcontains(local.view_sql, "u.identity_metadata.run_as LIKE '%@%'") &&
       strcontains(local.view_sql, "IN ('GENIE', 'JOBS', 'DLT'))) AS personal") &&
-      strcontains(databricks_dashboard.cost[0].serialized_dashboard, "WHERE personal AND run_as = current_user()") &&
+      strcontains(databricks_dashboard.mine[0].serialized_dashboard, "WHERE personal AND run_as = current_user()") &&
       strcontains(local.view_sql, "CASE WHEN u.identity_metadata.run_as = current_user() OR va.is_admin THEN u.identity_metadata.run_as END AS run_as") &&
       strcontains(local.view_sql, "admins (workspace_id, group_name) AS (VALUES ('2222222222222222', 'fin_platform_admins'), ('1111111111111111', 'hub_platform_admins'))")
     )
@@ -66,8 +66,20 @@ run "the_view_filters_rows_and_applies_the_discount" {
     error_message = "Without warehouse_id, Terraform creates the dashboard's warehouse and lets the viewers use it."
   }
   assert {
-    condition     = toset([for a in databricks_permissions.dashboard[0].access_control : "${a.group_name}=${a.permission_level}"]) == toset([for g in local.viewer_groups : "${g}=CAN_RUN"])
-    error_message = "Every viewer group may run the dashboard."
+    condition     = toset([for a in databricks_permissions.dashboard[0].access_control : "${a.group_name}=${a.permission_level}"]) == toset(["fin_platform_admins=CAN_RUN", "hub_platform_admins=CAN_RUN"])
+    error_message = "Only the platform admins open the admins' dashboard (their workspaces, by person)."
+  }
+  assert {
+    condition     = toset([for a in databricks_permissions.mine[0].access_control : "${a.group_name}=${a.permission_level}"]) == toset([for g in local.viewer_groups : "${g}=CAN_RUN"])
+    error_message = "Everyone opens their own dashboard."
+  }
+  assert {
+    condition = (
+      databricks_dashboard.mine[0].display_name == "My Databricks costs" && databricks_dashboard.mine[0].embed_credentials == false &&
+      strcontains(databricks_dashboard.mine[0].serialized_dashboard, "WHERE personal AND run_as = current_user()") &&
+      !strcontains(databricks_dashboard.mine[0].serialized_dashboard, "filter-multi-select")
+    )
+    error_message = "Everyone's dashboard shows only their own usage, with nothing to choose but dates."
   }
 }
 
@@ -86,7 +98,7 @@ run "off_creates_nothing" {
   variables { config_dir = "tests/fixtures/off" }
 
   assert {
-    condition     = length(databricks_dashboard.cost) == 0 && length(databricks_schema.cost) == 0 && length(databricks_sql_endpoint.dashboard) == 0 && length(databricks_grant.catalog) == 0
+    condition     = length(databricks_dashboard.cost) == 0 && length(databricks_dashboard.mine) == 0 && length(databricks_schema.cost) == 0 && length(databricks_sql_endpoint.dashboard) == 0 && length(databricks_grant.catalog) == 0
     error_message = "enabled: false creates nothing."
   }
 }
