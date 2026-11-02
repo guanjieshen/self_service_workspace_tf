@@ -16,6 +16,7 @@ each, in parallel on the runners there are, each with its own log and Re-run but
 | `checks.yml` (**Format and validate**, **Tests**) | Every pull request | Formatting, `terraform validate`, the cross-workspace checks, every test. Required by branch protection |
 | `deploy.yml`, on a pull request | The workspaces the change concerns (below) | For each: preflight, plan, and a plan comment (the plan, the plan guard's warnings, an AI review) when the plan changes something. Hard-to-undo, security-weakening and access-removing changes are listed under **Before merging**; nothing blocks |
 | `deploy.yml`, on merge to `main` | The same workspaces, without the review-only changes | The approval step (`apply-approval`), then for each workspace: preflight (an error stops it before anything changes) and the apply. A deleted workspace file: its Terraform state is removed (the workspace is unchanged) |
+| `deploy.yml`, **App plan** / **Deploy the app** | When a change concerns the self-service app (below) | On a pull request, what deploying the app would change (`scripts/app_deploy.py --plan`, in the run's summary). After a merge, once every workspace's apply has passed: the hub (both apps, the database, migrations), then each served workspace's jobs. One job, one deploy at a time |
 | `deploy.yml`, every Monday (or Run workflow) | Every workspace | Drift check: plans each, and opens an issue labelled `drift` for each that no longer matches; closes it once clean |
 | `sign-in-subject.yml` (**Show the sign-in subject**) | Run workflow, by hand | Prints the two subjects for the federated credentials (SETUP.md, step 4), from its own token's subject. Signs in to nothing |
 
@@ -24,9 +25,16 @@ Which workspaces a change concerns:
 | Change | Planned (pull request) | Applied (merge) |
 | --- | --- | --- |
 | `config/workspaces/<name>.yaml` | That workspace | That workspace (a deleted file: its state is removed) |
-| `config/defaults/`, `terraform/` (except `terraform/tests/` and its `.md` guides), `scripts/tf.sh`, `scripts/plan-guard.py`, `scripts/workspaces.py` | Every workspace | Every workspace |
+| `config/defaults/`, `terraform/` (except `terraform/tests/` and its `.md` guides), `scripts/tf.sh`, `scripts/plan-guard.py`, `scripts/workspaces.py`, `config/self-service/hub.yaml` (Terraform grants its `app_ids`) | Every workspace | Every workspace |
 | What the plan comment shows: `scripts/preflight.py`, `scripts/ai-plan-review.py`, `.github/ai/`, `config/setup.yaml`, `deploy.yml` and what it uses | Every workspace | None |
 | Anything else: tests, docs, other scripts | None | None |
+
+The self-service app is deployed (**Deploy the app**) when a change touches `apps/`, `bundle/`,
+`config/self-service/`, `scripts/app_build.py`, `scripts/app_deploy.py`, a workspace file, or
+anything every workspace's Terraform reads (a workspace's output may change):
+`scripts/workspaces.py app`. It runs on the Terraform runner (`TERRAFORM_RUNNER`), with the same
+sign-in: it reads each workspace's Terraform output, and reaches the hub, every served workspace
+and the hub's Lakebase database. Like every job that signs in, it runs in no GitHub Environment.
 
 A change to every workspace applies them all, each in its own job: one that fails does not
 stop the others. Fix it in a pull request; or, if a missing prerequisite was fixed, re-run

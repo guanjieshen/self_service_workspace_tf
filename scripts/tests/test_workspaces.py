@@ -250,5 +250,51 @@ class Commands(unittest.TestCase):
                 self.assertIn("workspaces.py", err)
 
 
+class App(unittest.TestCase):
+    """Whether a change redeploys the self-service app (scripts/workspaces.py app)."""
+
+    git, change, affected = Affected.git, Affected.change, Affected.affected   # the same throwaway repository
+
+    def setUp(self):
+        Affected.setUp(self)
+        (self.repo / "config/self-service").mkdir(parents=True)
+        (self.repo / "config/self-service/hub.yaml").write_text("app_ids: {}\n")
+        (self.repo / "apps/self-service").mkdir(parents=True)
+        (self.repo / "apps/self-service/main.py").write_text("x\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "app")
+        self.base = self.git("rev-parse", "HEAD").strip()
+
+    def app(self):
+        return ws.app(self.base, "HEAD")
+
+    def test_the_apps_own_files_redeploy_it(self):
+        for path in ("apps/self-service/main.py", "bundle/hub/databricks.yml", "config/self-service/app.yaml", "scripts/app_deploy.py"):
+            with self.subTest(path=path):
+                self.change(path)
+                self.assertTrue(self.app())
+                self.base = self.git("rev-parse", "HEAD").strip()
+
+    def test_a_workspace_or_what_terraform_reads_redeploys_it(self):
+        self.change("config/workspaces/alpha.yaml")
+        self.assertTrue(self.app(), "a served workspace changed: its jobs, and the hub's list")
+        self.base = self.git("rev-parse", "HEAD").strip()
+        self.change("terraform/main.tf")
+        self.assertTrue(self.app(), "a workspace's Terraform output may change")
+
+    def test_anything_else_does_not(self):
+        self.change("docs/x.md", "terraform/tests/x.tftest.hcl", "config/workspaces/_example.yaml")
+        self.assertFalse(self.app())
+
+    def test_the_hub_file_plans_terraform_too(self):
+        self.change("config/self-service/hub.yaml")
+        self.assertEqual(self.affected(plan=True)["workspaces"], ["alpha", "beta", "gamma"], "Terraform grants its app_ids")
+
+    def test_no_app_in_the_repository(self):
+        (self.repo / "config/self-service/hub.yaml").unlink()
+        self.change("apps/self-service/main.py")
+        self.assertFalse(self.app())
+
+
 if __name__ == "__main__":
     unittest.main()

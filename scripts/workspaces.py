@@ -5,6 +5,8 @@
     scripts/workspaces.py affected <base-ref> <head-ref>
                                           what a pull request plans (--plan) or a merge applies, as
                                           JSON: {"workspaces": [...], "removed": [...]}
+    scripts/workspaces.py app <base-ref> <head-ref>
+                                          whether the change redeploys the self-service app (true/false)
     scripts/workspaces.py list            every workspace, as a JSON list (the drift check)
     scripts/workspaces.py check           checks across every workspace file (CI)
     scripts/workspaces.py field <ws> <key>  a top-level value of the workspace's file
@@ -16,7 +18,8 @@ of a release). Files starting with "_" are templates. A name must be unique acro
 Which workspaces a change concerns:
   - a workspace's own file: that workspace (a deleted file: "removed", so its state goes);
   - what Terraform does to every workspace: all of them (config/defaults/, terraform/ but not
-    its tests, scripts/tf.sh, scripts/plan-guard.py);
+    its tests, scripts/tf.sh, scripts/plan-guard.py, and config/self-service/hub.yaml, whose
+    app_ids Terraform grants);
   - with --plan (pull requests), also what the plan comment shows: all of them, planned but
     never applied (scripts/preflight.py, scripts/ai-plan-review.py, .github/ai/,
     config/setup.yaml, the deploy workflow and what it uses);
@@ -46,12 +49,18 @@ NAME = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 
 # Paths whose change concerns every workspace: applied (EVERYTHING), or only planned (PLAN_ONLY).
 # This file is one: it decides what is planned and applied, and reads each workspace's host.
-EVERYTHING = r"^(config/defaults/|terraform/(?!tests/)|scripts/tf\.sh$|scripts/plan-guard\.py$|scripts/workspaces\.py$)"
+EVERYTHING = r"^(config/defaults/|config/self-service/hub\.yaml$|terraform/(?!tests/)|scripts/tf\.sh$|scripts/plan-guard\.py$|scripts/workspaces\.py$)"
 # Under those paths, files Terraform never reads: guidance for maintainers (terraform/**.md) and
 # loose files in the Genie Code skills folder (only skill folders are deployed, not its README).
 NOT_DEPLOYED = r"^(terraform/.*\.md$|config/defaults/genie-code/skills/[^/]+$)"
 PLAN_ONLY = (r"^(scripts/preflight\.py$|scripts/ai-plan-review\.py$|\.github/ai/|config/setup\.yaml$|"
              r"\.github/workflows/deploy\.yml$|\.github/actions/|\.github/scripts/plan-comment\.js$)")
+
+
+# Paths whose change redeploys the self-service app (the hub and every served workspace's jobs):
+# its code, its bundles, its settings and its deploy, and anything that changes what it reads (a
+# workspace file, or anything Terraform reads: a workspace's output may change).
+APP = r"^(apps/|bundle/|config/self-service/|scripts/app_build\.py$|scripts/app_deploy\.py$|config/workspaces/[^/_][^/]*\.yaml$)"
 
 
 def drop_comment(line):
@@ -219,6 +228,20 @@ def affected(base, head, plan=False):
     return {"workspaces": sorted(touched & set(current)), "removed": removed}
 
 
+def app(base, head):
+    """Whether a change redeploys the self-service app: true when it touches APP or EVERYTHING."""
+    def git(*args):
+        return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True)
+    if not (ROOT / "config/self-service/hub.yaml").exists():
+        return False   # no app in this repository
+    if git("rev-parse", "--quiet", "--verify", f"{base}^{{commit}}").returncode != 0:
+        return True    # no usable base (first push, force push): everything
+    prefix = git("rev-parse", "--show-prefix").stdout.strip()
+    paths = [p[len(prefix):] if prefix and p.startswith(prefix) else p
+             for p in git("diff", "--name-only", "--no-renames", base, head, "--", ".").stdout.splitlines() if p]
+    return any(re.match(APP, p) or (re.match(EVERYTHING, p) and not re.match(NOT_DEPLOYED, p)) for p in paths)
+
+
 def main(argv):
     if argv[:1] == ["affected"]:
         rest = argv[1:]
@@ -228,6 +251,9 @@ def main(argv):
             print(__doc__.split("\n\n")[1], file=sys.stderr)
             return 2
         print(json.dumps(affected(rest[0], rest[1], plan)))
+        return 0
+    if argv[:1] == ["app"] and len(argv) == 3:
+        print(json.dumps(app(argv[1], argv[2])))
         return 0
     if argv == ["list"]:
         print(json.dumps(names()))
