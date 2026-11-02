@@ -52,6 +52,14 @@ run "the_view_filters_rows_and_applies_the_discount" {
     error_message = "The dashboard reads the view with each viewer's credentials, and says which discount it applies."
   }
   assert {
+    condition = (
+      strcontains(local.view_sql, "u.identity_metadata.run_as LIKE '%@%'") &&
+      strcontains(local.view_sql, "u.billing_origin_product IN ('GENIE', 'JOBS', 'DLT')")) AS personal") &&
+      strcontains(databricks_dashboard.cost[0].serialized_dashboard, "WHERE personal AND run_as = current_user()")
+    )
+    error_message = "My usage counts only what ran as the person: serverless notebooks, Genie, and their own jobs and pipelines."
+  }
+  assert {
     condition     = length(databricks_sql_endpoint.dashboard) == 1 && length(databricks_permissions.warehouse) == 1
     error_message = "Without warehouse_id, Terraform creates the dashboard's warehouse and lets the viewers use it."
   }
