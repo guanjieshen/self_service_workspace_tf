@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% from "_components.html" import callout, field %}
+{% block content %}
+{% set task_icon, task_name, task_text, task_category = "folder", "Request a workspace folder", "Create a shared folder for your work.", "Workspace & Compute" %}
+{% set task_aside = True %}{% include "_task_header.html" %}
+
+<div class="page-grid form-grid">
+<form class="panel" method="post" action="/folder" data-submit>
+  <div class="panel-body">
+    {% call callout() %}You and the group you select can manage this folder. You can share it with others after it's created.{% endcall %}
+    {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
+    {% if not workspaces %}
+      {% if not error %}{% call callout("error") %}No workspace offers folders yet.{% endcall %}{% endif %}
+    {% else %}
+      {% set on_change = True %}{% include "_workspace_select.html" %}
+
+      {% call field("folder", "Folder name", required=True, hint="Use lowercase letters, numbers, and dashes.") %}
+        <div class="prefixed"><span class="prefix mono">/Workspace/</span>
+          <input id="folder" name="folder" class="mono" required pattern="[a-z0-9][a-z0-9\-]*" value="{{ form.folder or '' }}" placeholder="gtm-my-project"></div>
+      {% endcall %}
+
+      {% set check_kind = "folder" %}{% set reason = form.reason %}{% include "_reason.html" %}
+
+      {% call field("owner_group", "Who can manage this folder?") %}
+        <select id="owner_group" name="owner_group" {{ 'disabled' if not my_groups }}>
+          <option value="">Only me</option>
+          {% for g in my_groups %}<option value="{{ g }}" {{ 'selected' if form.owner_group == g }}>{{ g }}</option>{% endfor %}
+        </select>
+        {#- The hint follows the choice (app.js): never says a team manages it when only the requester does. -#}
+        {% if my_groups %}<p class="hint" data-hint-for="owner_group" data-hint-none="Select a group to let your team manage this folder too."
+           data-hint-group="Your team can manage this folder too, even if you move on.">{{ "Your team can manage this folder too, even if you move on." if form.owner_group else "Select a group to let your team manage this folder too." }}</p>
+        {% else %}<p class="hint">You're not in any groups in this workspace, so only you can manage this folder.</p>{% endif %}
+      {% endcall %}
+      {% include "_ai_check.html" %}
+    {% endif %}
+  </div>
+  <div class="panel-foot form-foot">
+    <div class="form-actions">
+      <button type="submit" class="primary" {{ 'disabled' if not workspaces }}>{{ "Submit request" if approval["folder"] == "required" else "Create folder" }}</button>
+      <a class="button" href="/">Cancel</a>
+    </div>
+    <p class="meta">{{ "Your folder will be created once approved." if approval["folder"] == "required" else "Your folder will be ready in under a minute." }}</p>
+  </div>
+</form>
+{% include "_task_aside.html" %}
+</div>
+{% endblock %}

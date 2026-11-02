@@ -1,0 +1,42 @@
+{#- The layout every page shares: header with navigation and the signed-in account. -#}
+{%- from "_icons.html" import icon -%}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ config.title }}{% endblock %}</title>
+  <link rel="icon" href="/static/{{ 'favicon-approvals.svg' if mode == 'approvals' else 'favicon.svg' }}" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/app.css?v={{ asset_version }}">
+</head>
+<body>
+  <header class="topbar{{ ' topbar-admin' if mode == 'approvals' }}">
+    <div class="topbar-inner">
+      {% if mode == "approvals" %}
+      {#- The approvals app says so: its own name and an Admin tag, on a dark bar. -#}
+      <a class="brand" href="/approvals"><span class="brand-first">{{ config.title.split(" ", 1)[0] }}</span><span class="brand-rest">Approvals</span><span class="brand-tag">Admin</span></a>
+      <nav aria-label="Main">
+        <a href="/approvals" {% if nav == 'queue' %}aria-current="page"{% endif %}>Approvals{% if waiting_count %} <span class="nav-count">{{ waiting_count }}</span>{% endif %}</a>
+        <a href="/approvals/overview" {% if nav == 'overview' %}aria-current="page"{% endif %}>Overview</a>
+        <a href="/approvals/settings" {% if nav == 'settings' %}aria-current="page"{% endif %}>Settings</a>
+      </nav>
+      {% else %}
+      <a class="brand" href="/">{%- set title_words = config.title.split(" ", 1) -%}<span class="brand-first">{{ title_words[0] }}</span>{% if title_words | length > 1 %}<span class="brand-rest">{{ title_words[1] }}</span>{% endif %}</a>
+      <nav aria-label="Main">
+        <a href="/" {% if nav == 'catalog' %}aria-current="page"{% endif %}>Catalog</a>
+        <a href="/requests" {% if nav == 'requests' %}aria-current="page"{% endif %}>My requests{% if replies_needed %} <span class="nav-count" title="{{ replies_needed }} {{ 'request needs' if replies_needed == 1 else 'requests need' }} your reply">{{ replies_needed }}</span>{% endif %}</a>
+      </nav>
+      {% endif %}
+      <div class="topbar-end">
+        {% if links.wiki %}<a class="toplink" href="{{ links.wiki }}" target="_blank" rel="noopener">Docs</a>{% endif %}
+        <span class="account" title="Signed in as {{ user }}"><span class="avatar" aria-hidden="true">{{ user[:1] | upper }}</span><span class="account-email">{{ user }}</span></span>
+      </div>
+    </div>
+  </header>
+  {% if config.banner %}<div class="banner" role="status"><div class="banner-inner">{{ icon("info", "icon icon-xs") }}<span>{{ config.banner.text }}</span></div></div>{% endif %}
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <script src="/static/app.js?v={{ asset_version }}"></script>
+</body>
+</html>

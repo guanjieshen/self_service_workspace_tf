@@ -1,0 +1,11 @@
+{#- The workspace a request is for: a choice when the app serves several. -#}
+{% if workspaces | length > 1 %}
+{% from "_components.html" import field %}
+{% call field("workspace", "Workspace", required=True) %}
+  <select id="workspace" name="workspace" {% if on_change %}onchange="location.search='?workspace='+this.value"{% endif %}>
+    {% for w in workspaces %}<option value="{{ w.name }}" {{ 'selected' if w.name == chosen }}>{{ w.bu }} · {{ w.name }}</option>{% endfor %}
+  </select>
+{% endcall %}
+{% elif workspaces %}
+<input type="hidden" name="workspace" value="{{ workspaces[0].name }}">
+{% endif %}

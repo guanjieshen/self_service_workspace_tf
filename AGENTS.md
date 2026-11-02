@@ -8,6 +8,8 @@ Guidance for **coding agents and people** changing the framework: the Terraform,
 | --- | --- |
 | `terraform/` (root module, modules, checks, tests) | [agents/terraform.md](agents/terraform.md) |
 | `config/` (an organization's settings) | [agents/config.md](agents/config.md) |
+| `apps/self-service/`, `bundle/`, `config/self-service/`, `scripts/app_build.py`, `scripts/app_deploy.py` (the self-service app, its jobs and their deploy) | [agents/app.md](agents/app.md) |
+| Any template, `app.css`, or text people read in the apps | [agents/design.md](agents/design.md) |
 | `scripts/`, `.github/`, docs | This file |
 
 ## What this repository is
@@ -15,7 +17,8 @@ Guidance for **coding agents and people** changing the framework: the Terraform,
 A governed baseline for Azure Databricks citizen development workspaces, run from Git:
 YAML in `config/`, Terraform in `terraform/`, one state per workspace, planned on every pull
 request and applied on merge by GitHub Actions. What people request (schemas, workspace
-folders) belongs to the self-service app, in its own repository, not here.
+folders) belongs to the self-service app (`apps/`), deployed separately by Databricks Asset
+Bundles (`bundle/`) from the same configuration: `agents/app.md`.
 
 Two kinds of repository use this code:
 

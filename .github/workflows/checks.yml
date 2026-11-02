@@ -48,5 +48,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
+      # The self-service app's packages, for its suite (scripts/test.sh app). Its database tests
+      # run only with a Postgres (PG_TEST_DSN) and are skipped here, so any runner will do.
+      - run: python3 -m pip install --quiet -r apps/self-service/requirements.txt httpx pyyaml
       # Mocked providers: no workspace, credentials or network. Same as bash scripts/test.sh locally.
       - run: bash scripts/test.sh
