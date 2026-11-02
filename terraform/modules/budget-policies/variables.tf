@@ -8,7 +8,7 @@ variable "workspace_id" {
 }
 
 variable "policies" {
-  description = "Key => { name, tags, groups }."
+  description = "Key => { name, tags, groups, principals }: groups (names) and principals (users/<email>, servicePrincipals/<app-id>) may use the policy."
   type        = any
 }
 

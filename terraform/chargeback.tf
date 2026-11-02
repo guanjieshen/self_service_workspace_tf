@@ -23,6 +23,8 @@ locals {
       name   = replace(replace(tostring(local.sp.name), "{PREFIX}", local.prefix_upper), "{prefix}", local.prefix)
       tags   = local.chargeback_tags
       groups = distinct(concat(flatten(values(local.persona_groups)), local.platform_admins))
+      # Who else may use it, as rule set principals: the self-service jobs' identity (self_service.tf).
+      principals = local.pipeline_principal
     }
   }
 }

@@ -58,6 +58,8 @@ locals {
     [for g in local.platform_admins : { principal = g, privileges = try(local.config.catalog.platform_admin_privileges, []) }],
     # Anyone else: an application ID or a group name, or a key of groups.
     [for p, privs in coalesce(try(local.config.catalog.other_privileges, null), {}) : { principal = lookup(local.group_names, p, p), privileges = privs }],
+    # The self-service app's service principals (self_service.tf): they see the catalog.
+    [for id in local.self_service_app_ids : { principal = id, privileges = ["USE_CATALOG", "BROWSE"] }],
   )
   catalog_grants = {
     for principal in distinct([for x in local.catalog_grant_pairs : x.principal]) : principal => sort(distinct(flatten([

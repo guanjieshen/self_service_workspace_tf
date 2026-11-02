@@ -18,6 +18,20 @@ that you may want to copy. A setting missing from your baseline is left alone.
   It keeps a short profile in the user's own folder (`.onboarding/profile.md`), only with their
   permission. The first plan adds the skill's file to every workspace.
 
+- **The self-service app's needs in the workspaces it serves** (`terraform/self_service.tf`), ahead
+  of the app moving into this repository. Nothing changes until `app_ids` in
+  `config/self-service/hub.yaml` are set:
+  - the apps' two service principals are assigned to each workspace and may see its catalog
+    (`USE_CATALOG`, `BROWSE`);
+  - the pipeline's identity, which runs the self-service jobs, may use the workspace's serverless
+    usage policy;
+  - a new output, `self_service`, gives the app's deploy the workspace's prefix, ID, host,
+    catalog and usage policy.
+
+  A workspace opts out with `self_service: false` in its file (a new workspace key; the hub
+  itself, for example). The first plan after the upgrade shows the pipeline added to the usage
+  policy's users.
+
 ## 1.0.0
 
 The first release: a governed baseline for existing Azure Databricks citizen development

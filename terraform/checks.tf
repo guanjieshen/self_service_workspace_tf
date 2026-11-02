@@ -15,6 +15,10 @@ resource "terraform_data" "config_checks" {
       error_message = "These keys are not in the baseline (config/defaults/), so they change nothing; check the spelling: ${join(", ", local.unknown_overrides)}."
     }
     precondition {
+      condition     = can(tobool(try(local.ws_all.self_service, true)))
+      error_message = "self_service in the workspace's file must be true (the self-service app serves the workspace; the default) or false (it does not, for example the hub itself)."
+    }
+    precondition {
       condition     = length(local.unknown_keys) == 0
       error_message = "The workspace file has keys that are neither a baseline setting nor a workspace key (usually a typo): ${join(", ", local.unknown_keys)}. Workspace keys: ${join(", ", local.workspace_keys)}; baseline settings: ${join(", ", sort(local.defaults_sections))}."
     }
