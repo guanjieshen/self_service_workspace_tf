@@ -8,7 +8,11 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
-Nothing yet.
+- A new default Genie Code skill, **`onboard-me`** (`config/defaults/genie-code/skills/onboard-me/`): the
+  first time someone says "onboard me", it introduces the workspace, lists the data they can see,
+  suggests three first questions and asks what they want to achieve; later sessions coach them.
+  It keeps a short profile in the user's own folder (`.onboarding/profile.md`), only with their
+  permission. The first plan adds the skill's file to every workspace.
 
 ## 1.0.0
 
