@@ -13,10 +13,9 @@
 # apply and destroy run in the workspace's workflow after a merge; locally they refuse
 # unless ALLOW_LOCAL_APPLY=1 (break glass).
 #
-# plan and apply run scripts/plan-guard.py, which warns about changes that are
-# hard to undo (deleted folders, replaced warehouses, disabling legacy access).
-# apply then asks you to type the workspace name to continue. In CI, set
-# CONFIRM_ENV=<workspace> to approve; without it a flagged apply fails.
+# plan and apply run scripts/plan-guard.py, which lists changes that are hard to undo
+# (deleted folders, replaced warehouses, disabling legacy access) for the reviewer: it never
+# blocks. At a terminal, apply asks you to confirm (the workspace name, if it listed any).
 # force-unlock <lock ID> releases a state lock left by a run that died (docs/SETUP.md, 11).
 set -euo pipefail
 
@@ -98,7 +97,7 @@ vars=(-var "workspace=$workspace" -var "workspaces_dir=$ws_root")
 plan_file="$root/.plans/$workspace.tfplan"
 
 # Plan to a file, then check it for changes that are hard to undo.
-# Sets guard_status: 0 = nothing risky, 2 = risky changes found.
+# Sets guard_status: 0 = nothing listed, 2 = hard-to-undo changes listed (for the plan comment).
 # Also writes, for CI: .plans/<workspace>.txt (readable plan), .guard.txt (warnings),
 # .guard (status) and .changes (number of resources to add, change or destroy).
 plan_and_guard() {
@@ -112,7 +111,7 @@ plan_and_guard() {
   # workspace from one that still uses legacy access. Locally, without them, it flags as usual.
   local evidence=()
   [[ "${GITHUB_ACTIONS:-}" == "true" && -f "$base.preflight-all.txt" ]] && evidence=(--preflight "$base.preflight-all.txt")
-  python3 "$root/scripts/plan-guard.py" "${evidence[@]}" < "$base.json" | tee "$base.guard.txt" || guard_status=${PIPESTATUS[0]}
+  python3 "$root/scripts/plan-guard.py" ${evidence[@]+"${evidence[@]}"} < "$base.json" | tee "$base.guard.txt" || guard_status=${PIPESTATUS[0]}
   echo "$guard_status" > "$base.guard"
   python3 -c 'import json,sys; p=json.load(open(sys.argv[1])); print(sum(1 for r in p.get("resource_changes",[]) if r["change"]["actions"] not in (["no-op"],["read"])))' "$base.json" > "$base.changes"
 }
@@ -162,20 +161,10 @@ case "$cmd" in
       echo "Planning again without the released resources."
       plan_and_guard "$@"
     fi
-    if [[ $guard_status -ne 0 ]]; then
-      if [[ "${CONFIRM_ENV:-}" == "$workspace" ]]; then
-        echo "CONFIRM_ENV=$workspace set; continuing."
-      elif [[ -t 0 ]]; then
-        read -r -p "Type the workspace name ($workspace) to apply anyway: " answer
-        [[ "$answer" == "$workspace" ]] || { echo "Cancelled."; exit 1; }
-      else
-        if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
-          echo "::error::The plan guard flagged this apply, and the merged pull request has no allow-risky-changes label. If a person approves the change, add the label to the pull request and re-run this job."
-        else
-          echo "Refusing to apply risky changes without CONFIRM_ENV=$workspace."
-        fi
-        exit 1
-      fi
+    # A person at a terminal (break glass) confirms; CI applies what was merged.
+    if [[ -t 0 && $guard_status -ne 0 ]]; then
+      read -r -p "The plan guard listed changes that are hard to undo (above). Type the workspace name ($workspace) to apply: " answer
+      [[ "$answer" == "$workspace" ]] || { echo "Cancelled."; exit 1; }
     elif [[ -t 0 ]]; then
       read -r -p "Apply this plan to $workspace? Type yes: " answer
       [[ "$answer" == "yes" ]] || { echo "Cancelled."; exit 1; }

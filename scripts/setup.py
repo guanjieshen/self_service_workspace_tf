@@ -147,8 +147,6 @@ echo "Repository: {a.repo} (from {a.repo_source})."
 gh variable set AZURE_CLIENT_ID -R {repo} -b {q(a.client_id)}
 gh variable set AZURE_TENANT_ID -R {repo} -b {q(a.tenant_id)}
 gh variable set AZURE_SUBSCRIPTION_ID -R {repo} -b {q(a.subscription)}
-gh label create allow-risky-changes -R {repo} --force --color B60205 \\
-  --description "A person reviewed the plan's hard-to-undo or security-weakening changes"
 gh label create drift -R {repo} --force --color FBCA04 --description "A workspace no longer matches its configuration"
 # The approval step before each apply: main only{', and these reviewers' if a.approvers else '; add required reviewers to make applies wait for one'}.
 {reviewers}{put_env}gh api -X PUT repos/{a.repo}/environments/apply-approval --input - >/dev/null <<EOF

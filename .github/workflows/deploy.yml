@@ -13,8 +13,7 @@ name: Deploy
 
 on:
   pull_request:
-    # labeled / unlabeled: adding or removing allow-risky-changes re-runs the check that reads it.
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, synchronize, reopened]
   push:
     branches: [main]
   schedule:
@@ -33,8 +32,6 @@ env:
 jobs:
   route:
     name: Find the workspaces
-    # A label change re-runs the plans only for the approval label; any other label is noise.
-    if: (github.event.action != 'labeled' && github.event.action != 'unlabeled') || github.event.label.name == 'allow-risky-changes'
     runs-on: ${{ fromJSON(vars.CHECKS_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     permissions:
@@ -147,15 +144,6 @@ jobs:
             const { post } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/plan-comment.js`);
             await post({ github, context }, process.env.WORKSPACE, process.env.ENDPOINT);
 
-      - name: Block risky changes unless approved
-        if: ${{ !contains(github.event.pull_request.labels.*.name, 'allow-risky-changes') }}
-        run: |
-          status="$(cat ".plans/$WORKSPACE.guard")"
-          if [[ "$status" != "0" ]]; then
-            echo "::error::Hard-to-undo changes in $WORKSPACE need approval. Review the plan comment; if a person approves, add the label allow-risky-changes (that re-runs this check)."
-            exit 1
-          fi
-
   # A pull request that deletes a workspace's file: retirement plans nothing, so a comment
   # says what merging does instead.
   retire-notice:
@@ -208,7 +196,6 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
-      pull-requests: read     # the approval label on the merged pull request
       id-token: write
     # One apply at a time per workspace; the others wait (they share its state).
     concurrency:
@@ -233,27 +220,10 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           workspace: ${{ matrix.workspace }}
-      # The same read-only checks as the plan: a problem stops here, before anything is
-      # changed, and the plan guard gets the same evidence it had on the pull request (what
-      # still uses legacy access), so it decides the same way.
+      # The same read-only checks as the plan: a problem stops here, before anything is changed.
       - name: Preflight
         run: python3 scripts/preflight.py "$WORKSPACE" --out ".plans/$WORKSPACE.preflight.txt"
-      # The plan guard's approval, enforced here whatever the GitHub plan: a pull request can be
-      # merged with a failed plan check (branch protection cannot require the per-workspace plan
-      # jobs), so a flagged apply goes ahead only if the merged pull request carries the label.
-      # tf.sh refuses a flagged apply without CONFIRM_ENV; an unflagged one does not need it.
-      - name: Approval label
-        id: approval
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const { data } = await github.rest.repos.listPullRequestsAssociatedWithCommit({ ...context.repo, commit_sha: context.sha });
-            const approved = data.some((pr) => pr.labels.some((l) => l.name === 'allow-risky-changes'));
-            core.setOutput('approved', approved ? 'true' : 'false');
-            core.info(approved ? 'The merged pull request has allow-risky-changes.' : 'No allow-risky-changes on the merged pull request: a flagged apply stops.');
       - name: Apply
-        env:
-          CONFIRM_ENV: ${{ steps.approval.outputs.approved == 'true' && matrix.workspace || '' }}
         run: bash scripts/tf.sh "$WORKSPACE" apply -no-color -input=false
       # The summary is shown on the run's page, which GitHub does not mask: redacted like comments.
       - name: Summary

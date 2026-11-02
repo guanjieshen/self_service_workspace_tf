@@ -15,7 +15,7 @@ function plans(files) {
 
 test('a full comment has every section, in order', () => {
   const body = buildBody('ws', 'system.ai.model', plans({
-    '.txt': 'Plan: 1 to add', '.changes': '1', '.guard.txt': 'Needs approval: 1 change\n  - DELETE folder\n      module.x', '.guard': '2\n',
+    '.txt': 'Plan: 1 to add', '.changes': '1', '.guard.txt': 'To review: 1 change\n  - DELETE folder\n      module.x', '.guard': '2\n',
     '.ai.md': '**🔴 High risk: a folder is deleted**', '.summary.md': '| table |',
   }));
   assert.ok(body.startsWith('<!-- plan:ws -->'), 'starts with the marker used to find and update it');
@@ -33,13 +33,14 @@ test('optional sections are left out', () => {
   assert.ok(body.includes('Full Terraform plan'));
 });
 
-test('approval is asked for only when the plan guard flagged something', () => {
-  const flagged = buildBody('ws', 'm', plans({ '.txt': 'p', '.guard.txt': 'Left unmanaged from now on:\n  - RELEASE r\n\nNeeds approval: 2 changes that are hard to undo\n  - LOOSEN x\n  - DELETE y', '.guard': '2\n' }));
-  assert.match(flagged, /### Before merging[^]*flagged 2 changes[^]*`allow-risky-changes`[^]*does not make the change safer/);
+test('the guard\'s findings are pointed out before merging, and nothing asks for approval', () => {
+  const flagged = buildBody('ws', 'm', plans({ '.txt': 'p', '.guard.txt': 'Left unmanaged from now on:\n  - RELEASE r\n\nTo review: 2 changes that are hard to undo\n  - LOOSEN x\n  - DELETE y', '.guard': '2\n' }));
+  assert.match(flagged, /### Before merging[^]*found 2 changes[^]*Check that each is intended before merging/);
+  assert.ok(!flagged.includes('allow-risky-changes') && !/approv/i.test(flagged.split('Technical details')[0]), 'no label, no approval');
   const noted = buildBody('ws', 'm', plans({ '.txt': 'p', '.guard.txt': 'Not flagged, with the evidence: DISABLE legacy access', '.guard': '0\n' }));
-  assert.ok(!noted.includes('Before merging') && !noted.includes('allow-risky-changes'), 'no approval asked when the guard needs none');
+  assert.ok(!noted.includes('Before merging'), 'nothing to point out when the guard found nothing');
   assert.ok(/<details><summary>Technical details[^]*DISABLE legacy access/.test(noted), 'what the guard noted stays in the technical details');
-  assert.match(buildBody('ws', 'm', plans({ '.txt': 'p', '.guard.txt': '  - DELETE folder' })), /### Before merging/, 'no status: approval asked, to be safe');
+  assert.match(buildBody('ws', 'm', plans({ '.txt': 'p', '.guard.txt': '  - DELETE folder' })), /### Before merging/, 'no status: pointed out, to be safe');
   assert.ok(!buildBody('ws', 'm', plans({ '.txt': 'p' })).includes('AI-generated'), 'no AI footer without an AI review');
 });
 
@@ -141,7 +142,7 @@ test('a plan touching hundreds of resources still fits in one GitHub comment', (
   const many = (line, n) => Array.from({ length: n }, (_, i) => `${line} ${i}`).join('\n');
   const body = buildBody('ws', 'm', plans({
     '.txt': many('  # module.x will be destroyed', 4000), '.changes': '4000', '.guard': '2\n',
-    '.guard.txt': 'Needs approval: 4000 changes\n' + many('  - DELETE permissions\n      module.compute.databricks_permissions.x', 4000),
+    '.guard.txt': 'To review: 4000 changes\n' + many('  - DELETE permissions\n      module.compute.databricks_permissions.x', 4000),
     '.summary.md': many('| delete | `module.compute.databricks_permissions.x` |', 4000),
   }));
   assert.ok(body.length <= 65536, `${body.length} characters`);
