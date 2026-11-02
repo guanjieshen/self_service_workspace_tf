@@ -54,7 +54,7 @@ run "the_view_filters_rows_and_applies_the_discount" {
   assert {
     condition = (
       strcontains(local.view_sql, "u.identity_metadata.run_as LIKE '%@%'") &&
-      strcontains(local.view_sql, "u.billing_origin_product IN ('GENIE', 'JOBS', 'DLT')")) AS personal") &&
+      strcontains(local.view_sql, "IN ('GENIE', 'JOBS', 'DLT'))) AS personal") &&
       strcontains(databricks_dashboard.cost[0].serialized_dashboard, "WHERE personal AND run_as = current_user()")
     )
     error_message = "My usage counts only what ran as the person: serverless notebooks, Genie, and their own jobs and pipelines."
