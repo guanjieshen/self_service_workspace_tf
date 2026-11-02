@@ -14,6 +14,7 @@ groups:
   explorer: gss-cd-explorers
   builder: gss-cd-builders
   publisher: null          # nobody gets this persona here
+  platform_admins: gss_platform_admins   # the hub's admins run this workspace too
 
 # ---- Changes to the baseline, for this workspace only ----------------------
 
