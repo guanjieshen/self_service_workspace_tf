@@ -46,6 +46,8 @@ OWNER = "@your-org/databricks-platform"
 SECURITY_OWNER = "@your-org/security"
 # CODEOWNERS paths that also need the security team (docs/SETUP.md, step 2).
 SECURITY_PATHS = ("/config/defaults/settings.yaml",)
+# The self-service app's hub (its URL, database, identities): blanked like config/setup.yaml.
+HUB_FILE = "config/self-service/hub.yaml"
 
 
 def committed_files():
@@ -73,6 +75,13 @@ def own_identifiers(files):
             text = data.decode()
             found.update(re.findall(r"https://adb-[0-9]+\.[0-9]+\.azuredatabricks\.net", text))
             found.update(re.findall(r"abfss://[^\s\"']+", text))
+    # The self-service hub: its URL, its database's endpoint, the readers, the apps' identities.
+    hub = files.get(HUB_FILE, b"").decode()
+    found.update(re.findall(r"https://adb-[0-9]+\.[0-9]+\.azuredatabricks\.net", hub))
+    found.update(re.findall(r"ep-[a-z0-9-]+\.database\.[a-z0-9.-]+", hub))
+    found.update(re.findall(r"[\w.%+-]+@[\w-]+\.[\w.-]+", hub))
+    found.update(re.findall(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", hub))
+    found.update(re.findall(r"(?m)^  name: (\S+)", hub))
     found.update(o for o in re.findall(r"@[\w.-]+(?:/[\w.-]+)?", files.get(".github/CODEOWNERS", b"").decode())
                  if o not in (OWNER, SECURITY_OWNER))
     return {v for v in found if len(v) >= 6}
@@ -88,6 +97,14 @@ def blank_setup(text):
     return re.sub(r"(?m)^([a-z_]+): (\S+)([ \t]+#.*)?$", blank, text)
 
 
+def blank_hub(text):
+    """config/self-service/hub.yaml as a template: the hub, its database and the apps' identities
+    to null or empty, nothing to adopt; comments and the groups kept."""
+    text = re.sub(r"(?m)^(  (?:name|host|warehouse_id|self_service|approvals)): (?!null\b)\S+", r"\1: null", text)
+    text = re.sub(r"(?m)^(  readers): \[.*\]", r"\1: []", text)
+    return re.sub(r"(?ms)^adopt:\n(?:  .*\n?)*", "adopt: {}\n", text)
+
+
 def release_files(files):
     out = {}
     for path, data in files.items():
@@ -100,6 +117,8 @@ def release_files(files):
                           data.decode()).encode()
         elif path == ".github/CODEOWNERS":
             data = release_codeowners(data.decode()).encode()
+        elif path == HUB_FILE:
+            data = blank_hub(data.decode()).encode()
         out[path] = data
     return out
 

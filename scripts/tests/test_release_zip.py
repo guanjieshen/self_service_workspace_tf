@@ -37,6 +37,16 @@ class ReleaseZip(unittest.TestCase):
         self.assertRegex(owners, r"(?m)^/config/defaults/settings\.yaml\s+@your-org/databricks-platform @your-org/security$",
                          "the security settings keep a separate security reviewer")
 
+    def test_the_self_service_hub_is_a_template(self):
+        """config/self-service/hub.yaml: no hub, database or app identities of this repository's."""
+        hub = rel.release_files(self.files)["config/self-service/hub.yaml"].decode()
+        for key in ("name", "host", "warehouse_id", "self_service", "approvals"):
+            with self.subTest(key=key):
+                self.assertNotRegex(hub, rf"(?m)^  {key}: (?!null\b)\S")
+        self.assertRegex(hub, r"(?m)^  readers: \[\]")
+        self.assertRegex(hub, r"(?m)^adopt: \{\}$")
+        self.assertIn("users_group: users", hub, "the groups' defaults stay")
+
     def test_none_of_this_environment_is_left(self):
         identifiers = rel.own_identifiers(self.files)
         self.assertEqual(rel.leaks(rel.release_files(self.files), identifiers), [])

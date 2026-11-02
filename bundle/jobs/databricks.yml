@@ -11,7 +11,7 @@ include:
   - build/*/target.yml
 
 variables:
-  bu:
+  business_unit:
     description: The workspace's business unit, its prefix in upper case (in the job names).
 
 sync:

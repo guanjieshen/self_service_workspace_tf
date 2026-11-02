@@ -177,7 +177,7 @@ def jobs_target(s, w, app_ids):
     return {"targets": {w["name"]: {
         "mode": "production",
         "workspace": {"host": w["host"], "root_path": f"{jobs['admin_path']}/bundle/jobs"},
-        "variables": {"bu": w["bu"]},
+        "variables": {"business_unit": w["bu"]},
         "resources": {"jobs": {
             "personal_schema": {"tags": {"cd_catalog": w["catalog"], "cd_prefix": jobs["personal_schema"]["prefix"]},
                                 "permissions": runners, **policy},

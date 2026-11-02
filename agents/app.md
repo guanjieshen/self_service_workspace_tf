@@ -1,6 +1,7 @@
 # Working on apps/self-service/
 
-Read the repository's [AGENTS.md](../AGENTS.md) first. This is the self-service app:
+Read the repository's [AGENTS.md](../AGENTS.md) first. This guide is for **maintaining the
+self-service web app** (the workspace baseline has its own: [terraform.md](terraform.md)). This is the self-service app:
 a Databricks App where people ask for a personal, project or team schema or a workspace
 folder, and follow their requests, plus the approvals app (the same code) and the jobs they
 run. `docs/design.md` ("The self-service app") is the design; this is how to work on it.

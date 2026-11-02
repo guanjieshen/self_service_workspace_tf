@@ -78,9 +78,12 @@ self_service_app:
   ai_summary:
     model: system.ai.claude-sonnet-5-5   # null = no summary
   # Genie One Onboarding: a card that opens Genie One in the person's workspace with this question
-  # already asked. Platform admins change it in the approvals app's Settings; "" hides the card.
+  # already asked. "onboard me" starts the onboard-me skill every workspace gets
+  # (config/defaults/genie-code/skills/onboard-me/): an introduction, the data the person can see,
+  # first questions, and notes so later sessions coach them. Platform admins change it in the
+  # approvals app's Settings; "" hides the card.
   onboarding:
-    prompt: "I'm new here and this is my first session. Be my onboarding guide and show me what you can do. 1) In 2-3 sentences, explain how you can help me: answering questions about data in plain language, making charts, and finding dashboards and Genie spaces. 2) Show me the data I can access, grouped by business area, with one line on what each main table or dataset is for. 3) Show me what's popular: the dashboards, Genie spaces and tables people in my organization use most. 4) Suggest 5 good first questions about this data, then answer one of them now, with a chart, so I see how it works. 5) Finish with 2-3 next steps and ask what I'd like to explore. Keep it short and easy to skim, and use only data I'm allowed to see."
+    prompt: onboard me
   # FAQ pages: an FAQ link beside each section of the catalog, and "How it works" for people
   # who are new. null = no link. PLACEHOLDERS until the real pages exist: replace each with
   # its SharePoint page.

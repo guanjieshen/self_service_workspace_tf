@@ -1,7 +1,10 @@
 # Working on terraform/
 
-Read the repository's [AGENTS.md](../AGENTS.md) first. Operators never edit this folder;
-they edit `config/`. Everything here turns that YAML into one workspace's resources.
+Read the repository's [AGENTS.md](../AGENTS.md) first. This guide is for **maintaining the
+workspace baseline** (the self-service web app has its own: [app.md](app.md)). Operators never
+edit this folder; they edit `config/`. Everything here turns that YAML into one workspace's
+resources. What the app needs on these resources is granted in `self_service.tf`, never by the
+app: keep that file in step with `scripts/app_build.py` when you change either.
 
 ## How a plan is built
 

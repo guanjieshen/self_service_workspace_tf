@@ -2,13 +2,32 @@
 
 Guidance for **coding agents and people** changing the framework: the Terraform, the scripts, the workflows and the docs. If you only need to configure workspaces, start with the [README](README.md) and [config/README.md](config/README.md) instead.
 
-> **Start here.** Read this file (the rules and the workflow), then the guide in [`agents/`](agents/) for the folder you are changing. The AGENTS.md files in `terraform/` and `config/` only point here.
+> **Start here.** Read this file (the rules and the workflow), then the guide for the part you are maintaining. The AGENTS.md files in `terraform/`, `config/` and `apps/self-service/` only point here.
+
+## Two parts, two maintainers
+
+The repository holds two things that share one configuration but are built, tested and deployed separately. Work on one at a time, and stay inside its folders.
+
+| | **The workspace baseline** | **The self-service web app** |
+| --- | --- | --- |
+| What it is | Every workspace's settings, personas, compute, usage policy and catalog | The self-service app and the approvals app, their database, and the two jobs they run in each workspace |
+| Built with | Terraform | Databricks Asset Bundles |
+| Folders | `terraform/`, `config/defaults/`, `config/workspaces/` | `apps/self-service/`, `bundle/`, `config/self-service/`, `scripts/app_build.py`, `scripts/app_deploy.py` |
+| Guides | [agents/terraform.md](agents/terraform.md), [agents/config.md](agents/config.md) | [agents/app.md](agents/app.md), [agents/design.md](agents/design.md) (look, typography, copy) |
+| Tests | `./scripts/test.sh terraform`, `python`, `scaffold` | `./scripts/test.sh app` (and the notebooks' tests in `python`) |
+| Deployed by | `scripts/tf.sh`, per workspace, in the deploy workflow | `scripts/app_deploy.py`: the hub, then each workspace's jobs |
+
+**Where they meet** (change both sides in one pull request when you touch these):
+
+- **Terraform grants what the app needs on Terraform's objects** (`terraform/self_service.tf`): the apps' catalog privileges, their workspace assignment, the jobs' use of the usage policy. The app never grants on catalogs, warehouses, usage policies or assignments itself (`docs/design.md`, section 9, "Every object has one owner").
+- **The app reads, never repeats,** each served workspace's file and its Terraform output `self_service` (prefix, ID, host, catalog, usage policy).
+- **One value flows back:** the apps' service principals, `app_ids` in `config/self-service/hub.yaml`.
 
 | You are changing | Read |
 | --- | --- |
 | `terraform/` (root module, modules, checks, tests) | [agents/terraform.md](agents/terraform.md) |
-| `config/` (an organization's settings) | [agents/config.md](agents/config.md) |
-| `apps/self-service/`, `bundle/`, `config/self-service/`, `scripts/app_build.py`, `scripts/app_deploy.py` (the self-service app, its jobs and their deploy) | [agents/app.md](agents/app.md) |
+| `config/defaults/`, `config/workspaces/` (an organization's settings) | [agents/config.md](agents/config.md) |
+| `apps/self-service/`, `bundle/`, `config/self-service/`, `scripts/app_build.py`, `scripts/app_deploy.py` | [agents/app.md](agents/app.md) |
 | Any template, `app.css`, or text people read in the apps | [agents/design.md](agents/design.md) |
 | `scripts/`, `.github/`, docs | This file |
 
@@ -124,7 +143,7 @@ further step. When you add something:
 
 ```bash
 ./scripts/test.sh                # everything
-./scripts/test.sh terraform      # or one suite: terraform | python | node | scaffold
+./scripts/test.sh terraform      # or one suite: terraform | python | node | scaffold | app
 ```
 
 - `terraform`: `terraform/tests/*.tftest.hcl`, mocked providers, fixture workspaces, and the
@@ -132,6 +151,10 @@ further step. When you add something:
 - `python`: `scripts/tests/` (standard library only).
 - `node`: the plan comment (`.github/scripts/tests/`).
 - `scaffold`: a workspace file copied from `_example.yaml` and filled in plans.
+- `app`: the self-service web app (`apps/self-service/tests/`): its pages, its database code,
+  its build (`scripts/app_build.py`) and its contract with the jobs. Needs the app's packages
+  (`pip install -r apps/self-service/requirements.txt httpx pyyaml`); fails rather than skips
+  without them. Its database tests run only with a Postgres (`PG_TEST_DSN`).
 
 No workspace or cloud credentials are needed. The first `terraform` run downloads the Databricks
 provider (registry.terraform.io, or your mirror); later runs reuse it from `.terraform/`.

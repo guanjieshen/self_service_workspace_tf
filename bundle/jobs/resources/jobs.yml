@@ -9,7 +9,7 @@ resources:
   # (scripts/app_build.py).
   jobs:
     personal_schema:
-      name: ${var.bu} personal schema
+      name: ${var.business_unit} personal schema
       max_concurrent_runs: 20
       queue:
         enabled: true
@@ -31,7 +31,7 @@ resources:
             notebook_path: ../build/${bundle.target}/personal_schema.py
 
     team_folder:
-      name: ${var.bu} team folder
+      name: ${var.business_unit} team folder
       max_concurrent_runs: 20
       queue:
         enabled: true

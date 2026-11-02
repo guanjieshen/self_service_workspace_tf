@@ -95,7 +95,7 @@ class Builds(unittest.TestCase):
         out = app_build.build_jobs(self.s, self.spokes[0], ["11111111-1111-1111-1111-111111111111"], root=self.tmp)
         t = self.read(out / "target.yml")["targets"]["fin-citizen-dev"]
         self.assertEqual(t["workspace"], {"host": "https://adb-2000000000000002.2.azuredatabricks.net", "root_path": "/Workspace/Admin/self-service/bundle/jobs"})
-        self.assertEqual(t["variables"], {"bu": "FIN"})
+        self.assertEqual(t["variables"], {"business_unit": "FIN"})
         jobs = t["resources"]["jobs"]
         self.assertEqual(jobs["personal_schema"]["tags"], {"cd_catalog": "fin_citizen_dev", "cd_prefix": "cd_"})
         self.assertEqual(jobs["personal_schema"]["permissions"], [{"level": "CAN_MANAGE_RUN", "service_principal_name": "11111111-1111-1111-1111-111111111111"}])
@@ -129,8 +129,13 @@ class Builds(unittest.TestCase):
                     app_build.check(bad)
                 self.assertIn(setting, str(e.exception))
 
-    def test_the_repositorys_own_settings_load(self):
-        s = app_build.load()
+    def test_the_repositorys_own_settings_load_or_say_what_to_fill_in(self):
+        """This repository's hub.yaml is filled in; a release's is blank until set up."""
+        try:
+            s = app_build.load()
+        except SystemExit as e:
+            self.assertIn("hub.host", str(e))
+            return
         self.assertTrue(s["hub"]["host"].startswith("https://"))
 
 
