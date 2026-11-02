@@ -77,6 +77,8 @@ def check(s):
     need(all(re.fullmatch(EMAIL, r) for r in db.get("readers") or []), "hub.yaml database.readers: plain email addresses.")
     need(db.get("host") is None or re.fullmatch(r"[a-z0-9.-]+", db["host"]), "hub.yaml database.host: the Lakebase production endpoint's host, or null on a first install.")
     need(all(v is None or re.fullmatch(r"[0-9a-f-]{36}", str(v)) for v in s["app_ids"].values()), "hub.yaml app_ids: the apps' service principals' application IDs, or null.")
+    need(s["adopt"].get("database") is None or re.fullmatch(r"projects/[a-z0-9-]+", str(s["adopt"]["database"])),
+         "hub.yaml adopt.database: the project's resource name, projects/<project ID> (for example projects/cd-self-service).")
     if jobs.get("require_request_record"):
         need(re.fullmatch(r"[a-z0-9_]+", (app.get("database") or {}).get("catalog") or ""),
              "app.yaml jobs.require_request_record needs the app's records in Unity Catalog: set self_service_app.database.catalog.")

@@ -27,9 +27,10 @@ app_ids:
   self_service: c8a1fb0a-e87a-4662-964e-54a7db2a8dbf   # the self-service app's
   approvals: b8a68358-50f0-4176-95c0-e969717aa0be      # the approvals app's
 
-# Resources that already exist and the hub's bundle should take over instead of creating: their
-# names. The first deploy binds them; after that, these lines do nothing.
+# Resources that already exist and the hub's bundle should take over instead of creating: the
+# apps' names, and the database project's resource name (projects/<project ID>). The first
+# deploy binds them; after that, these lines do nothing.
 adopt:
   self_service: cd-self-service
   approvals: cd-approvals
-  database: cd-self-service
+  database: projects/cd-self-service
