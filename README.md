@@ -16,7 +16,7 @@ Every onboarded workspace gets the same baseline, with workspace-specific settin
 | **Access** | Three group-based personas: **Explorer** for SQL access, and **Builder** and **Publisher** for broader workspace access. Members of the workspace's users group get **Consumer** access through Databricks One (the simplified interface for business users: dashboards, Genie spaces and apps). Group membership is managed in Entra ID, not in this repository. |
 | **Compute** | A serverless-first setup with a default serverless SQL warehouse and the workspace's serverless usage policy, which tags serverless usage. Approved users can also request access to classic compute policies for interactive clusters, jobs, and pipelines through the self-service app. Each classic policy allows one cluster per user at a time. |
 | **Unity Catalog** | One catalog per workspace with predictive optimization enabled. The self-service app manages schemas within that catalog. |
-| **Cost tracking** | A shared set of chargeback tags, defined in `config/defaults/cost.yaml`, applied to serverless usage, the SQL warehouse, and classic compute. Optionally, a **cost dashboard** in the central workspace shows each person what their workspaces cost, by usage policy, project and product (`config/central.yaml`). |
+| **Cost tracking** | A shared set of chargeback tags, defined in `config/defaults/cost.yaml`, applied to serverless usage, the SQL warehouse, and classic compute. |
 
 **This project does not create Databricks workspaces.** It applies and maintains the baseline on workspaces that already exist.
 
@@ -41,15 +41,15 @@ The full walkthrough is in [docs/SETUP.md](docs/SETUP.md). Here's the setup proc
 | --- | --- | --- |
 | 1 | Fill in [`config/setup.yaml`](config/setup.yaml) with the Azure tenant, Terraform state storage, and GitHub repository details. | Platform team |
 | 2 | Put this project in your GitHub repository, with your teams in `.github/CODEOWNERS`: from a Databricks workspace (no git needed), or from the zip ([step 2](docs/SETUP.md#2-put-the-repository-in-your-github)). | Platform team |
-| 3 | Run `python3 scripts/setup.py state` to prepare Terraform state storage and its backend configuration. | Cloud team |
-| 4 | Run `python3 scripts/setup.py identity` to prepare the deployment identity: an Entra app registration with two GitHub federated credentials and no secrets ([what it needs](docs/SETUP.md#what-the-app-registration-needs)). | Entra admin |
-| 5 | Run `python3 scripts/setup.py github` to configure GitHub for deployments. | GitHub admin |
+| 3 | In the Azure portal, create the Terraform state storage account and container, and write their names into `config/backend.hcl`. | Cloud team |
+| 4 | In the Azure portal, create the deployment identity: an Entra app registration with two GitHub federated credentials and no secrets ([what it needs](docs/SETUP.md#what-the-app-registration-needs)). | Entra admin |
+| 5 | In the GitHub web UI, set the repository variables, labels, the `apply-approval` environment and the protection of `main`. | GitHub admin |
 | 6 | In the Databricks account console, add the deployment service principal, grant it workspace admin access to the target workspaces, and give it the **Billing admin** role so it can create serverless usage policies. A metastore admin grants it `CREATE CATALOG` ([step 6](docs/SETUP.md#6-databricks-account-by-hand)). | Databricks account and metastore admins |
 | 7 | Create the persona groups in Entra ID and sync them to the Databricks account. | Identity team |
 | 8 | Review the baseline YAML files in `config/defaults/` with the platform and security teams, and set the Databricks `account_id` in `config/defaults/cost.yaml`. | Platform and security teams |
 | 9 | Copy [`config/workspaces/_example.yaml`](config/workspaces/_example.yaml) to `config/workspaces/<name>.yaml`, update the workspace details, and open a pull request. Its first plan needs the `allow-risky-changes` label; a brand-new workspace first needs one personal access token created and revoked ([step 9](docs/SETUP.md#9-onboard-a-workspace)). | Platform team |
 
-The setup commands in steps 3–5 **show what they would do by default**. Add `--run` when you're ready to execute a step. Follow the setup guide for prerequisites and the full sequence, and for the steps done by hand: some Databricks settings have no API yet (step 9).
+**Every step is done in a web UI** (the Azure portal, GitHub, the Databricks account console): nothing needs a terminal or Python on a laptop. With one, `scripts/setup.py` can do steps 3 to 5 for you. Follow the setup guide for prerequisites and the full sequence.
 
 ## Making changes after setup
 
@@ -74,8 +74,7 @@ Changes to the Terraform modules, scripts, or workflows are **framework changes*
 | `config/defaults/` | Baseline configuration for access, compute, cost, catalogs, workspace settings, and `genie-code/`. |
 | `config/workspaces/` | One YAML file per managed workspace. These files define which workspaces are in scope. |
 | `config/backend.hcl` | Terraform state backend configuration, generated by the setup process. |
-| `config/central.yaml` | What lives once, in the central workspace: the cost dashboard. |
-| `terraform/` | Root Terraform configuration and reusable modules; `terraform/central/` for the central workspace. |
+| `terraform/` | Root Terraform configuration and reusable modules. |
 | `scripts/` | Setup, workspace onboarding and validation, preflight checks, Terraform execution, plan review, and tests. |
 | `.github/` | GitHub Actions workflows (`deploy.yml` and `checks.yml`), `CODEOWNERS`, and the pull request checklist. |
 | `docs/` | Setup, design decisions, workflows, and operational guides. |

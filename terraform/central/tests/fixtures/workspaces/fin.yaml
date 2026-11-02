@@ -1,3 +1,0 @@
-prefix: fin
-host: https://adb-2222222222222222.2.azuredatabricks.net
-groups: {users: fin-users, builder: fin-builders, publisher: null}

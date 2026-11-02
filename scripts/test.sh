@@ -18,10 +18,6 @@ if run terraform; then
   export TF_DATA_DIR="$root/.terraform/_test"
   "$tf" -chdir="$root/terraform" init -backend=false -input=false > /dev/null
   "$tf" -chdir="$root/terraform" test -no-color
-  echo "== Terraform: terraform/central/tests/*.tftest.hcl"
-  export TF_DATA_DIR="$root/.terraform/_test_central"
-  "$tf" -chdir="$root/terraform/central" init -backend=false -input=false > /dev/null
-  "$tf" -chdir="$root/terraform/central" test -no-color
   unset TF_DATA_DIR
 fi
 if run python; then

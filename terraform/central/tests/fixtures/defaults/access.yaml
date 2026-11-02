@@ -1,7 +1,0 @@
-# Test fixture: the baseline's groups (terraform/central reads only groups).
-groups:
-  users: null
-  explorer: null
-  builder: null
-  publisher: null
-  platform_admins: "{prefix}_platform_admins"

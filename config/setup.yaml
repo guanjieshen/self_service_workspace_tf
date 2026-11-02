@@ -28,4 +28,4 @@ ai_review_model: system.ai.claude-opus-5-5   # the model there, a Unity Gateway 
 
 # ---- WRITTEN BY SETUP: leave empty -------------------------------------------
 
-pipeline_client_id: null            # the service principal's client ID (`setup.py identity --run` writes it)
+pipeline_client_id: null            # the service principal's client ID: copy it here at the end of SETUP step 4

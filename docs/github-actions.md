@@ -17,6 +17,7 @@ each, in parallel on the runners there are, each with its own log and Re-run but
 | `deploy.yml`, on a pull request | The workspaces the change concerns (below) | For each: preflight, plan, and a plan comment (the plan, the plan guard's warnings, an AI review) when the plan changes something. A plan with hard-to-undo or security-weakening changes fails until someone adds the label `allow-risky-changes` |
 | `deploy.yml`, on merge to `main` | The same workspaces, without the review-only changes | The approval step (`apply-approval`), then for each workspace: preflight (an error stops it before anything changes), the `allow-risky-changes` check on the merged pull request, and the apply. A deleted workspace file: its Terraform state is removed (the workspace is unchanged) |
 | `deploy.yml`, every Monday (or Run workflow) | Every workspace | Drift check: plans each, and opens an issue labelled `drift` for each that no longer matches; closes it once clean |
+| `sign-in-subject.yml` (**Show the sign-in subject**) | Run workflow, by hand | Prints the two subjects for the federated credentials (SETUP.md, step 4), from its own token's subject. Signs in to nothing |
 
 Which workspaces a change concerns:
 
@@ -24,7 +25,6 @@ Which workspaces a change concerns:
 | --- | --- | --- |
 | `config/workspaces/<name>.yaml` | That workspace | That workspace (a deleted file: its state is removed) |
 | `config/defaults/`, `terraform/` (except `terraform/tests/` and its `.md` guides), `scripts/tf.sh`, `scripts/plan-guard.py`, `scripts/workspaces.py` | Every workspace | Every workspace |
-| `config/central.yaml`, `terraform/central/`, and whatever changes who sees which costs (a workspace file, `config/defaults/access.yaml` or `config/defaults/cost.yaml`, `config/setup.yaml`) | `central`, when its dashboard is enabled | `central` |
 | What the plan comment shows: `scripts/preflight.py`, `scripts/ai-plan-review.py`, `.github/ai/`, `config/setup.yaml`, `deploy.yml` and what it uses | Every workspace | None |
 | Anything else: tests, docs, other scripts | None | None |
 

@@ -73,7 +73,6 @@ Each topic has one home. Update that file; link to it from elsewhere instead of 
 | A workflow step | `.github/workflows/deploy.yml`; `docs/github-actions.md` | A job that signs in must not run in a GitHub Environment (`test_setup.py`) |
 | What a change plans or applies | `EVERYTHING` and `PLAN_ONLY` in `scripts/workspaces.py`; `docs/github-actions.md` | `scripts/tests/test_workspaces.py` (`Affected`) |
 | A new workspace key (in a workspace file, not the baseline) | `workspace_keys` in `terraform/config.tf`; `config/workspaces/_example.yaml`; the workspace keys table in `config/README.md` | A fixture and an assertion |
-| The central workspace (the cost dashboard) | `terraform/central/` and `config/central.yaml`; its dashboard is `terraform/central/cost.lvdash.json.tftpl` (test every dataset query on a warehouse before changing it); `CENTRAL` in `scripts/workspaces.py`; `central_checks` in `scripts/preflight.py`; SETUP.md step 10 | `terraform/central/tests/central.tftest.hcl` (run by `scripts/test.sh terraform`) |
 | Something removed or renamed | Every doc that mentions it (search the repository), and its tests and fixtures; add the old name to `RETIRED` in `scripts/tests/test_docs.py` | The suite still passes with nothing skipped; `test_docs.py` fails on a path that no longer exists, or a retired name that comes back |
 
 ### Keep it simple
@@ -126,8 +125,7 @@ further step. When you add something:
 ```
 
 - `terraform`: `terraform/tests/*.tftest.hcl`, mocked providers, fixture workspaces, and the
-  pinned baseline in `terraform/tests/defaults/` (never the organization's `config/defaults/`);
-  then `terraform/central/tests/` (the central target, with its own fixtures).
+  pinned baseline in `terraform/tests/defaults/` (never the organization's `config/defaults/`).
 - `python`: `scripts/tests/` (standard library only).
 - `node`: the plan comment (`.github/scripts/tests/`).
 - `scaffold`: a workspace file copied from `_example.yaml` and filled in plans.
