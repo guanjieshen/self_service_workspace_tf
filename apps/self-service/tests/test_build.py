@@ -18,7 +18,6 @@ HUB = """hub:
   approvals_group: platform-admins
   warehouse_id: null
 database:
-  host: ep-example-1.database.canadacentral.azuredatabricks.net
   readers: [reader@contoso.com]
 app_ids:
   self_service: 11111111-1111-1111-1111-111111111111
@@ -69,7 +68,7 @@ class Builds(unittest.TestCase):
             app_build.served(self.s, {**OUTPUTS, "ops-citizen-dev": {**OUTPUTS["ops-citizen-dev"], "catalog": None}})
 
     def test_each_app_lists_every_served_workspace(self):
-        out = app_build.build_hub(self.s, self.spokes, root=self.tmp)
+        out = app_build.build_hub(self.s, self.spokes, database_host="ep-example-1.database.canadacentral.azuredatabricks.net", root=self.tmp)
         config, approvals = self.read(out / "self-service/config.json"), self.read(out / "approvals/config.json")
         self.assertEqual(approvals, {**config, "mode": "approvals"})
         self.assertEqual(config["workspaces"], [

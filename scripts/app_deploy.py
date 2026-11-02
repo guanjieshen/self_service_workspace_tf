@@ -120,10 +120,8 @@ def deploy_hub(s, spokes, plan):
         app_build.build_hub(s, spokes, database=False)
         run(host, HUB, "databricks", "bundle", "deploy", "-t", "hub", "--auto-approve")
     ensure_database(host, branch, owner, readers)
-    db_host = s["database"].get("host")
-    if not db_host:   # the endpoint is known once the project exists
-        db_host = cli(host, "postgres", "get-endpoint", f"{branch}/endpoints/primary")["status"]["hosts"]["host"]
-        print(f"the database's endpoint is {db_host}: set database.host in config/self-service/hub.yaml")
+    # The endpoint, looked up every time (never stored): a new database gets a new one.
+    db_host = cli(host, "postgres", "get-endpoint", f"{branch}/endpoints/primary")["status"]["hosts"]["host"]
     app_build.build_hub(s, spokes, database_host=db_host)
     run(host, HUB, "databricks", "bundle", "deploy", "-t", "hub", "--auto-approve")
 
