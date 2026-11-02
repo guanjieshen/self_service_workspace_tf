@@ -15,8 +15,8 @@ tenant_id: bf465dc7-3bc8-4944-b018-092572b5c20d         # Entra tenant ID; the s
 subscription_id: edd4cc45-85c7-4aec-8bf5-648062d519bf   # Azure subscription for the Terraform state (cloud team)
 state_location: canadacentral                           # region for the state storage (cloud team)
 state_resource_group: guanjie-rg                        # resource group for the state; created if missing (cloud team)
-state_storage_account: guanjieadls2026                  # storage account: 3 to 24 lowercase letters and digits; created if missing (cloud team)
-state_container: tfstatetest                            # blob container for the state files, for example tfstate (cloud team)
+state_storage_account: guanjieadls2027                  # storage account: 3 to 24 lowercase letters and digits; created if missing (cloud team)
+state_container: tfstorage                              # blob container for the state files, for example tfstate (cloud team)
 
 # ---- OPTIONAL: the default is fine unless you have a reason -----------------
 
