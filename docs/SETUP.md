@@ -79,7 +79,7 @@ Two more things to know before you start; they live in their own files, not here
 
 ### From a Databricks workspace (no git needed)
 
-You need a Databricks workspace you can use, with **serverless notebooks** and outbound access to github.com, and a **Git credential for your GitHub** in it (your user settings > **Linked accounts** > Git integration).
+You need a Databricks workspace you can use, with **serverless notebooks**, and a **Git credential for your GitHub** in it (your user settings > **Linked accounts** > Git integration). Databricks clones and pushes Git folders itself, so the notebook needs no network access; but if your GitHub only accepts known IP addresses, it must accept Databricks Git folders (or your workspace uses the Git server proxy).
 
 | # | Where | What |
 | --- | --- | --- |
