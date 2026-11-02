@@ -2,6 +2,9 @@
 prefix: gss
 host: https://adb-7405607317299160.0.azuredatabricks.net
 
+# The self-service hub (config/self-service/hub.yaml): it runs the apps, not the jobs.
+self_service: false
+
 # Shown next to the workspace name in the top bar.
 label:
   text: gss self service

@@ -39,6 +39,7 @@ jobs:
     outputs:
       workspaces: ${{ steps.route.outputs.workspaces }}
       removed: ${{ steps.route.outputs.removed }}
+      app: ${{ steps.route.outputs.app }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -52,11 +53,14 @@ jobs:
           SHA: ${{ github.sha }}
         run: |
           case "$EVENT" in
-            pull_request) result="$(python3 scripts/workspaces.py affected --plan "origin/$BASE_REF" HEAD)" ;;
-            push)         result="$(python3 scripts/workspaces.py affected "$BEFORE" "$SHA")" ;;
-            *)            result="{\"workspaces\": $(python3 scripts/workspaces.py list), \"removed\": []}" ;;
+            pull_request) result="$(python3 scripts/workspaces.py affected --plan "origin/$BASE_REF" HEAD)"
+                          app="$(python3 scripts/workspaces.py app "origin/$BASE_REF" HEAD)" ;;
+            push)         result="$(python3 scripts/workspaces.py affected "$BEFORE" "$SHA")"
+                          app="$(python3 scripts/workspaces.py app "$BEFORE" "$SHA")" ;;
+            *)            result="{\"workspaces\": $(python3 scripts/workspaces.py list), \"removed\": []}"; app=false ;;
           esac
-          echo "Workspaces: $result"
+          echo "Workspaces: $result; the self-service app: $app"
+          echo "app=$app" >> "$GITHUB_OUTPUT"
           python3 -c 'import json, sys; r = json.loads(sys.argv[1]); print("workspaces=" + json.dumps(r["workspaces"])); print("removed=" + json.dumps(r["removed"]))' "$result" >> "$GITHUB_OUTPUT"
 
   plan:
@@ -236,6 +240,68 @@ jobs:
             tail -c 60000 ".plans/$WORKSPACE.txt" 2>/dev/null || echo "(no plan)"
             echo '```'; echo "</details>"
           } | node -e 'const { redact } = require("./.github/scripts/plan-comment.js"); let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => process.stdout.write(redact(s)));' >> "$GITHUB_STEP_SUMMARY"
+
+  # The self-service app (apps/, bundle/; docs/design.md, section 9): Databricks Asset Bundles,
+  # not Terraform. On a pull request, what a deploy would change; after a merge, the deploy: the
+  # hub first, then each served workspace's jobs, after that workspace's Terraform apply (the
+  # jobs need its catalog, grants and usage policy). One deploy at a time.
+  app-plan:
+    name: App plan
+    needs: route
+    if: github.event_name == 'pull_request' && needs.route.outputs.app == 'true'
+    runs-on: ${{ fromJSON(vars.TERRAFORM_RUNNER || '"ubuntu-latest"') }}   # must reach the workspaces and the state
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: app-plan-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: python3 -m pip install --quiet -r apps/self-service/requirements.txt pyyaml
+      - name: Plan
+        run: python3 scripts/app_deploy.py --plan 2>&1 | tee .app-plan.txt
+      - name: Summary
+        if: always()
+        run: |
+          { echo "### App plan"; echo '```'; tail -c 60000 .app-plan.txt 2>/dev/null || echo "(no plan)"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+  app-deploy:
+    name: Deploy the app
+    needs: [route, apply]
+    # After every workspace's apply (or none: the change was the app's only); never after a failed one.
+    if: >-
+      always() && github.event_name == 'push' && needs.route.outputs.app == 'true' &&
+      (needs.apply.result == 'success' || needs.apply.result == 'skipped')
+    runs-on: ${{ fromJSON(vars.TERRAFORM_RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: app-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # A re-run deploys its own commit: refuse once main has moved on (as apply does).
+      - name: Check the commit is still the latest on main
+        if: github.run_attempt > 1
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          latest="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [[ "$latest" != "$SHA" ]]; then
+            echo "::error::main has moved on since this run's commit ($SHA, now $latest); re-run the latest run instead."
+            exit 1
+          fi
+      - uses: ./.github/actions/setup
+      - run: python3 -m pip install --quiet -r apps/self-service/requirements.txt pyyaml
+      - name: Deploy
+        run: python3 scripts/app_deploy.py
 
   # A workspace whose file was deleted: Terraform stops managing it. Its state file goes, so a
   # workspace added later under the same name starts clean. Nothing in Databricks changes.
