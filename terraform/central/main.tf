@@ -17,6 +17,7 @@ locals {
   sql_rows = {
     workspaces = length(local.members) == 0 ? "('-', '-')" : join(", ", [for m in values(local.members) : "('${m.id}', '${replace(m.prefix, "'", "''")}')"])
     access     = length(local.access) == 0 ? "('-', '-')" : join(", ", [for a in local.access : "('${a.workspace_id}', '${replace(a.group, "'", "''")}')"])
+    admins     = length(local.members) == 0 ? "('-', '-')" : join(", ", [for m in values(local.members) : "('${m.id}', '${replace(m.admins, "'", "''")}')"])
     policies   = length(local.policy_names) == 0 ? "('-', '-')" : join(", ", [for id, name in local.policy_names : "('${id}', '${replace(name, "'", "''")}')"])
   }
   view_sql = templatefile("${path.module}/usage_cost.sql.tftpl", merge(local.sql_rows, { discount = local.discount_percent }))

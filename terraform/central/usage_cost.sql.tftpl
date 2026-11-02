@@ -1,7 +1,10 @@
 WITH
   workspaces (workspace_id, workspace) AS (VALUES ${workspaces}),
   access (workspace_id, group_name) AS (VALUES ${access}),
-  policies (policy_id, policy_name) AS (VALUES ${policies})
+  policies (policy_id, policy_name) AS (VALUES ${policies}),
+  -- Whether the viewer is a platform admin of each workspace: they see who ran what there.
+  admins (workspace_id, group_name) AS (VALUES ${admins}),
+  viewer_admin AS (SELECT workspace_id, max(is_account_group_member(group_name)) AS is_admin FROM admins GROUP BY workspace_id)
 SELECT
   u.usage_date,
   DATE_TRUNC('MONTH', u.usage_date) AS month,
@@ -29,12 +32,14 @@ SELECT
   (u.identity_metadata.run_as LIKE '%@%'
    AND ((u.billing_origin_product = 'INTERACTIVE' AND u.product_features.is_serverless)
         OR u.billing_origin_product IN ('GENIE', 'JOBS', 'DLT'))) AS personal,
-  u.identity_metadata.run_as AS run_as,
+  -- Who ran it: on the viewer's own rows, or anywhere in a workspace they are platform admin of.
+  CASE WHEN u.identity_metadata.run_as = current_user() OR va.is_admin THEN u.identity_metadata.run_as END AS run_as,
   CASE WHEN u.usage_unit = 'DBU' THEN u.usage_quantity ELSE 0 END AS dbus,
   u.usage_quantity * coalesce(p.pricing.effective_list.default, 0) AS list_cost,
   u.usage_quantity * coalesce(p.pricing.effective_list.default, 0) * (1 - ${discount} / 100) AS cost
 FROM system.billing.usage u
 JOIN workspaces w ON u.workspace_id = w.workspace_id
+LEFT JOIN viewer_admin va ON va.workspace_id = u.workspace_id
 LEFT JOIN system.billing.list_prices p
   ON u.sku_name = p.sku_name AND u.cloud = p.cloud AND u.usage_unit = p.usage_unit
  AND u.usage_end_time >= p.price_start_time AND (p.price_end_time IS NULL OR u.usage_end_time < p.price_end_time)

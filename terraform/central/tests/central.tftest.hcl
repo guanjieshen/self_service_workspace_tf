@@ -55,9 +55,11 @@ run "the_view_filters_rows_and_applies_the_discount" {
     condition = (
       strcontains(local.view_sql, "u.identity_metadata.run_as LIKE '%@%'") &&
       strcontains(local.view_sql, "IN ('GENIE', 'JOBS', 'DLT'))) AS personal") &&
-      strcontains(databricks_dashboard.cost[0].serialized_dashboard, "WHERE personal AND run_as = current_user()")
+      strcontains(databricks_dashboard.cost[0].serialized_dashboard, "WHERE personal AND run_as = current_user()") &&
+      strcontains(local.view_sql, "CASE WHEN u.identity_metadata.run_as = current_user() OR va.is_admin THEN u.identity_metadata.run_as END AS run_as") &&
+      strcontains(local.view_sql, "admins (workspace_id, group_name) AS (VALUES ('2222222222222222', 'fin_platform_admins'), ('1111111111111111', 'hub_platform_admins'))")
     )
-    error_message = "My usage counts only what ran as the person: serverless notebooks, Genie, and their own jobs and pipelines."
+    error_message = "My usage counts only what ran as the person (serverless notebooks, Genie, their own jobs and pipelines), and the view names people only to themselves and to their workspace's platform admins."
   }
   assert {
     condition     = length(databricks_sql_endpoint.dashboard) == 1 && length(databricks_permissions.warehouse) == 1

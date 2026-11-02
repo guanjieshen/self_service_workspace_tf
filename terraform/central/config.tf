@@ -36,6 +36,7 @@ locals {
       prefix = lower(w.prefix)
       host   = trimsuffix(w.host, "/")
       id     = tostring(try(w.id, regex("adb-([0-9]+)\\.", w.host)[0]))
+      admins = replace(replace(coalesce(try(w.groups.platform_admins, null), try(local.default_groups.platform_admins, null), "-"), "{PREFIX}", upper(w.prefix)), "{prefix}", lower(w.prefix))
       groups = sort(distinct([
         for k, g in merge(local.default_groups, try(w.groups, {})) :
         replace(replace(g, "{PREFIX}", upper(w.prefix)), "{prefix}", lower(w.prefix)) if g != null
