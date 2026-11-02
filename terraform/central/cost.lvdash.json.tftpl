@@ -18,7 +18,7 @@
    "name": "ds_mine",
    "displayName": "My usage",
    "queryLines": [
-    "SELECT usage_date, workspace, product, sum(dbus) AS dbus, sum(cost) AS cost FROM ${view} WHERE run_as = current_user() AND usage_date >= add_months(date_trunc('MONTH', current_date()), -5) GROUP BY usage_date, workspace, product"
+    "SELECT usage_date, workspace, product, sum(dbus) AS dbus, sum(cost) AS cost FROM ${view} WHERE personal AND run_as = current_user() AND usage_date >= add_months(date_trunc('MONTH', current_date()), -5) GROUP BY usage_date, workspace, product"
    ]
   }
  ],
@@ -574,7 +574,7 @@
       "name": "me_note",
       "multilineTextboxSpec": {
        "lines": [
-        "*What ran as you: your notebooks, jobs, queries and apps.*"
+        "*What ran as you: serverless notebooks, Genie, and the jobs and pipelines that run as you. SQL warehouses, apps and other shared compute are charged to the resource, so they count in your workspace's totals, not here.*"
        ]
       }
      },

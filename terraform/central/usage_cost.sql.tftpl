@@ -10,20 +10,25 @@ SELECT
            CASE WHEN coalesce(u.usage_metadata.usage_policy_id, u.usage_metadata.budget_policy_id) IS NULL
                 THEN 'No usage policy' ELSE 'Another usage policy' END) AS usage_policy,
   coalesce(u.custom_tags['APPID'], 'Not set') AS project,
-  CASE u.billing_origin_product
-    WHEN 'SQL' THEN 'SQL'
-    WHEN 'JOBS' THEN 'Jobs'
-    WHEN 'DLT' THEN 'Pipelines'
-    WHEN 'INTERACTIVE' THEN 'Notebooks'
-    WHEN 'ALL_PURPOSE' THEN 'Notebooks'
-    WHEN 'MODEL_SERVING' THEN 'AI and model serving'
-    WHEN 'AI_GATEWAY' THEN 'AI and model serving'
-    WHEN 'VECTOR_SEARCH' THEN 'AI and model serving'
-    WHEN 'AGENT_BRICKS' THEN 'AI and model serving'
-    WHEN 'APPS' THEN 'Apps'
-    WHEN 'LAKEBASE' THEN 'Lakebase'
+  CASE
+    WHEN u.billing_origin_product = 'INTERACTIVE' AND u.product_features.is_serverless THEN 'Serverless notebooks'
+    WHEN u.billing_origin_product IN ('INTERACTIVE', 'ALL_PURPOSE') THEN 'Notebooks on clusters'
+    WHEN u.billing_origin_product = 'GENIE' THEN 'Genie'
+    WHEN u.billing_origin_product = 'JOBS' THEN 'Jobs'
+    WHEN u.billing_origin_product = 'DLT' THEN 'Pipelines'
+    WHEN u.billing_origin_product = 'SQL' THEN 'SQL warehouses'
+    WHEN u.billing_origin_product IN ('MODEL_SERVING', 'AI_GATEWAY', 'AI_FUNCTIONS', 'VECTOR_SEARCH', 'AGENT_BRICKS') THEN 'AI and model serving'
+    WHEN u.billing_origin_product = 'LAKEFLOW_CONNECT' THEN 'Ingestion'
+    WHEN u.billing_origin_product = 'APPS' THEN 'Apps'
+    WHEN u.billing_origin_product = 'LAKEBASE' THEN 'Lakebase'
     ELSE 'Other'
   END AS product,
+  -- A person's own usage: serverless notebooks, Genie, and jobs and pipelines that ran as them.
+  -- Shared compute (warehouses, apps, serving, clusters) is charged to the resource, not a
+  -- person, so it counts only in the workspace's totals.
+  (u.identity_metadata.run_as LIKE '%@%'
+   AND ((u.billing_origin_product = 'INTERACTIVE' AND u.product_features.is_serverless)
+        OR u.billing_origin_product IN ('GENIE', 'JOBS', 'DLT'))) AS personal,
   u.identity_metadata.run_as AS run_as,
   CASE WHEN u.usage_unit = 'DBU' THEN u.usage_quantity ELSE 0 END AS dbus,
   u.usage_quantity * coalesce(p.pricing.effective_list.default, 0) AS list_cost,
