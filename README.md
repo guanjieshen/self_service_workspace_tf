@@ -40,7 +40,7 @@ The full walkthrough is in [docs/SETUP.md](docs/SETUP.md). Here's the setup proc
 | Step | What to do | Usually handled by |
 | --- | --- | --- |
 | 1 | Fill in [`config/setup.yaml`](config/setup.yaml) with the Azure tenant, Terraform state storage, and GitHub repository details. | Platform team |
-| 2 | Put this project in your GitHub repository, with your teams in `.github/CODEOWNERS`: from a Databricks workspace (no git needed), or from the zip ([step 2](docs/SETUP.md#2-put-the-repository-in-your-github)). | Platform team |
+| 2 | Put this project in your GitHub repository, with your teams in `.github/CODEOWNERS`: clone it into a Databricks Git folder and run the `install/copy_to_your_repo` notebook, which copies it into your repository's Git folder without this repository's own environment ([step 2](docs/SETUP.md#2-put-the-repository-in-your-github)). | Platform team |
 | 3 | In the Azure portal, create the Terraform state storage account and container, and write their names into `config/backend.hcl`. | Cloud team |
 | 4 | In the Azure portal, create the deployment identity: an Entra app registration with two GitHub federated credentials and no secrets ([what it needs](docs/SETUP.md#what-the-app-registration-needs)). | Entra admin |
 | 5 | In the GitHub web UI, set the repository variables, labels, the `apply-approval` environment and the protection of `main`. | GitHub admin |
@@ -78,7 +78,7 @@ Changes to the Terraform modules, scripts, or workflows are **framework changes*
 | `scripts/` | Setup, workspace onboarding and validation, preflight checks, Terraform execution, plan review, and tests. |
 | `.github/` | GitHub Actions workflows (`deploy.yml` and `checks.yml`), `CODEOWNERS`, and the pull request checklist. |
 | `docs/` | Setup, design decisions, workflows, and operational guides. |
-| `install/` | `copy_to_your_repo`: a Databricks notebook that copies a release into your repository's Git folder (installing without git). |
+| `install/` | `copy_to_your_repo`: a Databricks notebook (or one command in the web terminal) that installs or upgrades this project in your repository's Git folder, without this repository's own environment and without replacing your configuration. |
 | `dev/` | Workspaces used to test the framework itself; not included in a release. |
 | `AGENTS.md`, `agents/`, `CLAUDE.md` | Contributor and coding-agent guidance. `AGENTS.md` is the main entry point. |
 

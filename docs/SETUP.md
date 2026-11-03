@@ -1,8 +1,8 @@
-# Setup: from the zip to the first workspace
+# Setup: from this repository to the first workspace
 
 ## Overview
 
-This guide takes the repository from a zip file to its first governed workspace. It is ordered by **who does what**: each step is one team's checklist, with the values it needs and the command it runs. Most steps happen once. Onboarding each further workspace repeats step 6 (items 2 and 5), step 7 and step 9.
+This guide takes this repository from a Databricks Git folder to its first governed workspace. It is ordered by **who does what**: each step is one team's checklist, with the values it needs, done in a web UI (Databricks, GitHub, the Azure portal); where a terminal could do it faster, that is an option, never a requirement. Most steps happen once. Onboarding each further workspace repeats step 6 (items 2 and 5), step 7 and step 9.
 
 | # | Step | Who | When |
 | - | --- | --- | --- |
@@ -83,30 +83,23 @@ You need a Databricks workspace you can use, with **serverless notebooks**, and 
 
 | # | Where | What |
 | --- | --- | --- |
-| 1 | Workspace > your folder > **Create > Git folder** | **This release:** the framework repository's URL (you were given it), branch **`release/<version>`**, for example `release/v1.0.0`. It is public: no credential needed |
+| 1 | Workspace > your folder > **Create > Git folder** | **This repository:** the framework repository's URL (you were given it), branch **`main`** (or a `release/<version>` branch, if you were given one). It is public: no credential needed |
 | 2 | The same | **Your repository:** its URL. Then, in that Git folder, create a **new branch** (for example `install-baseline`): your `main` may be protected |
-| 3 | In the release's Git folder, open `install/copy_to_your_repo` | Set `source` and `target` to the two Git folders' paths (each folder's ⋮ > **Copy path**; they start with `/Workspace/`), leave `mode` on `preview`, and **Run all** on serverless |
-| 4 | The notebook's output | What happens to each file: **new**; **replace** (yours is replaced by the release's: your `README.md`, your old `.github/CODEOWNERS`, printed so you can merge required owners); **merge** (`.gitignore`: both sets of lines); **keep** (yours only, never deleted; your own workflows keep running on pull requests) |
+| 3 | In the framework's Git folder, open `install/copy_to_your_repo` | Set `source` and `target` to the two Git folders' paths (each folder's ⋮ > **Copy path**; they start with `/Workspace/`), leave `mode` on `preview`, and **Run all** on serverless |
+| 4 | The notebook's output | What happens to each file: **new**; **replace** (yours is replaced by the framework's: your `README.md`, your old `.github/CODEOWNERS`, printed so you can merge required owners); **merge** (`.gitignore`: both sets of lines); **keep** (yours only, never deleted; your own workflows keep running on pull requests); **skip** (the framework repository's own environment: its workspace files, state and `dev/`, never copied) |
 | 5 | The notebook | Set `mode` to `copy` and **Run all** again |
-| 6 | Your repository's Git folder | Fill in `config/setup.yaml` (step 1), and put your teams in `.github/CODEOWNERS` (item 2 under "Either way") |
+| 6 | Your repository's Git folder | Fill in `config/setup.yaml` (step 1), and put your teams in `.github/CODEOWNERS` (item 2 under "Before step 5") |
 | 7 | The same | **Commit & push** to the new branch, then open a pull request on GitHub and merge it |
 
-The release's Git folder can be deleted afterwards. Keep your repository's Git folder if you will edit the configuration from Databricks.
+**Never copy the framework's folder with `cp`:** it holds the framework repository's own environment (its workspaces, state storage, identities). The notebook leaves all of it out, blanks the values in `config/setup.yaml`, `config/self-service/hub.yaml` and `.github/CODEOWNERS`, and stops without writing anything if any of its identifiers would still be copied.
 
-### From the zip (with git)
+**From the Databricks web terminal** (after cloning the framework there), the same copy is one command: `python3 install/copy_to_your_repo.py <framework folder> <your repository's folder>` previews it, and `--copy` writes it.
 
-```bash
-unzip <release>.zip && cd <release>
-# config/setup.yaml filled in (step 1)
-git init -b main && git add -A && git commit -m "Workspace baseline v1.0.0"
-git remote add origin https://github.com/<org>/<repo>.git && git push -u origin main
-```
+The framework's Git folder can be deleted afterwards. Keep your repository's Git folder if you will edit the configuration from Databricks.
 
-This needs an **empty** repository. For one with template files, use the Databricks route above.
+### Before step 5
 
-### Either way
-
-1. **Push only what you want deployed.** Once step 5 is done, every push to `main` applies the workspaces that push concerns: the `config/workspaces/` files it changes, or every workspace when it changes `config/defaults/` or the Terraform code ([github-actions.md](github-actions.md)). A release ships with none (only `_example.yaml`), so the first push deploys nothing.
+1. **Push only what you want deployed.** Once step 5 is done, every push to `main` applies the workspaces that push concerns: the `config/workspaces/` files it changes, or every workspace when it changes `config/defaults/` or the Terraform code ([github-actions.md](github-actions.md)). The copy holds none (only `_example.yaml`), so the first push deploys nothing.
 2. **Replace the owners in `.github/CODEOWNERS`** with your teams (for example `@my-org/databricks-platform` and `@my-org/security`) **before step 5**. Step 5 turns on branch protection that requires code owners to review, so a placeholder owner would leave nobody able to approve.
 
 > **Note:** The repository's GitHub OIDC subject includes its numeric IDs, so create the repository with its final name before step 4. Renaming it later means recreating the two federated credentials (update `github_repo` and run step 4 again).
@@ -342,20 +335,19 @@ The plan guard lists changes that are hard to undo, weaken security or take acce
 
 ### Upgrade to a new release
 
-Each release is a zip named after its version (`v1.2.0`), with what changed in `CHANGELOG.md`. `VERSION` at the top of the repository says which release you run.
+Each release is a version of this repository (`v1.2.0`), with what changed in `CHANGELOG.md`. `VERSION` at the top of your repository says which one you run (`main` when you copied it from `main`).
 
-Replace the framework files, keep your configuration. Unpack the new release next to your repository (for example as `../new`), then from your repository:
+Replace the framework files, keep your configuration: the same notebook as the install (step 2), from Databricks.
 
-```bash
-FRAMEWORK="terraform scripts .github/workflows .github/actions .github/scripts .github/ai docs \
-  .github/dependabot.yml .github/pull_request_template.md README.md CHANGELOG.md AGENTS.md CLAUDE.md \
-  agents config/README.md config/AGENTS.md config/workspaces/_example.yaml VERSION"
-git rm -r -q --ignore-unmatch $FRAMEWORK             # also drops files the release removed
-(cd ../new && tar -cf - $FRAMEWORK) | tar -xf -      # the release's versions
-git add -A && git checkout -b upgrade-v1.3.0
-```
+| # | Where | What |
+| --- | --- | --- |
+| 1 | The framework's Git folder (step 2; clone it again if you deleted it) | **Pull**, or switch to the new version's branch |
+| 2 | Your repository's Git folder | Create a **new branch** (for example `upgrade-v1.3.0`) |
+| 3 | `install/copy_to_your_repo` in the framework's Git folder | The same `source` and `target` as the install, `mode` on `preview`, **Run all** on serverless. Your repository has `VERSION`, so this is an upgrade: **yours** (your files under `config/` and `.github/CODEOWNERS`, kept), **replace** (framework files), **remove** (framework files the new version no longer has; only in the framework's own folders, never your workflows), **baseline** (new files in `config/defaults/`: not copied, add them yourself) |
+| 4 | The notebook | `mode` on `copy`, **Run all** again |
+| 5 | Your repository's Git folder | **Commit & push**, then open a pull request |
 
-It touches nothing else: not `config/defaults/`, your workspaces, `config/setup.yaml` or `.github/CODEOWNERS`. A baseline setting that is new in the release is absent from your `config/defaults/` until you add it, which means "leave alone", so an upgrade never turns something on by itself. Each release's **Baseline edits** in `CHANGELOG.md` lists the YAML to change in `config/defaults/`: new settings, and defaults the release changed that you may want too. Open a pull request: its plan shows what the new version changes in each workspace before anything is applied.
+It never replaces your configuration: `config/defaults/`, your workspaces, `config/setup.yaml`, `config/self-service/` or `.github/CODEOWNERS`. A baseline setting that is new in the release is absent from your `config/defaults/` until you add it, which means "leave alone", so an upgrade never turns something on by itself. Each release's **Baseline edits** in `CHANGELOG.md` lists the YAML to change in `config/defaults/`: new settings, and defaults the release changed that you may want too. Open a pull request: its plan shows what the new version changes in each workspace before anything is applied.
 
 > **Warning:** Do not edit framework files in your repository: the next upgrade replaces them. Send a fix to the framework maintainers so it is in the next release.
 

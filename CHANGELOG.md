@@ -8,6 +8,14 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **Install and upgrade from a clone, all in Databricks.** Clone this repository (`main`) into a
+  Databricks Git folder and run `install/copy_to_your_repo` on serverless (or, in the web
+  terminal, `python3 install/copy_to_your_repo.py <source> <target>`): it copies the framework
+  without this repository's own environment (the same rules as a release) and stops if any of its
+  identifiers would be copied. Run again for an upgrade: your configuration is kept, framework
+  files the new version dropped are removed, and new baseline files are listed for you to add.
+  The zip and the terminal upgrade steps are gone from `docs/SETUP.md`.
+
 - **Persona request links per business unit.** In the approvals app's Settings (Onboarding), a
   **Business unit** selector (All business units, or one of those the app serves) shows the
   Explorer, Builder and Publisher links to edit. Request workspace access uses the person's own
