@@ -13,7 +13,8 @@
 {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
 <form class="bu-choice" method="post" action="/business-unit">
   <input type="hidden" name="next" value="{{ next }}">
-  <fieldset class="bu-options">
+  {#- Columns that leave no card alone on a row: two for 2 or 4 business units, three otherwise. -#}
+  <fieldset class="bu-options bu-cols-{{ 2 if units | length in (2, 4) else 3 }}">
     <legend class="visually-hidden">Business unit</legend>
     {% for bu, workspaces in units %}
     <label class="bu-option">

@@ -102,7 +102,10 @@ a.account:hover { border-color: var(--border-strong); background: var(--hover); 
 .bu-head .lead { max-width: 720px; }
 .bu-choice { display: flex; flex-direction: column; }
 .bu-options { border: 0; margin: 0; padding: 0; min-width: 0;
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--s5); }
+  display: grid; gap: var(--s5); }
+.bu-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.bu-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 760px) { .bu-options { grid-template-columns: 1fr; } }
 .bu-option { position: relative; display: flex; flex-direction: column; gap: var(--s4); padding: var(--s6) var(--s8) var(--s6) var(--s6);
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); cursor: pointer;
   transition: border-color 0.12s, box-shadow 0.12s; }
