@@ -7,6 +7,8 @@ To add a card, add one Card to CARDS: its section, title and text, and where it 
   link); the card is left out while that link is not set;
 - neither: Coming soon.
 
+A link card with soon=True shows as Coming soon until its link is set, instead of being left out.
+
 A new section goes in SECTIONS; its key is also its FAQ link (self_service_app.faq.<key>, and
 settings.FAQS). Keys stay the same when a title changes: Settings stores the FAQ links by key.
 """
@@ -29,12 +31,16 @@ class Card:
     href: str = ""  # a page of this app
     link: str = ""  # a page in Databricks: config links.<link>, or "onboarding"
     icon: str = ""  # _icons.html name; the key when empty
+    soon: bool = False  # a link card: Coming soon (not left out) while its link is not set
 
 
 CARDS = [
     Card("persona", "access", "Request workspace access", "Choose the access level you need.", href="/persona"),
     Card("onboarding", "access", "Genie One Onboarding",
          "Ask Genie to look at the data you can use and suggest the best questions to start with.", link="onboarding", icon="ask"),
+    Card("group_request", "access", "Add a group to your workspace",
+         "Ask for an Entra group to be added to your workspace with a persona, so you can share your work with it.",
+         link="group_request", icon="group", soon=True),
 
     Card("discover", "data", "Discover data",
          "Browse the data your organization has curated, by business domain, in Databricks.", link="discover", icon="search"),
@@ -71,6 +77,8 @@ def groups(links, onboarding=None):
             if c.link:
                 href = onboarding if c.link == "onboarding" else (links or {}).get(c.link)
                 if not href:
+                    if c.soon:
+                        shown.append({"card": c, "href": "", "external": False, "ready": False})
                     continue
                 shown.append({"card": c, "href": href, "external": True, "ready": True})
             else:

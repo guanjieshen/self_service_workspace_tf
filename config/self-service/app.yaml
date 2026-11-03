@@ -17,6 +17,9 @@ self_service_app:
     # Where people ask for a persona (an Entra access package or My Groups): one link for
     # all, or one per persona, for example {explorer: <url>, builder: <url>, publisher: <url>}.
     persona_request: null
+    # Where people ask for an Entra group to be added to their workspace with a persona (for
+    # example a ServiceNow form): the Add a group card. null = the card shows as Coming soon.
+    group_request: null
     # Where people review data access requests in Databricks: the ones they made, and the ones
     # others made for their data (Catalog Explorer's requests view). {host} and {workspace_id}
     # are the person's own workspace's (their business unit's), not the hub's; or a full URL

@@ -759,6 +759,16 @@ class Cards(unittest.TestCase):
         only_data = [(k, t, [c for c in cs if c["card"].section == "data"]) for k, t, cs in cards.groups({})]
         self.assertEqual([k for k, _, cs in cards.groups({}) if k == "data"], [], "Data has only link cards: hidden without links")
 
+    def test_adding_a_group_is_a_link_coming_soon_until_it_is_set(self):
+        import cards
+        import settings
+        card = lambda groups: next(c for _, _, cs in groups for c in cs if c["card"].key == "group_request")
+        self.assertEqual((card(cards.groups({}))["ready"], card(cards.groups({}))["href"]), (False, ""), "no link yet: Coming soon")
+        set_ = card(cards.groups({"group_request": "https://servicenow.example.com/add-group"}))
+        self.assertEqual((set_["ready"], set_["external"], set_["href"]), (True, True, "https://servicenow.example.com/add-group"))
+        shown = settings.apply({"links": {"group_request": None}}, {"group_request": {"value": "https://sn.example.com/g"}})
+        self.assertEqual(shown["links"]["group_request"], "https://sn.example.com/g", "platform admins set it in Settings")
+
     def test_every_section_has_an_faq_setting(self):
         import cards
         import settings

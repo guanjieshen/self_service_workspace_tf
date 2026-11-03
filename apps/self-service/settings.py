@@ -31,6 +31,8 @@ SECTIONS = [
         ("onboarding.prompt", "Prompt", "prompt")]),
     ("Persona request links", "Links to request each access level, such as a ServiceNow catalog item.", [
         (f"persona_request.{p}", p.title(), "url") for p in PERSONAS]),
+    ("Group request link", "Where people ask for an Entra group to be added to their workspace with a persona, such as a ServiceNow form. Empty shows the card as Coming soon.", [
+        ("group_request", "Add a group to your workspace", "url")]),
     ("FAQ pages", "FAQ links shown in each catalog section.", [
         (f"faq.{k}", label, "url") for k, label in FAQS.items()]),
     ("Standard operating procedures", "SOP links shown on each catalog item.", [
@@ -40,7 +42,7 @@ SECTIONS = [
 # Onboarding section shows; the change history is a tab of its own (approvals.py).
 TABS = [
     ("announcement", "Announcement", ["Announcement banner"]),
-    ("onboarding", "Onboarding", ["Genie One Onboarding", "Persona request links"]),
+    ("onboarding", "Onboarding", ["Genie One Onboarding", "Persona request links", "Group request link"]),
     ("help", "Help links", ["FAQ pages", "Standard operating procedures"]),
 ]
 KINDS = {key: kind for _, _, fields in SECTIONS for key, _, kind in fields}
@@ -52,7 +54,8 @@ def defaults(config):
     """Each setting's value from app.yaml ("" when it has none)."""
     links = config.get("links") or {}
     persona = links.get("persona_request")
-    out = {"banner.text": "", "banner.until": "", "onboarding.prompt": (config.get("onboarding") or {}).get("prompt") or ""}
+    out = {"banner.text": "", "banner.until": "", "onboarding.prompt": (config.get("onboarding") or {}).get("prompt") or "",
+           "group_request": links.get("group_request") or ""}
     for p in PERSONAS:
         out[f"persona_request.{p}"] = (persona.get(p) if isinstance(persona, dict) else persona) or ""
     for k in FAQS:
@@ -79,7 +82,7 @@ def apply(config, overrides, today=None):
     v = values(config, overrides)
     links = {**(config.get("links") or {}),
              "persona_request": {p: v[f"persona_request.{p}"] or None for p in PERSONAS},
-             "sop": {k: v[f"sop.{k}"] or None for k in SOPS}}
+             "sop": {k: v[f"sop.{k}"] or None for k in SOPS}, "group_request": v["group_request"] or None}
     today = today or dt.datetime.now(dt.timezone.utc).date()
     until = v["banner.until"]
     shown = v["banner.text"] and not (until and until < today.isoformat())
