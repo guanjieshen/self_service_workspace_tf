@@ -8,6 +8,12 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **The deploy's own flow is tested** (`scripts/app_deploy.py`, from 44% of its lines to 97%):
+  a first install deploys twice, an existing hub once, a plan changes nothing, `app_ids` that
+  are not the apps stop it, the database and reader roles, adopting resources, and the hub
+  first, then each workspace. The **Database tests** check reports its coverage of the database
+  code.
+
 - **Two requests for the same new schema name never share it:** the schema job creates a new
   schema on its own (no `IF NOT EXISTS`), so when two run at once only the first gets it and the
   other stops with "choose another name".
