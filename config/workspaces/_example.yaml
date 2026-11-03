@@ -26,6 +26,10 @@ groups:
   builder: null            # the full workspace: notebooks, jobs, pipelines
   publisher: null          # the same as builder here
 
+# Optional: Entra groups people may share folders with, assigned with no entitlements (their
+# members still need a persona to sign in). Not a persona, platform admins or users group.
+# sharing_groups: [fin-finance-analysts]
+
 # ---- OPTIONAL: this workspace only --------------------------------------------
 
 # Chargeback tags (tags: in config/defaults/cost.yaml): change a value, add a tag, or

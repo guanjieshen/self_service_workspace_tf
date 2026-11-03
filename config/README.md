@@ -78,6 +78,7 @@ The keys a workspace file usually sets. `prefix`, `host`, `genie_code_instructio
 | Stop managing a workspace | | Delete its file (its Terraform state goes; the workspace is unchanged) |
 | Give someone a persona | | Add them to the workspace's group for it in Entra ID; no change here |
 | Change which group holds a persona | | `groups.<persona>` in its file |
+| Let people share folders with an Entra group | | `sharing_groups: [<group>]` in its file: assigned with no entitlements, so it only becomes something to share with |
 | Change what a persona can do | `personas` in `defaults/access.yaml` | `personas.<persona>.<key>` in its file |
 | Let another persona create tokens | `personas.<persona>.can_create_tokens` in `defaults/access.yaml` | the same key in its file |
 | Add, remove or rename a chargeback tag | `tags` (and `classic_user_tags`) in `defaults/cost.yaml` | `tags.<KEY>` in its file (`null` drops it) |

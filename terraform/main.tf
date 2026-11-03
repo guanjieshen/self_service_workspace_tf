@@ -15,6 +15,7 @@ module "personas" {
   platform_admins          = local.platform_admins
   platform_admin_role      = "ADMIN"
   extra_groups             = local.extra_groups
+  sharing_groups           = local.sharing_groups
   users_group_entitlements = local.settings.users_group_entitlements
 
   # Invalid input stops at the plain-language checks in checks.tf, not a crash inside a

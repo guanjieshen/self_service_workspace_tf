@@ -76,6 +76,14 @@ resource "terraform_data" "config_checks" {
       error_message = "groups (config/defaults/access.yaml, or the workspace's file): each must be a group name (or null for none), and platform_admins must be set."
     }
     precondition {
+      condition     = alltrue([for g in local.sharing_groups : can(regex("^[^\\s]", g)) && !contains(concat(flatten(values(local.persona_groups)), local.platform_admins, compact([local.users_group])), g)])
+      error_message = "sharing_groups (config/defaults/access.yaml, or the workspace's file): each must be a group name, and not a persona, platform_admins or users group (those get their access from groups:)."
+    }
+    precondition {
+      condition     = length(local.sharing_groups) == 0 || alltrue([for e in ["workspace_access", "workspace_consume", "databricks_sql_access", "allow_cluster_create"] : try(local.settings.users_group_entitlements[e], null) == false])
+      error_message = "sharing_groups needs settings.users_group_entitlements (config/defaults/settings.yaml) to set every entitlement to false: the built-in users group's entitlements reach every sharing group's members. Turn them off, or remove sharing_groups."
+    }
+    precondition {
       condition     = try(local.settings.compliance_security_profile, null) == null || can(tolist(local.settings.compliance_security_profile))
       error_message = "settings.compliance_security_profile must be null (leave alone) or a list of compliance standards."
     }

@@ -8,6 +8,11 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **Sharing groups.** `sharing_groups: [<group>, ...]` in a workspace's file assigns Entra groups
+  to the workspace **with every entitlement off**, so people can share folders with them. Their
+  members still sign in only through a persona. A plan fails if a sharing group is a persona,
+  platform admins or users group, or if the built-in users group has any entitlement. The first
+  plan shows no change until a workspace sets the key.
 - **The default SQL warehouse is Medium** (was Small). The first plan shows the warehouse's size
   changing in every workspace that doesn't set `sql_warehouse.size` in its own file. Serverless
   warehouses resize without downtime; a Medium warehouse costs about twice a Small one per hour
@@ -17,6 +22,7 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
   | File | Change |
   | --- | --- |
+  | `config/defaults/access.yaml` | Add `sharing_groups: []` (a top-level key, after `groups:`) |
   | `config/defaults/compute.yaml` | `sql_warehouse.size: Medium` (was `Small`), if you want the new default |
 - **A new card, Add a group to your workspace** (Get started): a link to your organization's
   form for adding an Entra group to a workspace with a persona (for example ServiceNow).

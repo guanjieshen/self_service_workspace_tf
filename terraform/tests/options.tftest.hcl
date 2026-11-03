@@ -175,6 +175,28 @@ run "all_settings_left_alone" {
 }
 
 # A workspace that names only some persona groups: the others are skipped, nothing fails.
+run "sharing_groups" {
+  command = plan
+  variables { workspace = "sharing" }
+
+  assert {
+    condition     = local.sharing_groups == tolist(["tst-finance-analysts", "tst-project-x"])
+    error_message = "Sharing groups come from the workspace file, with {prefix} filled in. Got: ${jsonencode(local.sharing_groups)}"
+  }
+  assert {
+    condition     = alltrue([for g in ["tst-finance-analysts", "tst-project-x"] : tolist(module.personas.assigned_groups[g]) == tolist(["USER"])])
+    error_message = "Sharing groups are assigned to the workspace as USER, so people can share with them."
+  }
+  assert {
+    condition     = alltrue([for e in module.personas.sharing_entitlements : !e.workspace_access && !e.databricks_sql_access && !e.allow_cluster_create]) && length(module.personas.sharing_entitlements) == 2
+    error_message = "Sharing groups get every entitlement off, set explicitly."
+  }
+  assert {
+    condition     = !contains(keys(local.catalog_grants), "tst-finance-analysts") && !contains(keys(local.entitlement_groups), "tst-finance-analysts")
+    error_message = "Sharing groups get no catalog grants and no persona."
+  }
+}
+
 run "some_groups" {
   command = plan
   variables { workspace = "some-groups" }
