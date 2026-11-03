@@ -108,6 +108,7 @@ Your repository's Git folder comes with **Genie Code skills** (`agents/skills/`)
 | `change-all-workspaces` | Change a default for every workspace |
 | `change-one-workspace` | Change one workspace's own configuration, or retire it |
 | `update-self-service-app` | The self-service app: its settings, the hub, a new business unit |
+| `upgrade-to-a-new-release` | Update your repository to a newer release of this framework |
 | `pull-request-from-databricks` | Get any change reviewed and deployed (the others end here) |
 
 **Turn them on once, per admin:** in your repository's Git folder, open the Genie Code pane > **Settings** (skills) > add the folder `<your Git folder>/agents/skills` (for example `/Workspace/Users/<you>/<repo>/agents/skills`) > **Add folder**. Then ask Genie Code, for example, "I want to add a new workspace", or @ mention a skill. Genie Code also reads `AGENTS.md` in the folder.
@@ -352,7 +353,7 @@ The plan guard lists changes that are hard to undo, weaken security or take acce
 
 Each release is a version of this repository (`v1.2.0`), with what changed in `CHANGELOG.md`. `VERSION` at the top of your repository says which one you run (`main` when you copied it from `main`).
 
-Replace the framework files, keep your configuration: the same notebook as the install (step 2), from Databricks.
+Replace the framework files, keep your configuration: the same notebook as the install (step 2), from Databricks. **Genie Code's skill `upgrade-to-a-new-release` walks you through all of it**, including what changed since your `VERSION` and the Baseline edits.
 
 | # | Where | What |
 | --- | --- | --- |
