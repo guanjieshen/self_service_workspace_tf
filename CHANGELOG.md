@@ -1,12 +1,25 @@
 # Changelog
 
-Each release is a zip named after its version (`v1.0.0`; `VERSION` in the repository says which
-one you run). Each entry says what the first plan after an upgrade shows. An upgrade never
-touches `config/defaults/` (it is your baseline), so each entry also lists, under **Baseline
-edits**, the exact YAML to change there: new settings to add, and defaults the release changed
-that you may want to copy. A setting missing from your baseline is left alone.
+Each release is a tagged version of this repository (`v1.0.0`), with a branch to install from
+(`release/v1.0.0`); `VERSION` in your repository says which one you run (or `main @ <commit>`,
+copied from `main`). Each entry says what the first plan after an upgrade shows. An upgrade
+never touches your `config/` (`install/copy_to_your_repo` keeps it), so each entry also lists,
+under **Baseline edits**, the exact YAML to change in `config/defaults/`: new settings to add,
+and defaults the release changed that you may want to copy. A setting missing from your baseline
+is left alone.
 
 ## Unreleased
+
+Nothing yet.
+
+## 1.0.0
+
+The first tagged release: a governed baseline for existing Azure Databricks citizen development
+workspaces, configured in YAML and deployed by GitHub Actions, and the self-service app. Set up
+from scratch with [docs/SETUP.md](docs/SETUP.md); there is nothing to upgrade from. An
+installation copied from `main` before this release upgrades to it like any release.
+
+### Added since the first version of the baseline
 
 - **Genie Code skills for your admins** (`agents/skills/`): `add-workspace`,
   `change-all-workspaces`, `change-one-workspace`, `update-self-service-app` and
@@ -195,11 +208,7 @@ that you may want to copy. A setting missing from your baseline is left alone.
   itself, for example). The first plan after the upgrade shows the pipeline added to the usage
   policy's users.
 
-## 1.0.0
-
-The first release: a governed baseline for existing Azure Databricks citizen development
-workspaces, configured in YAML and deployed by GitHub Actions. Set up from scratch with
-[docs/SETUP.md](docs/SETUP.md); there is nothing to upgrade from.
+### The baseline
 
 **What every workspace gets** (`config/defaults/`):
 

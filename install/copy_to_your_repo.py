@@ -116,10 +116,27 @@ def check(source, target):
     return problems
 
 
+def source_version(source):
+    """What VERSION says when the source is not a release: its branch and commit, from git's
+    own files when they can be read (a clone in the web terminal), else just "main"."""
+    git = pathlib.Path(source) / ".git"
+    try:
+        head = (git / "HEAD").read_text().strip()
+        if not head.startswith("ref: "):
+            return f"main @ {head[:7]}"   # a detached checkout: the commit itself
+        ref = head[5:]
+        loose = git / ref
+        sha = loose.read_text().strip() if loose.is_file() else next(
+            line.split()[0] for line in (git / "packed-refs").read_text().splitlines() if line.endswith(" " + ref))
+        return f"{ref.rpartition('/')[2]} @ {sha[:7]}"
+    except (OSError, StopIteration):   # a Databricks Git folder does not show .git
+        return "main"
+
+
 def released(source):
     """{path: bytes}: what is copied. Every readable file of the source, as a release has it
     (scripts/release.py: this repository's environment left out or blanked), with VERSION
-    ("main" when the source is not a release). ValueError if any of the source's own
+    (a release's, or the source's branch and commit: source_version). ValueError if any of the source's own
     identifiers is still in it: then nothing is copied."""
     source = pathlib.Path(source)
     spec = importlib.util.spec_from_file_location("release", source / "scripts/release.py")
@@ -128,7 +145,7 @@ def released(source):
     skip = ignored(source)
     found = {p: (source / p).read_bytes() for p in files(source) if not skip(p) and readable(source / p)}
     out = rel.release_files(found)
-    out.setdefault("VERSION", b"main\n")
+    out.setdefault("VERSION", (source_version(source) + "\n").encode())
     leaked = rel.leaks(out, rel.own_identifiers(found))
     if leaked:
         raise ValueError("This repository's own identifiers would be copied; nothing was written:\n"
@@ -167,8 +184,8 @@ def plan(source, target, release):
             out[path] = "yours"
         elif upgrade and path not in theirs and path.startswith("config/defaults/"):
             out[path] = "baseline"   # a new baseline file would turn its settings on: yours to add
-        elif path not in release:
-            out[path] = "skip"      # a notebook (this installer), or this repository's environment
+        elif path not in release:   # a notebook (this installer), or this repository's environment
+            out[path] = "keep" if path in theirs else "skip"   # a file of theirs with the same name stays theirs
         elif path not in theirs:
             out[path] = "new"
         elif release[path] == (target / path).read_bytes():
