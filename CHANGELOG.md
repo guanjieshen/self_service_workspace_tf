@@ -10,7 +10,10 @@ is left alone.
 
 ## Unreleased
 
-Nothing yet.
+- **A Genie Code skill to upgrade, `upgrade-to-a-new-release`:** it finds your version and the
+  new one, reads what changed with you, runs the copy (preview, then copy), helps with the
+  Baseline edits and guides the pull request. The README now explains the skills, and releases
+  and upgrades.
 
 ## 1.0.0
 

@@ -70,6 +70,37 @@ Most day-to-day requests fit into one of these paths:
 
 Changes to the Terraform modules, scripts, or workflows are **framework changes**, not normal workspace configuration changes. See [AGENTS.md](AGENTS.md) before working on those areas.
 
+## Genie Code skills: guided changes, no git or Terraform needed
+
+In your repository's Databricks Git folder, Genie Code walks an admin through each everyday change: it asks what they want in plain language, makes the edit, and guides them to a pull request. The skills are in `agents/skills/`.
+
+| Ask Genie Code to... | Skill |
+| --- | --- |
+| Add a new workspace | `add-workspace` |
+| Change a default for every workspace | `change-all-workspaces` |
+| Change one workspace's configuration, or stop managing it | `change-one-workspace` |
+| Change the self-service app (its settings, its hub, a new business unit) | `update-self-service-app` |
+| Upgrade to a new release of this framework | `upgrade-to-a-new-release` |
+| Get any change reviewed and deployed | `pull-request-from-databricks` (the others end here) |
+
+**Turn them on once per admin:** in the Git folder, open the Genie Code pane > **Settings** (skills) > add `<your Git folder>/agents/skills` > **Add folder**. Then ask, for example, "I want to add a new workspace", or @ mention a skill ([setup, step 2](docs/SETUP.md#genie-code-your-guide-in-the-git-folder)).
+
+## Releases and upgrades
+
+Each release is a tagged version of this framework (`v1.0.0`) with a branch to install from (`release/v1.0.0`); [CHANGELOG.md](CHANGELOG.md) says what each one changes. `VERSION` in your repository says which you run.
+
+**To upgrade** (or ask Genie Code: the skill `upgrade-to-a-new-release` does all of it with you):
+
+| # | Where | What |
+| --- | --- | --- |
+| 1 | The framework's Git folder | Switch to the new version's branch, `release/<version>` |
+| 2 | Your repository's Git folder | A new branch, for example `upgrade-v1.1.0` |
+| 3 | `install/copy_to_your_repo` (a notebook, in the framework's Git folder) | `preview`, then `copy`: framework files are replaced, your configuration (`config/`, `.github/CODEOWNERS`) is kept, new baseline files are listed for you to add |
+| 4 | Your `config/defaults/` | The release's **Baseline edits** (in the changelog) that you want: an upgrade never changes your settings by itself |
+| 5 | GitHub | Commit, push, open a pull request: its plans show what the new version changes in each workspace before anything is applied |
+
+Never edit the framework's files in your repository: the next upgrade replaces them. A fix goes to the framework's maintainers and comes back in a release.
+
 ## Repository structure
 
 | Path | Purpose |
