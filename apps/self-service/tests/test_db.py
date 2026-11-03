@@ -97,8 +97,8 @@ class AgainstPostgres(unittest.TestCase):
         c.execute("INSERT INTO self_service.request_events (request_id, actor, role, type) VALUES (%s, 'ana@contoso.com', 'requester', 'submitted')", (rid,))
 
     def test_migrations_run_once(self):
-        self.assertEqual(self.first, ["001_requests.sql", "002_one_finish_per_request.sql", "003_run_outcome_from_jobs.sql",
-                                      "004_settings.sql"])
+        self.assertEqual(self.first, [f.name for f in migrate.migrations()], "every migration, in order, on an empty database")
+        self.assertIn("005_chosen_business_units.sql", self.first)
         self.assertEqual(self.second, [], "running again changes nothing")
 
     def test_the_app_adds_and_reads_but_never_rewrites_history(self):
