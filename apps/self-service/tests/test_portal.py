@@ -764,7 +764,7 @@ class Cards(unittest.TestCase):
         self.assertEqual(set_["card"].opens, "Opens your organization's request form", "not Databricks")
         opens = {c.key: c.opens for c in cards.CARDS}
         self.assertEqual(opens["discover"], "Opens in Databricks (workspace access is required)")
-        self.assertEqual(opens["onboarding"], "Opens in Databricks", "Genie One needs only consumer access")
+        self.assertEqual(opens["onboarding"], "Opens in Databricks (workspace access is required)")
         shown = settings.apply({"links": {"group_request": None}}, {"group_request": {"value": "https://sn.example.com/g"}})
         self.assertEqual(shown["links"]["group_request"], "https://sn.example.com/g", "platform admins set it in Settings")
 
