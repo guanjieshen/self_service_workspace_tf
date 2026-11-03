@@ -542,6 +542,7 @@ a.inbox-row:focus-visible { box-shadow: inset var(--ring); border-radius: 0; }
 .settings-section { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: var(--s8); padding: var(--s6); }
 .settings-section + .settings-section { border-top: 1px solid var(--border); }
 .settings-about h2 { font-size: var(--text-base); line-height: 20px; }
+.settings-bu { display: flex; flex-direction: column; gap: var(--s1); margin-top: var(--s4); max-width: 240px; }
 .settings-about .meta { margin-top: var(--s1); }
 .settings-fields { display: flex; flex-direction: column; gap: var(--s4); max-width: 520px; }
 .settings-hint { display: flex; align-items: center; gap: var(--s2); }
