@@ -40,7 +40,7 @@ run "served_workspace" {
     error_message = "The identity running Terraform (which runs the self-service jobs) may use the usage policy."
   }
   assert {
-    condition     = output.self_service.enabled && output.self_service.prefix == "tst" && output.self_service.id == "1111111111111111" && output.self_service.host == "https://adb-1111111111111111.1.azuredatabricks.net" && output.self_service.catalog == "tst_citizen_dev"
+    condition     = output.self_service.enabled && output.self_service.prefix == "tst" && output.self_service.id == "1111111111111111" && output.self_service.host == "https://adb-1111111111111111.1.azuredatabricks.net" && output.self_service.catalog == "tst_citizen_dev" && output.self_service.platform_admins == local.platform_admins && length(output.self_service.platform_admins) > 0
     error_message = "The output gives the app's deploy what this workspace's configuration already has."
   }
 }

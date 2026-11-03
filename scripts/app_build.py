@@ -97,7 +97,8 @@ def served(s, outputs):
         if not o.get("catalog"):
             raise SystemExit(f"{name} has no catalog (catalog: null), so its schema job has nowhere to create schemas: set self_service: false, or give it a catalog.")
         out.append({"name": name, "bu": o["prefix"].upper(), "host": o["host"].rstrip("/"), "id": str(o.get("id") or ""),
-                    "catalog": o["catalog"], "usage_policy_id": o.get("usage_policy_id")})
+                    "catalog": o["catalog"], "usage_policy_id": o.get("usage_policy_id"),
+                    "platform_admins": list(o.get("platform_admins") or [])})
     return out
 
 
@@ -211,7 +212,7 @@ def build_jobs(s, w, app_ids, root=None):
     (out / "personal_schema.py").write_text(notebook("personal_schema", {
         "prefix": jobs["personal_schema"]["prefix"], "privileges": jobs["personal_schema"]["privileges"],
         "owner": jobs.get("catalog_owner") or "", "allowed_catalogs": [w["catalog"]], **record}))
-    (out / "team_folder.py").write_text(notebook("team_folder", {"root": jobs["folder_root"], **record}))
+    (out / "team_folder.py").write_text(notebook("team_folder", {"root": jobs["folder_root"], "admin_groups": w["platform_admins"], **record}))
     (out / "target.yml").write_text(json.dumps(jobs_target(s, w, app_ids), indent=1))
     return out
 

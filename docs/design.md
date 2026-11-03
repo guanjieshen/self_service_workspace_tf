@@ -224,7 +224,7 @@ next apply. What the app needs on those, Terraform grants (`terraform/self_servi
 | Both apps, their permissions, the Lakebase project, its database and migrations | `bundle/hub/`, `app_deploy.py` | Terraform never manages them |
 
 **Configuration flows one way.** The app reads each served workspace's file and its Terraform
-output `self_service` (prefix, ID, host, catalog, usage policy), and never repeats them. One
+output `self_service` (prefix, ID, host, catalog, usage policy, platform admins), and never repeats them. One
 value flows back: the apps' service principals (`app_ids` in `hub.yaml`), set once after the
 hub's first deploy, which Terraform reads to grant them. Terraform loads nothing else from
 `config/self-service/`, so an app setting never plans Terraform.

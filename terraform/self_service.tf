@@ -67,5 +67,6 @@ output "self_service" {
     host            = try(trimsuffix(local.workspace.host, "/"), null)
     catalog         = try(local.catalog.name, null)
     usage_policy_id = try(module.budget_policies[0].policy_ids[local.serverless_policies.self_service.name], null)
+    platform_admins = local.platform_admins # the folder job gives them CAN_MANAGE on every folder it creates
   }
 }
