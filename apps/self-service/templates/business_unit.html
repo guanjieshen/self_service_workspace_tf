@@ -5,7 +5,7 @@
 {% block title %}Your business unit · {{ config.title }}{% endblock %}
 {% block content %}
 {% if not first %}{{ back(next, "Back") }}{% endif %}
-<div class="page-head">
+<div class="page-head bu-head">
   <h1>{{ "Which business unit are you in?" if first else "Your business unit" }}</h1>
   <p class="lead">Your requests go to its workspace: folders are created there, schemas in its catalog, and Genie One opens there.
     {{ "You can change it later from your name, top right." if first else "" }}</p>
@@ -20,14 +20,17 @@
       <input type="radio" name="bu" value="{{ bu }}" {{ 'checked' if bu == business_unit }} required>
       <span class="bu-code">{{ bu }}</span>
       {% for w in workspaces %}
-      <span class="bu-facts"><span class="mono">{{ w.name }}</span>{% if w.catalog %}<span class="meta">Catalog <span class="mono">{{ w.catalog }}</span></span>{% endif %}</span>
+      <dl class="bu-facts">
+        <div><dt>Workspace:</dt><dd class="mono">{{ w.name }}</dd></div>
+        {% if w.catalog %}<div><dt>Catalog:</dt><dd class="mono">{{ w.catalog }}</dd></div>{% endif %}
+      </dl>
       {% endfor %}
     </label>
     {% endfor %}
   </fieldset>
-  <div class="form-actions">
+  <div class="form-actions bu-actions">
     <button type="submit" class="primary">{{ "Continue" if first else "Save" }}</button>
-    {% if not first %}<a class="button" href="{{ next }}">Cancel</a>{% endif %}
+    {% if not first %}<a class="bu-cancel" href="{{ next }}">Cancel</a>{% endif %}
   </div>
 </form>
 {% endblock %}
