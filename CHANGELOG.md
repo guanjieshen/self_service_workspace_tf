@@ -8,6 +8,11 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **Add a group to your workspace** moves to **Build**, next to the folder it lets you share.
+- **Genie One Onboarding** says "Opens in Databricks (workspace access is required)", like the Data cards.
+- **The folder form no longer asks who can manage the folder.** The requester manages it (and
+  the workspace's platform admins), and shares it with others in Databricks once it exists.
+
 - **The AI check runs in the hub** (the apps' own workspace), and so do the approvers' AI
   summaries: AI Decide needs enabling there only, not in every workspace.
 - **Validate is simpler:** two questions instead of four. It checks that the name says what it

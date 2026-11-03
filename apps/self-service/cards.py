@@ -38,10 +38,8 @@ class Card:
 CARDS = [
     Card("persona", "access", "Request workspace access", "Choose the access level you need.", href="/persona"),
     Card("onboarding", "access", "Genie One Onboarding",
-         "Ask Genie to look at the data you can use and suggest the best questions to start with.", link="onboarding", icon="ask"),
-    Card("group_request", "access", "Add a group to your workspace",
-         "Ask for an Entra group to be added to your workspace with a persona, so you can share your work with it.",
-         link="group_request", icon="group", soon=True, opens="Opens your organization's request form"),
+         "Ask Genie to look at the data you can use and suggest the best questions to start with.", link="onboarding", icon="ask",
+         opens="Opens in Databricks (workspace access is required)"),
 
     Card("discover", "data", "Discover data",
          "Browse the data your organization has curated, by business domain, in Databricks.", link="discover", icon="search",
@@ -58,6 +56,9 @@ CARDS = [
          "Create a schema your team manages together, so it stays when people move on.", href="/schema/team", icon="schema"),
     Card("folder", "workspace", "Request a workspace folder",
          "Create a shared workspace folder and control who can access it.", href="/folder"),
+    Card("group_request", "workspace", "Add a group to your workspace",
+         "Ask for an Entra group to be added to your workspace with a persona, so you can share your work with it.",
+         link="group_request", icon="group", soon=True, opens="Opens your organization's request form"),
 
     Card("warehouses", "compute", "Manage SQL warehouses", "Create and manage SQL warehouses sized to your workload."),
     Card("budget_policy", "compute", "Request a budget policy",

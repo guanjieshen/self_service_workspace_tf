@@ -8,7 +8,7 @@
 <div class="page-grid form-grid">
 <form class="panel" method="post" action="/folder" data-submit>
   <div class="panel-body">
-    {% call callout() %}You and the group you select can manage this folder. You can share it with others after it's created.{% endcall %}
+    {% call callout() %}You can manage this folder, and share it with others in Databricks once it's created. Your workspace's platform admins can manage it too.{% endcall %}
     {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
     {% if not workspaces %}
       {% if not error %}{% call callout("error") %}No workspace offers folders yet.{% endcall %}{% endif %}
@@ -22,16 +22,6 @@
 
       {% set check_kind = "folder" %}{% set reason = form.reason %}{% include "_reason.html" %}
 
-      {% call field("owner_group", "Who can manage this folder?") %}
-        <select id="owner_group" name="owner_group" {{ 'disabled' if not my_groups }}>
-          <option value="">Only me</option>
-          {% for g in my_groups %}<option value="{{ g }}" {{ 'selected' if form.owner_group == g }}>{{ g }}</option>{% endfor %}
-        </select>
-        {#- The hint follows the choice (app.js): never says a team manages it when only the requester does. -#}
-        {% if my_groups %}<p class="hint" data-hint-for="owner_group" data-hint-none="Select a group to let your team manage this folder too."
-           data-hint-group="Your team can manage this folder too, even if you move on.">{{ "Your team can manage this folder too, even if you move on." if form.owner_group else "Select a group to let your team manage this folder too." }}</p>
-        {% else %}<p class="hint">You're not in any groups in this workspace, so only you can manage this folder.</p>{% endif %}
-      {% endcall %}
       {% include "_ai_check.html" %}
     {% endif %}
   </div>
