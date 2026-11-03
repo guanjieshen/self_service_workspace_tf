@@ -84,7 +84,7 @@ You need a Databricks workspace you can use, with **serverless notebooks**, and 
 
 | # | Where | What |
 | --- | --- | --- |
-| 1 | Workspace > your folder > **Create > Git folder** | **This repository:** the framework repository's URL (you were given it), branch **`main`** (or a `release/<version>` branch, if you were given one). It is public: no credential needed |
+| 1 | Workspace > your folder > **Create > Git folder** | **This repository:** the framework repository's URL (you were given it), a **release branch**, `release/<version>` (for example `release/v1.0.0`: the version you install, in `CHANGELOG.md`), or `main` for the newest. It is public: no credential needed |
 | 2 | The same | **Your repository:** its URL. Then, in that Git folder, create a **new branch** (for example `install-baseline`): your `main` may be protected |
 | 3 | In the framework's Git folder, open `install/copy_to_your_repo` | Set `source` and `target` to the two Git folders' paths (each folder's ⋮ > **Copy path**; they start with `/Workspace/`), leave `mode` on `preview`, and **Run all** on serverless |
 | 4 | The notebook's output | What happens to each file: **new**; **replace** (yours is replaced by the framework's: your `README.md`, your old `.github/CODEOWNERS`, printed so you can merge required owners); **merge** (`.gitignore`: both sets of lines); **keep** (yours only, never deleted; your own workflows keep running on pull requests); **skip** (the framework repository's own environment: its workspace files, state and `dev/`, never copied) |
@@ -356,7 +356,7 @@ Replace the framework files, keep your configuration: the same notebook as the i
 
 | # | Where | What |
 | --- | --- | --- |
-| 1 | The framework's Git folder (step 2; clone it again if you deleted it) | **Pull**, or switch to the new version's branch |
+| 1 | The framework's Git folder (step 2; clone it again if you deleted it) | Switch to the new version's branch (`release/<version>`), or **Pull** on `main`. `CHANGELOG.md` says what changed since the `VERSION` in your repository |
 | 2 | Your repository's Git folder | Create a **new branch** (for example `upgrade-v1.3.0`) |
 | 3 | `install/copy_to_your_repo` in the framework's Git folder | The same `source` and `target` as the install, `mode` on `preview`, **Run all** on serverless. Your repository has `VERSION`, so this is an upgrade: **yours** (your files under `config/` and `.github/CODEOWNERS`, kept), **replace** (framework files), **remove** (framework files the new version no longer has; only in the framework's own folders, never your workflows), **baseline** (new files in `config/defaults/`: not copied, add them yourself) |
 | 4 | The notebook | `mode` on `copy`, **Run all** again |

@@ -145,6 +145,32 @@ class Install(unittest.TestCase):
         self.assertEqual((self.target / "scripts/new.py").read_text(), "new\n")
         self.assertEqual((self.target / "VERSION").read_text(), (self.source / "VERSION").read_text(), "the new version")
 
+    def test_a_clone_says_which_commit_it_copied(self):
+        (self.source / "VERSION").unlink()          # main has no VERSION
+        write(self.source, {".git/HEAD": "ref: refs/heads/main\n", ".git/refs/heads/main": "5569f87abcdef0123456789\n"})
+        self.assertEqual(inst.source_version(self.source), "main @ 5569f87")
+        (self.source / ".git/refs/heads/main").unlink()   # after git gc: in packed-refs
+        write(self.source, {".git/packed-refs": "# pack-refs with: peeled\n0b1c2d3e4f5a refs/heads/main\n"})
+        self.assertEqual(inst.source_version(self.source), "main @ 0b1c2d3")
+        write(self.source, {".git/HEAD": "9f8e7d6c5b4a\n"})       # a detached checkout
+        self.assertEqual(inst.source_version(self.source), "main @ 9f8e7d6")
+        self.assertEqual(inst.source_version(self.target / "nowhere"), "main", "no .git to read (a Databricks Git folder)")
+        self.copy(self.plan())
+        self.assertEqual((self.target / "VERSION").read_text(), "main @ 9f8e7d6\n")
+
+    def test_your_workspace_files_are_never_touched_even_on_a_first_install(self):
+        # Theirs, before the first copy; one named like one of this repository's own.
+        write(self.target, {"config/workspaces/hr.yaml": "prefix: hr   # ours\n",
+                            "config/workspaces/sandbox.yaml": "prefix: theirs\n"})
+        write(self.source, {"config/workspaces/sandbox.yaml": "prefix: sbx\nhost: https://adb-1234567890123456.7.azuredatabricks.net\n",
+                            "config/workspaces/_example.yaml": "prefix: xyz\n"})
+        actions = self.plan()
+        self.assertEqual(actions["config/workspaces/hr.yaml"], "keep")
+        self.assertEqual(actions["config/workspaces/sandbox.yaml"], "keep", "this repository's is never copied, so theirs stays")
+        self.copy(actions)
+        self.assertEqual((self.target / "config/workspaces/sandbox.yaml").read_text(), "prefix: theirs\n")
+        self.assertEqual((self.target / "config/workspaces/hr.yaml").read_text(), "prefix: hr   # ours\n")
+
     def test_wrong_folders_are_refused(self):
         self.assertEqual(inst.check(self.source, self.target), [])
         self.assertTrue(inst.check(self.target, self.source), "the source is not this repository")
