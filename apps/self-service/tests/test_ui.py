@@ -533,6 +533,38 @@ class SettingsPages(unittest.TestCase):
     def load(self, mode, config):
         return load_main(mode, config)
 
+    def test_a_decision_needs_a_known_action_on_a_request_the_approver_approves(self):
+        http = TestClient(self.load("approvals", {"faq": {}}).app)
+        self.assertEqual(http.post("/approvals/ss-0001", data={"action": "delete"}).status_code, 400, "only approve, reject or ask")
+        self.assertEqual(http.post("/approvals/ss-9999", data={"action": "approve"}).status_code, 404, "not a request they approve")
+        page = http.post("/approvals/ss-0001", data={"action": "reject", "comment": " "}).text
+        self.assertIn("Say why, so the requester knows what to change.", page, "a rejection says why")
+
+    def test_a_form_posted_from_another_site_is_refused(self):
+        http = TestClient(self.load("approvals", {"faq": {}}).app)
+        for site in ("cross-site", "same-site"):   # same-site: another app on the same domain
+            with self.subTest(site=site):
+                r = http.post("/approvals/ss-0001", data={"action": "approve"}, headers={"Sec-Fetch-Site": site})
+                self.assertEqual(r.status_code, 403)
+                r = http.post("/approvals/settings", data={"tab": "announcement", "banner.text": "x"}, headers={"Sec-Fetch-Site": site})
+                self.assertEqual(r.status_code, 403, "settings reach every page: never from elsewhere")
+        r = http.post("/approvals/ss-0001", data={"action": "approve"}, headers={"Sec-Fetch-Site": "same-origin"}, follow_redirects=False)
+        self.assertEqual(r.status_code, 303, "from the app itself: decided")
+
+    def test_settings_have_limits_and_an_unknown_one_is_refused(self):
+        import settings
+        self.assertEqual(settings.check("banner.text", "  a   b "), "a b", "spaces tidied")
+        for key, value, message in (("banner.text", "x" * 201, "under 200"), ("onboarding.prompt", "x" * 1001, "under 1,000"),
+                                    ("faq.data", "http://plain.example.com", "starts with https://"),
+                                    ("banner.until", "30/11/2026", "a date"), ("no.such", "x", "No setting")):
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, message):
+                settings.check(key, value)
+        self.assertEqual(settings.check("banner.text", "x" * 200), "x" * 200, "the limit itself is allowed")
+        for overrides in ({}, {"banner.text": {"value": "hi"}}):
+            with self.subTest(overrides=bool(overrides)):
+                shown = settings.apply({"links": {}}, overrides)
+                self.assertLessEqual({"banner", "onboarding", "links"}, set(shown), "what the pages read, with or without overrides")
+
     def test_each_business_unit_has_its_own_persona_links_one_at_a_time(self):
         main = self.load("approvals", {"links": {}, "faq": {}, "workspaces": [
             {"name": "gsp", "bu": "GSP", "host": "https://adb-1.1.azuredatabricks.net"},

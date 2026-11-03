@@ -459,6 +459,17 @@ class RequestsInTheDatabase(unittest.TestCase):
             p.run_recorded(row)
         self.assertEqual(db.events[-1][1:], ("start_failed", {"body": "The job could not be started."}))
 
+    def test_an_ai_summary_that_fails_never_blocks_a_request(self):
+        db = FakeStore()
+        p, fake = make(db)
+        p.config = {**p.config, "human_approval": ["project_schema"], "ai_summary": {"model": "system.ai.some-model"}}
+        with mock.patch.object(portal.summary_module, "summarize", side_effect=ConnectionError("model down")):
+            request_id = p.request_schema("fin", ANA, schema="fin_forecast", reason=WHY)
+            self.assertRegex(request_id, r"^ss-", "recorded and waiting for an approver")
+            row = {"id": request_id, "kind": "project_schema", "workspace": "fin", "requested_by": ANA, "name": "fin_forecast"}
+            self.assertIsNone(p.summarize(row), "the approvals app opens it with no summary, not an error")
+        self.assertEqual(fake.started, [], "nothing ran: it waits for the approver")
+
     def test_a_job_that_cannot_start_is_recorded_as_failed(self):
         db = FakeStore()
         p, fake = make(db)
@@ -809,6 +820,24 @@ class Pages(unittest.TestCase):
                 r = self.http.get(path, headers=self.as_ana)
                 self.assertEqual(r.status_code, 200, r.text[:300])
         self.assertNotIn('id="owner_group"', self.http.get("/folder", headers=self.as_ana).text, "no owner group: people share the folder themselves")
+
+    def test_a_wrong_kind_is_not_found_or_refused(self):
+        self.assertEqual(self.http.post("/schema/other", data={"workspace": "fin", "name": "x"}, headers=self.as_ana).status_code, 404)
+        self.main.CONFIG["ai_check"] = "on"
+        try:
+            r = self.http.post("/api/check", data={"kind": "warehouse", "workspace": "fin", "reason": WHY}, headers=self.as_ana)
+            self.assertEqual(r.status_code, 400, "only the kinds Validate knows")
+        finally:
+            self.main.CONFIG.pop("ai_check")
+
+    def test_the_requests_page_polls_only_the_persons_own_runs(self):
+        run_id = self.main.PORTAL.request_schema("fin", ANA)
+        mine = self.http.get(f"/api/requests?ids=fin/{run_id},fin/424242,", headers=self.as_ana).json()
+        self.assertEqual(set(mine), {f"fin/{run_id}"}, "unknown runs are left out; an empty id is ignored")
+        self.assertEqual(mine[f"fin/{run_id}"]["status"], "In progress")
+        self.assertEqual(self.http.get(f"/api/requests?ids=fin/{run_id}", headers={"X-Forwarded-Email": BO}).json(), {},
+                         "someone else's run is not shown")
+        self.assertEqual(self.http.get("/api/requests", headers=self.as_ana).json(), {})
 
     def test_folders_show_their_workspace_and_schemas_only_their_catalog(self):
         folder = self.http.get("/folder", headers=self.as_ana).text

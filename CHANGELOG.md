@@ -8,6 +8,12 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **Both apps refuse a form sent from another site** (or another app on the same domain),
+  from what the browser says (`Sec-Fetch-Site`): an approval runs a job, and Settings reach
+  every page.
+- More tests where a mistake would go unnoticed: decisions (a known action, only on requests
+  the approver approves), the settings' limits, polling only one's own runs, wrong kinds, and an
+  AI summary that fails without blocking the request.
 - **Docs match the code, for an organization installing it:**
   - `docs/SETUP.md` has a new step 12, **the self-service app**: what the hub needs (serverless,
     Apps, Lakebase, AI Decide, cross-workspace access behind Private Link), the two-pull-request
