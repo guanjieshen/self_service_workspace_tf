@@ -7,7 +7,7 @@ description: Use when someone wants to change the default (baseline) for every m
 
 The person may not know YAML or Terraform. Ask what they want in their own words, then translate; at most two questions at a time.
 
-**The defaults are `config/defaults/`**: `access.yaml`, `compute.yaml`, `cost.yaml`, `catalog.yaml`, `settings.yaml`, and `genie-code/`. A change there reaches **every** workspace in `config/workspaces/`. If they mean only one workspace, use the skill **change-one-workspace** instead.
+**The defaults are `config/defaults/`**: one file per area (access, compute, cost, catalog, settings) and `config/defaults/genie-code/`. A change there reaches **every** workspace in `config/workspaces/`. If they mean only one workspace, use the skill **change-one-workspace** instead.
 
 ## 1. Find the key
 
@@ -15,7 +15,7 @@ The person may not know YAML or Terraform. Ask what they want in their own words
 2. Open that file in `config/defaults/` and read the key's comment: **it is the key's documentation** (what it does, its values, what `null` means).
 3. If nothing fits, search the comments in `config/defaults/*.yaml`. If it still does not fit, say so: some things are not managed here (creating workspaces, the metastore, who is in a group: that is Entra ID), and changing the framework's code is for its maintainers.
 
-Common ones: the default warehouse, `sql_warehouse` in `compute.yaml`; tags, `tags` in `cost.yaml`; who may create tokens, `personas.<persona>.can_create_tokens` in `access.yaml`; an admin or security setting, `settings.<key>` in `settings.yaml`.
+Common ones: the default warehouse, `sql_warehouse` in `config/defaults/compute.yaml`; tags, `tags` in `config/defaults/cost.yaml`; who may create tokens, `personas.<persona>.can_create_tokens` in `config/defaults/access.yaml`; an admin or security setting, `settings.<key>` in `config/defaults/settings.yaml`.
 
 ## 2. Check which workspaces will not follow
 
