@@ -8,6 +8,9 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **Every route of both apps has a test request,** and a new one fails the suite until a test
+  asks for it (`EveryRoute`).
+
 - **The deploy's own flow is tested** (`scripts/app_deploy.py`, from 44% of its lines to 97%):
   a first install deploys twice, an existing hub once, a plan changes nothing, `app_ids` that
   are not the apps stop it, the database and reader roles, adopting resources, and the hub

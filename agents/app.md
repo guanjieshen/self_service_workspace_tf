@@ -188,6 +188,11 @@ python3 -m unittest discover -s tests          # or ./scripts/test.sh app from t
 PORTAL_CONFIG=<config.json> PORTAL_USER=<email> python3 main.py   # locally, signed in with the Databricks CLI
 ```
 
+**Every route has a test request** (`tests/test_ui.py`, `EveryRoute`): a new page or form fails the
+suite until a test asks for it. Line coverage is a weaker guide here: the coverage tool does not
+record the bodies of the `async def` routes that the test client runs (they run, and their
+tests check what they return).
+
 To run locally against a real database, use the Lakebase **dev** branch (never production):
 psycopg needs libpq (`brew install libpq`, then `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/opt/libpq/lib`),
 `PGUSER=<your email>`, and a `database` entry in `config.json` with the dev branch's host and

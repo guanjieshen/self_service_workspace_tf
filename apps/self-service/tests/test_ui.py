@@ -8,6 +8,7 @@ import importlib
 import json
 import os
 import pathlib
+import re
 import sys
 import tempfile
 import unittest
@@ -545,6 +546,26 @@ class Settings(unittest.TestCase):
         first = cached()
         with self.assertLogs("settings", "WARNING"):
             self.assertEqual(cached(), first)
+
+
+@unittest.skipIf(TestClient is None, "FastAPI is not installed")
+class EveryRoute(unittest.TestCase):
+    def test_every_route_of_both_apps_has_a_test_request(self):
+        """A new page or form comes with a test that asks for it. Matched in the test files' text:
+        a request to the path (its {parameters} any value), or, for a page reached by a redirect,
+        its fixed beginning (for example /request/)."""
+        tests = "\n".join(p.read_text() for p in pathlib.Path(__file__).parent.glob("test_*.py"))
+        main = load_main("approvals", {"faq": {}, "workspaces": [{"name": "fin", "bu": "FIN", "host": "https://adb-1.1.azuredatabricks.net"}]})
+        for route in main.app.routes:
+            path = getattr(route, "path", "")
+            if not path or path.startswith("/static") or path in ("/openapi.json", "/docs", "/redoc"):
+                continue
+            exact = re.sub(r"\\\{[a-z_]+\\\}", r"[^\"'\\s?]+", re.escape(path))
+            fixed = path.split("{")[0]
+            with self.subTest(route=path):
+                self.assertTrue(re.search(rf"""(get|post)\(\s*f?["']{exact}(["'?&]|$)""", tests, re.I)
+                                or ("{" in path and len(fixed) > 1 and f"^{fixed}" in tests or f'"{fixed}' in tests),
+                                f"{path}: no test asks for it")
 
 
 @unittest.skipIf(TestClient is None, "FastAPI is not installed")
