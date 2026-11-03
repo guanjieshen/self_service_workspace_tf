@@ -8,6 +8,7 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **Add a group to your workspace** moves to **Build**, next to the folder it lets you share.
 - **Genie One Onboarding** says "Opens in Databricks (workspace access is required)", like the Data cards.
 - **The folder form no longer asks who can manage the folder.** The requester manages it (and
   the workspace's platform admins), and shares it with others in Databricks once it exists.
