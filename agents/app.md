@@ -229,6 +229,10 @@ deploy would change, signed in with the Databricks CLI: `python3 scripts/app_dep
 - The user's forwarded token is the hub's: another workspace's SCIM `/Me` may not accept it,
   so the team schema form may offer no groups there. (The folder form asks for none: people
   share a folder themselves once it exists.)
-- The approvals app reads each listed request's run (one Jobs API call each): fine for
-  hundreds of requests, slow for thousands. Batch it per workspace if that comes.
+- The approvals app reads each listed request's run once (a finished run is never read again),
+  8 side by side after a deploy (`LakebaseStore._warm`): a cold inbox of thousands of requests
+  still takes a moment on its first load.
+- Two requests for the same new folder at the same instant can both succeed, and both people
+  then manage it (the schema job refuses the second: `CREATE SCHEMA` without `IF NOT EXISTS`).
+  Workspace folders have no exclusive create; the window is milliseconds.
 - In-memory caches are per app process; they reset on every deploy.
