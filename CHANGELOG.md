@@ -8,6 +8,14 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **Self-service links open in the person's own workspace.** Discover data, Review data access
+  requests and Genie One now open in the person's business unit's workspace, not the hub.
+  `{host}` and `{workspace_id}` in `config/self-service/app.yaml` links are that workspace's, and
+  `o=` is Terraform's workspace ID, so custom URLs work too.
+- **Request workspace access says which workspace** it is for.
+- **The Genie One Onboarding prompt spells out each step** (Genie One does not start the
+  `onboard-me` skill from a link). `{catalog}` in the prompt is the person's workspace catalog.
+
 - **Self-service forms say where a request goes.** A folder request always shows its workspace
   (the person's business unit's), even when there is only one. Schema requests no longer show a
   workspace: Unity Catalog is not tied to one, so they show only the catalog (a choice of catalog

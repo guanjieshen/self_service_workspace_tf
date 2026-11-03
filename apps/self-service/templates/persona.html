@@ -11,7 +11,7 @@
 ] %}
 {% set request = links.persona_request %}
 
-{% call callout() %}Everyone starts with Consumer access to shared dashboards, Genie and apps. Additional access requires approval and typically takes effect within an hour.{% endcall %}
+{% call callout() %}{% if workspace %}This is access to <span class="strong">{{ workspace.bu }} · {{ workspace.name }}</span>, your business unit's workspace. {% endif %}Everyone starts with Consumer access to shared dashboards, Genie and apps. Additional access requires approval and typically takes effect within an hour.{% endcall %}
 
 <div class="options">
   {% for key, name, summary, can, ready in personas %}

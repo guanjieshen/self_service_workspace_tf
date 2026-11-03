@@ -167,7 +167,7 @@ def catalog(request: Request):
     user = user_of(request)
     shown = settings.apply(CONFIG, SETTINGS())   # the links and the onboarding prompt, as admins set them
     return page(request, "catalog.html", nav="catalog", personal=personal_schema(user), ask_bu=PORTAL.needs_bu_choice(user),
-                groups=cards.groups(shown.get("links"), PORTAL.onboarding_link(user, shown["onboarding"]["prompt"])))
+                groups=cards.groups(PORTAL.links_for(user, shown.get("links")), PORTAL.onboarding_link(user, shown["onboarding"]["prompt"])))
 
 
 @app.get("/schema", response_class=HTMLResponse)
@@ -281,7 +281,7 @@ async def folder_submit(request: Request):
 @app.get("/persona", response_class=HTMLResponse)
 def persona(request: Request):
     """The personas, each with where to ask for it (links.persona_request)."""
-    return page(request, "persona.html", nav="catalog")
+    return page(request, "persona.html", nav="catalog", workspace=PORTAL.my_workspace(user_of(request)))
 
 
 @app.get("/ask", response_class=HTMLResponse)

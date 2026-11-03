@@ -19,7 +19,8 @@ self_service_app:
     persona_request: null
     # Where people review data access requests in Databricks: the ones they made, and the ones
     # others made for their data (Catalog Explorer's requests view). {host} and {workspace_id}
-    # are the hub's; or a full URL (for example on your own domain). null = no tile.
+    # are the person's own workspace's (their business unit's), not the hub's; or a full URL
+    # (for example on your own domain). null = no tile.
     review_requests: "{host}/explore/data?o={workspace_id}&requestsView=audit"
     # The workspace's Discover page: data assets curated by business domain. {host} and
     # {workspace_id} as above; null = no Discover data card.
@@ -78,12 +79,22 @@ self_service_app:
   ai_summary:
     model: system.ai.claude-sonnet-5-5   # null = no summary
   # Genie One Onboarding: a card that opens Genie One in the person's workspace with this question
-  # already asked. "onboard me" starts the onboard-me skill every workspace gets
-  # (config/defaults/genie-code/skills/onboard-me/): an introduction, the data the person can see,
-  # first questions, and notes so later sessions coach them. Platform admins change it in the
-  # approvals app's Settings; "" hides the card.
+  # already asked. Genie One does not start the onboard-me skill from a link, so the prompt spells
+  # out each step. {catalog} is the person's workspace catalog. Keep it under about 1,500
+  # characters: it travels in the link. Platform admins change it in the approvals app's
+  # Settings; "" hides the card.
   onboarding:
-    prompt: onboard me
+    prompt: >-
+      I'm new here. Please onboard me, one step at a time, in plain words and short answers.
+      1) In two or three sentences, tell me what I can do with Genie One in this workspace:
+      ask questions of data in plain language, find data, and build dashboards.
+      2) Look at the data I can access, starting with the {catalog} catalog. Name the most
+      useful schemas and tables, with one line each on what they seem to hold. Describe only
+      what you find, and say when you are guessing from names.
+      3) If I can't see any data yet, say so plainly, and that access comes from my platform team.
+      4) Suggest three specific questions I could ask right now that those tables can answer,
+      and offer to answer one.
+      5) Then ask me my role and what I want to achieve with data, and suggest one small next step.
   # FAQ pages: an FAQ link beside each section of the catalog, and "How it works" for people
   # who are new. null = no link. PLACEHOLDERS until the real pages exist: replace each with
   # its SharePoint page.
