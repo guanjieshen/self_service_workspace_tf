@@ -258,7 +258,7 @@ class App(unittest.TestCase):
     def setUp(self):
         Affected.setUp(self)
         (self.repo / "config/self-service").mkdir(parents=True)
-        (self.repo / "config/self-service/hub.yaml").write_text("app_ids: {}\n")
+        (self.repo / "config/self-service/hub.yaml").write_text("hub:\n  host: https://adb-1.1.azuredatabricks.net\napp_ids: {}\n")
         (self.repo / "apps/self-service").mkdir(parents=True)
         (self.repo / "apps/self-service/main.py").write_text("x\n")
         self.git("add", "-A")
@@ -289,6 +289,12 @@ class App(unittest.TestCase):
     def test_the_hub_file_plans_terraform_too(self):
         self.change("config/self-service/hub.yaml")
         self.assertEqual(self.affected(plan=True)["workspaces"], ["alpha", "beta", "gamma"], "Terraform grants its app_ids")
+
+    def test_an_app_not_set_up_yet_is_never_planned_or_deployed(self):
+        # A fresh install: hub.yaml as it ships (hub.host null). Nothing to deploy to, so no red check.
+        (self.repo / "config/self-service/hub.yaml").write_text("hub:\n  name: null\n  host: null # its URL\napp_ids: {}\n")
+        self.change("apps/self-service/main.py", "config/workspaces/alpha.yaml")
+        self.assertFalse(self.app())
 
     def test_no_app_in_the_repository(self):
         (self.repo / "config/self-service/hub.yaml").unlink()
