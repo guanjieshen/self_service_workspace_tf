@@ -99,7 +99,16 @@ if not exists:
 if request_id:
     tags["cd_request_id"] = request_id
 
-spark.sql(f"CREATE SCHEMA IF NOT EXISTS {name} COMMENT '{kind.capitalize()} schema of {owner_group or user} (self-service)'")
+# A new schema is created on its own (no IF NOT EXISTS): when two requests for the same name run
+# at once, both see it missing, and only the first may create it; the other stops here, so it is
+# never handed to two people. An existing one (checked above: this user's) is a run again.
+if not exists:
+    try:
+        spark.sql(f"CREATE SCHEMA {name} COMMENT '{kind.capitalize()} schema of {owner_group or user} (self-service)'")
+    except Exception as e:
+        if "ALREADY_EXISTS" in str(e) or "already exists" in str(e):
+            raise ValueError(f"{catalog}.{schema} was just created by another request: choose another name") from e
+        raise
 spark.sql(f"ALTER SCHEMA {name} SET TAGS ({', '.join(f'{k!r} = {v!r}' for k, v in tags.items())})")
 grant = ', '.join(p.replace('_', ' ') for p in privileges)
 spark.sql(f"GRANT {grant} ON SCHEMA {name} TO `{user}`")

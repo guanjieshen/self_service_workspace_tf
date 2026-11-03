@@ -2,6 +2,7 @@
 read from the app's database (LakebaseStore). Tests use tests/sample_store.py instead.
 """
 import datetime as dt
+from concurrent.futures import ThreadPoolExecutor
 
 # Every kind of request, as approvers read it (the database's kinds).
 TYPES = {"personal_schema": "Personal schema", "project_schema": "Project schema", "team_schema": "Team schema", "folder": "Workspace folder"}
@@ -57,6 +58,15 @@ class LakebaseStore:
             return row["state"]
         return "waiting"
 
+    def _warm(self, rows):
+        """Read the job runs of these rows' requests side by side (8 at a time), before the page
+        reads them one by one: after a deploy, nothing is cached and an inbox may list thousands."""
+        runs = {(r["workspace"], r["run"]["run_id"]) for r in rows if r["state"] == "run_started" and (r["run"] or {}).get("run_id")}
+        if len(runs) > 1:
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                list(pool.map(lambda k: self.run_status(*k), runs))
+        return rows
+
     def needs_person(self, row):
         """A request a person decides: its kind needs one (human_approval), and no job has run for it."""
         return not row["run"] and row["kind"] in self.human_approval
@@ -71,8 +81,8 @@ class LakebaseStore:
         return sorted(out, key=lambda r: r["submitted"])
 
     def all(self, approver, bu=None, kind=None):
-        rows = self.db.requests_in([bu] if bu else self._bus, limit=1000)
-        return [self._record(r) for r in rows if not kind or r["kind"] == kind]
+        rows = self._warm([r for r in self.db.requests_in([bu] if bu else self._bus, limit=1000) if not kind or r["kind"] == kind])
+        return [self._record(r) for r in rows]
 
     def history(self, approver):
         return [r for r in self.all(approver) if r["status"] in ("approved", "rejected")]

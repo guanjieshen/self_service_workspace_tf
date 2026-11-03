@@ -97,6 +97,16 @@ def user_of(request):
 
 
 @app.middleware("http")
+async def same_origin_forms(request: Request, call_next):
+    """A form posted from another site (or another app on the same domain) is refused: the
+    browser says where a request comes from (Sec-Fetch-Site), whatever proxy is in between. An
+    approval runs a job and Settings reach every page, so neither may be sent from elsewhere."""
+    if request.method == "POST" and request.headers.get("sec-fetch-site") in ("cross-site", "same-site"):
+        return HTMLResponse("This form was sent from another site, so it was refused.", status_code=403)
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def business_unit_first(request: Request, call_next):
     """A request sent before choosing a business unit (when one must be chosen) goes to the
     choice instead: the pages ask first (page()), and this covers a form posted anyway."""

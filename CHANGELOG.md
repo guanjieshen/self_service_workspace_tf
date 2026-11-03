@@ -8,6 +8,17 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **Two requests for the same new schema name never share it:** the schema job creates a new
+  schema on its own (no `IF NOT EXISTS`), so when two run at once only the first gets it and the
+  other stops with "choose another name".
+- **The approvals inbox reads each job run once, and side by side** (8 at a time) after a deploy,
+  instead of two calls per request one after another.
+- **Both apps refuse a form sent from another site** (or another app on the same domain),
+  from what the browser says (`Sec-Fetch-Site`): an approval runs a job, and Settings reach
+  every page.
+- More tests where a mistake would go unnoticed: decisions (a known action, only on requests
+  the approver approves), the settings' limits, polling only one's own runs, wrong kinds, and an
+  AI summary that fails without blocking the request.
 - **Docs match the code, for an organization installing it:**
   - `docs/SETUP.md` has a new step 12, **the self-service app**: what the hub needs (serverless,
     Apps, Lakebase, AI Decide, cross-workspace access behind Private Link), the two-pull-request

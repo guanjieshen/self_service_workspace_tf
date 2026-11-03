@@ -240,6 +240,7 @@ class Portal:
         self._runs = {}       # (workspace, run_id) -> (time read, Request or None)
         self._personal = {}   # (workspace, user) -> (time read, the personal schema card)
         self._checks = {}     # the request asked about -> (time, the AI check's result)
+        self._statuses = {}   # (workspace, run_id) -> (time read, status), for the approvals app
         self._bus = {}        # person -> (time read, their business unit or None), for the BU lookup
         self._chosen = {}     # person -> (time read, the business unit they chose or None), without it
 
@@ -789,21 +790,20 @@ class Portal:
         whose approvers see every request in their business units. Finished when the Jobs API no
         longer has it; None if it cannot be read."""
         key = (ws_name, int(run_id))
-        cached = self._runs.get(key)
-        if cached and cached[1] is not None and cached[1].status != "In progress":
-            return cached[1].status
-        try:
-            owner = None
-            w = next((w for w in self.workspaces() if w.name == ws_name and not w.error), None)
-            if w is None:
-                return None
-            run = self.client(w.host).jobs.get_run(int(run_id))
-            kind = next((k for k, j in w.jobs.items() if j["id"] == run.job_id), None)
-            owner = requester(kind, params_of(run)) if kind else None
-            r = self.run(ws_name, run_id, owner) if owner else None
-            return r.status if r else status_of(run.state)
+        cached = self._statuses.get(key)   # a finished run never changes; one in progress is read again after a few seconds
+        if cached and (cached[1] != "In progress" or time.time() - cached[0] < self.run_cache_seconds):
+            return cached[1]
+        w = next((w for w in self.workspaces() if w.name == ws_name and not w.error), None)
+        if w is None:
+            return None
+        try:   # one call: the status only (the requester's own page reads the details)
+            status = status_of(self.client(w.host).jobs.get_run(int(run_id)).state)
         except Exception as e:
-            return "Finished" if isinstance(e, NotFound) or "does not exist" in str(e).lower() else None
+            if not (isinstance(e, NotFound) or "does not exist" in str(e).lower()):
+                return None
+            status = "Finished"   # the Jobs API no longer has it
+        keep(self._statuses, key, status)
+        return status
 
     def runs(self, ids, user, limit=20):
         """Several of the user's requests at once ("workspace/run_id" each), for the Requests page."""
