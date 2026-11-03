@@ -81,7 +81,11 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           sign-in: "false"
-      - run: python3 -m pip install --quiet -r apps/self-service/requirements.txt
-      - run: python3 -m unittest discover -s apps/self-service/tests -p "test_db.py" -v
+      - run: python3 -m pip install --quiet -r apps/self-service/requirements.txt coverage
+      # Under coverage, so the log shows how much of the database code (store.py, db/) ran.
+      - run: |
+          python3 -m coverage run --include="apps/self-service/store.py,apps/self-service/db/*" \
+            -m unittest discover -s apps/self-service/tests -p "test_db.py" -v
+          python3 -m coverage report -m
         env:
           PG_TEST_DSN: host=localhost port=5432 user=postgres dbname=postgres
