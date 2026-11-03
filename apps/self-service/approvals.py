@@ -144,14 +144,18 @@ def register(app, page, user_of, store, config=None):
     tabs = {key: (label, titles) for key, label, titles in settings.TABS}
 
     @app.get("/approvals/settings", response_class=HTMLResponse)
-    def settings_page(request: Request, tab: str = "", error: str = "", saved: str = "", form: dict = None):
+    def settings_page(request: Request, tab: str = "", bu: str = "", error: str = "", saved: str = "", form: dict = None):
         """The self-service app's links, banner and onboarding prompt (settings.py), one tab at a
         time: the defaults, which an approver may override here; every change is kept with who
-        made it (the Change history tab)."""
+        made it (the Change history tab). The persona request links show one business unit at a
+        time (bu; empty: the links for all of them)."""
         tab = tab if tab in tabs else settings.TABS[0][0]
+        bu = bu if bu in settings.BUSINESS_UNITS else ""
         overrides = store.settings()
+        sections = [settings.bu_section(bu) if s[0] == "Persona request links" else s
+                    for s in settings.SECTIONS if s[0] in tabs[tab][1]]
         return page(request, "approvals/settings.html", nav="settings", **ctx(
-            request, tab=tab, tabs=settings.TABS, sections=[s for s in settings.SECTIONS if s[0] in tabs[tab][1]],
+            request, tab=tab, tabs=settings.TABS, sections=sections, bu=bu, bus=settings.BUSINESS_UNITS,
             values={**settings.values(config, overrides), **(form or {})}, defaults=settings.defaults(config),
             overrides={k: v for k, v in overrides.items() if v.get("value") is not None}, error=error, saved=saved == "1"))
 
@@ -180,10 +184,11 @@ def register(app, page, user_of, store, config=None):
             else:
                 changes = settings.changes(config, store.settings(), form)
         except ValueError as e:
-            return settings_page(request, tab=tab, error=str(e), form={k: v for k, v in form.items() if k in settings.KINDS})
+            return settings_page(request, tab=tab, bu=form.get("bu", ""), error=str(e), form={k: v for k, v in form.items() if k in settings.KINDS})
         if changes:
             store.set_settings(changes, user_of(request))
-        return RedirectResponse(f"/approvals/settings?{urlencode({'tab': tab, **({'saved': 1} if changes else {})})}", status_code=303)
+        bu = form.get("bu") if form.get("bu") in settings.BUSINESS_UNITS else ""
+        return RedirectResponse(f"/approvals/settings?{urlencode({'tab': tab, **({'bu': bu} if bu else {}), **({'saved': 1} if changes else {})})}", status_code=303)
 
     @app.get("/approvals/{request_id}", response_class=HTMLResponse)
     def detail(request: Request, request_id: str, error: str = "", back: str = ""):

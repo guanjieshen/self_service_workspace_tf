@@ -29,10 +29,8 @@ SECTIONS = [
         ("banner.until", "Show until", "date")]),
     ("Genie One Onboarding", "The question the Genie One Onboarding card asks Genie in the person's workspace. Empty hides the card.", [
         ("onboarding.prompt", "Prompt", "prompt")]),
-    ("Persona request links", "Links to request each access level, such as a ServiceNow catalog item. Used in every business unit's workspace that has no links of its own (below).", [
+    ("Persona request links", "Links to request each access level, such as a ServiceNow catalog item, for every business unit without links of its own.", [
         (f"persona_request.{p}", p.title(), "url") for p in PERSONAS]),
-    ("Group request link", "Where people ask for an Entra group to be added to their workspace with a persona, such as a ServiceNow form. Empty shows the card as Coming soon.", [
-        ("group_request", "Add a group to your workspace", "url")]),
     ("FAQ pages", "FAQ links shown in each catalog section.", [
         (f"faq.{k}", label, "url") for k, label in FAQS.items()]),
     ("Standard operating procedures", "SOP links shown on each catalog item.", [
@@ -42,7 +40,7 @@ SECTIONS = [
 # Onboarding section shows; the change history is a tab of its own (approvals.py).
 TABS = [
     ("announcement", "Announcement", ["Announcement banner"]),
-    ("onboarding", "Onboarding", ["Genie One Onboarding", "Persona request links", "Group request link"]),
+    ("onboarding", "Onboarding", ["Genie One Onboarding", "Persona request links"]),
     ("help", "Help links", ["FAQ pages", "Standard operating procedures"]),
 ]
 BUSINESS_UNITS = []   # the business units the app serves (use()): each gets its own persona request links
@@ -56,20 +54,21 @@ def _index():
 
 
 def use(business_units):
-    """Add a persona request links section per business unit (config.json's workspaces), after
-    the general one: each workspace's own access requests, such as its ServiceNow items."""
+    """Persona request links for each business unit (config.json's workspaces): each workspace's
+    own access requests, such as its ServiceNow items. The Settings page shows one business unit
+    at a time, chosen in the section (bu_section)."""
     global BUSINESS_UNITS
     BUSINESS_UNITS = sorted({bu.upper() for bu in business_units})
     SECTIONS[:] = [s for s in SECTIONS if not s[0].startswith("Persona request links · ")]
-    at = next(i for i, s in enumerate(SECTIONS) if s[0] == "Persona request links") + 1
-    SECTIONS[at:at] = [(f"Persona request links · {bu}", f"The {bu} workspace's links. Empty uses the link above.", [
-        (f"persona_request.{bu}.{p}", p.title(), "url") for p in PERSONAS]) for bu in BUSINESS_UNITS]
-    for key, label, titles in TABS:
-        if key == "onboarding":
-            titles[:] = [t for t in titles if not t.startswith("Persona request links · ")]
-            i = titles.index("Persona request links") + 1
-            titles[i:i] = [f"Persona request links · {bu}" for bu in BUSINESS_UNITS]
+    SECTIONS.extend((f"Persona request links · {bu}", f"{bu}'s own links. Empty uses the links for all business units.", [
+        (f"persona_request.{bu}.{p}", p.title(), "url") for p in PERSONAS]) for bu in BUSINESS_UNITS)
     _index()
+
+
+def bu_section(bu):
+    """The persona request links section to show: one business unit's, or the general one."""
+    title = f"Persona request links · {bu}" if bu in BUSINESS_UNITS else "Persona request links"
+    return next(s for s in SECTIONS if s[0] == title)
 
 
 _index()
@@ -79,8 +78,7 @@ def defaults(config):
     """Each setting's value from app.yaml ("" when it has none)."""
     links = config.get("links") or {}
     persona = links.get("persona_request")
-    out = {"banner.text": "", "banner.until": "", "onboarding.prompt": (config.get("onboarding") or {}).get("prompt") or "",
-           "group_request": links.get("group_request") or ""}
+    out = {"banner.text": "", "banner.until": "", "onboarding.prompt": (config.get("onboarding") or {}).get("prompt") or ""}
     for p in PERSONAS:
         out[f"persona_request.{p}"] = (persona.get(p) if isinstance(persona, dict) else persona) or ""
         for bu in BUSINESS_UNITS:
@@ -111,7 +109,7 @@ def apply(config, overrides, today=None):
     links = {**(config.get("links") or {}),
              "persona_request": {p: v[f"persona_request.{p}"] or None for p in PERSONAS},
              "persona_request_by_bu": {bu: {p: v[f"persona_request.{bu}.{p}"] or None for p in PERSONAS} for bu in BUSINESS_UNITS},
-             "sop": {k: v[f"sop.{k}"] or None for k in SOPS}, "group_request": v["group_request"] or None}
+             "sop": {k: v[f"sop.{k}"] or None for k in SOPS}}
     today = today or dt.datetime.now(dt.timezone.utc).date()
     until = v["banner.until"]
     shown = v["banner.text"] and not (until and until < today.isoformat())

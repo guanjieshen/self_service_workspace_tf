@@ -533,16 +533,24 @@ class SettingsPages(unittest.TestCase):
     def load(self, mode, config):
         return load_main(mode, config)
 
-    def test_each_business_unit_has_its_own_persona_links(self):
+    def test_each_business_unit_has_its_own_persona_links_one_at_a_time(self):
         main = self.load("approvals", {"links": {}, "faq": {}, "workspaces": [
             {"name": "gsp", "bu": "GSP", "host": "https://adb-1.1.azuredatabricks.net"},
             {"name": "gsq", "bu": "GSQ", "host": "https://adb-2.2.azuredatabricks.net"}]})
-        page = TestClient(main.app).get("/approvals/settings?tab=onboarding").text
-        for bu in ("GSP", "GSQ"):
-            with self.subTest(bu=bu):
-                self.assertIn(f"Persona request links · {bu}", page)
-                self.assertIn(f'name="persona_request.{bu}.builder"', page)
-        self.assertLess(page.index("Persona request links · GSP"), page.index("Group request link"), "next to the general links")
+        http = TestClient(main.app)
+        page = http.get("/approvals/settings?tab=onboarding").text
+        self.assertIn('<option value="">All business units</option>', page, "a selector, not a section per business unit")
+        self.assertIn('<option value="GSQ" >GSQ</option>', page)
+        self.assertIn('name="persona_request.builder"', page, "all business units by default")
+        self.assertNotIn("persona_request.GSP.", page)
+        page = http.get("/approvals/settings?tab=onboarding&bu=GSP").text
+        self.assertIn('name="persona_request.GSP.builder"', page)
+        self.assertNotIn('name="persona_request.builder"', page, "one business unit at a time")
+        self.assertIn('<option value="GSP" selected>GSP</option>', page)
+        r = http.post("/approvals/settings", data={"tab": "onboarding", "bu": "GSP", "persona_request.GSP.builder": "https://sn.example.com/gsp"},
+                      follow_redirects=False)
+        self.assertEqual(r.headers["location"], "/approvals/settings?tab=onboarding&bu=GSP&saved=1", "back to the same business unit")
+        self.assertNotIn("Group request link", page, "not a setting for now")
 
     def test_an_approver_changes_a_link_and_resets_it(self):
         main = self.load("approvals", {"links": {"persona_request": "https://snow.example.com/all"}, "faq": {}})

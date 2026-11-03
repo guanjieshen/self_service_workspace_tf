@@ -765,8 +765,7 @@ class Cards(unittest.TestCase):
         opens = {c.key: c.opens for c in cards.CARDS}
         self.assertEqual(opens["discover"], "Opens in Databricks (workspace access is required)")
         self.assertEqual(opens["onboarding"], "Opens in Databricks (workspace access is required)")
-        shown = settings.apply({"links": {"group_request": None}}, {"group_request": {"value": "https://sn.example.com/g"}})
-        self.assertEqual(shown["links"]["group_request"], "https://sn.example.com/g", "platform admins set it in Settings")
+        self.assertNotIn("group_request", settings.KINDS, "set in app.yaml (links.group_request), not in Settings, for now")
 
     def test_every_section_has_an_faq_setting(self):
         import cards

@@ -8,10 +8,10 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
-- **Persona request links per business unit.** The approvals app's Settings (Onboarding) has a
-  section of Explorer, Builder and Publisher links for each business unit the app serves, next
-  to the general ones. Request workspace access uses the person's own business unit's link, or
-  the general one where it has none.
+- **Persona request links per business unit.** In the approvals app's Settings (Onboarding), a
+  **Business unit** selector (All business units, or one of those the app serves) shows the
+  Explorer, Builder and Publisher links to edit. Request workspace access uses the person's own
+  business unit's link, or the one for all business units where it has none.
 - **Choosing a business unit comes first.** Until someone has chosen one (when there are several
   and no lookup function), every page takes them to the choice, then back where they were going;
   they change it later from their name. The choice page is redesigned: one card per business
@@ -52,8 +52,8 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 - **A new card, Add a group to your workspace** (Get started): a link to your organization's
   form for adding an Entra group to a workspace with a persona (for example ServiceNow).
-  Set it in `config/self-service/app.yaml` (`links.group_request`) or in the approvals app's
-  Settings (Onboarding). Until then the card shows as Coming soon.
+  Set it in `config/self-service/app.yaml` (`links.group_request`). Until then the card shows as
+  Coming soon.
 - Discover data and Review data access requests say **"Opens in Databricks (workspace access is
   required)"**. The onboarding prompt asks about **the data assets you have access to**.
 - **Platform admins can manage every requested workspace folder.** The folder job gives the
