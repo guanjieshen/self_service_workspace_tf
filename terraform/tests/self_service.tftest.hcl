@@ -28,6 +28,10 @@ run "served_workspace" {
     error_message = "Both apps' service principals are assigned to a workspace the app serves."
   }
   assert {
+    condition     = toset(keys(databricks_entitlements.self_service_app)) == toset(["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]) && alltrue([for e in databricks_entitlements.self_service_app : e.workspace_access])
+    error_message = "Both apps get workspace access (the users group has none), so they can use the Jobs API."
+  }
+  assert {
     condition     = local.catalog_grants["11111111-1111-1111-1111-111111111111"] == tolist(["BROWSE", "USE_CATALOG"]) && local.catalog_grants["22222222-2222-2222-2222-222222222222"] == tolist(["BROWSE", "USE_CATALOG"])
     error_message = "The apps may see the catalog (USE CATALOG, BROWSE) and nothing more."
   }
@@ -46,7 +50,7 @@ run "not_served" {
   variables { workspace = "not-served" }
 
   assert {
-    condition     = length(databricks_permission_assignment.self_service_app) == 0 && !contains(keys(local.catalog_grants), "11111111-1111-1111-1111-111111111111")
+    condition     = length(databricks_permission_assignment.self_service_app) == 0 && length(databricks_entitlements.self_service_app) == 0 && !contains(keys(local.catalog_grants), "11111111-1111-1111-1111-111111111111")
     error_message = "self_service: false: no assignment and no catalog grants for the apps."
   }
   assert {

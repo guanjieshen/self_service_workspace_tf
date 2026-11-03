@@ -24,6 +24,11 @@ that you may want to copy. A setting missing from your baseline is left alone.
   It keeps a short profile in the user's own folder (`.onboarding/profile.md`), only with their
   permission. The first plan adds the skill's file to every workspace.
 
+- **The self-service apps get workspace access in the workspaces they serve**
+  (`terraform/self_service.tf`): the baseline gives the users group no entitlements, so without
+  it the apps could not use the Jobs API there and found no jobs. The first plan shows two
+  entitlements per served workspace.
+
 - **A first install of the self-service app** is two pull requests (the first creates the hub and
   the jobs, the second sets `app_ids`, so Terraform assigns the apps and the deploy grants them
   the jobs), and a deploy says how to clear a Lakebase project that was deleted but not purged.
