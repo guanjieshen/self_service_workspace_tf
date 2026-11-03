@@ -219,7 +219,7 @@ next apply. What the app needs on those, Terraform grants (`terraform/self_servi
 | The catalog `{prefix}_citizen_dev` and its grants, including the apps' `USE_CATALOG` and `BROWSE` | Terraform | the bundles and the jobs never grant on the catalog |
 | Schemas in the catalog and their grants; team folders `/Workspace/<team>` | The jobs, on request | Terraform never manages them |
 | The usage policy and who may use it (including the jobs' identity) | Terraform | the bundles only refer to its ID |
-| The apps' service principals' assignment to served workspaces | Terraform | the bundles do not assign |
+| The apps' service principals' assignment to served workspaces, and their workspace access entitlement | Terraform | the bundles do not assign |
 | The jobs, their notebooks and who may run them (the hub's two apps) | `bundle/jobs/` | Terraform never manages them |
 | Both apps, their permissions, the Lakebase project, its database and migrations | `bundle/hub/`, `app_deploy.py` | Terraform never manages them |
 
