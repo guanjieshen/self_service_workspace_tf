@@ -11,7 +11,7 @@ import unittest
 from notebook_helpers import ROOT, RecordsSpark, render_notebook
 
 NOTEBOOK = (ROOT / "bundle/jobs/notebooks/personal_schema.py").read_text()
-GROUPS = {"a@contoso.com": ["fin-data-eng", "fin-local"], "guanjie.shen@contoso.com": []}   # each user's groups
+GROUPS = {"a@contoso.com": ["fin-data-eng", "fin-local"], "sam.lee@contoso.com": []}   # each user's groups
 CONFIG = {"prefix": "cd_", "privileges": ["ALL_PRIVILEGES", "MANAGE"], "owner": "fin_platform_admins", "allowed_catalogs": ["fin_citizen_dev"]}
 
 
@@ -77,16 +77,16 @@ def run(params, schemas=None, config=None, records=None):
 
 class PersonalSchema(unittest.TestCase):
     def test_creates_tags_grants_and_hands_over_a_new_schema(self):
-        sql, result = run({"user": "Guanjie.Shen@contoso.com", "request_id": "REQ-42"})
-        self.assertEqual(result, {"catalog": "fin_citizen_dev", "schema": "cd_guanjie_shen", "kind": "personal",
-                                  "user": "guanjie.shen@contoso.com", "owner_group": "", "reason": "", "created": True})
-        self.assertEqual(sql[0], "CREATE SCHEMA IF NOT EXISTS `fin_citizen_dev`.`cd_guanjie_shen` "
-                                 "COMMENT 'Personal schema of guanjie.shen@contoso.com (self-service)'")
-        self.assertIn("'cd_managed_by' = 'self_service', 'cd_user' = 'guanjie.shen@contoso.com', 'cd_schema_kind' = 'personal', 'cd_created' = ", sql[1])
+        sql, result = run({"user": "Sam.Lee@contoso.com", "request_id": "REQ-42"})
+        self.assertEqual(result, {"catalog": "fin_citizen_dev", "schema": "cd_sam_lee", "kind": "personal",
+                                  "user": "sam.lee@contoso.com", "owner_group": "", "reason": "", "created": True})
+        self.assertEqual(sql[0], "CREATE SCHEMA IF NOT EXISTS `fin_citizen_dev`.`cd_sam_lee` "
+                                 "COMMENT 'Personal schema of sam.lee@contoso.com (self-service)'")
+        self.assertIn("'cd_managed_by' = 'self_service', 'cd_user' = 'sam.lee@contoso.com', 'cd_schema_kind' = 'personal', 'cd_created' = ", sql[1])
         self.assertIn("'cd_request_id' = 'REQ-42'", sql[1])
-        self.assertEqual(sql[2], "GRANT ALL PRIVILEGES, MANAGE ON SCHEMA `fin_citizen_dev`.`cd_guanjie_shen` TO `guanjie.shen@contoso.com`",
+        self.assertEqual(sql[2], "GRANT ALL PRIVILEGES, MANAGE ON SCHEMA `fin_citizen_dev`.`cd_sam_lee` TO `sam.lee@contoso.com`",
                          "SQL spells ALL_PRIVILEGES as ALL PRIVILEGES; MANAGE lets them share it")
-        self.assertEqual(sql[3], "ALTER SCHEMA `fin_citizen_dev`.`cd_guanjie_shen` OWNER TO `fin_platform_admins`")
+        self.assertEqual(sql[3], "ALTER SCHEMA `fin_citizen_dev`.`cd_sam_lee` OWNER TO `fin_platform_admins`")
         self.assertEqual(len(sql), 4)
 
     def test_tags_come_before_the_grant_so_a_failed_run_can_be_run_again(self):

@@ -22,10 +22,14 @@ browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py
                          the job checks the request again and does the work
 ```
 
+- **The business unit comes first.** Without a lookup function (`bu_lookup`), a person chooses
+  their business unit (a served workspace, by its prefix) before any page shows (`main.page`
+  redirects); it decides where their requests go and where the Databricks links open
+  (`portal.my_workspace`).
 - **It changes nothing itself.** A request is a run of a workspace's job. The job is the
   security boundary; the app's checks are for a good message, not for safety.
 - **One central copy, many workspaces.** `config.json` (written by the deployment from the app's
-  settings, `config.defaults.yaml`) lists the workspaces.
+  settings, `config/self-service/app.yaml`) lists the workspaces.
   The app finds each one's jobs by their `cd_self_service` tag and reads what the jobs say
   about themselves from other tags (`cd_catalog`, `cd_prefix`, `cd_root`). Never hardcode
   what a job's tags say.
@@ -43,8 +47,10 @@ browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py
 | `main.py` | Routes and pages only: who the user is, read the form, call `portal`, render |
 | `portal.py` | The logic: discovery, checks, running jobs, describing runs, caches. No web framework |
 | `approvals.py`, `approvals_store.py` | The approvals app (the same code, `mode: approvals`): its pages, and its data (`LakebaseStore`; tests use `tests/sample_store.py`) |
-| `settings.py` | What approvers change in the approvals app's Settings (links, banner): the list, checks, and how they override app.yaml |
-| `checks.py` | The AI check behind Validate on the forms: one AI Decide call, four questions on the name and reason, advice for the requester only |
+| `store.py`, `db/` | The requests database: `store.Store` (every query), `db/migrations/` (numbered SQL, run once each by `db/migrate.py` at deploy), `db/grants.sql` (each role's rights: the app adds and reads, never rewrites) |
+| `cards.py` | The catalog's sections and cards, in order: add a card here (a task, a Databricks link, or Coming soon) |
+| `settings.py` | What approvers change in the approvals app's Settings (links per business unit, FAQs, SOPs, the onboarding prompt, the banner): the list, checks, and how they override app.yaml |
+| `checks.py` | The AI check behind Validate on the forms: one AI Decide call in the hub, two questions (does the name say what it holds; does the reason say what it is for and who will use it), with an example to copy; advice for the requester only |
 | `summary.py` | The AI summary for approvers (a foundation model): the only AI an approver reads |
 | `templates/` | Jinja pages; `base.html` is the layout, `_icons.html` the icon and approval macros |
 | `static/app.css` | The design system (tokens at the top) |
@@ -52,6 +58,10 @@ browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py
 | `app.yaml` | How Databricks Apps starts it |
 | `tests/test_portal.py` | Logic and page tests against a fake Databricks client |
 | `tests/test_contract.py` | The app and the jobs agree (parameters, rules, naming, tags) |
+| `tests/test_db.py` | The database against a real Postgres (`PG_TEST_DSN`; the **Database tests** check) |
+| `tests/test_build.py`, `tests/test_deploy.py` | `scripts/app_build.py` (what each bundle deploys) and `scripts/app_deploy.py` (the order and rules of a deploy) |
+
+Outside `apps/`: `bundle/hub/` (the apps and the Lakebase project), `bundle/jobs/` (the two jobs and their notebooks, deployed to every served workspace), `config/self-service/` (`hub.yaml`, `app.yaml`), and `scripts/app_build.py` / `scripts/app_deploy.py`.
 
 ## Rules
 
@@ -173,7 +183,7 @@ changing a template, `static/app.css` or any text people read.
 ## Run and test
 
 ```bash
-pip install -r requirements.txt httpx
+pip install -r requirements.txt httpx pyyaml
 python3 -m unittest discover -s tests          # or ./scripts/test.sh app from the repository root
 PORTAL_CONFIG=<config.json> PORTAL_USER=<email> python3 main.py   # locally, signed in with the Databricks CLI
 ```
@@ -217,5 +227,8 @@ deploy would change, signed in with the Databricks CLI: `python3 scripts/app_dep
 
 - My Requests shows a user's requests among each job's newest 200 runs (everyone's).
 - The user's forwarded token is the hub's: another workspace's SCIM `/Me` may not accept it,
-  so the team schema and folder forms may offer no groups there.
+  so the team schema form may offer no groups there. (The folder form asks for none: people
+  share a folder themselves once it exists.)
+- The approvals app reads each listed request's run (one Jobs API call each): fine for
+  hundreds of requests, slow for thousands. Batch it per workspace if that comes.
 - In-memory caches are per app process; they reset on every deploy.

@@ -101,14 +101,14 @@ self_service_app:
       and offer to answer one.
       5) Then ask me my role and what I want to achieve with data, and suggest one small next step.
   # FAQ pages: an FAQ link beside each section of the catalog, and "How it works" for people
-  # who are new. null = no link. PLACEHOLDERS until the real pages exist: replace each with
-  # its SharePoint page.
+  # who are new. null = no link: set each to your FAQ page, here or in the approvals app's
+  # Settings (Help links).
   faq:
-    getting_started: https://en.wikipedia.org/wiki/FAQ   # "New here? ... How it works"
-    access: https://en.wikipedia.org/wiki/FAQ            # Get started: workspace access, Genie One Onboarding
-    data: https://en.wikipedia.org/wiki/FAQ              # Data: Discover, data access requests
-    workspace: https://en.wikipedia.org/wiki/FAQ         # Build: schemas and folders
-    compute: https://en.wikipedia.org/wiki/FAQ           # Compute & cost
+    getting_started: null   # "New here? ... How it works"
+    access: null            # Get started: workspace access, Genie One Onboarding
+    data: null              # Data: Discover, data access requests
+    workspace: null         # Build: schemas and folders
+    compute: null           # Compute & cost
 
 # The self-service jobs, in each workspace the app serves (bundle/jobs/). The catalog they create
 # schemas in is the workspace's own (its Terraform output), never set here.

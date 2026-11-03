@@ -1,6 +1,6 @@
 # Citizen Development Workspace Baseline
 
-A Terraform framework for keeping **existing Azure Databricks citizen development workspaces** consistent, secure, and easy to manage.
+A framework for keeping **existing Azure Databricks citizen development workspaces** consistent, secure, and easy to manage: a **Terraform baseline** for every workspace, and an optional **self-service app** where people ask for what they need.
 
 The goal is to make workspace configuration predictable without having to manage each workspace separately. Most changes happen in YAML, go through a pull request, and are deployed by GitHub Actions.
 
@@ -14,13 +14,13 @@ Every onboarded workspace gets the same baseline, with workspace-specific settin
 | --- | --- |
 | **Security** | Standard workspace admin settings, including restrictions on legacy access, DBFS (root, mounts and the file browser), personal access tokens, Git providers, and other workspace features. Downloads and exports stay allowed by default; each is one setting. User isolation is enforced, and integrations such as Unity Gateway and Microsoft Teams are configured through the baseline. |
 | **Access** | Three group-based personas: **Explorer** for SQL access, and **Builder** and **Publisher** for broader workspace access. Members of the workspace's users group get **Consumer** access through Databricks One (the simplified interface for business users: dashboards, Genie spaces and apps). Group membership is managed in Entra ID, not in this repository. |
-| **Compute** | A serverless-first setup with a default serverless SQL warehouse and the workspace's serverless usage policy, which tags serverless usage. Approved users can also request access to classic compute policies for interactive clusters, jobs, and pipelines through the self-service app. Each classic policy allows one cluster per user at a time. |
+| **Compute** | A serverless-first setup with a default serverless SQL warehouse and the workspace's serverless usage policy, which tags serverless usage. Classic compute policies for interactive clusters, jobs, and pipelines exist too, each allowing one cluster per user at a time; nobody uses them until a platform admin grants them. |
 | **Unity Catalog** | One catalog per workspace with predictive optimization enabled. The self-service app manages schemas within that catalog. |
 | **Cost tracking** | A shared set of chargeback tags, defined in `config/defaults/cost.yaml`, applied to serverless usage, the SQL warehouse, and classic compute. |
 
 **This project does not create Databricks workspaces.** It applies and maintains the baseline on workspaces that already exist.
 
-**The self-service app is in this repository too** (`apps/`, deployed by Databricks Asset Bundles from `bundle/`, separately from Terraform). It handles what people request: schemas and team folders today. Without it, workspace admins do those by hand; this baseline works either way ([design](docs/design.md), section 9).
+**The self-service app is in this repository too** (`apps/`, deployed by Databricks Asset Bundles from `bundle/`, after Terraform, in the same workflow). People open one web app in a central **hub** workspace, choose their business unit (a workspace, by its prefix), and ask for a personal, project or team schema or a workspace folder; two jobs in their workspace do the work, and platform admins approve what needs it in an approvals app. Without it, workspace admins do those by hand: the baseline works either way ([setup, step 12](docs/SETUP.md#12-the-self-service-app); [design](docs/design.md), section 9).
 
 ## How it works
 
@@ -49,7 +49,9 @@ The full walkthrough is in [docs/SETUP.md](docs/SETUP.md). Here's the setup proc
 | 8 | Review the baseline YAML files in `config/defaults/` with the platform and security teams, and set the Databricks `account_id` in `config/defaults/cost.yaml`. | Platform and security teams |
 | 9 | Copy [`config/workspaces/_example.yaml`](config/workspaces/_example.yaml) to `config/workspaces/<name>.yaml`, update the workspace details, and open a pull request. Read its plan comment before merging; a brand-new workspace first needs one personal access token created and revoked ([step 9](docs/SETUP.md#9-onboard-a-workspace)). | Platform team |
 
-**Every step is done in a web UI** (the Azure portal, GitHub, the Databricks account console): nothing needs a terminal or Python on a laptop. With one, `scripts/setup.py` can do steps 3 to 5 for you. Follow the setup guide for prerequisites and the full sequence.
+Optionally, **install the self-service app** ([step 12](docs/SETUP.md#12-the-self-service-app)): two pull requests, deployed by the same workflow.
+
+**Every step is done in a web UI** (Databricks, the Azure portal, GitHub, the Databricks account console): nothing needs a terminal or Python on a laptop. With one (the Databricks web terminal works), `scripts/setup.py` can do steps 3 to 5 for you. Follow the setup guide for prerequisites and the full sequence.
 
 ## Making changes after setup
 
@@ -61,7 +63,9 @@ Most day-to-day requests fit into one of these paths:
 | Onboard a workspace | Add a YAML file under `config/workspaces/` using `_example.yaml` |
 | Change settings for one workspace | Update its file in `config/workspaces/` |
 | Change who has Explorer, Builder, or Publisher access | Update group membership in Entra ID (for example, through access packages) |
-| Give someone access to classic compute | Use the self-service app's approval process |
+| Give someone access to classic compute | A platform admin grants the cluster policy (a self-service request for it is not built yet) |
+| Change what the self-service app offers, who approves, or its jobs' rights | `config/self-service/app.yaml` |
+| Change the app's links, onboarding prompt or banner | The approvals app's **Settings** tab (no pull request) |
 | Change who must review configuration changes | `.github/CODEOWNERS` |
 
 Changes to the Terraform modules, scripts, or workflows are **framework changes**, not normal workspace configuration changes. See [AGENTS.md](AGENTS.md) before working on those areas.
@@ -74,12 +78,15 @@ Changes to the Terraform modules, scripts, or workflows are **framework changes*
 | `config/defaults/` | Baseline configuration for access, compute, cost, catalogs, workspace settings, and `genie-code/`. |
 | `config/workspaces/` | One YAML file per managed workspace. These files define which workspaces are in scope. |
 | `config/backend.hcl` | Terraform state backend configuration, generated by the setup process. |
+| `config/self-service/` | The self-service app's configuration: `hub.yaml` (the hub workspace, the apps' identities) and `app.yaml` (what it offers and how). |
 | `terraform/` | Root Terraform configuration and reusable modules. |
+| `apps/self-service/` | The self-service app and the approvals app (one codebase), and their database migrations. |
+| `bundle/` | The Databricks Asset Bundles that deploy them: `hub/` (the apps, the database) and `jobs/` (the two jobs in each workspace). |
 | `scripts/` | Setup, workspace onboarding and validation, preflight checks, Terraform execution, plan review, and tests. |
 | `.github/` | GitHub Actions workflows (`deploy.yml` and `checks.yml`), `CODEOWNERS`, and the pull request checklist. |
 | `docs/` | Setup, design decisions, workflows, and operational guides. |
 | `install/` | `copy_to_your_repo`: a Databricks notebook (or one command in the web terminal) that installs or upgrades this project in your repository's Git folder, without this repository's own environment and without replacing your configuration. |
-| `dev/` | Workspaces used to test the framework itself; not included in a release. |
+| `dev/` | The framework repository's own notes and test workspaces; never copied into your repository. |
 | `AGENTS.md`, `agents/`, `CLAUDE.md` | Contributor and coding-agent guidance. `AGENTS.md` is the main entry point. |
 
 ## Documentation
@@ -95,7 +102,7 @@ Changes to the Terraform modules, scripts, or workflows are **framework changes*
 
 ## Running tests
 
-From the repository root:
+For framework maintainers (your repository runs them as the **Tests** check on every pull request). From the repository root:
 
 ```bash
 ./scripts/test.sh

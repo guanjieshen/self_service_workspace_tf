@@ -100,7 +100,7 @@ Each affected workspace gets one comment on the pull request, updated on every p
 | --- | --- | --- |
 | Title | Plan | Number of resource changes |
 | Preflight | `scripts/preflight.py` | When it found a problem: what is missing, and what to do |
-| Risk summary, What does this mean?, What's changing?, What should you review? | `scripts/ai-plan-review.py` | When `ai_review_host` is set. Adapts to the risk: a Low change gets the summary and the table only. It never mentions the approval label or resource addresses |
+| Risk summary, What does this mean?, What's changing?, What should you review? | `scripts/ai-plan-review.py` | When `ai_review_host` is set. Adapts to the risk: a Low change gets the summary and the table only. It never mentions resource addresses |
 | Before merging | `scripts/plan-guard.py` (its status) | Only when the plan guard listed something: check each change is intended before merging. Never written by the AI |
 | Technical details | Plan guard, [tf-summarize](https://github.com/dineshba/tf-summarize), plan | Collapsed: the guard's findings with resource addresses, every changed resource, the full plan (its start cut if the comment would exceed GitHub's size limit) |
 | Footer | | *AI-generated review based on the Terraform plan. Verify findings before merging.* (only with an AI review) |

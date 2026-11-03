@@ -15,7 +15,7 @@ yellow is otherwise used sparingly (the amber accent). No logo. Status pages lea
 what was asked for. A page that takes more than 150 ms shows a loading bar. Reuse the
 existing classes and tokens before adding new ones.
 
-## The design language (2026-10-22, from the Stitch request page)
+## The design language (2026-10-22)
 
 New pages and changes use this; the request pages (`request.html`, `request_held.html`) are the
 reference. The yellow stays the accent (badges, the step in progress, approver questions);

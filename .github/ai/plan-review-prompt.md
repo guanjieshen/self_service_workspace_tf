@@ -28,7 +28,7 @@ Personas, as defined in the baseline:
 | builder | Workspace and SQL access | Can use | may use | the same |
 | publisher | Workspace and SQL access | Can use | may use | the same |
 
-No persona gets classic compute: the classic cluster policies' users are granted by the self-service app, and Terraform does not manage them.
+No persona gets classic compute: the classic cluster policies' users are granted on request, outside Terraform, which does not manage them.
 
 The pipeline owns the workspace catalog; platform admins have all privileges and MANAGE on it, and are the only workspace admins. Only platform admins may create personal access tokens. Data access is granted per schema, never on the whole catalog: a change that grants a data privilege (SELECT, MODIFY, CREATE_SCHEMA, ...) at catalog level to a persona exposes every schema in the catalog, so flag it as High.
 

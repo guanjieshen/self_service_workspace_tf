@@ -17,8 +17,8 @@ platform team runs it from Git: YAML only, reviewed in pull requests, applied by
 the workspace catalog, the chargeback tags and serverless usage policy, Genie Code).
 **Out of scope:** creating workspaces and networking (combined mode, future), the
 metastore and shared catalogs, who is in which group (Entra ID), and everything people
-request: schemas, workspace folders, team warehouses, project usage policies and access to
-classic compute (the self-service app). The rule: Terraform holds what every workspace has
+request: schemas and workspace folders (the self-service app today), and team warehouses,
+project usage policies and access to classic compute (by hand until the app offers them). The rule: Terraform holds what every workspace has
 and rarely changes; anything that changes by ad hoc request belongs to the app.
 
 ## 2. How it works
@@ -86,9 +86,9 @@ workspace. What keeps that safe:
 | Persona (its group) | Entitlement | Default warehouse | Usage policy | Classic cluster policies | Catalog |
 |---|---|---|---|---|---|
 | users (`groups.users`): everyone | Consumer (Databricks One) | | | | |
-| explorer (`groups.explorer`) | SQL access | Can use | User | By request (app) | USE CATALOG, USE SCHEMA |
-| builder (`groups.builder`) | Workspace and SQL access | Can use | User | By request (app) | same |
-| publisher (`groups.publisher`) | Workspace and SQL access | Can use | User | By request (app) | same |
+| explorer (`groups.explorer`) | SQL access | Can use | User | By request | USE CATALOG, USE SCHEMA |
+| builder (`groups.builder`) | Workspace and SQL access | Can use | User | By request | same |
+| publisher (`groups.publisher`) | Workspace and SQL access | Can use | User | By request | same |
 | platform admins (`{prefix}_platform_admins`) | Workspace admin | Manage | User, manager | Yes (workspace admins) | All privileges, MANAGE (the pipeline owns it) |
 
 - Entitlements are tiers, each including the one before: Consumer access (Databricks One
@@ -97,8 +97,9 @@ workspace. What keeps that safe:
   the provider accepts Consumer access only on its own, so the module sets it only then.
 - **Serverless first.** Every persona gets one serverless usage policy. Classic compute is
   the exception: three cluster policies per workspace (interactive, jobs, pipelines), one
-  cluster per person each, whose users the self-service app grants on request. Terraform does
-  not manage who may use them, so the app's grants stay. Each person's clusters take IP
+  cluster per person each, whose users are granted on request (by a platform admin; a
+  self-service app request is planned). Terraform does not manage who may use them, so those
+  grants stay. Each person's clusters take IP
   addresses from the workspace's subnets; policies cap clusters per person, not per
   workspace, so the number of people approved is what bounds the total.
 - Nobody gets "Allow unrestricted cluster creation". No persona is workspace admin:
@@ -188,7 +189,7 @@ Terraform's: people get them from the self-service app.
 | P5 | Approved dashboard embedding domains? | None |
 | P7 | Narrow the Git allowlist to your GitHub organization (or add a GitHub Enterprise host)? | `https://github.com/`: every github.com repository |
 | P8 | The chargeback tag set (it will change; one list in `config/defaults/cost.yaml`)? | `BUSINESS_UNIT`, `APPID`, `COST_CATEGORY`; users fill in `APPID`, `TEAM`, `PROJECT` on classic |
-| P12 | Remove `users` from `/Workspace/Shared` so folder permissions mean something? | Organisation only |
+| P12 | Remove `users` from `/Workspace/Shared` so folder permissions mean something? | Organization only |
 
 ## 8. Not built yet
 
