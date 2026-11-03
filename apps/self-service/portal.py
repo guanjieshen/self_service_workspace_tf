@@ -454,6 +454,11 @@ class Portal:
         keep(self._personal, key, found)
         return found
 
+    def hub(self):
+        """The app's own workspace (the hub), where the AI calls run: AI Decide for the check,
+        the AI gateway for the summaries. Not the workspace a request goes to."""
+        return self.client(None)
+
     # ---- The AI check of a name and reason (advice for the requester; it decides nothing) ----
 
     def ai_check(self, ws_name, kind, name, reason, owner_group="", user=None):
@@ -486,7 +491,7 @@ class Portal:
         rules = [{True: (False, f"The {noun} name is already taken (fine only if it is yours)"),
                   False: (True, f"The {noun} name is available"),
                   None: (False, f"Could not confirm the {noun} name is available")}[taken]]
-        result = checks.check(c, kind, name, reason, owner_group, ws_name)
+        result = checks.check(self.hub(), kind, name, reason, owner_group, ws_name)
         result = {**result, "rows": rules + result["rows"]}
         if not result["error"]:
             keep(self._checks, key, result, limit=500)
@@ -593,8 +598,7 @@ class Portal:
         if not model:
             return None
         try:
-            w = self.workspace(row["workspace"], "team_folder" if row["kind"] == "folder" else "personal_schema")
-            result = summary_module.summarize(self.client(w.host), model, row)
+            result = summary_module.summarize(self.hub(), model, row)
         except Exception as e:
             warn(f"writing the AI summary of {row['id']}", e)
             return None
@@ -610,7 +614,7 @@ class Portal:
             return
         def run():
             try:
-                self.store.summarized(r["id"], summary_module.summarize(self.client(w.host), model, r))
+                self.store.summarized(r["id"], summary_module.summarize(self.hub(), model, r))
             except Exception as e:
                 warn(f"writing the AI summary of {r['id']}", e)
         threading.Thread(target=run, daemon=True).start()

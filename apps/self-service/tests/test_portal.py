@@ -113,7 +113,7 @@ def make(store=None):
     fake = FakeClient()
 
     def client(host):
-        if host != HOST:
+        if host not in (HOST, None):   # None: the app's own workspace (the hub)
             raise ConnectionError("no route to host\nmore detail")
         return fake
     return portal.Portal(CONFIG, client, store=FakeStore() if store is None else store), fake
@@ -364,39 +364,34 @@ class AICheck(unittest.TestCase):
 
     def test_a_clear_request_passes_every_check_in_one_call(self):
         p, fake, result = self.check()
-        self.assertEqual(result["rows"], [(True, "The schema name is available"), (True, "The schema name matches the reason given"),
-                                          (True, "The reason says what the work is, what it will hold and who will use it")],
-                         )
-        self.assertEqual(len(fake.decided), 1, "one call, four questions")
-        self.assertEqual(set(fake.decided[0]["questions"]), {"name", "work", "contents", "audience"}, "about the name and the reason only")
+        self.assertEqual(result["rows"], [(True, "The schema name is available"), (True, "The name matches the reason"),
+                                          (True, "The reason says what it's for and who will use it")])
+        self.assertEqual(len(fake.decided), 1, "one call, two questions")
+        self.assertEqual(set(fake.decided[0]["questions"]), {"name", "reason"}, "about the name and the reason only")
         self.assertEqual(fake.decided[0]["questions"], portal.checks.questions("project_schema"), "the questions never contain what the person typed")
         self.assertNotIn(WHY, json.dumps(fake.decided[0]["questions"]))
         self.assertEqual(fake.decided[0]["state"]["why_needed"], WHY)
         p.ai_check("fin", "project_schema", "gtm_pipeline_forecast", WHY)
         self.assertEqual(len(fake.decided), 1, "asking again is answered from the cache")
 
-    def test_it_coaches_on_the_name_and_the_reason(self):
+    def test_it_shows_how_to_write_a_good_name_and_reason(self):
         p, fake = make()
-        fake.decide.update(name="generic", contents="general", audience="none")
-        result = p.ai_check("fin", "project_schema", "gtm_data", WHY)
-        self.assertIn((False, "The schema name is too general to tell what it holds"), result["rows"])
-        self.assertIn((False, "Say what data it will hold, for example: weekly Salesforce opportunity snapshots by region"), result["rows"])
-        self.assertIn((False, "Say who will use it, for example: you alone, or the LPM integrity team"), result["rows"])
-        self.assertFalse(any("what work" in text for _, text in result["rows"]), "only the parts that are missing")
-
-    def test_a_folder_is_asked_what_it_will_hold_not_what_data(self):
+        fake.decide.update(name="unclear", reason="unclear")
+        rows = p.ai_check("fin", "project_schema", "gtm_data", WHY)["rows"]
+        self.assertIn((False, "Use a name that says what it holds, for example: sales_forecast_weekly"), rows)
+        self.assertIn((False, "Say what it's for and who will use it, for example: weekly sales forecast tables for the sales operations team"), rows)
         p, fake = make()
-        fake.decide.update(contents="general")
+        fake.decide.update(reason="unclear")
         rows = p.ai_check("fin", "folder", "fin-docs", WHY)["rows"]
-        self.assertIn((False, "Say what you will keep in it, for example: notebooks and dashboards for the integrity risk model"), rows)
-        self.assertIn("notebooks, dashboards", fake.decided[0]["questions"]["contents"]["criteria"]["named"])
+        self.assertIn((False, "Say what it's for and who will use it, for example: notebooks and dashboards for the weekly sales forecast, used by the sales operations team"), rows)
+        self.assertIn("folder", fake.decided[0]["questions"]["reason"]["instructions"], "a folder is asked about as a folder")
 
-    def test_anyone_named_counts_as_who_will_use_it(self):
-        for who in ("self", "team", "role"):
-            p, fake = make()
-            fake.decide["audience"] = who
-            with self.subTest(audience=who):
-                self.assertTrue(all(ok for ok, _ in p.ai_check("fin", "project_schema", "gtm_pipeline_forecast", WHY)["rows"]))
+    def test_ai_decide_runs_in_the_hub_not_the_requests_workspace(self):
+        p, spoke = make()
+        hub = FakeClient()
+        p.client = lambda host: hub if host is None else spoke
+        p.ai_check("fin", "project_schema", "gtm_pipeline_forecast", WHY)
+        self.assertEqual((len(hub.decided), len(spoke.decided)), (1, 0), "AI Decide is enabled in the hub")
 
     def test_rules_come_first_and_cost_no_call(self):
         p, fake = make()
@@ -934,7 +929,7 @@ class Pages(unittest.TestCase):
                 self.assertIn(">Validate</button>", page)
                 send = lambda name: self.http.post("/schema/project", data={"workspace": "fin", "name": name, "reason": WHY},
                                                    headers=self.as_ana, follow_redirects=False)
-                self.fake.decide = {**portal.checks.SAFE, "contents": "general"}   # the check finds something
+                self.fake.decide = {**portal.checks.SAFE, "reason": "unclear"}     # the check finds something
                 self.assertEqual(send(f"gtm_forecast_{mode}").status_code, 303, mode)
                 self.fake.decide = None                                            # AI Decide cannot answer
                 self.assertEqual(send(f"gtm_forecast_{mode}_two").status_code, 303, "sent anyway: the check is advice")

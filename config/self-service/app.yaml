@@ -73,7 +73,7 @@ self_service_app:
   # (human_approval decides who must approve; approvers read the AI summary below).
   #   on:  the Validate check
   #   off: no check
-  # Needs AI Decide in the host workspace.
+  # Needs AI Decide in the hub (the apps' own workspace), whichever workspace a request goes to.
   ai_check: "on"
   # The summary approvers read before a request that waits for them: a headline, what is
   # asked and why, what is worth checking and questions to ask, written by a foundation model
