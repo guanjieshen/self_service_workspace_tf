@@ -787,6 +787,7 @@ class Pages(unittest.TestCase):
         sys.modules.pop("main", None)
         self.main = importlib.import_module("main")
         self.main.PORTAL, self.fake = make()
+        self.main.PORTAL.choose_bu(ANA, "FIN")   # the first step (test_the_business_unit_comes_first)
         self.http = TestClient(self.main.app)
         self.as_ana = {"X-Forwarded-Email": ANA}
 
@@ -1016,20 +1017,40 @@ class Pages(unittest.TestCase):
         self.assertIn('data-search="request a workspace folder create a shared workspace folder', page)
         self.assertIn('id="no-results" hidden', page)
 
-    def test_people_choose_their_business_unit_and_see_it_in_the_header(self):
-        page = self.http.get("/", headers=self.as_ana).text
-        self.assertIn("Which business unit are you in?", page)
-        self.assertIn('href="/business-unit"', page)
-        form = self.http.get("/business-unit", headers=self.as_ana).text
+    def test_the_business_unit_comes_first(self):
+        as_bo = {"X-Forwarded-Email": BO}   # Bo has not chosen yet (Ana chose FIN in setUp)
+        for path in ("/", "/folder", "/schema/project", "/persona"):
+            with self.subTest(path=path):
+                r = self.http.get(path, headers=as_bo, follow_redirects=False)
+                self.assertEqual((r.status_code, r.headers["location"]), (303, f"/business-unit?next={path}"))
+        form = self.http.get("/business-unit?next=/folder", headers=as_bo).text
+        self.assertIn("Which business unit are you in?", form)
+        self.assertIn(">Continue</button>", form)
+        self.assertNotIn(">Cancel</a>", form, "nothing to go back to before choosing")
         self.assertIn('value="FIN"', form)
         self.assertIn('value="OPS"', form)
-        r = self.http.post("/business-unit", data={"bu": "FIN"}, headers=self.as_ana, follow_redirects=False)
-        self.assertEqual((r.status_code, r.headers["location"]), (303, "/"))
-        page = self.http.get("/", headers=self.as_ana).text
-        self.assertNotIn("Which business unit are you in?", page)
-        self.assertIn('<span class="account-bu">FIN</span>', page, "shown in the account chip")
+        r = self.http.post("/business-unit", data={"bu": "OPS", "next": "/folder"}, headers=as_bo, follow_redirects=False)
+        self.assertEqual((r.status_code, r.headers["location"]), (303, "/folder"), "back to where they were going")
+        page = self.http.get("/", headers=as_bo).text
+        self.assertIn('<span class="account-bu">OPS</span>', page, "shown in the account chip")
         self.assertIn('<a class="account" href="/business-unit"', page, "and changeable from there")
-        self.assertIn("Choose one of the business units", self.http.post("/business-unit", data={"bu": "HR"}, headers=self.as_ana).text)
+        change = self.http.get("/business-unit", headers=as_bo).text
+        self.assertIn(">Save</button>", change)
+        self.assertIn(">Cancel</a>", change)
+        self.assertIn('value="OPS" checked', change)
+        self.assertIn("Choose one of the business units", self.http.post("/business-unit", data={"bu": "HR"}, headers=as_bo).text)
+
+    def test_a_form_posted_before_choosing_goes_to_the_choice(self):
+        r = self.http.post("/folder", data={"workspace": "fin", "folder": "fin-docs", "reason": WHY},
+                           headers={"X-Forwarded-Email": BO}, follow_redirects=False)
+        self.assertEqual((r.status_code, r.headers["location"]), (303, "/business-unit"))
+        self.assertEqual(self.fake.started, [], "nothing runs")
+
+    def test_choosing_never_sends_someone_to_another_site(self):
+        for nxt in ("https://evil.example.com", "//evil.example.com", "/business-unit"):
+            with self.subTest(next=nxt):
+                r = self.http.post("/business-unit", data={"bu": "FIN", "next": nxt}, headers=self.as_ana, follow_redirects=False)
+                self.assertEqual(r.headers["location"], "/")
 
     def test_request_a_budget_policy_and_the_cost_dashboard_are_coming_soon(self):
         page = self.http.get("/", headers=self.as_ana).text
@@ -1123,6 +1144,7 @@ class ApprovalRequests(unittest.TestCase):
         self.db = FakeStore()
         self.main.PORTAL, self.fake = make(self.db)
         self.main.PORTAL.config = self.main.CONFIG
+        self.main.PORTAL.choose_bu(ANA, "FIN")
         self.http = TestClient(self.main.app)
         self.as_ana = {"X-Forwarded-Email": ANA}
 

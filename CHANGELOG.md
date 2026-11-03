@@ -8,6 +8,12 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **Choosing a business unit comes first.** Until someone has chosen one (when there are several
+  and no lookup function), every page takes them to the choice, then back where they were going;
+  they change it later from their name. The choice page is redesigned: one card per business
+  unit, with its workspace and catalog. The catalog's "Which business unit are you in?" banner
+  is gone.
+
 - **One runner setting for every workflow:** the repository variable `RUNNER` (a JSON `runs-on`
   value) replaces `CHECKS_RUNNER` and `TERRAFORM_RUNNER`. If you set either, set `RUNNER` instead
   and delete them. A pull request from a fork never runs on the runner.
