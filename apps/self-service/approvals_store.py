@@ -29,7 +29,7 @@ class LakebaseStore:
 
     def bus_for(self, approver):
         # For now every approver approves for every BU the app serves: the app opens only for
-        # one approvers group (workspace admins in the sandbox). When BU data owners approve,
+        # one approvers group (approvals_group in hub.yaml; workspace admins by default). When BU data owners approve,
         # this maps the person's groups to their BUs, and queue/all/get filter by them.
         return self._bus
 

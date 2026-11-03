@@ -8,6 +8,17 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **Docs match the code, for an organization installing it:**
+  - `docs/SETUP.md` has a new step 12, **the self-service app**: what the hub needs (serverless,
+    Apps, Lakebase, AI Decide, cross-workspace access behind Private Link), the two-pull-request
+    install, and what to do when something goes wrong.
+  - No step needs a laptop: the overview, break glass and teardown say which need a terminal.
+  - The README describes both parts (the baseline and the app), and its layout lists `apps/`,
+    `bundle/` and `config/self-service/`.
+  - Classic compute is granted by a platform admin; the docs no longer say the app does it.
+  - `AGENTS.md`: `main` is what customers install, and where an environment value may live.
+- `config/self-service/app.yaml`: the FAQ links are `null` until you set them (they were
+  placeholders).
 - **The self-service app's database is tested in CI:** a new **Database tests** check runs its
   migrations, grants and queries against Postgres 17 (they were skipped before). It is not a
   required check, since it needs Docker on the runner.
@@ -139,7 +150,7 @@ that you may want to copy. A setting missing from your baseline is left alone.
     `self_service`. Hub first, then the jobs.
 
   The app's tests are a new suite, `scripts/test.sh app` (the Tests check installs the app's
-  packages). Nothing deploys the app from GitHub Actions yet.
+  packages). The Deploy workflow's App plan and Deploy the app jobs deploy it.
 
 - **The self-service app's needs in the workspaces it serves** (`terraform/self_service.tf`), ahead
   of the app moving into this repository. Nothing changes until `app_ids` in

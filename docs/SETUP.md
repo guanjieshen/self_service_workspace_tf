@@ -17,12 +17,13 @@ This guide takes this repository from a Databricks Git folder to its first gover
 | 9 | [Onboard a workspace](#9-onboard-a-workspace) | Platform team | Per workspace |
 | 10 | [Day to day](#10-day-to-day) | Platform team | Ongoing |
 | 11 | [Troubleshooting](#11-troubleshooting) | Anyone | When needed |
+| 12 | [The self-service app](#12-the-self-service-app) (optional) | Platform team | Once, then per workspace (automatic) |
 
 Steps 3 to 8 can run in parallel once step 2 is done, except that step 4 needs the storage account from step 3, and steps 5 and 6 need the client ID from step 4. **Push what steps 3 and 4 write (`config/backend.hcl`, the client ID in `config/setup.yaml`) to `main` before step 5:** step 5 protects `main`, and after it every change goes through a pull request with an approval.
 
-Steps 3 to 5 are commands that read their values from `config/setup.yaml`; step 6 is done by hand in the Databricks account console. Each command prints the script it would run, so you can read it first or send it to the team that owns the step; add `--run` to run it. Each one checks before it creates, so running it again is safe.
+**Every step is done in a web UI:** the Azure portal (steps 3 and 4), GitHub (step 5), the Databricks account console (step 6), and your repository's Databricks Git folder for the files. Nothing needs a laptop.
 
-> **Tip:** Run every command from the repository root. Tools: git, Terraform 1.9+, Python 3.9+, the Databricks CLI, the Azure CLI (`az`) and the GitHub CLI (`gh`), each signed in as the person running that step. Node.js 22 runs the plan comment's tests.
+> **Tip:** With a terminal (the Databricks web terminal works), `scripts/setup.py` can do steps 3 to 5 from the values in `config/setup.yaml`: each command prints the script it would run, and runs it with `--run`; running it again is safe. It is a shortcut, never required.
 
 ## 1. Fill in `config/setup.yaml`
 
@@ -248,7 +249,7 @@ Create Entra ID groups and sync them to the Databricks account (automatic identi
 | Platform admins | `{prefix}_platform_admins`, one per workspace prefix (the baseline) | Workspace admin; all privileges and MANAGE on the workspace catalog |
 | Users | Per workspace, in its file (`groups.users`) | Consumer access (Databricks One): dashboards, Genie spaces, apps |
 | Explorers | Per workspace (`groups.explorer`) | SQL access: the SQL editor, queries, dashboards, Genie |
-| Builders, publishers | Per workspace (`groups.builder`, `groups.publisher`) | Workspace access: notebooks, jobs, pipelines on serverless; classic compute only through the self-service app |
+| Builders, publishers | Per workspace (`groups.builder`, `groups.publisher`) | Workspace access: notebooks, jobs, pipelines on serverless; classic compute only when a platform admin grants a cluster policy |
 
 A workspace that leaves a persona's group `null` simply has nobody with that persona.
 
@@ -357,7 +358,7 @@ State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (ste
 
 **To stop managing a workspace, retire it** (delete its file in a pull request): Terraform forgets it, and nothing in the workspace changes.
 
-`./scripts/tf.sh <name> destroy` is different: it **deletes** what this project created, including the default warehouse, the usage and cluster policies, and the workspace catalog **with its data**, and resets the workspace configuration keys it manages (`enable*`, `enforce*`) to `false`, which turns personal access tokens off. Outside GitHub Actions it refuses unless `ALLOW_LOCAL_APPLY=1` (see **Break glass**, step 11). Review the plan before confirming.
+Deleting a workspace's resources is a rare, deliberate act with a terminal, not a pull request: `./scripts/tf.sh <name> destroy` is different from retiring: it **deletes** what this project created, including the default warehouse, the usage and cluster policies, and the workspace catalog **with its data**, and resets the workspace configuration keys it manages (`enable*`, `enforce*`) to `false`, which turns personal access tokens off. Outside GitHub Actions it refuses unless `ALLOW_LOCAL_APPLY=1` (see **Break glass**, step 11). Review the plan before confirming.
 
 ## 11. Troubleshooting
 
@@ -400,7 +401,7 @@ If the state itself is damaged (an apply reports it cannot read it), restore the
 
 ### Break glass: applying from a laptop
 
-For when CI cannot run (GitHub is down, the runner is broken) and a workspace needs a fix now. Everything else goes through a pull request.
+For when CI cannot run (GitHub is down, the runner is broken) and a workspace needs a fix now. Everything else goes through a pull request. **It needs a terminal with Terraform and access to the state storage** (the Databricks web terminal works if it can reach them); without one, wait for CI, or re-run the failed job from the Actions tab.
 
 1. **Use the shared state.** `config/backend.hcl` must be in your checkout: `tf.sh` refuses to apply without it, because a local state would split from the one CI uses.
 2. **Sign in as someone with the pipeline's rights:** workspace admin in the workspace, Storage Blob Data Contributor on the state container, and for usage policies the account's Billing admin role (step 6). A local run uses your identity, not the service principal.
@@ -413,3 +414,46 @@ For when CI cannot run (GitHub is down, the runner is broken) and a workspace ne
 
    The apply takes the same lock CI does, so it cannot run at the same time as a CI apply.
 4. **Open a pull request with the same change straight after.** Until it is merged, `main` does not match the workspace, and the next CI apply or drift check undoes the fix.
+
+## 12. The self-service app
+
+**Who:** the platform team. **Optional:** the baseline works without it.
+
+The app lets people ask for what they need (a personal, project or team schema, a workspace folder) in a web page, and an approvals app lets platform admins approve, change settings and answer questions. Both apps and their database run in one **hub** workspace; each workspace the app serves gets two jobs that do the work. The Deploy workflow deploys all of it (**Deploy the app**), from `config/self-service/`, after Terraform: nothing is deployed by hand.
+
+### Before you start
+
+| # | What | Who |
+| --- | --- | --- |
+| 1 | **A hub workspace**: Premium, with **serverless**, **Databricks Apps** and **Lakebase** available (Lakebase is regional: check your region). A dedicated workspace is simplest; it need not be one of the workspaces in `config/workspaces/` | Databricks account admin |
+| 2 | The pipeline's service principal (step 4) is **workspace admin in the hub**, as in every served workspace (step 6) | Databricks account admin |
+| 3 | For **Validate** (`ai_check: "on"` in `config/self-service/app.yaml`): **AI Decide** enabled in the hub (Previews). Otherwise set `ai_check: "off"` | Workspace admin |
+| 4 | For the approvers' **AI summary** (`ai_summary.model`): the model served in the hub, which the apps' identities may use. Otherwise set `model: null` | Workspace admin |
+| 5 | **Private Link:** the hub calls each served workspace's APIs. An account admin allows it with **cross-workspace access** (the hub's serverless egress policy lists each served workspace; each one's ingress policy allows the hub) | Databricks account admin, network team |
+
+### Install: two pull requests
+
+| # | Pull request | What the merge does |
+| --- | --- | --- |
+| 1 | `config/self-service/hub.yaml`: the hub's `name` and per-workspace URL (`host`), who opens each app (`users_group`, `approvals_group`), and `database.readers` if anyone should read the data. Review `config/self-service/app.yaml` (the title, links, `human_approval`, the jobs' settings) | **Deploy the app** creates both apps, the database (its migrations run) and the jobs in every served workspace. Its log ends with the two apps' **application IDs** |
+| 2 | Those two IDs into `app_ids` in `hub.yaml` | Terraform gives the apps what they need in every served workspace (assignment with workspace access, browse on its catalog); the deploy lets them run the jobs, which run as the pipeline's identity |
+
+The first pull request cannot do both: Terraform needs the apps' identities, and they exist only once the apps do. Every later change is one pull request.
+
+**Then check:** open the self-service app (Compute > Apps > the app's URL). It asks which **business unit** you are in (one per served workspace, named by its prefix), then shows the catalog of tasks. Ask for a workspace folder: it is ready in under a minute.
+
+### After that
+
+- **A new workspace** (step 9) is served automatically: its merge deploys its jobs, and the app offers its business unit. Set `self_service: false` in a workspace file to leave it out.
+- **Settings without a pull request:** the approvals app's **Settings** tab holds the links people see (persona requests per business unit, FAQs, SOPs), the onboarding prompt and a banner.
+- **What people may do** (who approves what, naming, the jobs' rights) stays in `config/self-service/app.yaml`, changed by pull request.
+
+### When something goes wrong
+
+| What you see | Cause | What to do |
+| --- | --- | --- |
+| A form says there is **no workspace** for the request | The app cannot use that workspace yet: the second pull request (`app_ids`) is not merged, or its Terraform apply failed | Merge it, or re-run the failed apply; the app checks again within 5 minutes |
+| **Validate** says the AI check is unavailable | AI Decide is off in the hub (Before you start, item 3) | Turn it on, or set `ai_check: "off"` |
+| The deploy stops: **the Lakebase project was deleted** | A deleted project is kept 7 days and blocks a new one with the same ID | Undelete it, wait until it is purged, or set another `self_service_app.database.project_id` in `app.yaml` |
+| An app **cannot be deleted** | Its identity is still assigned to served workspaces | Clear `app_ids` in a pull request first, then delete the app |
+| The deploy says the apps' identities **do not match** `app_ids` | The apps were recreated | Put the new IDs (in the deploy's log) into `app_ids` |

@@ -100,7 +100,8 @@ def blank_setup(text):
 def blank_hub(text):
     """config/self-service/hub.yaml as a template: the hub, its database and the apps' identities
     to null or empty, nothing to adopt; comments and the groups kept."""
-    text = re.sub(r"(?m)^(  (?:name|host|warehouse_id|self_service|approvals)): (?!null\b)\S+", r"\1: null", text)
+    keep_column = lambda m: f"{m.group(1)}: null".ljust(len(m.group(0)))   # the comments stay aligned
+    text = re.sub(r"(?m)^(  (?:name|host|warehouse_id|self_service|approvals)): (?!null\b)\S+", keep_column, text)
     text = re.sub(r"(?m)^(  readers): \[.*\]", r"\1: []", text)
     return re.sub(r"(?ms)^adopt:\n(?:  .*\n?)*", "adopt: {}\n", text)
 

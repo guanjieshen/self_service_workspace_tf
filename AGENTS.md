@@ -29,7 +29,7 @@ The repository holds two things that share one configuration but are built, test
 | `config/defaults/`, `config/workspaces/` (an organization's settings) | [agents/config.md](agents/config.md) |
 | `apps/self-service/`, `bundle/`, `config/self-service/`, `scripts/app_build.py`, `scripts/app_deploy.py` | [agents/app.md](agents/app.md) |
 | Any template, `app.css`, or text people read in the apps | [agents/design.md](agents/design.md) |
-| `scripts/`, `.github/`, docs | This file |
+| `scripts/`, `.github/`, `install/`, docs | This file |
 
 ## What this repository is
 
@@ -117,7 +117,7 @@ further step. When you add something:
   something in the workspace, a precondition in `terraform/checks.tf` for the
   configuration) rather than half-way through an apply.
 - **Never depend on this repository's own setup:** not a CLI profile, a laptop, `dev/`, the
-  sandbox's names or IDs, or a person's account.
+  this repository's own names or IDs, or a person's account.
 
 ## Rules
 
@@ -161,7 +161,9 @@ provider (registry.terraform.io, or your mirror); later runs reuse it from `.ter
 
 ## Releasing
 
-A release is a zip an organization installs ([SETUP.md](docs/SETUP.md), step 2). This repository holds a working installation (its tenant, state storage, account and workspaces) so every change is tested for real; the release must hold none of it.
+**Organizations install from a clone of `main`** ([SETUP.md](docs/SETUP.md), step 2): `install/copy_to_your_repo` (a notebook, or one command in the Databricks web terminal) copies it into their repository without this repository's environment, and copies again for an upgrade (their `config/` kept). So **`main` is always shippable**: every commit there is what a customer may install. This repository holds a working installation (its tenant, state storage, account and workspaces) so every change is tested for real; no copy may hold any of it. A tagged release (below) is the same files, frozen.
+
+**The one rule for this:** an environment value lives only in the files the release rules blank or leave out (`config/setup.yaml`, `config/backend.hcl`, `config/workspaces/*.yaml` but `_example.yaml`, `config/self-service/hub.yaml`, `config/defaults/cost.yaml` `account_id`, `.github/CODEOWNERS`, `dev/`). Never write a host, ID, group or person's name anywhere else (docs, tests, comments): the copy and the release stop on it.
 
 | Step | What to do |
 | --- | --- |
@@ -171,7 +173,7 @@ A release is a zip an organization installs ([SETUP.md](docs/SETUP.md), step 2).
 | 4 | Build the zip: `python3 scripts/release.py v1.0.0` writes `dist/<repo>-v1.0.0.zip`. Write the same files to the branch an organization installs from: `python3 scripts/release.py v1.0.0 --branch`, then `git push origin release/v1.0.0` |
 | 5 | Check it: unzip it, `git init`, commit, and run `./scripts/test.sh` there (the branch holds the same files) |
 
-`scripts/release.py` leaves out `dev/`, `config/backend.hcl` and every workspace file but `_example.yaml`, sets the values in `config/setup.yaml` and `account_id` to `null`, replaces the CODEOWNERS owners (`@your-org/databricks-platform`, and `@your-org/security` too on `config/defaults/settings.yaml`), and adds `VERSION`. It **refuses to write the zip** if any of this repository's own identifiers (tenant, subscription, storage, account, workspace hosts, owners) is still in it. A value it does not know about yet (a new file holding an environment value) is your job: add it to the script and to `scripts/tests/test_release_zip.py`.
+`scripts/release.py` leaves out `dev/`, `config/backend.hcl` and every workspace file but `_example.yaml`, sets the values in `config/setup.yaml` and `account_id` to `null`, replaces the CODEOWNERS owners (`@your-org/databricks-platform`, and `@your-org/security` too on `config/defaults/settings.yaml`), and adds `VERSION`. It **refuses to write the zip** if any of this repository's own identifiers (tenant, subscription, storage, account, workspace hosts, owners) is still in it. A value it does not know about yet (a new file holding an environment value) is your job: add it to the script and to `scripts/tests/test_release_zip.py`. `install/copy_to_your_repo` uses the same functions (`release_files`, `own_identifiers`, `leaks`), so one change covers both.
 
 ## Writing style
 
