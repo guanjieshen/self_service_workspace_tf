@@ -1058,6 +1058,15 @@ class Pages(unittest.TestCase):
         self.assertEqual((r.status_code, r.headers["location"]), (303, "/business-unit"))
         self.assertEqual(self.fake.started, [], "nothing runs")
 
+    def test_no_business_unit_card_is_left_alone_on_a_row(self):
+        for count, cols in ((2, 2), (3, 3), (4, 2), (5, 3), (6, 3)):
+            workspaces = [{"name": f"ws{i}", "bu": f"B{i}", "host": HOST} for i in range(count)]
+            with self.subTest(business_units=count), \
+                    mock.patch.dict(self.main.CONFIG, {"workspaces": workspaces}), \
+                    mock.patch.dict(self.main.PORTAL.config, {"workspaces": workspaces}):
+                page = self.http.get("/business-unit", headers=self.as_ana).text
+                self.assertIn(f'class="bu-options bu-cols-{cols}"', page)
+
     def test_choosing_never_sends_someone_to_another_site(self):
         for nxt in ("https://evil.example.com", "//evil.example.com", "/business-unit"):
             with self.subTest(next=nxt):
