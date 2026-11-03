@@ -14,6 +14,7 @@ each, in parallel on the runners there are, each with its own log and Re-run but
 | Workflow | Runs on | Does |
 | --- | --- | --- |
 | `checks.yml` (**Format and validate**, **Tests**) | Every pull request | Formatting, `terraform validate`, the cross-workspace checks, every test. Required by branch protection |
+| `checks.yml` (**Database tests**) | Every pull request | The self-service app's database (migrations, grants, queries) against Postgres 17, in a service container. Not required: a runner without Docker cannot start it |
 | `deploy.yml`, on a pull request | The workspaces the change concerns (below) | For each: preflight, plan, and a plan comment (the plan, the plan guard's warnings, an AI review) when the plan changes something. Hard-to-undo, security-weakening and access-removing changes are listed under **Before merging**; nothing blocks |
 | `deploy.yml`, on merge to `main` | The same workspaces, without the review-only changes | The approval step (`apply-approval`), then for each workspace: preflight (an error stops it before anything changes) and the apply. A deleted workspace file: its Terraform state is removed (the workspace is unchanged) |
 | `deploy.yml`, **App plan** / **Deploy the app** | When a change concerns the self-service app (below) | On a pull request, what deploying the app would change (`scripts/app_deploy.py --plan`, in the run's summary). After a merge, once every workspace's apply has passed: the hub (both apps, the database, migrations), then each served workspace's jobs. One job, one deploy at a time |

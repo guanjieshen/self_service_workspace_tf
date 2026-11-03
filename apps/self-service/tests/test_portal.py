@@ -105,6 +105,8 @@ class FakeClient:
 
     def get_run(self, run_id):
         self.get_runs += 1
+        if run_id not in self.runs_:
+            raise NotFound(f"Run {run_id} does not exist.")
         return self.runs_[run_id]
 
 
@@ -197,18 +199,16 @@ class Submitting(unittest.TestCase):
 
     def test_folder_runs_the_job_with_the_permissions(self):
         p, fake = make()
-        p.request_folder("fin", ANA, "fin-docs", "fin-data-eng", ["fin-data-eng", "fin_builder"], reason=WHY)
+        p.request_folder("fin", ANA, "fin-docs", reason=WHY)
         job_id, params = fake.started[0]
         self.assertEqual((job_id, params["folder"], params["requested_by"]), (2, "fin-docs", ANA))
-        self.assertEqual(params["owner_group"], "fin-data-eng")
+        self.assertEqual(params["owner_group"], "", "no owner group: the job gives the platform admins Can manage")
 
     def test_bad_requests_are_refused_before_any_run(self):
         p, fake = make()
-        for folder, owner in (("Fin Docs", ""), ("users", ""),
-                              ("fin-docs", "fin-finance"),   # not one of ana's groups
-                              ("fin-docs", 'x" or "1')):
-            with self.subTest(folder=folder, owner=owner), self.assertRaises(portal.RequestError):
-                p.request_folder("fin", ANA, folder, owner, ["fin-data-eng", "fin_builder"], reason=WHY)
+        for folder in ("Fin Docs", "users", 'x" or "1'):
+            with self.subTest(folder=folder), self.assertRaises(portal.RequestError):
+                p.request_folder("fin", ANA, folder, reason=WHY)
         with self.assertRaises(portal.RequestError):
             p.request_schema("down", ANA)            # a workspace without the job
         with self.assertRaises(portal.RequestError):
@@ -446,11 +446,24 @@ class RequestsInTheDatabase(unittest.TestCase):
             p.request_folder("fin", ANA, "fin-docs", reason=WHY)
         self.assertEqual(fake.started, [])
 
+    def test_a_run_that_does_not_exist_is_not_found(self):
+        p, _ = make()
+        self.assertIsNone(p.run("fin", 999999, ANA), "a page saying not found, not an error page")
+
+    def test_an_approved_request_whose_workspace_is_gone_is_recorded_as_failed(self):
+        db = FakeStore()
+        p, _ = make(db)
+        row = {"id": "ss-1", "kind": "folder", "workspace": "retired", "bu": "FIN", "requested_by": ANA, "name": "fin-docs",
+               "owner_group": None, "reason": WHY}
+        with self.assertRaises(portal.RequestError):
+            p.run_recorded(row)
+        self.assertEqual(db.events[-1][1:], ("start_failed", {"body": "The job could not be started."}))
+
     def test_a_job_that_cannot_start_is_recorded_as_failed(self):
         db = FakeStore()
         p, fake = make(db)
         fake.jobs.run_now = lambda job_id, job_parameters: (_ for _ in ()).throw(ConnectionError("down"))
-        with self.assertRaises(ConnectionError):
+        with self.assertRaisesRegex(portal.RequestError, "its job could not be started"):   # a message, not an error page
             p.request_folder("fin", ANA, "fin-docs", reason=WHY)
         self.assertEqual(db.events[-1][1:], ("start_failed", {"body": "The job could not be started."}))
         self.assertEqual([(r.status, r.message) for r in p.requests(ANA)], [("Failed", "The job could not be started.")])
@@ -1068,7 +1081,7 @@ class Pages(unittest.TestCase):
                 self.assertIn(f'class="bu-options bu-cols-{cols}"', page)
 
     def test_choosing_never_sends_someone_to_another_site(self):
-        for nxt in ("https://evil.example.com", "//evil.example.com", "/business-unit"):
+        for nxt in ("https://evil.example.com", "//evil.example.com", "/\\evil.example.com", "/\tevil", "/business-unit"):
             with self.subTest(next=nxt):
                 r = self.http.post("/business-unit", data={"bu": "FIN", "next": nxt}, headers=self.as_ana, follow_redirects=False)
                 self.assertEqual(r.headers["location"], "/")

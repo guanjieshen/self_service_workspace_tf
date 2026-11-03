@@ -28,6 +28,7 @@ import argparse
 import json
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -43,14 +44,19 @@ def env(host):
     return {**os.environ, "DATABRICKS_HOST": host}
 
 
-def cli(host, *args, check=True):
-    """The Databricks CLI's JSON output in a workspace (None for a failed call when check is False).
-    Run outside the bundles' folders, where the CLI would take a bundle's target instead."""
+NOT_FOUND = re.compile(r"not.?found|does not exist|RESOURCE_DOES_NOT_EXIST|404", re.I)
+
+
+def cli(host, *args, missing_ok=False):
+    """The Databricks CLI's JSON output in a workspace. missing_ok: None when what was asked for
+    does not exist; any other failure (sign-in, network, permission) stops the deploy, so a
+    passing outage is never read as "not there" (which would create it again). Run outside the
+    bundles' folders, where the CLI would take a bundle's target instead."""
     r = subprocess.run(["databricks", *args, "-o", "json"], cwd=tempfile.gettempdir(), env=env(host), capture_output=True, text=True)
     if r.returncode:
-        if check:
-            raise SystemExit(f"databricks {' '.join(args)} failed:\n{r.stderr.strip()}")
-        return None
+        if missing_ok and NOT_FOUND.search(r.stderr):
+            return None
+        raise SystemExit(f"databricks {' '.join(args)} failed:\n{r.stderr.strip()}")
     return json.loads(r.stdout) if r.stdout.strip() else {}
 
 
@@ -93,7 +99,7 @@ def ensure_database(host, branch, owner, readers):
     roles = cli(host, "postgres", "list-roles", branch)
     roles = roles if isinstance(roles, list) else roles.get("roles", [])
     by_name = {(r.get("status") or {}).get("postgres_role"): r["name"] for r in roles}
-    if cli(host, "postgres", "get-database", f"{branch}/databases/self-service", check=False) is None:
+    if cli(host, "postgres", "get-database", f"{branch}/databases/self-service", missing_ok=True) is None:
         if owner not in by_name:
             raise SystemExit(f"No Lakebase role for {owner} on {branch}: the deploying identity must have one.")
         cli(host, "postgres", "create-database", branch, "--database-id", "self-service",
@@ -109,7 +115,7 @@ def ensure_database(host, branch, owner, readers):
 def project_exists(host, project):
     """Whether the Lakebase project exists. A deleted one is kept for a while (it can be
     undeleted) and still answers: it stops the deploy, saying how to clear it."""
-    p = cli(host, "postgres", "get-project", f"projects/{project}", check=False)
+    p = cli(host, "postgres", "get-project", f"projects/{project}", missing_ok=True)
     if p is None:
         return False
     if p.get("delete_time"):
