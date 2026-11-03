@@ -1,7 +1,7 @@
 # On every pull request: formatting, validation, the cross-workspace checks and every test.
 # Required by branch protection on main ("Format and validate", "Tests"). The workspaces' plans
-# run in deploy.yml. CHECKS_RUNNER (a repository variable, JSON runs-on value) picks the runner,
-# for organizations without GitHub-hosted runners.
+# run in deploy.yml. RUNNER (a repository variable, JSON runs-on value) picks the runner of every
+# job in every workflow; a pull request from a fork never runs.
 name: Checks
 
 on:
@@ -18,7 +18,9 @@ concurrency:
 jobs:
   checks:
     name: Format and validate
-    runs-on: ${{ fromJSON(vars.CHECKS_RUNNER || '"ubuntu-latest"') }}
+    # A pull request from a fork never runs on the runner (it may be self-hosted, in your network).
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ fromJSON(vars.RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -36,7 +38,9 @@ jobs:
 
   tests:
     name: Tests
-    runs-on: ${{ fromJSON(vars.CHECKS_RUNNER || '"ubuntu-latest"') }}
+    # A pull request from a fork never runs on the runner (it may be self-hosted, in your network).
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ fromJSON(vars.RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -8,6 +8,10 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **One runner setting for every workflow:** the repository variable `RUNNER` (a JSON `runs-on`
+  value) replaces `CHECKS_RUNNER` and `TERRAFORM_RUNNER`. If you set either, set `RUNNER` instead
+  and delete them. A pull request from a fork never runs on the runner.
+
 - **Add a group to your workspace** moves to **Build**, next to the folder it lets you share.
 - **Genie One Onboarding** says "Opens in Databricks (workspace access is required)", like the Data cards.
 - **The folder form no longer asks who can manage the folder.** The requester manages it (and

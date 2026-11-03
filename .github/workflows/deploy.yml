@@ -32,7 +32,10 @@ env:
 jobs:
   route:
     name: Find the workspaces
-    runs-on: ${{ fromJSON(vars.CHECKS_RUNNER || '"ubuntu-latest"') }}
+    # A pull request from a fork never runs on the runner (it may be self-hosted, in your
+    # network): this job skips, and so does every job after it.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ fromJSON(vars.RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     permissions:
       contents: read
@@ -70,7 +73,7 @@ jobs:
     if: >-
       github.event_name == 'pull_request' && needs.route.outputs.workspaces != '[]' &&
       github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ fromJSON(vars.TERRAFORM_RUNNER || '"ubuntu-latest"') }}   # must reach the workspaces; see docs
+    runs-on: ${{ fromJSON(vars.RUNNER || '"ubuntu-latest"') }}   # must reach the workspaces
     timeout-minutes: 30
     permissions:
       contents: read
@@ -154,7 +157,7 @@ jobs:
     name: Retire notice ${{ matrix.workspace }}
     needs: route
     if: github.event_name == 'pull_request' && needs.route.outputs.removed != '[]'
-    runs-on: ${{ fromJSON(vars.CHECKS_RUNNER || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     permissions:
       contents: read
@@ -178,7 +181,7 @@ jobs:
     name: Approve
     needs: route
     if: github.event_name == 'push' && (needs.route.outputs.workspaces != '[]' || needs.route.outputs.removed != '[]')
-    runs-on: ${{ fromJSON(vars.CHECKS_RUNNER || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.RUNNER || '"ubuntu-latest"') }}
     # Holds no credentials, so it does not change how the applies sign in. Without required
     # reviewers on it, merging the pull request is the approval.
     environment: apply-approval
@@ -192,7 +195,7 @@ jobs:
     needs: [route, approve]
     # Only after a merge to main; approve runs only then too, this says it here as well.
     if: github.event_name == 'push' && needs.route.outputs.workspaces != '[]'
-    runs-on: ${{ fromJSON(vars.TERRAFORM_RUNNER || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.RUNNER || '"ubuntu-latest"') }}
     strategy:
       fail-fast: false        # one workspace failing does not stop the others
       matrix:
@@ -249,7 +252,7 @@ jobs:
     name: App plan
     needs: route
     if: github.event_name == 'pull_request' && needs.route.outputs.app == 'true'
-    runs-on: ${{ fromJSON(vars.TERRAFORM_RUNNER || '"ubuntu-latest"') }}   # must reach the workspaces and the state
+    runs-on: ${{ fromJSON(vars.RUNNER || '"ubuntu-latest"') }}   # must reach the workspaces and the state
     timeout-minutes: 30
     permissions:
       contents: read
@@ -277,7 +280,7 @@ jobs:
     if: >-
       always() && github.event_name == 'push' && needs.route.outputs.app == 'true' &&
       (needs.apply.result == 'success' || needs.apply.result == 'skipped')
-    runs-on: ${{ fromJSON(vars.TERRAFORM_RUNNER || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 60
     permissions:
       contents: read
@@ -309,7 +312,7 @@ jobs:
     name: Retire ${{ matrix.workspace }}
     needs: [route, approve]
     if: needs.route.outputs.removed != '[]'
-    runs-on: ${{ fromJSON(vars.TERRAFORM_RUNNER || '"ubuntu-latest"') }}   # must reach the state storage
+    runs-on: ${{ fromJSON(vars.RUNNER || '"ubuntu-latest"') }}   # must reach the state storage
     strategy:
       fail-fast: false
       matrix:
@@ -348,7 +351,7 @@ jobs:
     name: Drift ${{ matrix.workspace }}
     needs: route
     if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && needs.route.outputs.workspaces != '[]'
-    runs-on: ${{ fromJSON(vars.TERRAFORM_RUNNER || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 30
     permissions:
       contents: read

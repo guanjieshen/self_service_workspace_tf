@@ -32,7 +32,7 @@ Which workspaces a change concerns:
 The self-service app is deployed (**Deploy the app**) when a change touches `apps/`, `bundle/`,
 `config/self-service/`, `scripts/app_build.py`, `scripts/app_deploy.py`, a workspace file, or
 anything every workspace's Terraform reads (a workspace's output may change):
-`scripts/workspaces.py app`. It runs on the Terraform runner (`TERRAFORM_RUNNER`), with the same
+`scripts/workspaces.py app`. It runs on the runner (`RUNNER`), with the same
 sign-in: it reads each workspace's Terraform output, and reaches the hub, every served workspace
 and the hub's Lakebase database. Like every job that signs in, it runs in no GitHub Environment.
 
@@ -65,7 +65,7 @@ The jobs that run Terraform call the workspace API, so the runner must be able t
 - uses Private Link with public access disabled, or
 - has an IP access list (the error is `Source IP address ... is blocked by Databricks IP ACL`).
 
-In that case, run these jobs on a runner inside an allowed network and set the repository variable `TERRAFORM_RUNNER` to its `runs-on` value, written as JSON:
+In that case, run the jobs on a runner inside an allowed network and set the repository variable `RUNNER` to its `runs-on` value, written as JSON. **One variable sets the runner of every job in every workflow:**
 
 ```text
 "citizen-dev"                                              a single runner label (note the quotes)
@@ -75,10 +75,10 @@ In that case, run these jobs on a runner inside an allowed network and set the r
 
 | Runner | Notes |
 | --- | --- |
-| Self-hosted runner in the Azure network (VM or container) | Register it to the repository or organization with a label such as `citizen-dev`, then set `TERRAFORM_RUNNER` to `"citizen-dev"`. Needs `bash`, `python3`, `git`, `node` (for `actions/github-script`), `curl`, `tar` and `sha256sum`, and the **Azure CLI** (the retire job). The jobs install Terraform and the Databricks CLI themselves. Outbound access to: GitHub (github.com, api.github.com, the Actions endpoints), the Terraform registry and releases (registry.terraform.io, releases.hashicorp.com, or your mirror), Entra ID (login.microsoftonline.com), the state storage account (`<account>.blob.core.windows.net`), the Databricks account console (accounts.azuredatabricks.net) and each workspace. |
-| GitHub-hosted runners with Azure private networking | GitHub Team or Enterprise; runners join an Azure VNet you provide. Set `TERRAFORM_RUNNER` to the runner group, for example `{"group": "my-runner-group", "labels": "linux-4core"}`. |
+| Self-hosted runner in the Azure network (VM or container) | Register it to the repository or organization with a label such as `citizen-dev`, then set `RUNNER` to `"citizen-dev"`. Needs `bash`, `python3`, `git`, `node` (for `actions/github-script`), `curl`, `tar` and `sha256sum`, and the **Azure CLI** (the retire job). The jobs install Terraform and the Databricks CLI themselves. Outbound access to: GitHub (github.com, api.github.com, the Actions endpoints), the Terraform registry and releases (registry.terraform.io, releases.hashicorp.com, or your mirror), Entra ID (login.microsoftonline.com), the state storage account (`<account>.blob.core.windows.net`), the Databricks account console (accounts.azuredatabricks.net) and each workspace. |
+| GitHub-hosted runners with Azure private networking | GitHub Team or Enterprise; runners join an Azure VNet you provide. Set `RUNNER` to the runner group, for example `{"group": "my-runner-group", "labels": "linux-4core"}`. |
 
-The jobs that reach Databricks or the state use `TERRAFORM_RUNNER`. The checks and the routing step use `CHECKS_RUNNER` (default `ubuntu-latest`): set it too if your organization has no GitHub-hosted runners. They run a pull request's code before review, so in a public repository never point `CHECKS_RUNNER` at a self-hosted runner: a pull request from a fork would run on it.
+Without `RUNNER`, every job runs on `ubuntu-latest`. **A pull request from a fork never runs on the runner:** the checks and **Find the workspaces** (which every other job waits for) skip it, because a fork's code would otherwise run before review on a runner inside your network. A test (`scripts/tests/test_workflows.py`) keeps it that way.
 
 ## Hardening and noise
 

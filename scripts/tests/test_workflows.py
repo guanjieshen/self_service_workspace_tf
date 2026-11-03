@@ -74,6 +74,25 @@ class Workflows(unittest.TestCase):
             if "tf.sh" in line and " apply " in line:
                 self.assertNotIn("-lock=false", line)
 
+    def test_one_runner_variable_for_every_job(self):
+        # RUNNER picks the runner of every job; there is no second variable to forget.
+        for path in WORKFLOWS:
+            for name, text in jobs(path).items():
+                with self.subTest(file=path.name, job=name):
+                    self.assertIn("runs-on: ${{ fromJSON(vars.RUNNER || '\"ubuntu-latest\"') }}", text)
+
+    def test_a_pull_request_from_a_fork_never_runs_on_the_runner(self):
+        # The runner may be self-hosted, inside the network: a fork's code must not run there.
+        # Every job a pull request starts first (no needs:) checks where the pull request comes from.
+        guard = "github.event.pull_request.head.repo.full_name == github.repository"
+        for path in WORKFLOWS:
+            if "pull_request" not in path.read_text().split("jobs:")[0]:
+                continue
+            for name, text in jobs(path).items():
+                if "    needs:" not in text:
+                    with self.subTest(file=path.name, job=name):
+                        self.assertIn(guard, text)
+
     def test_nothing_waits_for_a_label(self):
         # The plan guard is advice in the plan comment: no step reads a label or fails on its findings.
         text = (ROOT / ".github/workflows/deploy.yml").read_text()
