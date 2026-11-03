@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% from "_components.html" import back, facts, conversation, callout, kv, copy_button %}
+{% from "approvals/_macros.html" import age, sla, status %}
+{% block title %}{{ r.name }} · Approvals{% endblock %}
+{#- The Approval card's facts, one row each: the decision, who and when, then the job and its URL. -#}
+{%- macro approval_rows(decision, by, at) -%}
+{%- set job -%}{% if r.run %}{{ status(r.status) }}{% endif %}{%- endset -%}
+{%- set url -%}{% if r.run_url %}<a class="text-link" href="{{ r.run_url }}" target="_blank" rel="noopener">Open job run {{ icon("external", "icon icon-xs") }}</a>{% endif %}{%- endset -%}
+<div class="kv-side">{{ kv([("Decision", decision), ("By", by), ("When", at), ("Job status", job | trim)]) }}</div>
+{%- endmacro -%}
+{% block content %}
+{%- set decided = r.decision -%}
+{%- set open = view_of(r) in ("review", "info") -%}
+{{ back("/approvals?" ~ back if back else "/approvals", "Approvals") }}
+{#- The thing asked for leads, as on the request pages: its icon, its name, its status. -#}
+{%- set noun = "folder" if r.kind == "folder" else "schema" -%}
+<div class="request-head">
+  <div class="request-name">
+    <span class="request-icon" title="{{ r.type }}">{{ icon(noun, "icon icon-sm") }}</span>
+    <h1 class="request-title">{{ r.name }}</h1>
+    {{ copy_button(r.name, "Copy the " ~ noun ~ " name") }}
+  </div>
+  {{ status(r.status, pill=True) }}
+</div>
+{{ facts([("Type", r.type), ("Requested by", r.requested_by), ("Business unit", r.bu), ("Workspace", r.workspace, "mono"), ("Team", r.owner_group),
+          ("Waiting", age(now, r.waiting_since or r.submitted), "age " ~ sla(now, r.waiting_since or r.submitted)) if open else ("", "")]) }}
+
+<div class="page-grid">
+  <div class="stack">
+    <section class="panel summary-panel">
+      <div class="panel-body">
+        <div class="summary">
+        <h2 class="panel-title">Summary</h2>
+        {% if r.summary %}
+        <p class="summary-headline">{{ r.summary.headline }}</p>
+        <p class="summary-text">{{ r.summary.summary | mention(r.name) }}</p>
+        {% if r.summary.concerns %}
+        <h3 class="summary-label">Worth checking</h3>
+        {#- Most important first, each with its level; with three or more, the rest fold away. -#}
+        {%- macro concern(c) -%}<li class="concern {{ c.level or 'medium' }}"><span class="concern-level">{{ (c.level or "medium") | capitalize }}</span><span class="strong">{{ c.label }}</span> {{ c.detail | mention(r.name) }}</li>{%- endmacro -%}
+        {%- set shown = 1 if r.summary.concerns | length >= 3 else 2 -%}
+        <ul class="summary-concerns">{% for c in r.summary.concerns[:shown] %}{{ concern(c) }}{% endfor %}</ul>
+        {% if r.summary.concerns | length > shown %}
+        <details class="concerns-more">
+          <summary>+{{ r.summary.concerns | length - shown }} more</summary>
+          <ul class="summary-concerns">{% for c in r.summary.concerns[shown:] %}{{ concern(c) }}{% endfor %}</ul>
+        </details>
+        {% endif %}
+        {% endif %}
+        <p class="meta summary-foot" title="Written from the request alone. Advice, not an approval: confirm what matters with the requester.">AI summary · {{ model_name(r.summary.model) }} · Use with discretion</p>
+        {% else %}
+        <p class="meta">No AI summary for this request. Read the reason below, and ask the requester if anything is unclear.</p>
+        {% endif %}
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-body">
+        <h2 class="panel-title">Conversation</h2>
+        {{ conversation(r.events | rejectattr("type", "equalto", "reviewed") | list) }}
+      </div>
+    </section>
+  </div>
+
+  <aside class="stack">
+  <section class="panel decision-panel">
+    <div class="panel-body">
+      {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
+      {% if decided %}
+        <h2 class="panel-title">Approval</h2>
+        {{ approval_rows(status(r.decision.outcome), r.decision.by, r.decision.at | local) }}
+        {% if r.decision.comment %}<p class="event-message">{{ r.decision.comment }}</p>{% endif %}
+      {% elif not open %}
+        <h2 class="panel-title">Approval</h2>
+        {{ approval_rows("Not needed (" ~ r.type | lower ~ " requests run when asked)", "", "") }}
+      {% else %}
+        <h2 class="panel-title">Review and approve</h2>
+        {% if r.status == "needs_info" %}{% call callout() %}Waiting for the requester's answer. You can still approve or reject.{% endcall %}{% endif %}
+        <form method="post" action="/approvals/{{ r.id }}" class="decision-form">
+          <input type="hidden" name="back" value="{{ back }}">
+          <label for="comment">Message to the requester <span class="meta">(needed to reject or ask a question)</span></label>
+          <textarea id="comment" name="comment" rows="3" placeholder="Optional when you approve"></textarea>
+          <div class="decision-actions">
+            <button type="submit" name="action" value="approve" class="primary">Approve</button>
+            <button type="submit" name="action" value="ask" class="button">Ask a question</button>
+            <button type="submit" name="action" value="reject" class="button danger">Reject</button>
+          </div>
+          <p class="meta">Approve creates the {{ "folder" if r.kind == "folder" else "schema" }} in under a minute.</p>
+        </form>
+        {% if r.summary and r.summary.questions %}
+        <div class="suggested">
+          <h3 class="summary-label">Suggested questions</h3>
+          <p class="meta">Sends the question to the requester and returns the request to them for an answer.</p>
+          {% for q in r.summary.questions %}
+          <form method="post" action="/approvals/{{ r.id }}" class="suggested-question">
+            <input type="hidden" name="back" value="{{ back }}">
+            <input type="hidden" name="action" value="ask">
+            <input type="hidden" name="comment" value="{{ q }}">
+            <button type="submit" class="suggestion">{{ q }}{{ icon("arrow", "icon icon-xs") }}</button>
+          </form>
+          {% endfor %}
+        </div>
+        {% endif %}
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card card-body">
+    <div class="card-head"><h2 class="card-label">Request details</h2>{{ copy_button(r.id, "Copy the request ID") }}</div>
+    {%- set rid -%}<span class="id-chip">{{ r.id }}</span>{%- endset -%}
+    {%- set ws -%}<span class="mono">{{ r.workspace }}</span>{%- endset -%}
+    {%- set url -%}{% if r.run_url %}<a class="text-link" href="{{ r.run_url }}" target="_blank" rel="noopener">Open job run {{ icon("external", "icon icon-xs") }}</a>{% endif %}{%- endset -%}
+    <div class="kv-side">{{ kv([("Request ID", rid), ("Submitted", r.submitted | local), ("Target workspace", ws), ("Job URL", url | trim)]) }}</div>
+  </section>
+  </aside>
+</div>
+{% endblock %}

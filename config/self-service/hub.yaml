@@ -1,0 +1,32 @@
+# =============================================================================
+# SELF-SERVICE HUB: the central workspace that runs the self-service app, the
+# approvals app and their database, and the apps' identities.
+#
+# The app (apps/, bundle/) is deployed by Databricks Asset Bundles, not by Terraform.
+# Terraform reads only app_ids from this file (terraform/self_service.tf): it gives those
+# service principals what they need in each workspace the app serves. Every other key is the
+# app's own (scripts/app_build.py).
+# =============================================================================
+
+hub:
+  name: null                                               # the hub, as the apps name it
+  host: null                                               # its per-workspace URL
+  users_group: users           # may open the self-service app (Consumer access is enough)
+  approvals_group: null        # may open the approvals app; null = workspace admins only
+  warehouse_id: null           # the SQL warehouse the business unit lookup runs on
+
+# The apps' database (Lakebase; the deploy finds its endpoint). readers: people who may read
+# the data, by email.
+database:
+  readers: []
+
+# The apps' service principals (application IDs). Empty until the hub's first deploy creates
+# the apps; then set them here, in a pull request, so every served workspace grants them.
+app_ids:
+  self_service: null                                   # the self-service app's
+  approvals: null                                      # the approvals app's
+
+# Resources that already exist and the hub's bundle should take over instead of creating: the
+# apps' names, and the database project's resource name (projects/<project ID>). The first
+# deploy binds them; after that, these lines do nothing.
+adopt: {}

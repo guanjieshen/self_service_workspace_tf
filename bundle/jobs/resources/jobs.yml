@@ -1,0 +1,51 @@
+# The self-service jobs, the same in every workspace the app serves. What differs by workspace
+# (the catalog tag, who may run them, the usage policy) is in build/<workspace>/target.yml.
+resources:
+  # The jobs are the app's interface and its security boundary: the app asks, the job checks
+  # and acts. Each runs on serverless, on the workspace's usage policy, 20 requests side by
+  # side, more wait their turn. Only workspace admins and the hub's two apps (their service
+  # principals, in build/<workspace>/target.yml) can run them. The parameters are all empty:
+  # the app sets them. The settings a run must not change are written into the notebooks
+  # (scripts/app_build.py).
+  jobs:
+    personal_schema:
+      name: ${var.business_unit} personal schema
+      max_concurrent_runs: 20
+      queue:
+        enabled: true
+      # How the app finds the job, and what it says about itself (cd_catalog, cd_prefix: target.yml).
+      tags:
+        cd_self_service: personal_schema
+      parameters:
+        - {name: user, default: ""}
+        - {name: catalog, default: ""}
+        - {name: schema, default: ""}
+        - {name: owner_group, default: ""}
+        - {name: reason, default: ""}
+        - {name: request_id, default: ""}
+      tasks:
+        - task_key: create
+          max_retries: 0
+          timeout_seconds: 600
+          notebook_task:
+            notebook_path: ../build/${bundle.target}/personal_schema.py
+
+    team_folder:
+      name: ${var.business_unit} team folder
+      max_concurrent_runs: 20
+      queue:
+        enabled: true
+      tags:
+        cd_self_service: team_folder
+      parameters:
+        - {name: folder, default: ""}
+        - {name: requested_by, default: ""}
+        - {name: owner_group, default: ""}
+        - {name: reason, default: ""}
+        - {name: request_id, default: ""}
+      tasks:
+        - task_key: create
+          max_retries: 0
+          timeout_seconds: 600
+          notebook_task:
+            notebook_path: ../build/${bundle.target}/team_folder.py

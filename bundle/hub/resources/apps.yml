@@ -1,0 +1,28 @@
+# The hub's resources. What each app may use (the database; the business unit lookup's
+# warehouse) and who may open it come from config/self-service/hub.yaml, in build/target.yml.
+# The apps run the jobs in other workspaces (bundle/jobs/), which grant them there.
+resources:
+  # The requests database. Deleting it loses every request's history: the bundle refuses.
+  postgres_projects:
+    database:
+      project_id: ${var.database_project}
+      display_name: ${var.database_display_name}
+      pg_version: 17
+      default_endpoint_settings:
+        autoscaling_limit_min_cu: ${var.database_min_cu}
+        autoscaling_limit_max_cu: ${var.database_max_cu}
+        suspend_timeout_duration: ${var.database_suspend_after}
+      lifecycle:
+        prevent_destroy: true
+
+  # Both apps run the same code; config.json (written by scripts/app_build.py) tells them apart.
+  apps:
+    self_service:
+      name: ${var.self_service_name}
+      description: "Databricks Self-Service: ask for a personal schema or a workspace folder"
+      source_code_path: ../build/self-service
+
+    approvals:
+      name: ${var.approvals_name}
+      description: "Databricks Self-Service: approvals and monitoring of self-service requests"
+      source_code_path: ../build/approvals

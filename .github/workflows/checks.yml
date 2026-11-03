@@ -1,0 +1,91 @@
+# On every pull request: formatting, validation, the cross-workspace checks and every test.
+# Required by branch protection on main ("Format and validate", "Tests"). The workspaces' plans
+# run in deploy.yml. RUNNER (a repository variable, JSON runs-on value) picks the runner of every
+# job in every workflow; a pull request from a fork never runs.
+name: Checks
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+# A newer push to the pull request replaces these checks.
+concurrency:
+  group: checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Format and validate
+    # A pull request from a fork never runs on the runner (it may be self-hosted, in your network).
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ fromJSON(vars.RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          sign-in: "false"
+      - run: terraform fmt -check -recursive terraform
+      # Across workspaces: unique hosts, ids and catalog names, budget policy names that do
+      # not collide on an account, and file names safe for workflow commands.
+      - run: python3 scripts/workspaces.py check
+      - run: terraform -chdir=terraform init -backend=false -input=false
+      - run: terraform -chdir=terraform validate
+
+  tests:
+    name: Tests
+    # A pull request from a fork never runs on the runner (it may be self-hosted, in your network).
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ fromJSON(vars.RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          sign-in: "false"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      # The self-service app's packages, for its suite (scripts/test.sh app). Its database tests
+      # need a Postgres (PG_TEST_DSN): they run in the Database tests job, and are skipped here.
+      - run: python3 -m pip install --quiet -r apps/self-service/requirements.txt httpx pyyaml
+      # Mocked providers: no workspace, credentials or network. Same as bash scripts/test.sh locally.
+      - run: bash scripts/test.sh
+
+  database:
+    name: Database tests
+    # The self-service app's migrations, grants and queries against a real Postgres 17 (Lakebase's
+    # version). Not a required check: a service container needs Docker on the runner, which a
+    # self-hosted runner may not have; there it fails without blocking a merge.
+    # A pull request from a fork never runs on the runner (it may be self-hosted, in your network).
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ fromJSON(vars.RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          sign-in: "false"
+      - run: python3 -m pip install --quiet -r apps/self-service/requirements.txt coverage
+      # Under coverage, so the log shows how much of the database code (store.py, db/) ran.
+      - run: |
+          python3 -m coverage run --include="apps/self-service/store.py,apps/self-service/db/*" \
+            -m unittest discover -s apps/self-service/tests -p "test_db.py" -v
+          python3 -m coverage report -m
+        env:
+          PG_TEST_DSN: host=localhost port=5432 user=postgres dbname=postgres

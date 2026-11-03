@@ -1,0 +1,78 @@
+{
+ "description": "A framework change removes data classification; the pipeline loses the usage-policy grant only classification needed (#36).",
+ "expected_risk": [
+  "Low",
+  "Medium"
+ ],
+ "must_mention": [
+  [
+   "service principal",
+   "pipeline"
+  ]
+ ],
+ "must_not_mention": [
+  "no config change explains",
+  "drifted",
+  "unexplained",
+  "no reason"
+ ],
+ "state": "update",
+ "changed_files": "- CHANGELOG.md: code, workflows or docs (no direct workspace change)\n- config/defaults/catalog.yaml: baseline (affects every workspace)\n- terraform/chargeback.tf: framework code (can change what every workspace gets; see code_diff)\n- terraform/modules/catalog/main.tf: framework code (can change what every workspace gets; see code_diff)",
+ "config_diff": "diff --git a/config/defaults/catalog.yaml b/config/defaults/catalog.yaml\nindex 43a067b..3ad8385 100644\n--- a/config/defaults/catalog.yaml\n+++ b/config/defaults/catalog.yaml\n@@ -23,14 +23,8 @@ catalog:\n   # Predictive optimization: Databricks runs OPTIMIZE, VACUUM and ANALYZE on managed\n   # tables when worth it (serverless, billed). Set on the catalog; every schema inherits it.\n   predictive_optimization: true\n-  # Data classification: scans every schema (new ones too) and finds sensitive data\n-  # (names, emails, card numbers, ...) so it can be tagged and governed. It runs on\n-  # serverless and needs a usage policy (serverless_policy in config/defaults/cost.yaml).\n-  # null = leave it alone: the API now requires a usage_policy_id that the Databricks\n-  # Terraform provider cannot send yet (checked up to 1.140.0), so true fails with \"Usage\n-  # policy ID must not be empty\". Turn it on in Catalog Explorer (catalog > Details) and\n-  # pick the workspace's usage policy, until the provider supports it.\n-  data_classification: null\n+  # Data classification and data quality monitoring are turned on by hand, in Catalog\n+  # Explorer (catalog > Details), not here (docs/SETUP.md, step 9).\n \n   # On the whole catalog, for every persona: enough to reach a schema and use what\n   # was shared with them, nothing more. USE SCHEMA does not show any data: a table\n",
+ "code_diff": "diff --git a/CHANGELOG.md b/CHANGELOG.md\nindex 3361c96..90120e4 100644\n--- a/CHANGELOG.md\n+++ b/CHANGELOG.md\n@@ -6,21 +6,17 @@ them for you: a setting missing from your baseline is left alone).\n \n ## Unreleased\n \n+- Data classification and data quality monitoring are turned on by hand in Catalog Explorer\n+  (`docs/SETUP.md`, step 9): removed `catalog.data_classification` and its checks. The\n+  classification API needs a usage policy ID the Terraform provider cannot send, and\n+  monitoring is per schema, and schemas come from the self-service app.\n - CI hardening, no change in what it deploys: permissions per job, actions pinned to commit\n   SHAs (with Dependabot), no token kept in checkouts, time limits on every job. Less noise:\n   plans do not take the state lock (no more collisions with applies), a newer push cancels\n   older plans, fork pull requests are not planned, an unchanged drift is not re-reported, and\n   preflight warnings alone no longer post a comment on a plan without changes.\n - Preflight checks that the pipeline may create usage policies (the account's **Billing admin**\n-  role; an error, before the plan) and warns when the platform admins group is empty. A plan with\n-  `catalog.data_classification: true` fails with why (the provider cannot send its usage policy yet).\n-- Data classification is left alone by default (`catalog.data_classification: null`): the API\n-  now requires a `usage_policy_id` the Terraform provider cannot send yet (up to 1.140.0), so\n-  turning it on failed every apply. Turn it on in Catalog Explorer, with the workspace's usage policy.\n-- The identity running Terraform (the pipeline's service principal) may use the workspace's\n-  serverless usage policy, and data classification waits for it: turning classification on\n-  failed with \"Usage policy ID must not be empty\". The service principal needs the account's\n-  **Billing admin** role to create the policy (`docs/SETUP.md`, step 6).\n+  role; an error, before the plan) and warns when the platform admins group is empty.\n - The Serverless Starter Warehouse Databricks creates in a new workspace is for the platform\n   admins only (`starter_warehouse.admins_only` in `config/defaults/compute.yaml`): people use\n   the default warehouse, which is sized and tagged. Only its permissions are managed. The first\ndiff --git a/terraform/chargeback.tf b/terraform/chargeback.tf\nindex a099285..1eca4bf 100644\n--- a/terraform/chargeback.tf\n+++ b/terraform/chargeback.tf\n@@ -23,14 +23,6 @@ locals {\n       name   = replace(replace(tostring(local.sp.name), \"{PREFIX}\", local.ws_name_upper), \"{prefix}\", local.ws_name)\n       tags   = local.chargeback_tags\n       groups = distinct(concat(flatten(values(local.persona_groups)), local.platform_admins))\n-      # The identity running Terraform uses it too: data classification runs on serverless as\n-      # whoever turns it on, and fails without a usage policy (\"Usage policy ID must not be empty\").\n-      users = compact([try(data.databricks_current_user.pipeline[0].acl_principal_id, \"\")])\n     }\n   }\n }\n-\n-# Who runs Terraform (the pipeline's service principal in CI), as a principal for the policy.\n-data \"databricks_current_user\" \"pipeline\" {\n-  count = local.sp.enabled ? 1 : 0\n-}\n",
+ "workspace_file": "prefix: ss1\nhost: https://adb-1234567890123456.7.azuredatabricks.net\ngroups:\n  users: ss1-cd-users\n  explorer: ss1-cd-explorers\n  builder: ss1-cd-builders\n  publisher: null\ncatalog:\n  storage_root: abfss://catalogs@examplestorage.dfs.core.windows.net/self_service_1\nsql_warehouse:\n  size: X-Small",
+ "plan": [
+  {
+   "address": "module.budget_policies[0].databricks_access_control_rule_set.this[\"self_service\"]",
+   "mode": "managed",
+   "type": "databricks_access_control_rule_set",
+   "name": "this",
+   "change": {
+    "actions": [
+     "update"
+    ],
+    "before": {
+     "grant_rules": [
+      {
+       "role": "roles/budgetPolicy.manager",
+       "principals": [
+        "groups/ss1_platform_admins"
+       ]
+      },
+      {
+       "role": "roles/budgetPolicy.user",
+       "principals": [
+        "servicePrincipals/11111111-2222-3333-4444-555555555555",
+        "groups/ss1-cd-builders",
+        "groups/ss1_platform_admins",
+        "groups/ss1-cd-explorers"
+       ]
+      }
+     ]
+    },
+    "after": {
+     "grant_rules": [
+      {
+       "role": "roles/budgetPolicy.manager",
+       "principals": [
+        "groups/ss1_platform_admins"
+       ]
+      },
+      {
+       "role": "roles/budgetPolicy.user",
+       "principals": [
+        "groups/ss1-cd-builders",
+        "groups/ss1_platform_admins",
+        "groups/ss1-cd-explorers"
+       ]
+      }
+     ]
+    }
+   },
+   "index": "self_service"
+  }
+ ],
+ "plan_guard": "",
+ "preflight": "ok: signed in as the pipeline, a workspace admin\nok: metastore primary\nok: account group ss1-cd-users (users)\nok: account group ss1-cd-explorers (explorer)\nok: account group ss1-cd-builders (builder)\nok: no publisher group: skipped (nobody gets it in this workspace)\nok: account group ss1_platform_admins (platform_admins)\nok: nothing found that still uses legacy access (Hive metastore, DBFS mounts, legacy clusters)",
+ "workspace": "self_service_1 (https://adb-1234567890123456.7.azuredatabricks.net)"
+}

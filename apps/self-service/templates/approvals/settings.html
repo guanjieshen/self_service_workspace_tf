@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% from "_components.html" import callout, field %}
+{#- One tab of the self-service app's settings (settings.py): the defaults, overridden here. -#}
+{% block title %}Settings · Approvals{% endblock %}
+{% block content %}
+{% include "approvals/_settings_head.html" %}
+{% if saved %}{% call callout("success", role="status") %}Saved. The self-service app shows it within 15 seconds.{% endcall %}{% endif %}
+{% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
+
+{#- Reset buttons belong to their own form: Enter in a field must save (the main form's first
+    submit button would otherwise be a Reset), and a reset must not send the other fields. -#}
+<form id="settings-reset" method="post" action="/approvals/settings" hidden><input type="hidden" name="tab" value="{{ tab }}"><input type="hidden" name="bu" value="{{ bu }}"></form>
+<form class="panel settings" method="post" action="/approvals/settings">
+  <input type="hidden" name="tab" value="{{ tab }}">
+  <input type="hidden" name="bu" value="{{ bu }}">
+  {% for title, about, fields in sections %}
+  <section class="settings-section">
+    <div class="settings-about">
+      {%- set persona_links = title.startswith("Persona request links") %}
+      <h2>{{ "Persona request links" if persona_links else title }}</h2>
+      <p class="meta">{{ about }}</p>
+      {#- One business unit's links at a time: the list of business units comes from the workspaces the app serves. -#}
+      {% if persona_links and bus %}
+      <label class="settings-bu">
+        <span class="meta">Business unit</span>
+        <select name="bu-shown" onchange="location.search='?tab={{ tab }}' + (this.value ? '&bu=' + this.value : '')">
+          <option value="">All business units</option>
+          {% for b in bus %}<option value="{{ b }}" {{ 'selected' if b == bu }}>{{ b }}</option>{% endfor %}
+        </select>
+      </label>
+      {% endif %}
+    </div>
+    <div class="settings-fields">
+      {% for key, label, kind in fields %}
+      {%- set changed = overrides.get(key) -%}
+      {% call field(key, label) %}
+        {% if kind == "prompt" %}<textarea id="{{ key }}" name="{{ key }}" rows="6" maxlength="1000" placeholder="No Genie One Onboarding card">{{ values[key] }}</textarea>
+        {% else %}<input id="{{ key }}" name="{{ key }}" value="{{ values[key] }}"
+               {% if kind == "url" %}type="url" placeholder="https://" class="mono"{% elif kind == "date" %}type="date"{% else %}maxlength="200" placeholder="No banner"{% endif %}>{% endif %}
+        {% if changed %}<p class="hint settings-hint">Last updated {{ changed.at | local }} by {{ changed.by }}
+          <button type="submit" class="link-button" form="settings-reset" name="reset" value="{{ key }}">Reset</button></p>
+        {% elif kind == "date" %}<p class="hint">Optional. The banner will automatically disappear after this date.</p>
+        {% elif defaults[key] %}<p class="hint">Default</p>{% endif %}
+      {% endcall %}
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+  <div class="panel-foot">
+    <button type="submit" class="primary">Save changes</button>
+    <a class="button" href="/approvals/settings?tab={{ tab }}{{ '&bu=' ~ bu if bu }}">Cancel</a>
+  </div>
+</form>
+{% if tab == "onboarding" and config.bu_lookup %}<p class="meta settings-source">People are routed to their business unit's workspace by <span class="mono">{{ config.bu_lookup.function }}</span>, set in config/self-service/app.yaml.</p>{% endif %}
+{% endblock %}
