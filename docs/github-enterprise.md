@@ -12,7 +12,7 @@ How to move this project into your own GitHub organization, including **GitHub E
 | 2 | Push the repository into your organization | It gets **new owner and repository IDs**, so its OIDC subject prefix is new. Credentials made for another repository do not work for this one |
 | 3 | `setup.py state`: the storage account, the container, `config/backend.hcl` | Entra sign-in only, no shared keys |
 | 4 | `setup.py identity`: an **app registration**, the two federated credentials for your repository, and Storage Blob Data Contributor on the state container | The script reads your repository's subject prefix through the GitHub API, and uses the github.com issuer (see [Which GitHub you have](#which-github-you-have)) |
-| 5 | `setup.py github`: repository variables, the `drift` label, the `apply-approval` environment, branch protection on `main` | On a paid plan, **required reviewers and branch protection work**: set `apply_approvers` in `config/setup.yaml`. `TERRAFORM_RUNNER` and `CHECKS_RUNNER` (self-hosted runners) are set by hand, below |
+| 5 | `setup.py github`: repository variables, the `drift` label, the `apply-approval` environment, branch protection on `main` | On a paid plan, **required reviewers and branch protection work**: set `apply_approvers` in `config/setup.yaml`. `RUNNER` (a self-hosted runner) is set by hand, below |
 | 6 | Databricks account, by hand: add the identity, make it workspace admin, give it **Billing admin** | The same on every GitHub |
 | 7 | Entra groups, synced to the Databricks account | Including `{prefix}_platform_admins`, **with members** (preflight warns while it is empty) |
 | 8 | Baseline decisions: `account_id`, the chargeback tags, the Git allowlist | Add your GitHub host to `settings.git.allowed_urls` if it is not github.com |
@@ -40,10 +40,9 @@ The workspaces usually sit behind private networking, so the jobs that run Terra
 
 | Repository variable | What it sets | Example |
 | --- | --- | --- |
-| `TERRAFORM_RUNNER` | Where plans, applies, drift checks and retirements run | `["self-hosted", "databricks"]` |
-| `CHECKS_RUNNER` | Where formatting, tests and the router run (no network access needed) | `"ubuntu-latest"` |
+| `RUNNER` | Where every job of every workflow runs. A pull request from a fork never runs on it | `["self-hosted", "databricks"]` |
 
-Both take a JSON `runs-on` value. Set them under the repository's **Settings > Secrets and variables > Actions > Variables**. Keep the runners up to date: the pinned actions run on Node 24, which needs a recent runner version. See [github-actions.md](github-actions.md) for what runs where.
+It takes a JSON `runs-on` value. Set them under the repository's **Settings > Secrets and variables > Actions > Variables**. Keep the runners up to date: the pinned actions run on Node 24, which needs a recent runner version. See [github-actions.md](github-actions.md) for what runs where.
 
 ## Checking it works
 

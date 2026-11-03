@@ -219,7 +219,7 @@ The rule applies to **repository admins too**: a push to `main` is an apply with
 
 Then, if needed:
 
-- **Private networking.** If the workspaces use Private Link or an IP access list, GitHub-hosted runners cannot reach them. Register a self-hosted runner inside the network (or use GitHub's Azure private networking) and set the repository variable `TERRAFORM_RUNNER`, for example `"citizen-dev"` with the quotes; if your organization has no GitHub-hosted runners at all, set `CHECKS_RUNNER` too ([docs/github-actions.md](github-actions.md): what the runner needs and must reach).
+- **Private networking.** If the workspaces use Private Link or an IP access list, GitHub-hosted runners cannot reach them. Register a self-hosted runner inside the network (or use GitHub's Azure private networking) and set the repository variable `RUNNER` (every job runs there), for example `"citizen-dev"` with the quotes ([docs/github-actions.md](github-actions.md): what the runner needs and must reach).
 - **Write access.** Only the platform team should be able to push branches: a pull request's plan runs with the pipeline's workspace-admin rights before review ([docs/github-actions.md](github-actions.md), "Who can run code with the workspace credentials").
 
 > **Warning:** Required reviewers and branch protection need GitHub Team or Enterprise for private repositories. Without them, merging is the only approval and nothing stops a merge before its plan finishes: wait for every check first.
@@ -372,7 +372,7 @@ State is local (`.state/<name>.tfstate`) unless `config/backend.hcl` exists (ste
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | `No matching federated identity record found for presented assertion` (an `AADSTS` error at sign-in) | The token's subject is not one of the two credentials: the repository was renamed or transferred, or a workflow ran from a branch other than `main` (Drift or Apply run by hand on a branch) | Update `github_repo` in `config/setup.yaml` and run step 4 again (it reads the current subject prefix); run Apply and Drift only from `main` |
-| `Source IP address ... is blocked by Databricks IP ACL`, or a timeout reaching the workspace | GitHub-hosted runners cannot reach the workspace | A runner inside the network and `TERRAFORM_RUNNER` (step 5) |
+| `Source IP address ... is blocked by Databricks IP ACL`, or a timeout reaching the workspace | GitHub-hosted runners cannot reach the workspace | A runner inside the network and `RUNNER` (step 5) |
 | `AuthorizationPermissionMismatch` or `403` reading the state | The role on the state container is missing or still propagating | Wait a few minutes after step 4; check Storage Blob Data Contributor on the container |
 | `state blob is already locked` | Another apply, or a local plan, holds the lock (CI plans do not lock) | If an apply for the workspace is running (the repository's Actions tab), wait for it and re-run. If none is, see **A lock left by a run that died**, below |
 | An apply was cancelled or timed out partway | The changes before the stop are made and in the state; the rest are not | Re-run the apply: Terraform makes only what is left. If it says the state is locked, see below |

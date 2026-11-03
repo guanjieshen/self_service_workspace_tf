@@ -13,7 +13,7 @@ permissions: {}
 jobs:
   subject:
     name: Sign-in subjects
-    runs-on: ${{ fromJSON(vars.CHECKS_RUNNER || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     permissions:
       id-token: write   # to read the subject of the token GitHub issues to this repository

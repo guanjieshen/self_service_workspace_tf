@@ -18,6 +18,7 @@ EXAMPLE_WORKSPACE = re.compile(r"config/workspaces/[a-z0-9-]+\.yaml")  # a works
 SKIP = {"CHANGELOG.md"}                       # history: it names what was removed
 # Keys and names that were removed or renamed, and must not come back.
 RETIRED = {
+    "CHECKS_RUNNER / TERRAFORM_RUNNER (now RUNNER)": re.compile(r"\b(CHECKS|TERRAFORM)_RUNNER\b"),
     "bu (now prefix)": re.compile(r"(^|\s|`)bu:|\{bu\}|\{BU\}|`bu`"),
     "APP_ID (now APPID)": re.compile(r"(?<![$\w])APP_ID\b(?!=)"),
     "teams / team_warehouses": re.compile(r"(^|\s|`)(teams|team_warehouses):"),
