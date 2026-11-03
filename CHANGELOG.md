@@ -24,6 +24,7 @@ that you may want to copy. A setting missing from your baseline is left alone.
   | --- | --- |
   | `config/defaults/access.yaml` | Add `sharing_groups: []` (a top-level key, after `groups:`) |
   | `config/defaults/compute.yaml` | `sql_warehouse.size: Medium` (was `Small`), if you want the new default |
+
 - **A new card, Add a group to your workspace** (Get started): a link to your organization's
   form for adding an Entra group to a workspace with a persona (for example ServiceNow).
   Set it in `config/self-service/app.yaml` (`links.group_request`) or in the approvals app's
