@@ -8,6 +8,10 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **The self-service app's jobs skip until it is set up:** with `hub.host` empty in
+  `config/self-service/hub.yaml` (as it ships), App plan and Deploy the app do nothing, so a first
+  install without the app has no failing checks.
+
 - **Every route of both apps has a test request,** and a new one fails the suite until a test
   asks for it (`EveryRoute`).
 

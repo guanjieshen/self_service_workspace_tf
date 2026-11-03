@@ -232,8 +232,11 @@ def app(base, head):
     """Whether a change redeploys the self-service app: true when it touches APP or EVERYTHING."""
     def git(*args):
         return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True)
-    if not (ROOT / "config/self-service/hub.yaml").exists():
+    hub = ROOT / "config/self-service/hub.yaml"
+    if not hub.exists():
         return False   # no app in this repository
+    if not re.search(r"(?m)^  host:\s*https://", hub.read_text()):
+        return False   # the app is not set up yet (hub.host empty): nothing to plan or deploy
     if git("rev-parse", "--quiet", "--verify", f"{base}^{{commit}}").returncode != 0:
         return True    # no usable base (first push, force push): everything
     prefix = git("rev-parse", "--show-prefix").stdout.strip()
