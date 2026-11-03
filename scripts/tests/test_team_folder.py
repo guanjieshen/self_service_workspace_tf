@@ -11,7 +11,7 @@ import unittest
 from notebook_helpers import ROOT, RecordsSpark, render_notebook
 
 NOTEBOOK = (ROOT / "bundle/jobs/notebooks/team_folder.py").read_text()
-CONFIG = {"root": "/Workspace"}
+CONFIG = {"root": "/Workspace", "admin_groups": []}
 ME = "ana@contoso.com"
 
 
@@ -98,6 +98,17 @@ class WorkspaceFolder(unittest.TestCase):
             {"user_name": ME, "permission_level": "CAN_MANAGE"},
             {"group_name": "fin-data-eng", "permission_level": "CAN_MANAGE"}])],
             "PATCH adds the permissions; it never replaces the folder's others")
+
+    def test_the_platform_admins_can_manage_every_folder(self):
+        w = FakeWorkspace()
+        run({"folder": "fin-docs", "owner_group": "fin-data-eng"}, w, config={"admin_groups": ["fin-data-eng", "fin_platform_admins"]})
+        self.assertEqual(w.patched[0][1], [
+            {"user_name": ME, "permission_level": "CAN_MANAGE"},
+            {"group_name": "fin-data-eng", "permission_level": "CAN_MANAGE"},
+            {"group_name": "fin_platform_admins", "permission_level": "CAN_MANAGE"}], "each group once, even when it is also the owner group")
+        w = FakeWorkspace()
+        run({"folder": "fin-docs"}, w, config={"admin_groups": ["fin_platform_admins"]})
+        self.assertIn({"group_name": "fin_platform_admins", "permission_level": "CAN_MANAGE"}, w.patched[0][1], "with no owner group too")
 
     def test_the_reason_is_kept_with_the_run(self):
         result = run({"folder": "fin-docs", "reason": "Notebooks for the month-end close."}, FakeWorkspace())

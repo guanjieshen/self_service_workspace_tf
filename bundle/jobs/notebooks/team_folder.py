@@ -20,6 +20,9 @@ from databricks.sdk.errors import NotFound
 
 # Written here by scripts/app_build.py from config/self-service/app.yaml: change it there. A run cannot change it.
 root = ${jsonencode(root)}
+# The workspace's platform admins (its Terraform output): they can manage every folder, so a
+# folder is never orphaned when its people move on.
+admin_groups = ${jsonencode(admin_groups)}
 # The request record check (below): the app's records, this workspace's name in them, and
 # the kinds that always need an approver. requests_catalog empty = off.
 requests_catalog = ${jsonencode(requests_catalog)}
@@ -86,9 +89,10 @@ else:
     w.workspace.mkdirs(path)
     object_id = w.workspace.get_status(path).object_id
 
-# The requester (and their group) can manage it. PATCH adds; it never removes anyone else's access.
+# The requester, their group and the platform admins can manage it. PATCH adds; it never
+# removes anyone else's access.
 acl = [{"user_name": requested_by, "permission_level": "CAN_MANAGE"}]
-if owner_group:
-    acl.append({"group_name": owner_group, "permission_level": "CAN_MANAGE"})
+for g in dict.fromkeys(([owner_group] if owner_group else []) + admin_groups):
+    acl.append({"group_name": g, "permission_level": "CAN_MANAGE"})
 w.api_client.do("PATCH", f"/api/2.0/permissions/directories/{object_id}", body={"access_control_list": acl})
 dbutils.notebook.exit(json.dumps({"path": path, "object_id": object_id, "owner_group": owner_group, "reason": reason, "request_id": request_id}))

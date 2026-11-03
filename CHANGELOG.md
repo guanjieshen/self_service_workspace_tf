@@ -8,6 +8,12 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **Platform admins can manage every requested workspace folder.** The folder job gives the
+  workspace's `platform_admins` group CAN_MANAGE, next to the requester and their group, so no
+  folder is left without a manager. The group comes from a new field of the Terraform output
+  `self_service`, `platform_admins`. The first plan shows only that output changing. Folders
+  created before this keep their permissions until they are requested again.
+
 - **Self-service links open in the person's own workspace.** Discover data, Review data access
   requests and Genie One now open in the person's business unit's workspace, not the hub.
   `{host}` and `{workspace_id}` in `config/self-service/app.yaml` links are that workspace's, and

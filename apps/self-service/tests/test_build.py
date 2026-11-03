@@ -31,7 +31,7 @@ WORKSPACES = {
 }
 OUTPUTS = {
     "fin-citizen-dev": {"enabled": True, "prefix": "fin", "id": "2000000000000002", "host": "https://adb-2000000000000002.2.azuredatabricks.net",
-                        "catalog": "fin_citizen_dev", "usage_policy_id": "policy-fin"},
+                        "catalog": "fin_citizen_dev", "usage_policy_id": "policy-fin", "platform_admins": ["fin_platform_admins"]},
     "ops-citizen-dev": {"enabled": True, "prefix": "ops", "id": "3000000000000003", "host": "https://adb-3000000000000003.3.azuredatabricks.net",
                         "catalog": "ops_citizen_dev", "usage_policy_id": None},
 }
@@ -97,6 +97,7 @@ class Builds(unittest.TestCase):
         self.assertEqual(t["variables"], {"business_unit": "FIN"})
         jobs = t["resources"]["jobs"]
         self.assertEqual(jobs["personal_schema"]["tags"], {"cd_catalog": "fin_citizen_dev", "cd_prefix": "cd_"})
+        self.assertIn('admin_groups = ["fin_platform_admins"]', (out / "team_folder.py").read_text(), "the workspace's platform admins, from its output")
         self.assertEqual(jobs["personal_schema"]["permissions"], [{"level": "CAN_MANAGE_RUN", "service_principal_name": "11111111-1111-1111-1111-111111111111"}])
         self.assertEqual(jobs["team_folder"]["usage_policy_id"], "policy-fin", "the jobs run on the workspace's usage policy")
         schema = (out / "personal_schema.py").read_text()
