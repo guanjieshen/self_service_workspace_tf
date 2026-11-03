@@ -21,10 +21,10 @@
       {% if not error %}{% call callout("error") %}No workspace offers schemas yet.{% endcall %}{% endif %}
     {% else %}
       {% set ws = (workspaces | selectattr("name", "equalto", chosen) | first) or workspaces[0] %}
-      {% set on_change = team %}{% include "_workspace_select.html" %}
+      {% set on_change, by = team, "catalog" %}{% include "_workspace_select.html" %}
       {% call field("name", "Schema name", required=True, hint="Starts with your organization prefix. Use lowercase letters, numbers, and underscores.") %}
         <div class="prefixed"><span class="prefix mono">{{ ws.jobs.personal_schema.tags.cd_catalog }}.</span>
-          <input id="name" name="name" class="mono" required pattern="[a-z0-9][a-z0-9_]*" value="{{ name }}" placeholder="gtm_my_project"></div>
+          <input id="name" name="name" class="mono" required pattern="[a-z0-9][a-z0-9_]*" value="{{ name }}" placeholder="my_project"></div>
       {% endcall %}
       {% set check_kind = "team_schema" if team else "project_schema" %}{% include "_reason.html" %}
       {% if team %}

@@ -19,7 +19,7 @@
       <div class="done-box">{{ icon("check") }}<div><p class="strong">You already have your personal schema <span class="quota full">1/1</span></p>
         <p class="mono">{{ personal.name }}</p></div></div>
     {% else %}
-      {% set chosen = workspaces[0].name %}{% include "_workspace_select.html" %}
+      {% set chosen, by = workspaces[0].name, "catalog" %}{% include "_workspace_select.html" %}
       {% call field("schema-name", "Schema", hint="Named after your email, so there is nothing to fill in.") %}
         <input id="schema-name" class="mono" value="{{ workspaces[0].jobs.personal_schema.tags.cd_catalog }}.{{ schema }}" readonly>
       {% endcall %}

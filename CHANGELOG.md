@@ -8,6 +8,11 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **Self-service forms say where a request goes.** A folder request always shows its workspace
+  (the person's business unit's), even when there is only one. Schema requests no longer show a
+  workspace: Unity Catalog is not tied to one, so they show only the catalog (a choice of catalog
+  before someone has chosen a business unit).
+
 - **The plan guard no longer blocks.** It still lists hard-to-undo, security-weakening and
   access-removing changes under **Before merging** in the plan comment, but no check fails and no
   label is needed: the `allow-risky-changes` label and its checks on plan and apply are gone.

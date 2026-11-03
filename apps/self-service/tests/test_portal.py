@@ -779,6 +779,26 @@ class Pages(unittest.TestCase):
                 self.assertEqual(r.status_code, 200, r.text[:300])
         self.assertIn('<option value="fin-data-eng"', self.http.get("/folder", headers=self.as_ana).text, "the requester's groups are offered as owner")
 
+    def test_folders_show_their_workspace_and_schemas_only_their_catalog(self):
+        folder = self.http.get("/folder", headers=self.as_ana).text
+        self.assertIn('value="FIN · fin" readonly', folder, "one workspace: shown, not hidden")
+        for path in ("/schema", "/schema/project", "/schema/team"):
+            with self.subTest(path=path):
+                page = self.http.get(path, headers=self.as_ana).text
+                self.assertNotIn(">Workspace<", page, "Unity Catalog requests are not tied to a workspace")
+                self.assertIn('name="workspace" value="fin"', page, "still routed to the business unit's")
+
+    def test_a_choice_of_schemas_is_a_choice_of_catalog(self):
+        two = [portal.Workspace("fin", "FIN", HOST), portal.Workspace("ops", "OPS", HOST)]
+        for w, catalog in zip(two, ("fin_citizen_dev", "ops_citizen_dev")):
+            w.jobs = {k: {"id": 1, "tags": {"cd_catalog": catalog}} for k in portal.TASKS}
+        with mock.patch.object(self.main.PORTAL, "workspaces_for", return_value=two):
+            page = self.http.get("/schema/project", headers=self.as_ana).text
+            folder = self.http.get("/folder", headers=self.as_ana).text
+        self.assertIn(">Catalog<", page)
+        self.assertIn(">ops_citizen_dev</option>", page)
+        self.assertIn(">OPS · ops</option>", folder)
+
     def test_tasks_say_how_they_are_approved(self):
         page = self.http.get("/", headers=self.as_ana).text
         self.assertEqual(page.count("Auto-approved"), 4, "personal, project and team schemas, folder")
