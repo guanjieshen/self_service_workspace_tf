@@ -9,7 +9,7 @@
   ("builder", "Builder", "Build notebooks, jobs and pipelines", ["Everything an explorer can do", "Notebooks, jobs and pipelines", "A personal cluster within the cluster policy"], True),
   ("publisher", "Publisher", "Publish and share your work", ["Everything a builder can do", "For people who publish dashboards, apps and data for others"], False),
 ] %}
-{% set request = links.persona_request %}
+{% set request = persona_links %}
 
 {% call callout() %}{% if workspace %}This is access to <span class="strong">{{ workspace.bu }} · {{ workspace.name }}</span>, your business unit's workspace. {% endif %}Everyone starts with Consumer access to shared dashboards, Genie and apps. Additional access requires approval and typically takes effect within an hour.{% endcall %}
 

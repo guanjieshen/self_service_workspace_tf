@@ -29,7 +29,7 @@ SECTIONS = [
         ("banner.until", "Show until", "date")]),
     ("Genie One Onboarding", "The question the Genie One Onboarding card asks Genie in the person's workspace. Empty hides the card.", [
         ("onboarding.prompt", "Prompt", "prompt")]),
-    ("Persona request links", "Links to request each access level, such as a ServiceNow catalog item.", [
+    ("Persona request links", "Links to request each access level, such as a ServiceNow catalog item. Used in every business unit's workspace that has no links of its own (below).", [
         (f"persona_request.{p}", p.title(), "url") for p in PERSONAS]),
     ("Group request link", "Where people ask for an Entra group to be added to their workspace with a persona, such as a ServiceNow form. Empty shows the card as Coming soon.", [
         ("group_request", "Add a group to your workspace", "url")]),
@@ -45,9 +45,34 @@ TABS = [
     ("onboarding", "Onboarding", ["Genie One Onboarding", "Persona request links", "Group request link"]),
     ("help", "Help links", ["FAQ pages", "Standard operating procedures"]),
 ]
-KINDS = {key: kind for _, _, fields in SECTIONS for key, _, kind in fields}
-LABELS = {key: label for _, _, fields in SECTIONS for key, label, _ in fields}
-NAMES = {key: f"{title} · {label}" for title, _, fields in SECTIONS for key, label, _ in fields}   # in the history
+BUSINESS_UNITS = []   # the business units the app serves (use()): each gets its own persona request links
+
+
+def _index():
+    global KINDS, LABELS, NAMES
+    KINDS = {key: kind for _, _, fields in SECTIONS for key, _, kind in fields}
+    LABELS = {key: label for _, _, fields in SECTIONS for key, label, _ in fields}
+    NAMES = {key: f"{title} · {label}" for title, _, fields in SECTIONS for key, label, _ in fields}   # in the history
+
+
+def use(business_units):
+    """Add a persona request links section per business unit (config.json's workspaces), after
+    the general one: each workspace's own access requests, such as its ServiceNow items."""
+    global BUSINESS_UNITS
+    BUSINESS_UNITS = sorted({bu.upper() for bu in business_units})
+    SECTIONS[:] = [s for s in SECTIONS if not s[0].startswith("Persona request links · ")]
+    at = next(i for i, s in enumerate(SECTIONS) if s[0] == "Persona request links") + 1
+    SECTIONS[at:at] = [(f"Persona request links · {bu}", f"The {bu} workspace's links. Empty uses the link above.", [
+        (f"persona_request.{bu}.{p}", p.title(), "url") for p in PERSONAS]) for bu in BUSINESS_UNITS]
+    for key, label, titles in TABS:
+        if key == "onboarding":
+            titles[:] = [t for t in titles if not t.startswith("Persona request links · ")]
+            i = titles.index("Persona request links") + 1
+            titles[i:i] = [f"Persona request links · {bu}" for bu in BUSINESS_UNITS]
+    _index()
+
+
+_index()
 
 
 def defaults(config):
@@ -58,6 +83,8 @@ def defaults(config):
            "group_request": links.get("group_request") or ""}
     for p in PERSONAS:
         out[f"persona_request.{p}"] = (persona.get(p) if isinstance(persona, dict) else persona) or ""
+        for bu in BUSINESS_UNITS:
+            out[f"persona_request.{bu}.{p}"] = ""
     for k in FAQS:
         out[f"faq.{k}"] = (config.get("faq") or {}).get(k) or ""
     for k in SOPS:
@@ -76,12 +103,14 @@ def values(config, overrides):
 
 def apply(config, overrides, today=None):
     """config with the settings in it, as the pages read it: links.persona_request (one per
-    persona), links.sop, faq and banner (None when there is none, or it has ended)."""
+    persona), links.persona_request_by_bu (per business unit, None where it has none), links.sop,
+    faq and banner (None when there is none, or it has ended)."""
     if not overrides:
         return {**config, "banner": None, "onboarding": {"prompt": defaults(config)["onboarding.prompt"]}}
     v = values(config, overrides)
     links = {**(config.get("links") or {}),
              "persona_request": {p: v[f"persona_request.{p}"] or None for p in PERSONAS},
+             "persona_request_by_bu": {bu: {p: v[f"persona_request.{bu}.{p}"] or None for p in PERSONAS} for bu in BUSINESS_UNITS},
              "sop": {k: v[f"sop.{k}"] or None for k in SOPS}, "group_request": v["group_request"] or None}
     today = today or dt.datetime.now(dt.timezone.utc).date()
     until = v["banner.until"]
