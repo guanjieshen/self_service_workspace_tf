@@ -236,3 +236,7 @@ deploy would change, signed in with the Databricks CLI: `python3 scripts/app_dep
   then manage it (the schema job refuses the second: `CREATE SCHEMA` without `IF NOT EXISTS`).
   Workspace folders have no exclusive create; the window is milliseconds.
 - In-memory caches are per app process; they reset on every deploy.
+- **Cross-site forms** are refused from the browser's `Sec-Fetch-Site` header (`main.same_origin_forms`).
+  It cannot block the apps' own forms (they are `same-origin`); if a proxy ever dropped the header,
+  nothing would be refused, so it fails open, never closed. Confirm it is active by sending a form
+  from another site (403) after a change to how the apps are served.
