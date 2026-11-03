@@ -8,6 +8,12 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **The AI check runs in the hub** (the apps' own workspace), and so do the approvers' AI
+  summaries: AI Decide needs enabling there only, not in every workspace.
+- **Validate is simpler:** two questions instead of four. It checks that the name says what it
+  holds and that the reason says what it is for and who will use it, and shows a good example
+  to copy when either falls short.
+
 - **Sharing groups.** `sharing_groups: [<group>, ...]` in a workspace's file assigns Entra groups
   to the workspace **with every entitlement off**, so people can share folders with them. Their
   members still sign in only through a persona. A plan fails if a sharing group is a persona,
