@@ -795,7 +795,7 @@ class Pages(unittest.TestCase):
             with self.subTest(path=path):
                 r = self.http.get(path, headers=self.as_ana)
                 self.assertEqual(r.status_code, 200, r.text[:300])
-        self.assertIn('<option value="fin-data-eng"', self.http.get("/folder", headers=self.as_ana).text, "the requester's groups are offered as owner")
+        self.assertNotIn('id="owner_group"', self.http.get("/folder", headers=self.as_ana).text, "no owner group: people share the folder themselves")
 
     def test_folders_show_their_workspace_and_schemas_only_their_catalog(self):
         folder = self.http.get("/folder", headers=self.as_ana).text
@@ -1081,8 +1081,8 @@ class Pages(unittest.TestCase):
         self.assertIn('<a href="https://wiki.contoso.com/start" target="_blank" rel="noopener">How it works', page)
 
     def test_a_form_error_is_shown_on_the_form(self):
-        r = self.http.post("/folder", data={"reason": WHY, "workspace": "fin", "folder": "fin-docs", "owner_group": "fin-finance"}, headers=self.as_ana)
-        self.assertIn("Choose one of your groups as the owner", r.text)
+        r = self.http.post("/folder", data={"reason": WHY, "workspace": "fin", "folder": "Fin Docs"}, headers=self.as_ana)
+        self.assertIn("The folder name must be lowercase letters, digits and dashes", r.text)
         self.assertEqual(self.fake.started, [])
 
     def test_in_databricks_apps_only_its_sign_in_counts(self):
@@ -1150,8 +1150,7 @@ class ApprovalRequests(unittest.TestCase):
         form = self.http.get("/folder", headers=self.as_ana).text
         self.assertIn(">Create folder</button>", form)
         self.assertIn("Your folder will be ready in under a minute.", form)
-        self.assertNotIn("Your team can manage this folder too", form.split('id="owner_group"')[1].split("</p>")[0].split("data-hint-group")[0],
-                         "with Only me chosen, the hint does not say a team manages it")
+        self.assertIn("Your workspace's platform admins can manage it too", form)
 
     def test_the_requester_answers_a_question_and_sees_the_decision(self):
         location = self.send().headers["location"]

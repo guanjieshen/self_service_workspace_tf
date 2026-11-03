@@ -257,12 +257,11 @@ def groups_of(request, workspace):
 @app.get("/folder", response_class=HTMLResponse)
 def folder_form(request: Request, workspace: str = "", error: str = "", form: dict = None):
     # Try again on a failed request opens the form with its values in the query string.
-    form = form or {k: v for k, v in request.query_params.items() if k in ("folder", "owner_group", "reason")}
+    form = form or {k: v for k, v in request.query_params.items() if k in ("folder", "reason")}
     workspaces, why = offered(user_of(request), "team_folder")
     chosen = workspace if workspace in {w.name for w in workspaces} else (workspaces[0].name if workspaces else "")
     error = error or why
-    return page(request, "folder.html", nav="catalog", workspaces=workspaces, chosen=chosen,
-                my_groups=groups_of(request, chosen), error=error, form=form)
+    return page(request, "folder.html", nav="catalog", workspaces=workspaces, chosen=chosen, error=error, form=form)
 
 
 @app.post("/folder")
@@ -270,8 +269,8 @@ async def folder_submit(request: Request):
     form = dict(await request.form())
     try:
         workspace = form.get("workspace", "")
-        started = PORTAL.request_folder(workspace, user_of(request), form.get("folder", "").strip(),
-                                        form.get("owner_group", "").strip(), groups_of(request, workspace),
+        # No owner group: the requester shares the folder themselves once it exists.
+        started = PORTAL.request_folder(workspace, user_of(request), form.get("folder", "").strip(), "", (),
                                         reason=form.get("reason", "").strip())
     except portal.RequestError as e:
         return folder_form(request, workspace=form.get("workspace", ""), error=str(e), form=form)
