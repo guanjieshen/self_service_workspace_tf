@@ -99,11 +99,19 @@ main { max-width: var(--page-w); margin: 0 auto; padding: var(--s8) var(--s6) va
 a.account { color: inherit; text-decoration: none; }
 a.account:hover { border-color: var(--border-strong); background: var(--hover); }
 /* The business unit choice: one row per business unit, its workspaces beside it. */
-.bu-choice { max-width: 640px; }
-.bu-choice fieldset { border: 0; margin: 0; display: flex; flex-direction: column; gap: var(--s2); }
-.choice { display: flex; align-items: center; gap: var(--s3); padding: var(--s3); border: 1px solid var(--border); border-radius: var(--r); cursor: pointer; }
-.choice:hover { border-color: var(--border-strong); background: var(--hover); }
-.choice input { width: auto; height: auto; }
+/* The business unit choice: one card per business unit, the chosen one marked in the accent. */
+.bu-choice { display: flex; flex-direction: column; gap: var(--s5); max-width: 880px; }
+.bu-options { border: 0; margin: 0; padding: 0; min-width: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--s3); }
+.bu-option { position: relative; display: flex; flex-direction: column; gap: var(--s2); padding: var(--s4) var(--s5);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); cursor: pointer; }
+.bu-option:hover { border-color: var(--border-strong); }
+.bu-option:has(input:checked) { border-color: var(--focus-border); background: var(--warn-soft); }
+.bu-option:has(input:focus-visible) { box-shadow: var(--ring); }
+.bu-option input { position: absolute; top: var(--s4); right: var(--s4); width: auto; height: auto; margin: 0; accent-color: var(--text); }
+.bu-code { font-size: var(--text-lg); font-weight: var(--semibold); letter-spacing: 0.02em; }
+.bu-facts { display: flex; flex-direction: column; gap: 2px; color: var(--text-2); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--border); border: 0;
   display: grid; place-items: center; font-size: var(--text-2xs); font-weight: var(--semibold); color: var(--text); flex: none; }
 

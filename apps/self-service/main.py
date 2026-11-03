@@ -8,7 +8,7 @@ import functools
 import logging
 import os
 import pathlib
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -95,7 +95,22 @@ def user_of(request):
     return user
 
 
+@app.middleware("http")
+async def business_unit_first(request: Request, call_next):
+    """A request sent before choosing a business unit (when one must be chosen) goes to the
+    choice instead: the pages ask first (page()), and this covers a form posted anyway."""
+    user = (request.headers.get("x-forwarded-email") or LOCAL_USER).strip().lower()   # not signed in: the route says so
+    if MODE != "approvals" and request.method == "POST" and request.url.path != "/business-unit" \
+            and user and PORTAL.needs_bu_choice(user):
+        return RedirectResponse("/business-unit", status_code=303)
+    return await call_next(request)
+
+
 def page(request, template, **context):
+    # The business unit comes first: until someone has chosen one (when they must), every page
+    # sends them to the choice, and back to where they were going.
+    if MODE != "approvals" and template != "business_unit.html" and PORTAL.needs_bu_choice(user_of(request)):
+        return RedirectResponse(f"/business-unit?next={quote(request.url.path)}", status_code=303)
     config = settings.apply(CONFIG, SETTINGS() if MODE != "approvals" else {})
     return templates.TemplateResponse(request, template, {
         "config": config, "links": config.get("links", {}), "user": user_of(request), "tasks": portal.TASKS,
@@ -166,7 +181,7 @@ def catalog(request: Request):
         return RedirectResponse("/approvals", status_code=303)
     user = user_of(request)
     shown = settings.apply(CONFIG, SETTINGS())   # the links and the onboarding prompt, as admins set them
-    return page(request, "catalog.html", nav="catalog", personal=personal_schema(user), ask_bu=PORTAL.needs_bu_choice(user),
+    return page(request, "catalog.html", nav="catalog", personal=personal_schema(user),
                 groups=cards.groups(PORTAL.links_for(user, shown.get("links")), PORTAL.onboarding_link(user, shown["onboarding"]["prompt"])))
 
 
@@ -178,24 +193,31 @@ def schema_form(request: Request, error: str = ""):
                 schema=portal.schema_name(user), personal=personal_schema(user), error=error or why)
 
 
+def local_path(path):
+    """A path in this app to go back to after choosing (never another site)."""
+    return path if path.startswith("/") and not path.startswith("//") and path != "/business-unit" else "/"
+
+
 @app.get("/business-unit", response_class=HTMLResponse)
-def business_unit_form(request: Request, error: str = ""):
-    """Which business unit the person is in, while there is no lookup function to say it."""
+def business_unit_form(request: Request, error: str = "", next: str = "/"):
+    """Which business unit the person is in, while there is no lookup function to say it: the
+    first step for someone who has not chosen (page() sends them here), and changeable later."""
     if CONFIG.get("bu_lookup") or MODE == "approvals":
         return RedirectResponse("/", status_code=303)
-    names = {}
+    units = {}
     for w in CONFIG["workspaces"]:
-        names.setdefault(w["bu"].upper(), []).append(w["name"])
-    return page(request, "business_unit.html", nav="catalog", units=[(bu, names[bu]) for bu in PORTAL.business_units()], error=error)
+        units.setdefault(w["bu"].upper(), []).append(w)
+    return page(request, "business_unit.html", nav="catalog", units=[(bu, units[bu]) for bu in PORTAL.business_units()],
+                first=PORTAL.needs_bu_choice(user_of(request)), next=local_path(next), error=error)
 
 
 @app.post("/business-unit")
-def business_unit_submit(request: Request, bu: str = Form("")):
+def business_unit_submit(request: Request, bu: str = Form(""), next: str = Form("/")):
     try:
         PORTAL.choose_bu(user_of(request), bu)
     except portal.RequestError as e:
-        return business_unit_form(request, error=str(e))
-    return RedirectResponse("/", status_code=303)
+        return business_unit_form(request, error=str(e), next=next)
+    return RedirectResponse(local_path(next), status_code=303)
 
 
 @app.post("/schema")

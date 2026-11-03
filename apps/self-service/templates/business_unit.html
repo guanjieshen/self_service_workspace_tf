@@ -1,28 +1,33 @@
 {% extends "base.html" %}
 {% from "_components.html" import back, callout %}
-{#- Which business unit the person is in, while there is no lookup function to say it (portal.choose_bu). -#}
+{#- Which business unit the person is in, while there is no lookup function to say it (portal.choose_bu):
+    the first step for someone who has not chosen (main.page sends them here), and changeable later. -#}
 {% block title %}Your business unit · {{ config.title }}{% endblock %}
 {% block content %}
-{{ back("/", "Catalog") }}
+{% if not first %}{{ back(next, "Back") }}{% endif %}
 <div class="page-head">
-  <h1>Your business unit</h1>
-  <p class="lead">Your requests go to your business unit's workspace. You can change it any time.</p>
+  <h1>{{ "Which business unit are you in?" if first else "Your business unit" }}</h1>
+  <p class="lead">Your requests go to its workspace: folders are created there, schemas in its catalog, and Genie One opens there.
+    {{ "You can change it later from your name, top right." if first else "" }}</p>
 </div>
 {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
-<form class="panel bu-choice" method="post" action="/business-unit">
-  <fieldset class="panel-body">
-    <legend class="card-label">Business unit</legend>
+<form class="bu-choice" method="post" action="/business-unit">
+  <input type="hidden" name="next" value="{{ next }}">
+  <fieldset class="bu-options">
+    <legend class="visually-hidden">Business unit</legend>
     {% for bu, workspaces in units %}
-    <label class="choice">
+    <label class="bu-option">
       <input type="radio" name="bu" value="{{ bu }}" {{ 'checked' if bu == business_unit }} required>
-      <span class="strong">{{ bu }}</span>
-      <span class="meta">{{ workspaces | join(", ") }}</span>
+      <span class="bu-code">{{ bu }}</span>
+      {% for w in workspaces %}
+      <span class="bu-facts"><span class="mono">{{ w.name }}</span>{% if w.catalog %}<span class="meta">Catalog <span class="mono">{{ w.catalog }}</span></span>{% endif %}</span>
+      {% endfor %}
     </label>
     {% endfor %}
   </fieldset>
-  <div class="panel-foot">
-    <button type="submit" class="primary">Save</button>
-    <a class="button" href="/">Cancel</a>
+  <div class="form-actions">
+    <button type="submit" class="primary">{{ "Continue" if first else "Save" }}</button>
+    {% if not first %}<a class="button" href="{{ next }}">Cancel</a>{% endif %}
   </div>
 </form>
 {% endblock %}
