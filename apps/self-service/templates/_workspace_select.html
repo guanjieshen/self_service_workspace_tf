@@ -1,11 +1,19 @@
-{#- The workspace a request is for: a choice when the app serves several. -#}
-{% if workspaces | length > 1 %}
+{#- Where a request goes. Folders (by = "workspace") always show their workspace: a choice when
+    there are several, a read-only line with one. Schemas (by = "catalog") are not tied to a
+    workspace: they show only a choice of catalog, when there are several. -#}
 {% from "_components.html" import field %}
-{% call field("workspace", "Workspace", required=True) %}
+{% set by = by | default("workspace") %}
+{% if workspaces | length > 1 %}
+{% call field("workspace", "Catalog" if by == "catalog" else "Workspace", required=True) %}
   <select id="workspace" name="workspace" {% if on_change %}onchange="location.search='?workspace='+this.value"{% endif %}>
-    {% for w in workspaces %}<option value="{{ w.name }}" {{ 'selected' if w.name == chosen }}>{{ w.bu }} · {{ w.name }}</option>{% endfor %}
+    {% for w in workspaces %}<option value="{{ w.name }}" {{ 'selected' if w.name == chosen }}>{{ w.jobs.personal_schema.tags.cd_catalog if by == "catalog" else w.bu ~ " · " ~ w.name }}</option>{% endfor %}
   </select>
 {% endcall %}
 {% elif workspaces %}
 <input type="hidden" name="workspace" value="{{ workspaces[0].name }}">
+{% if by == "workspace" %}
+{% call field("workspace-shown", "Workspace", hint="Your business unit's workspace.") %}
+  <input id="workspace-shown" value="{{ workspaces[0].bu }} · {{ workspaces[0].name }}" readonly>
+{% endcall %}
+{% endif %}
 {% endif %}

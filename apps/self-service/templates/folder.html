@@ -2,7 +2,7 @@
 
 {% from "_components.html" import callout, field %}
 {% block content %}
-{% set task_icon, task_name, task_text, task_category = "folder", "Request a workspace folder", "Create a shared folder for your work.", "Workspace & Compute" %}
+{% set task_icon, task_name, task_text, task_category = "folder", "Request a workspace folder", "Create a shared folder for your work.", "Build" %}
 {% set task_aside = True %}{% include "_task_header.html" %}
 
 <div class="page-grid form-grid">
@@ -17,7 +17,7 @@
 
       {% call field("folder", "Folder name", required=True, hint="Use lowercase letters, numbers, and dashes.") %}
         <div class="prefixed"><span class="prefix mono">/Workspace/</span>
-          <input id="folder" name="folder" class="mono" required pattern="[a-z0-9][a-z0-9\-]*" value="{{ form.folder or '' }}" placeholder="gtm-my-project"></div>
+          <input id="folder" name="folder" class="mono" required pattern="[a-z0-9][a-z0-9\-]*" value="{{ form.folder or '' }}" placeholder="my-project"></div>
       {% endcall %}
 
       {% set check_kind = "folder" %}{% set reason = form.reason %}{% include "_reason.html" %}
