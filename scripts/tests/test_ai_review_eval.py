@@ -1,6 +1,11 @@
 """scripts/ai-review-eval.py: every case is well formed, builds a request, and the checks work."""
+import contextlib
+import io
 import json
+import os
+import tempfile
 import unittest
+from unittest import mock
 
 from helpers import ROOT, load
 
@@ -61,3 +66,42 @@ class Checks(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Running(unittest.TestCase):
+    """run() and main() with a stand-in for the model: what the evaluation does without a workspace."""
+
+    def setUp(self):
+        (ROOT / ".ai-eval").mkdir(exist_ok=True)   # git ignores it; the script names its folder from the root
+        self.tmp = tempfile.TemporaryDirectory(dir=ROOT / ".ai-eval")
+        self.patches = [mock.patch.object(ev, "OUT", ev.pathlib.Path(self.tmp.name)),
+                        mock.patch.object(ev.review, "load_settings", return_value={"endpoint": "a-model", "host": ""})]
+        for p in self.patches:
+            p.start()
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+        self.tmp.cleanup()
+
+    def test_a_case_is_asked_and_its_answer_kept_and_checked(self):
+        with mock.patch.object(ev.review, "model_review", return_value=GOOD) as ask:
+            name, attempt, results = ev.run(CASES[0], "a-model", 2)
+        self.assertEqual(ask.call_args[0][0], "a-model")
+        self.assertEqual((ev.pathlib.Path(self.tmp.name) / f"{CASES[0]}.2.md").read_text(), GOOD + "\n", "each attempt kept apart")
+        self.assertEqual((name, attempt), (CASES[0], 2))
+        self.assertTrue(any(c == "risk level" for c, _, _ in results))
+
+    def test_main_reports_each_case_and_needs_a_review_workspace(self):
+        out = io.StringIO()
+        with mock.patch.object(ev.review, "model_review", return_value=GOOD), mock.patch.dict(os.environ, {}, clear=False), \
+                mock.patch("sys.argv", ["ai-review-eval.py", "--case", CASES[0], "--host", "https://review.example.com"]), \
+                contextlib.redirect_stdout(out):
+            ev.main()
+        self.assertRegex(out.getvalue(), rf"(PASS|FAIL)  {CASES[0]}")
+        self.assertRegex(out.getvalue(), r"\n[01]/1 passed\. Answers in \.ai-eval/")
+        with mock.patch("sys.argv", ["ai-review-eval.py", "--case", CASES[0]]), mock.patch.dict(os.environ, {}, clear=False), \
+                self.assertRaisesRegex(SystemExit, "No review workspace"):
+            os.environ.pop("DATABRICKS_HOST", None)
+            ev.main()
+
