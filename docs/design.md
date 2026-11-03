@@ -111,6 +111,18 @@ workspace. What keeps that safe:
 - Each workspace names its own persona groups (`groups:` in its file); only
   `{prefix}_platform_admins` comes from the baseline. A persona without a group is skipped.
 
+**Sharing groups.** A workspace folder can be shared only with a group assigned to the
+workspace. `sharing_groups` (in a workspace's file) assigns other Entra groups there **with
+every entitlement off**, so people can share with them:
+
+- **What someone can do** (sign in, SQL, notebooks) still comes only from their persona. A
+  member with no persona can't sign in; one with a persona opens what is shared with the group.
+- **Who sees what** follows the group's membership in Entra, with no change here.
+- **Two guards** (`terraform/checks.tf`): a sharing group is never a persona, platform admins or
+  users group, and sharing groups need the built-in `users` group without entitlements
+  (`settings.users_group_entitlements`), which every assigned group's members get.
+- Schemas don't need it: Unity Catalog grants take account groups directly.
+
 **Requests.** Three paths, by volume and risk:
 
 | Request | Path |

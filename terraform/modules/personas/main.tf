@@ -7,7 +7,7 @@ locals {
 
   # Workspace assignment: platform admins get their role; everyone else is USER.
   assignments = merge(
-    { for g in distinct(concat(local.persona_group_list, var.extra_groups)) : g => ["USER"] },
+    { for g in distinct(concat(local.persona_group_list, var.extra_groups, var.sharing_groups)) : g => ["USER"] },
     { for g in var.platform_admins : g => [var.platform_admin_role] },
   )
 
@@ -56,6 +56,27 @@ resource "databricks_entitlements" "persona" {
   # the ID is unknown, and group_id forces a replacement: every persona group's
   # entitlements would show as replaced (a false risky change) when one group is added.
   # The key is the group's name, so its ID does not change.
+  lifecycle {
+    ignore_changes = [group_id]
+  }
+}
+
+# Sharing groups: every entitlement off, set explicitly, so a change made in the UI is undone
+# at the next apply. Their members sign in only through a persona.
+data "databricks_group" "sharing" {
+  for_each     = toset(var.sharing_groups)
+  display_name = each.key
+  depends_on   = [databricks_permission_assignment.this]
+}
+
+resource "databricks_entitlements" "sharing" {
+  for_each              = toset(var.sharing_groups)
+  group_id              = data.databricks_group.sharing[each.key].id
+  workspace_access      = false
+  databricks_sql_access = false
+  allow_cluster_create  = false
+
+  # As for the persona groups: the key is the group's name, so its ID does not change.
   lifecycle {
     ignore_changes = [group_id]
   }

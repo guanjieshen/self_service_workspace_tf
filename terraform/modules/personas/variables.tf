@@ -23,6 +23,12 @@ variable "extra_groups" {
   type        = list(string)
 }
 
+variable "sharing_groups" {
+  description = "Groups assigned only so people can share with them: USER, with every entitlement off."
+  type        = list(string)
+  default     = []
+}
+
 variable "users_group_entitlements" {
   description = "Entitlements for the built-in users group, or null to leave it unmanaged."
   type        = any

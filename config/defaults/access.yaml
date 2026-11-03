@@ -24,6 +24,14 @@ groups:
   builder: null
   publisher: null
 
+# ---- Sharing groups ----------------------------------------------------------
+# Account groups assigned to the workspace only so people can share their folders (and other
+# workspace objects) with them. They get no entitlements: a member signs in only through a
+# persona, and then opens what is shared with the group. Usually set in a workspace's file;
+# never a persona, platform admins or users group. Needs the built-in users group to have no
+# entitlements (settings.users_group_entitlements), or every member would get them.
+sharing_groups: []
+
 # ---- Everyone ----------------------------------------------------------------
 # The users group's access tier (see the personas below): consumer = Databricks One
 # only, where people find dashboards, Genie spaces and apps.

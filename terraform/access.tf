@@ -10,6 +10,9 @@ locals {
   platform_admins = compact([try(local.group_names.platform_admins, "")])
   users_group     = try(local.group_names.users, null)
 
+  # Sharing groups: assigned only so people can share with them, with no entitlements.
+  sharing_groups = distinct([for g in coalesce(try(local.config.sharing_groups, null), []) : replace(replace(g, "{PREFIX}", local.prefix_upper), "{prefix}", local.prefix)])
+
   # The users group is assigned to the workspace like the persona groups.
   extra_groups = compact([local.users_group == null ? "" : local.users_group])
 

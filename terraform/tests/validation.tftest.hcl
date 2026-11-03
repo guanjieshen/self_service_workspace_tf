@@ -76,6 +76,20 @@ run "no_platform_admins" {
   expect_failures = [terraform_data.config_checks]
 }
 
+# A sharing group can't be a persona group (it would widen the persona)
+run "sharing_group_is_a_persona_group" {
+  command = plan
+  variables { workspace = "sharing-persona-group" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# Sharing groups need the built-in users group without entitlements
+run "sharing_groups_with_users_entitled" {
+  command = plan
+  variables { workspace = "sharing-users-entitled" }
+  expect_failures = [terraform_data.config_checks]
+}
+
 # Genie Code instructions are limited to 20,000 characters
 run "instructions_too_long" {
   command = plan
