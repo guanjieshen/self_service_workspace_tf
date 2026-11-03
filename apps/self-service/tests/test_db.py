@@ -1,7 +1,7 @@
 """db/: the self-service database's migrations, grants and the rules they enforce.
 
 The first tests need nothing. The rest run against a real Postgres when PG_TEST_DSN is set
-(CI's Tests job starts one, with no password: "host=localhost port=5432 user=postgres
+(CI's Database tests job starts one, with no password: "host=localhost port=5432 user=postgres
 dbname=postgres"); without it they are skipped and say so.
 """
 import os

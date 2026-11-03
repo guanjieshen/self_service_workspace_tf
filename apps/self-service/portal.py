@@ -539,20 +539,20 @@ class Portal:
         return self._start(w, "personal_schema", user, schema or resource.split(".", 1)[1], owner_group, reason, {
             "user": user, "catalog": catalog, "schema": schema, "owner_group": owner_group, "reason": reason})
 
-    def request_folder(self, ws_name, user, folder, owner_group="", groups=(), reason=""):
-        """Run the team folder job for the user's folder: they get Can manage, and so does
-        owner_group if given (one of their groups). Returns the run's ID."""
+    def request_folder(self, ws_name, user, folder, reason=""):
+        """Run the team folder job for the user's folder: they and the workspace's platform admins
+        get Can manage (the job); they share it with others in Databricks once it exists. Returns
+        the run's ID."""
         check_folder(folder)
         check_reason(reason)
         w = self.workspace(ws_name, "team_folder")
         self._check_bu(user, w, "team_folder")
-        if owner_group and owner_group not in groups:
-            raise RequestError(f"Choose one of your groups as the owner; {owner_group!r} is not one of them.")
         pending = self._one_at_a_time(ws_name, user, "team_folder", folder_path(w, folder))
         if pending:   # already asked for: show the one running
             return pending.run_id
-        return self._start(w, "team_folder", user, folder, owner_group, reason, {
-            "folder": folder, "requested_by": user, "owner_group": owner_group, "reason": reason})
+        # The job still takes an owner group (its contract): none from the form.
+        return self._start(w, "team_folder", user, folder, "", reason, {
+            "folder": folder, "requested_by": user, "owner_group": "", "reason": reason})
 
     def needs_approval(self, kind):
         """Whether this kind of request (the database's kinds) waits for an approver before its
@@ -578,16 +578,19 @@ class Portal:
                                        "bu": w.bu, "requested_by": user, "name": name, "owner_group": owner_group,
                                        "reason": reason})
         except Exception as e:
+            warn(f"recording request {request_id}", e)
             raise RequestError("Your request could not be recorded just now, so it was not sent. Try again in a minute.") from e
         if self.needs_approval(kind):
-            self._summarize_later(w, {"id": request_id, "kind": kind, "workspace": w.name, "bu": w.bu, "requested_by": user,
+            self._summarize_later({"id": request_id, "kind": kind, "workspace": w.name, "bu": w.bu, "requested_by": user,
                                       "name": name, "owner_group": owner_group, "reason": reason})
             return request_id
         try:
             run_id = self.client(w.host).jobs.run_now(w.jobs[job_kind]["id"], job_parameters={**params, "request_id": request_id}).run_id
-        except Exception:
+        except Exception as e:   # recorded as failed, and the person told so (not an error page)
+            warn(f"starting the {job_kind} job for {request_id} in {w.name}", e)
             self._quietly(self.store.start_failed, request_id, "The job could not be started.")
-            raise
+            raise RequestError("Your request was recorded, but its job could not be started. Try again in a minute; "
+                               "if it keeps failing, tell your platform admin.") from e
         self._quietly(self.store.run_started, request_id, w.name, run_id)
         return run_id
 
@@ -606,7 +609,7 @@ class Portal:
             self._quietly(self.store.summarized, row["id"], result)
         return result
 
-    def _summarize_later(self, w, r):
+    def _summarize_later(self, r):
         """The approver's summary (summary.py), written in the background so sending is not
         slowed down; the approvals app writes it when it opens a request that has none."""
         model = (self.config.get("ai_summary") or {}).get("model")
@@ -670,8 +673,8 @@ class Portal:
         """Run the job of a request in the database, as it was asked, with its request ID: once
         an approver approved it (approvals app). Returns the run's ID."""
         kind = "team_folder" if row["kind"] == "folder" else "personal_schema"
-        w = self.workspace(row["workspace"], kind)
-        try:
+        try:   # the workspace too: one that is gone, or has no job now, also marks the request failed
+            w = self.workspace(row["workspace"], kind)
             run_id = self.client(w.host).jobs.run_now(w.jobs[kind]["id"], job_parameters=record_params(row, w)).run_id
         except Exception:
             if self.store:
@@ -762,7 +765,10 @@ class Portal:
             w = next((w for w in self.workspaces() if w.name == ws_name and not w.error), None)
             if w is None:
                 return None
-            run = self.client(w.host).jobs.get_run(int(run_id))
+            try:
+                run = self.client(w.host).jobs.get_run(int(run_id))
+            except NotFound:   # a run that does not exist (or no longer): not found, not an error page
+                return None
             kind = next((k for k, j in w.jobs.items() if j["id"] == run.job_id), None)
             # Described for the requester; the cache keeps it and answers only them.
             r = self.describe(w, kind, run, requester(kind, params_of(run))) if kind else None

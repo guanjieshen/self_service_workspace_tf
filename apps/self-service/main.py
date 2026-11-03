@@ -5,6 +5,7 @@ as its own service principal. Locally: PORTAL_CONFIG=<config.json> PORTAL_USER=<
 python main.py, signed in through the Databricks CLI.
 """
 import functools
+import hashlib
 import logging
 import os
 import pathlib
@@ -56,8 +57,6 @@ SETTINGS = settings.Cached(PORTAL.store.settings if PORTAL.store else dict)
 app = FastAPI(title=CONFIG.get("title", "Self-Service"), docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
-# The static files' version (their contents' hash): in their links, so browsers load new ones after a deploy.
-import hashlib
 def local_time(t, style="full"):
     """A time as a <time> element that app.js shows in the browser's own time zone and locale
     (the text here, UTC, is what shows without JavaScript). style: full, short (feeds), time
@@ -84,6 +83,7 @@ def mention(text, name):
 
 
 templates.env.filters["mention"] = mention
+# The static files' version (their contents' hash): in their links, so browsers load new ones after a deploy.
 templates.env.globals["asset_version"] = app.state.asset_version = hashlib.sha1(b"".join((HERE / "static" / f).read_bytes() for f in ("app.css", "app.js"))).hexdigest()[:10]
 # Databricks Apps sets DATABRICKS_APP_NAME. There, only its sign-in says who the user is.
 LOCAL_USER = "" if os.environ.get("DATABRICKS_APP_NAME") else os.environ.get("PORTAL_USER", "")
@@ -195,8 +195,10 @@ def schema_form(request: Request, error: str = ""):
 
 
 def local_path(path):
-    """A path in this app to go back to after choosing (never another site)."""
-    return path if path.startswith("/") and not path.startswith("//") and path != "/business-unit" else "/"
+    """A path in this app to go back to after choosing (never another site: browsers read "/\\"
+    as "//", so a backslash or a control character is refused too)."""
+    safe = path.startswith("/") and not path.startswith("//") and not any(c == "\\" or ord(c) < 32 for c in path)
+    return path if safe and path != "/business-unit" else "/"
 
 
 @app.get("/business-unit", response_class=HTMLResponse)
@@ -293,7 +295,7 @@ async def folder_submit(request: Request):
     try:
         workspace = form.get("workspace", "")
         # No owner group: the requester shares the folder themselves once it exists.
-        started = PORTAL.request_folder(workspace, user_of(request), form.get("folder", "").strip(), "", (),
+        started = PORTAL.request_folder(workspace, user_of(request), form.get("folder", "").strip(),
                                         reason=form.get("reason", "").strip())
     except portal.RequestError as e:
         return folder_form(request, workspace=form.get("workspace", ""), error=str(e), form=form)
@@ -373,7 +375,7 @@ def retry_link(r):
     """The form again, filled in with a failed request's values."""
     if r.kind == "team_folder":
         return "/folder?" + urlencode({"workspace": r.workspace, "folder": r.params.get("folder", ""),
-                                       "owner_group": r.params.get("owner_group", ""), "reason": r.params.get("reason", "")})
+                                       "reason": r.params.get("reason", "")})
     if r.params.get("owner_group"):
         return "/schema/team?" + urlencode({"workspace": r.workspace, "name": r.params.get("schema", ""),
                                             "owner_group": r.params["owner_group"], "reason": r.params.get("reason", "")})

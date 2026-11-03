@@ -8,6 +8,16 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **The self-service app's database is tested in CI:** a new **Database tests** check runs its
+  migrations, grants and queries against Postgres 17 (they were skipped before). It is not a
+  required check, since it needs Docker on the runner.
+- **Fixes in the self-service app and its deploy:**
+  - The deploy no longer reads a failed CLI call (sign-in, network) as "the database does not
+    exist", which could have created it again; only a real not-found counts.
+  - The business unit page's return link refuses `/\` paths (an open redirect).
+  - A job that cannot start, or a run that does not exist, shows a message instead of an error
+    page; recording and start failures are logged.
+  - Leftovers of the folder form's owner group are gone.
 - **Install and upgrade from a clone, all in Databricks.** Clone this repository (`main`) into a
   Databricks Git folder and run `install/copy_to_your_repo` on serverless (or, in the web
   terminal, `python3 install/copy_to_your_repo.py <source> <target>`): it copies the framework

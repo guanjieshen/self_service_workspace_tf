@@ -48,13 +48,6 @@ document.querySelectorAll("form[data-submit]").forEach(form => form.addEventList
 // Filters apply at once: a select with data-autosubmit sends its form when it changes.
 document.querySelectorAll("select[data-autosubmit]").forEach(s => s.addEventListener("change", () => s.form.requestSubmit()));
 
-// A hint that follows a select's choice (the folder form's "Who can manage this folder?").
-document.querySelectorAll("[data-hint-for]").forEach(hint => {
-  const select = document.getElementById(hint.dataset.hintFor);
-  if (!select) return;
-  select.addEventListener("change", () => { hint.textContent = select.value ? hint.dataset.hintGroup : hint.dataset.hintNone; });
-});
-
 // ---- Validate: the rules and the AI check of the name and reason. Advice only: never a gate ----
 document.querySelectorAll("[data-ai-check]").forEach(box => {
   const form = box.closest("form"), button = box.querySelector("[data-ai-check-run]");

@@ -17,6 +17,17 @@ class ProjectExists(unittest.TestCase):
         self.assertIn("undelete-project", str(e.exception))
         self.assertIn("--purge", str(e.exception))
 
+    def test_only_a_real_not_found_counts_as_missing(self):
+        done = lambda code, err="": mock.Mock(returncode=code, stdout="", stderr=err)
+        with mock.patch.object(app_deploy.subprocess, "run", return_value=done(1, "Error: project projects/p does not exist")):
+            self.assertIsNone(app_deploy.cli("https://h", "postgres", "get-project", "projects/p", missing_ok=True))
+        for err in ("Error: cannot get access token: login.html", "dial tcp: i/o timeout", "PERMISSION_DENIED"):
+            with self.subTest(err=err), mock.patch.object(app_deploy.subprocess, "run", return_value=done(1, err)), \
+                    self.assertRaises(SystemExit, msg="an outage is never read as 'not there'"):
+                app_deploy.cli("https://h", "postgres", "get-project", "projects/p", missing_ok=True)
+        with mock.patch.object(app_deploy.subprocess, "run", return_value=done(1, "not found")), self.assertRaises(SystemExit):
+            app_deploy.cli("https://h", "postgres", "get-project", "projects/p")   # without missing_ok, any failure stops
+
     def test_missing_and_present(self):
         with mock.patch.object(app_deploy, "cli", return_value=None):
             self.assertFalse(app_deploy.project_exists("https://h", "p"))

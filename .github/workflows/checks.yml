@@ -53,7 +53,35 @@ jobs:
         with:
           node-version: 22
       # The self-service app's packages, for its suite (scripts/test.sh app). Its database tests
-      # run only with a Postgres (PG_TEST_DSN) and are skipped here, so any runner will do.
+      # need a Postgres (PG_TEST_DSN): they run in the Database tests job, and are skipped here.
       - run: python3 -m pip install --quiet -r apps/self-service/requirements.txt httpx pyyaml
       # Mocked providers: no workspace, credentials or network. Same as bash scripts/test.sh locally.
       - run: bash scripts/test.sh
+
+  database:
+    name: Database tests
+    # The self-service app's migrations, grants and queries against a real Postgres 17 (Lakebase's
+    # version). Not a required check: a service container needs Docker on the runner, which a
+    # self-hosted runner may not have; there it fails without blocking a merge.
+    # A pull request from a fork never runs on the runner (it may be self-hosted, in your network).
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ fromJSON(vars.RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          sign-in: "false"
+      - run: python3 -m pip install --quiet -r apps/self-service/requirements.txt
+      - run: python3 -m unittest discover -s apps/self-service/tests -p "test_db.py" -v
+        env:
+          PG_TEST_DSN: host=localhost port=5432 user=postgres dbname=postgres
