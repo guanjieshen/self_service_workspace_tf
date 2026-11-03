@@ -72,10 +72,10 @@ class Builds(unittest.TestCase):
         config, approvals = self.read(out / "self-service/config.json"), self.read(out / "approvals/config.json")
         self.assertEqual(approvals, {**config, "mode": "approvals"})
         self.assertEqual(config["workspaces"], [
-            {"name": "fin-citizen-dev", "bu": "FIN", "host": "https://adb-2000000000000002.2.azuredatabricks.net"},
-            {"name": "ops-citizen-dev", "bu": "OPS", "host": "https://adb-3000000000000003.3.azuredatabricks.net"}])
+            {"name": "fin-citizen-dev", "bu": "FIN", "host": "https://adb-2000000000000002.2.azuredatabricks.net", "id": "2000000000000002", "catalog": "fin_citizen_dev"},
+            {"name": "ops-citizen-dev", "bu": "OPS", "host": "https://adb-3000000000000003.3.azuredatabricks.net", "id": "3000000000000003", "catalog": "ops_citizen_dev"}])
         self.assertEqual(config["database"]["host"], "ep-example-1.database.canadacentral.azuredatabricks.net")
-        self.assertTrue(config["links"]["review_requests"].startswith("https://adb-1000000000000001.1.azuredatabricks.net/"), "links are the hub's")
+        self.assertTrue(config["links"]["discover"].startswith("{host}/"), "the app fills in each person's own workspace, not the hub's")
         for skipped in ("tests", "db", "AGENTS.md", "__pycache__"):
             self.assertFalse((out / "self-service" / skipped).exists(), skipped)
 

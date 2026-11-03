@@ -577,6 +577,15 @@ class BusinessUnitRouting(unittest.TestCase):
         self.assertIsNone(p.onboarding_link(BO, "Onboard me"), "the lookup does not know them: no card")
         self.assertIsNone(p.onboarding_link(ANA, ""), "no prompt: no card")
 
+    def test_links_open_in_the_persons_own_workspace(self):
+        p, _ = self.make()
+        p.config = {**p.config, "workspaces": [{"name": "fin", "bu": "FIN", "host": "https://acme.azuredatabricks.net", "id": "42", "catalog": "fin_citizen_dev"}]}
+        links = p.links_for(ANA, {"discover": "{host}/discover?o={workspace_id}", "wiki": "https://wiki", "sop": {"schema": None}})
+        self.assertEqual(links, {"discover": "https://acme.azuredatabricks.net/discover?o=42", "wiki": "https://wiki", "sop": {"schema": None}},
+                         "a custom URL: o= is Terraform's workspace ID")
+        self.assertIsNone(p.links_for(BO, {"discover": "{host}/discover"})["discover"], "no workspace for them: no card")
+        self.assertEqual(p.onboarding_link(ANA, "Start with {catalog}"), "https://acme.azuredatabricks.net/one/chat?o=42&q=Start%20with%20fin_citizen_dev")
+
     def test_genie_one_needs_a_workspace_id_only_on_azure(self):
         self.assertEqual(portal.genie_one_link("https://dbc-123.cloud.databricks.com/", "Onboard me"),
                          "https://dbc-123.cloud.databricks.com/one/chat?q=Onboard%20me")
@@ -787,6 +796,9 @@ class Pages(unittest.TestCase):
                 page = self.http.get(path, headers=self.as_ana).text
                 self.assertNotIn(">Workspace<", page, "Unity Catalog requests are not tied to a workspace")
                 self.assertIn('name="workspace" value="fin"', page, "still routed to the business unit's")
+
+    def test_access_says_which_workspace_it_is_for(self):
+        self.assertIn('<span class="strong">FIN · fin</span>', self.http.get("/persona", headers=self.as_ana).text)
 
     def test_a_choice_of_schemas_is_a_choice_of_catalog(self):
         two = [portal.Workspace("fin", "FIN", HOST), portal.Workspace("ops", "OPS", HOST)]

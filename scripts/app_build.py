@@ -105,8 +105,6 @@ def app_config(s, spokes, mode=None):
     """Each app's config.json: what the app reads (main.py, portal.py)."""
     app, hub, db = s["app"], s["hub"], s["database"]
     host = hub["host"].rstrip("/")
-    workspace_id = (re.search(r"adb-(\d+)\.", host) or [None, ""])[1]   # the number in an Azure Databricks host
-    fill = lambda v: v.replace("{host}", host).replace("{workspace_id}", workspace_id) if isinstance(v, str) else v
     lookup = app.get("bu_lookup") or {}
     config = {
         "title": app["title"],
@@ -116,10 +114,10 @@ def app_config(s, spokes, mode=None):
         "ai_summary": {"model": (app.get("ai_summary") or {}).get("model")},
         "bu_lookup": {"function": lookup["function"], "warehouse_id": hub["warehouse_id"], "host": host}
                      if lookup.get("function") else None,
-        "links": {k: fill(v) for k, v in (app.get("links") or {}).items()},
+        "links": dict(app.get("links") or {}),   # {host}, {workspace_id}, {catalog}: the person's workspace's, filled in by the app
         "onboarding": {"prompt": (app.get("onboarding") or {}).get("prompt") or ""},
         # The workspaces it serves: the business unit is each one's prefix.
-        "workspaces": [{"name": w["name"], "bu": w["bu"], "host": w["host"]} for w in spokes],
+        "workspaces": [{"name": w["name"], "bu": w["bu"], "host": w["host"], "id": w["id"], "catalog": w["catalog"]} for w in spokes],
         "database": {"host": db.get("host"), "name": "self_service",
                      "endpoint": f"projects/{app['database']['project_id']}/branches/production/endpoints/primary"},
     }

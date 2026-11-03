@@ -128,13 +128,26 @@ def record_params(row, w):
     return {**params, "owner_group": row.get("owner_group") or "", "reason": row.get("reason") or "", "request_id": row["id"]}
 
 
-def genie_one_link(host, prompt=""):
-    """Genie One's chat in a workspace, with a first question if one is given. o= is the
-    workspace ID, the number in an Azure Databricks host (adb-<id>.<n>); other hosts need none."""
+def workspace_id_of(host, workspace_id=""):
+    """The workspace ID for o= in links: the one Terraform gives, or the number in an Azure
+    Databricks host (adb-<id>.<n>); "" for other hosts, which need none."""
+    found = re.search(r"//adb-(\d+)\.", host)
+    return str(workspace_id or (found[1] if found else ""))
+
+
+def genie_one_link(host, prompt="", workspace_id=""):
+    """Genie One's chat in a workspace, with a first question if one is given."""
     host = host.rstrip("/")
-    workspace_id = re.search(r"//adb-(\d+)\.", host)
-    query = {**({"o": workspace_id[1]} if workspace_id else {}), **({"q": prompt} if prompt else {})}
+    wid = workspace_id_of(host, workspace_id)
+    query = {**({"o": wid} if wid else {}), **({"q": prompt} if prompt else {})}
     return f"{host}/one/chat" + (f"?{urllib.parse.urlencode(query, quote_via=urllib.parse.quote)}" if query else "")
+
+
+def fill(text, w):
+    """{host}, {workspace_id} and {catalog} in a link or a prompt, from a workspace in config.json."""
+    host = w["host"].rstrip("/")
+    return (text.replace("{host}", host).replace("{workspace_id}", workspace_id_of(host, w.get("id")))
+                .replace("{catalog}", w.get("catalog") or ""))
 
 
 def new_request_id():
@@ -349,9 +362,9 @@ class Portal:
         """Genie One with the onboarding prompt filled in; None when there is no prompt."""
         return self.genie_one(user, prompt) if prompt else None
 
-    def genie_one(self, user, prompt=""):
-        """Genie One in the person's own workspace (their BU's, with the BU lookup), with a first
-        question if one is given; None when there is no workspace for them."""
+    def my_workspace(self, user):
+        """The person's own workspace in config.json (their business unit's; the first one until
+        they have one), or None when there is none for them."""
         mine = self.config["workspaces"]
         try:
             bu = self.bu_of(user)
@@ -359,7 +372,20 @@ class Portal:
             return None
         if bu or self.config.get("bu_lookup"):
             mine = [w for w in mine if w["bu"].upper() == bu]
-        return genie_one_link(mine[0]["host"], prompt) if mine else None
+        return mine[0] if mine else None
+
+    def genie_one(self, user, prompt=""):
+        """Genie One in the person's own workspace, with a first question if one is given (its
+        {catalog} filled in); None when there is no workspace for them."""
+        w = self.my_workspace(user)
+        return genie_one_link(w["host"], fill(prompt, w), w.get("id")) if w else None
+
+    def links_for(self, user, links):
+        """The links with {host}, {workspace_id} and {catalog} of the person's own workspace, so
+        Discover and the access requests open where their data is. A link that needs a
+        workspace is left out (None) when they have none."""
+        w = self.my_workspace(user)
+        return {k: (fill(v, w) if w else None) if isinstance(v, str) and "{" in v else v for k, v in (links or {}).items()}
 
     def _check_bu(self, user, w, kind):
         """A request goes only to the person's own business unit's workspace (the forms offer
