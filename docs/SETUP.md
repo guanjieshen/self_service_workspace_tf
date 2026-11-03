@@ -98,6 +98,20 @@ You need a Databricks workspace you can use, with **serverless notebooks**, and 
 
 The framework's Git folder can be deleted afterwards. Keep your repository's Git folder if you will edit the configuration from Databricks.
 
+### Genie Code, your guide in the Git folder
+
+Your repository's Git folder comes with **Genie Code skills** (`agents/skills/`) that walk an admin through the everyday changes, asking questions in plain language and making the edit: no git, YAML or Terraform knowledge needed.
+
+| Skill | When |
+| --- | --- |
+| `add-workspace` | Onboard a workspace |
+| `change-all-workspaces` | Change a default for every workspace |
+| `change-one-workspace` | Change one workspace's own configuration, or retire it |
+| `update-self-service-app` | The self-service app: its settings, the hub, a new business unit |
+| `pull-request-from-databricks` | Get any change reviewed and deployed (the others end here) |
+
+**Turn them on once, per admin:** in your repository's Git folder, open the Genie Code pane > **Settings** (skills) > add the folder `<your Git folder>/agents/skills` (for example `/Workspace/Users/<you>/<repo>/agents/skills`) > **Add folder**. Then ask Genie Code, for example, "I want to add a new workspace", or @ mention a skill. Genie Code also reads `AGENTS.md` in the folder.
+
 ### Before step 5
 
 1. **Push only what you want deployed.** Once step 5 is done, every push to `main` applies the workspaces that push concerns: the `config/workspaces/` files it changes, or every workspace when it changes `config/defaults/` or the Terraform code ([github-actions.md](github-actions.md)). The copy holds none (only `_example.yaml`), so the first push deploys nothing.

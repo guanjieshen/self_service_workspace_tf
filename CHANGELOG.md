@@ -8,6 +8,11 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **Genie Code skills for your admins** (`agents/skills/`): `add-workspace`,
+  `change-all-workspaces`, `change-one-workspace`, `update-self-service-app` and
+  `pull-request-from-databricks`. In your repository's Git folder, Genie Code asks what they want
+  in plain language, makes the edit and walks them through the pull request: no git, YAML or
+  Terraform needed. Turn them on once per admin (`docs/SETUP.md`, step 2).
 - **The self-service app's jobs skip until it is set up:** with `hub.host` empty in
   `config/self-service/hub.yaml` (as it ships), App plan and Deploy the app do nothing, so a first
   install without the app has no failing checks.

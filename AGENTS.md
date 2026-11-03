@@ -28,6 +28,7 @@ The repository holds two things that share one configuration but are built, test
 | `terraform/` (root module, modules, checks, tests) | [agents/terraform.md](agents/terraform.md) |
 | `config/defaults/`, `config/workspaces/` (an organization's settings) | [agents/config.md](agents/config.md) |
 | `apps/self-service/`, `bundle/`, `config/self-service/`, `scripts/app_build.py`, `scripts/app_deploy.py` | [agents/app.md](agents/app.md) |
+| `agents/skills/` (the Genie Code skills an organization's admins use) | This file: they are written for someone with no git, YAML or Terraform, and end in a pull request |
 | Any template, `app.css`, or text people read in the apps | [agents/design.md](agents/design.md) |
 | `scripts/`, `.github/`, `install/`, docs | This file |
 
@@ -92,6 +93,7 @@ Each topic has one home. Update that file; link to it from elsewhere instead of 
 | A setup step or a manual step | `scripts/setup.py` if a command can do it, else the checklist in `docs/SETUP.md`; a `scripts/preflight.py` check if Terraform depends on it | `scripts/tests/test_setup.py`, `test_preflight.py` |
 | A value in `config/setup.yaml` | `docs/SETUP.md` step 1 table; `OPTIONS` in `scripts/setup.py` (or `scripts/ai-plan-review.py` for `ai_review_host` and `ai_review_model`) | `test_setup.py` checks every key in the file is read |
 | The AI review: its prompt (`.github/ai/plan-review-prompt.md`) or what it is given (`scripts/ai-plan-review.py`) | A case in `.github/ai/eval/` for the behaviour you change; run `python3 scripts/ai-review-eval.py` and read the answers in `.ai-eval/` | `scripts/tests/test_ai_review_eval.py` (cases well formed); the evaluation itself needs the review workspace |
+| Something an admin does (a key, a file, a step of a journey) | The skill in `agents/skills/` that guides it, and `config/README.md` (Common tasks), which the skills look keys up in | `scripts/tests/test_skills.py` (well formed, hands over to skills that exist, never deploys by hand); `test_docs.py` (its paths exist) |
 | A workflow step | `.github/workflows/deploy.yml`; `docs/github-actions.md` | A job that signs in must not run in a GitHub Environment (`test_setup.py`) |
 | What a change plans or applies | `EVERYTHING` and `PLAN_ONLY` in `scripts/workspaces.py`; `docs/github-actions.md` | `scripts/tests/test_workspaces.py` (`Affected`) |
 | A new workspace key (in a workspace file, not the baseline) | `workspace_keys` in `terraform/config.tf`; `config/workspaces/_example.yaml`; the workspace keys table in `config/README.md` | A fixture and an assertion |

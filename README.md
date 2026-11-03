@@ -87,7 +87,7 @@ Changes to the Terraform modules, scripts, or workflows are **framework changes*
 | `docs/` | Setup, design decisions, workflows, and operational guides. |
 | `install/` | `copy_to_your_repo`: a Databricks notebook (or one command in the web terminal) that installs or upgrades this project in your repository's Git folder, without this repository's own environment and without replacing your configuration. |
 | `dev/` | The framework repository's own notes and test workspaces; never copied into your repository. |
-| `AGENTS.md`, `agents/`, `CLAUDE.md` | Contributor and coding-agent guidance. `AGENTS.md` is the main entry point. |
+| `AGENTS.md`, `agents/`, `CLAUDE.md` | Contributor and coding-agent guidance. `AGENTS.md` is the main entry point. `agents/skills/` holds the Genie Code skills that guide an admin through everyday changes ([setup, step 2](docs/SETUP.md#genie-code-your-guide-in-the-git-folder)). |
 
 ## Documentation
 
