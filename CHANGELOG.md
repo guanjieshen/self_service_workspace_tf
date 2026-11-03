@@ -8,6 +8,10 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **Persona request links per business unit.** The approvals app's Settings (Onboarding) has a
+  section of Explorer, Builder and Publisher links for each business unit the app serves, next
+  to the general ones. Request workspace access uses the person's own business unit's link, or
+  the general one where it has none.
 - **Choosing a business unit comes first.** Until someone has chosen one (when there are several
   and no lookup function), every page takes them to the choice, then back where they were going;
   they change it later from their name. The choice page is redesigned: one card per business

@@ -51,6 +51,7 @@ import store
 
 PORTAL = portal.Portal(CONFIG, client, store=store.Store.from_config(CONFIG))
 # The links and banner approvers change in the approvals app (settings.py), over app.yaml's.
+settings.use(w["bu"] for w in CONFIG["workspaces"])   # a section of persona request links per business unit
 SETTINGS = settings.Cached(PORTAL.store.settings if PORTAL.store else dict)
 app = FastAPI(title=CONFIG.get("title", "Self-Service"), docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
@@ -301,8 +302,15 @@ async def folder_submit(request: Request):
 
 @app.get("/persona", response_class=HTMLResponse)
 def persona(request: Request):
-    """The personas, each with where to ask for it (links.persona_request)."""
-    return page(request, "persona.html", nav="catalog", workspace=PORTAL.my_workspace(user_of(request)))
+    """The personas, each with where to ask for it: the person's own business unit's link
+    (Settings), or the general one (links.persona_request)."""
+    w = PORTAL.my_workspace(user_of(request))
+    links = settings.apply(CONFIG, SETTINGS()).get("links") or {}
+    general = links.get("persona_request")
+    general = general if isinstance(general, dict) else {p: general for p in settings.PERSONAS}
+    own = (links.get("persona_request_by_bu") or {}).get(w["bu"].upper(), {}) if w else {}
+    return page(request, "persona.html", nav="catalog", workspace=w,
+                persona_links={p: own.get(p) or general.get(p) for p in settings.PERSONAS})
 
 
 @app.get("/ask", response_class=HTMLResponse)

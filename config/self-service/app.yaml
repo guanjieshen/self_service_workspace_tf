@@ -16,6 +16,8 @@ self_service_app:
     go_link: null                        # a short link to the app, shown on each page (for example go/cd-self-service)
     # Where people ask for a persona (an Entra access package or My Groups): one link for
     # all, or one per persona, for example {explorer: <url>, builder: <url>, publisher: <url>}.
+    # Each business unit's own links (its workspace's ServiceNow items) are set in the approvals
+    # app's Settings (Onboarding); this one is used where a business unit has none.
     persona_request: null
     # Where people ask for an Entra group to be added to their workspace with a persona (for
     # example a ServiceNow form): the Add a group card. null = the card shows as Coming soon.

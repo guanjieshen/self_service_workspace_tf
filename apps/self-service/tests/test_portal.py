@@ -949,6 +949,19 @@ class Pages(unittest.TestCase):
         self.assertNotIn("Current access", page, "what someone has is managed in ServiceNow, not shown here")
         self.assertNotIn("Ask a platform admin", page, "no link, no button: nothing to say")
 
+    def test_persona_links_can_differ_per_business_unit(self):
+        import settings
+        self.assertIn("Persona request links · FIN", [t for t, _, _ in settings.SECTIONS], "a section per business unit")
+        self.assertIn("persona_request.OPS.builder", settings.KINDS)
+        overrides = {"persona_request.builder": {"value": "https://sn.example.com/builder"},
+                     "persona_request.FIN.explorer": {"value": "https://sn.example.com/fin-explorer"}}
+        with mock.patch.object(self.main, "SETTINGS", lambda: overrides):
+            page = self.http.get("/persona", headers=self.as_ana).text   # Ana is in FIN
+        self.assertIn('href="https://sn.example.com/fin-explorer"', page, "FIN's own link")
+        self.assertIn('href="https://sn.example.com/builder"', page, "no FIN builder link: the general one")
+        shown = settings.apply(self.main.CONFIG, overrides)["links"]["persona_request_by_bu"]
+        self.assertEqual(shown["OPS"], {"explorer": None, "builder": None, "publisher": None}, "OPS has none of its own")
+
     def test_a_task_page_links_its_sop(self):
         self.main.CONFIG.setdefault("links", {})["sop"] = {"persona": "https://wiki.example.com/sop/access"}
         try:
