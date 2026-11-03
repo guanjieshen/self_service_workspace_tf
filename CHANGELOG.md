@@ -8,6 +8,16 @@ that you may want to copy. A setting missing from your baseline is left alone.
 
 ## Unreleased
 
+- **The default SQL warehouse is Medium** (was Small). The first plan shows the warehouse's size
+  changing in every workspace that doesn't set `sql_warehouse.size` in its own file. Serverless
+  warehouses resize without downtime; a Medium warehouse costs about twice a Small one per hour
+  it runs.
+
+  **Baseline edits:**
+
+  | File | Change |
+  | --- | --- |
+  | `config/defaults/compute.yaml` | `sql_warehouse.size: Medium` (was `Small`), if you want the new default |
 - **A new card, Add a group to your workspace** (Get started): a link to your organization's
   form for adding an Entra group to a workspace with a persona (for example ServiceNow).
   Set it in `config/self-service/app.yaml` (`links.group_request`) or in the approvals app's
