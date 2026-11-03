@@ -9,3 +9,4 @@ dist/
 __pycache__/
 .ai-eval/
 .DS_Store
+.coverage

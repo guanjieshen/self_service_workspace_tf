@@ -106,6 +106,19 @@ class Builds(unittest.TestCase):
         ops = app_build.jobs_target(self.s, self.spokes[1], [])["targets"]["ops-citizen-dev"]["resources"]["jobs"]
         self.assertNotIn("usage_policy_id", ops["personal_schema"], "no usage policy: none set")
 
+    def test_what_the_jobs_allow_follows_terraform_never_a_fixed_value(self):
+        """The notebooks' settings come from the workspace's Terraform output (and app.yaml): change
+        the catalog or the admins in Terraform, and the next deploy writes the new ones in."""
+        moved = app_build.served(self.s, {**OUTPUTS, "fin-citizen-dev": {**OUTPUTS["fin-citizen-dev"], "catalog": "fin_moved",
+                                                                         "platform_admins": ["fin_new_admins"]}})
+        out = app_build.build_jobs(self.s, moved[0], [], root=self.tmp)
+        schema, folder = (out / "personal_schema.py").read_text(), (out / "team_folder.py").read_text()
+        self.assertIn('allowed_catalogs = ["fin_moved"]', schema)
+        self.assertNotIn("fin_citizen_dev", schema)
+        self.assertIn('admin_groups = ["fin_new_admins"]', folder)
+        for name, text in (("personal_schema", schema), ("team_folder", folder)):
+            self.assertNotIn("${", text, f"{name}: every setting filled in at build")
+
     def test_the_build_never_grants_on_what_terraform_owns(self):
         """Catalogs, warehouses' permissions, usage policies and workspace assignment are Terraform's:
         the bundles only refer to them."""

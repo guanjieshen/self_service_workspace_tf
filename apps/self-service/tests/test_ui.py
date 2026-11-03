@@ -186,6 +186,25 @@ class LakebaseApprovals(unittest.TestCase):
         got = {r["id"]: r["run_url"] for r in s.all("dana")}
         self.assertEqual(got, {"b": "https://adb-1/jobs/2/runs/7", "a": None})
 
+    def test_the_inbox_reads_its_runs_side_by_side_first(self):
+        import threading
+        import time as clock
+        s = self.store([{"id": f"r{i}", "kind": "folder", "name": f"fin-{i}", "state": "run_started",
+                         "run": {"workspace": "fin", "run_id": i}} for i in range(1, 17)])
+        seen, threads = [], set()
+
+        def slow(ws, run_id):
+            threads.add(threading.get_ident())
+            clock.sleep(0.05)
+            seen.append(run_id)
+            return "Completed"
+        s.run_status = slow
+        started = clock.time()
+        s._warm(s.db.requests_in({"FIN"}))
+        self.assertEqual(sorted(seen), list(range(1, 17)), "every run read once")
+        self.assertGreater(len(threads), 1, "side by side")
+        self.assertLess(clock.time() - started, 16 * 0.05, "faster than one after another")
+
     def test_a_person_decides_only_the_kinds_in_human_approval(self):
         s = self.store([
             {"id": "a", "kind": "project_schema", "name": "gtm_x", "state": "submitted"},

@@ -21,11 +21,14 @@ class Exit(Exception):
 
 
 class FakeSpark:
-    def __init__(self, schemas):
+    def __init__(self, schemas, raced=()):
         self.schemas, self.sql_run = schemas, []   # schemas: {name: {tag: value}}
+        self.raced = set(raced)   # created by another run between this run's check and its CREATE
 
     def sql(self, text):
         self.sql_run.append(text)
+        if text.startswith("CREATE SCHEMA") and any(f".`{s}`" in text for s in self.raced):
+            raise RuntimeError("[SCHEMA_ALREADY_EXISTS] Cannot create schema because it already exists.")
         if text.startswith("GRANT") and text.endswith("TO `fin-local`"):   # a workspace-local group
             raise RuntimeError("[PRINCIPAL_DOES_NOT_EXIST] Could not find principal with name fin-local")
         if "information_schema.schemata" in text:
@@ -38,12 +41,12 @@ class FakeSpark:
         return types.SimpleNamespace(count=lambda: len(rows), collect=lambda: rows)
 
 
-def run(params, schemas=None, config=None, records=None):
+def run(params, schemas=None, config=None, records=None, raced=()):
     """Run the notebook with these request parameters (catalog defaults to the allowed one);
     returns (SQL statements, the exit value)."""
     values = {"catalog": "fin_citizen_dev", **params}
     notebook = render_notebook(NOTEBOOK, {**CONFIG, **(config or {})})
-    spark = FakeSpark(schemas or {})
+    spark = FakeSpark(schemas or {}, raced)
     out = {}
 
     def exit_(value):
@@ -80,7 +83,7 @@ class PersonalSchema(unittest.TestCase):
         sql, result = run({"user": "Sam.Lee@contoso.com", "request_id": "REQ-42"})
         self.assertEqual(result, {"catalog": "fin_citizen_dev", "schema": "cd_sam_lee", "kind": "personal",
                                   "user": "sam.lee@contoso.com", "owner_group": "", "reason": "", "created": True})
-        self.assertEqual(sql[0], "CREATE SCHEMA IF NOT EXISTS `fin_citizen_dev`.`cd_sam_lee` "
+        self.assertEqual(sql[0], "CREATE SCHEMA `fin_citizen_dev`.`cd_sam_lee` "
                                  "COMMENT 'Personal schema of sam.lee@contoso.com (self-service)'")
         self.assertIn("'cd_managed_by' = 'self_service', 'cd_user' = 'sam.lee@contoso.com', 'cd_schema_kind' = 'personal', 'cd_created' = ", sql[1])
         self.assertIn("'cd_request_id' = 'REQ-42'", sql[1])
@@ -106,10 +109,18 @@ class PersonalSchema(unittest.TestCase):
         with self.assertRaises(ValueError):
             run({"user": "a@contoso.com", "schema": "shared"}, {"shared": {}})  # asking for a shared schema
 
+    def test_two_requests_for_one_new_name_never_share_it(self):
+        # Both runs saw the name free; the other run created it first: this one stops, changing nothing.
+        with self.assertRaisesRegex(ValueError, "just created by another request: choose another name"):
+            run({"user": "a@contoso.com", "schema": "fin_forecast"}, raced={"fin_forecast"})
+        sql, _ = run({"user": "a@contoso.com", "schema": "fin_forecast"}, {"fin_forecast": {"cd_user": "a@contoso.com"}})
+        self.assertFalse(any(q.startswith("CREATE") for q in sql), "the user's own, run again: not created again")
+        self.assertTrue(any(q.startswith("GRANT") for q in sql), "and still granted")
+
     def test_schema_and_catalog_can_be_given(self):
         sql, result = run({"user": "a@contoso.com", "schema": "team_sandbox", "catalog": "fin_citizen_dev"})
         self.assertEqual(result["schema"], "team_sandbox")
-        self.assertTrue(sql[0].startswith("CREATE SCHEMA IF NOT EXISTS `fin_citizen_dev`.`team_sandbox`"))
+        self.assertTrue(sql[0].startswith("CREATE SCHEMA `fin_citizen_dev`.`team_sandbox`"))
 
     def test_a_project_schema_is_tagged_as_one(self):
         sql, result = run({"user": "a@contoso.com", "schema": "gtm_integrity"})
@@ -175,7 +186,7 @@ class PersonalSchema(unittest.TestCase):
         sql, _ = run({"user": "a@contoso.com", "owner": "users", "privileges": "MANAGE", "prefix": "x_",
                       "allowed_catalogs": "other"})
         self.assertIn("OWNER TO `fin_platform_admins`", sql[-1])
-        self.assertTrue(sql[0].startswith("CREATE SCHEMA IF NOT EXISTS `fin_citizen_dev`.`cd_a`"))
+        self.assertTrue(sql[0].startswith("CREATE SCHEMA `fin_citizen_dev`.`cd_a`"))
         self.assertIn("GRANT ALL PRIVILEGES, MANAGE ON", sql[2])
 
 

@@ -446,6 +446,20 @@ class RequestsInTheDatabase(unittest.TestCase):
             p.request_folder("fin", ANA, "fin-docs", reason=WHY)
         self.assertEqual(fake.started, [])
 
+    def test_the_approvals_app_reads_a_run_once_and_a_finished_one_never_again(self):
+        p, fake = make()
+        run_id = p.request_schema("fin", ANA)
+        fake.get_runs = 0
+        self.assertEqual(p.run_status("fin", run_id), "In progress")
+        self.assertEqual(fake.get_runs, 1, "one call for the status (no output, no second read)")
+        p.run_cache_seconds = 0
+        fake.runs_[run_id].state = state("TERMINATED", "SUCCESS")
+        self.assertEqual(p.run_status("fin", run_id), "Completed", "in progress: read again")
+        calls = fake.get_runs
+        self.assertEqual(p.run_status("fin", run_id), "Completed")
+        self.assertEqual(fake.get_runs, calls, "finished: never read again")
+        self.assertEqual(p.run_status("fin", 999999), "Finished", "the Jobs API no longer has it")
+
     def test_a_run_that_does_not_exist_is_not_found(self):
         p, _ = make()
         self.assertIsNone(p.run("fin", 999999, ANA), "a page saying not found, not an error page")
