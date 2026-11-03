@@ -12,6 +12,8 @@ that you may want to copy. A setting missing from your baseline is left alone.
   form for adding an Entra group to a workspace with a persona (for example ServiceNow).
   Set it in `config/self-service/app.yaml` (`links.group_request`) or in the approvals app's
   Settings (Onboarding). Until then the card shows as Coming soon.
+- Discover data and Review data access requests say **"Opens in Databricks (workspace access is
+  required)"**. The onboarding prompt asks about **the data assets you have access to**.
 - **Platform admins can manage every requested workspace folder.** The folder job gives the
   workspace's `platform_admins` group CAN_MANAGE, next to the requester and their group, so no
   folder is left without a manager. The group comes from a new field of the Terraform output

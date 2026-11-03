@@ -46,7 +46,7 @@
       <p>{{ text }}</p>
       {#- Every card has a foot, so they all have the same shape: how it is approved, or where it opens. -#}
       <div class="task-foot">
-        {% if ready and external %}<span class="meta">Opens in Databricks</span>
+        {% if ready and external %}<span class="meta">{{ c.opens }}</span>
         {% elif ready %}
         {{ approval_label(approval.get(key), approval_labels,
              "Approved in Entra ID before your access changes" if approval.get(key) == "required" else "Runs straight away; the job checks the request") }}

@@ -32,6 +32,7 @@ class Card:
     link: str = ""  # a page in Databricks: config links.<link>, or "onboarding"
     icon: str = ""  # _icons.html name; the key when empty
     soon: bool = False  # a link card: Coming soon (not left out) while its link is not set
+    opens: str = "Opens in Databricks"   # a link card's foot: where it goes, and what it needs
 
 
 CARDS = [
@@ -40,12 +41,14 @@ CARDS = [
          "Ask Genie to look at the data you can use and suggest the best questions to start with.", link="onboarding", icon="ask"),
     Card("group_request", "access", "Add a group to your workspace",
          "Ask for an Entra group to be added to your workspace with a persona, so you can share your work with it.",
-         link="group_request", icon="group", soon=True),
+         link="group_request", icon="group", soon=True, opens="Opens your organization's request form"),
 
     Card("discover", "data", "Discover data",
-         "Browse the data your organization has curated, by business domain, in Databricks.", link="discover", icon="search"),
+         "Browse the data your organization has curated, by business domain, in Databricks.", link="discover", icon="search",
+         opens="Opens in Databricks (workspace access is required)"),
     Card("review_requests", "data", "Review data access requests",
-         "See the data access requests you made in Databricks, and the ones others made for your data.", link="review_requests", icon="requests"),
+         "See the data access requests you made in Databricks, and the ones others made for your data.", link="review_requests", icon="requests",
+         opens="Opens in Databricks (workspace access is required)"),
 
     Card("schema", "workspace", "Request a personal schema",
          "Create your own schema in the workspace catalog, with full permissions to manage it.", href="/schema"),
