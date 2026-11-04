@@ -434,32 +434,31 @@ For when CI cannot run (GitHub is down, the runner is broken) and a workspace ne
 
 **Who:** the platform team. **Optional:** the baseline works without it.
 
-The app lets people ask for what they need (a personal, project or team schema, a workspace folder) in a web page, and an approvals app lets platform admins approve, change settings and answer questions. Both apps and their database run in one **hub** workspace; each workspace the app serves gets two jobs that do the work. The Deploy workflow deploys all of it (**Deploy the app**), from `config/self-service/`, after Terraform: nothing is deployed by hand.
+The app lets people ask for what they need (a personal, project or team schema; workspace folders are coming) in a web page, and an approvals app lets platform admins approve, change settings and answer questions. Both apps, their database **and each served workspace's schema job** run in one **hub** workspace: Unity Catalog is shared across the metastore, and each served workspace's catalog is bound to the hub too, so **the app never calls another workspace**. The Deploy workflow deploys all of it (**Deploy the app**), from `config/self-service/`, after Terraform: nothing is deployed by hand.
 
 ### Before you start
 
 | # | What | Who |
 | --- | --- | --- |
 | 1 | **A hub workspace**: Premium, with **serverless**, **Databricks Apps** and **Lakebase** available (Lakebase is regional: check your region). A dedicated workspace is simplest; it need not be one of the workspaces in `config/workspaces/` | Databricks account admin |
-| 2 | The pipeline's service principal (step 4) is **workspace admin in the hub**, as in every served workspace (step 6) | Databricks account admin |
+| 2 | The pipeline's service principal (step 4) is **workspace admin in the hub**, as in every served workspace (step 6). The hub shares the served workspaces' **Unity Catalog metastore** | Databricks account admin |
 | 3 | For **Validate** (`ai_check: "on"` in `config/self-service/app.yaml`): **AI Decide** enabled in the hub (Previews). Otherwise set `ai_check: "off"` | Workspace admin |
 | 4 | For the approvers' **AI summary** (`ai_summary.model`): the model served in the hub, which the apps' identities may use. Otherwise set `model: null` | Workspace admin |
-| 5 | **Private Link:** the hub calls each served workspace's APIs. An account admin allows it with **cross-workspace access** (the hub's serverless egress policy lists each served workspace; each one's ingress policy allows the hub) | Databricks account admin, network team |
 
 ### Install: two pull requests
 
 | # | Pull request | What the merge does |
 | --- | --- | --- |
-| 1 | `config/self-service/hub.yaml`: the hub's `name` and per-workspace URL (`host`), who opens each app (`users_group`, `approvals_group`), and `database.readers` if anyone should read the data. Review `config/self-service/app.yaml` (the title, links, `human_approval`, the jobs' settings) | **Deploy the app** creates both apps, the database (its migrations run) and the jobs in every served workspace. Its log ends with the two apps' **application IDs** |
-| 2 | Those two IDs into `app_ids` in `hub.yaml` | Terraform gives the apps what they need in every served workspace (assignment with workspace access, browse on its catalog); the deploy lets them run the jobs, which run as the pipeline's identity |
+| 1 | `config/self-service/hub.yaml`: the hub's `name` and per-workspace URL (`host`), who opens each app (`users_group`, `approvals_group`), and `database.readers` if anyone should read the data. Review `config/self-service/app.yaml` (the title, links, `human_approval`, the jobs' settings) | Terraform binds each served workspace's catalog and usage policy to the hub; **Deploy the app** creates both apps, the database (its migrations run) and a schema job per served workspace, in the hub. Its log ends with the two apps' **application IDs** |
+| 2 | Those two IDs into `app_ids` in `hub.yaml` | Terraform lets the apps browse each served workspace's catalog (to say whether a schema name is taken). The jobs, which run as the pipeline's identity, already let the apps run them |
 
-The first pull request cannot do both: Terraform needs the apps' identities, and they exist only once the apps do. Every later change is one pull request.
+The first pull request cannot do both: Terraform needs the apps' identities for the catalog grant, and they exist only once the apps do. Every later change is one pull request.
 
-**Then check:** open the self-service app (Compute > Apps > the app's URL). It asks which **business unit** you are in (one per served workspace, named by its prefix), then shows the catalog of tasks. Ask for a workspace folder: it is ready in under a minute.
+**Then check:** open the self-service app (Compute > Apps > the app's URL). It asks which **business unit** you are in (one per served workspace, named by its prefix), then shows the catalog of tasks. Ask for your personal schema: it is ready in under a minute.
 
 ### After that
 
-- **A new workspace** (step 9) is served automatically: its merge deploys its jobs, and the app offers its business unit. Set `self_service: false` in a workspace file to leave it out.
+- **A new workspace** (step 9) is served automatically: its merge binds its catalog to the hub and deploys its schema job there, and the app offers its business unit. Set `self_service: false` in a workspace file to leave it out.
 - **Settings without a pull request:** the approvals app's **Settings** tab holds the links people see (persona requests per business unit, FAQs, SOPs), the onboarding prompt and a banner.
 - **What people may do** (who approves what, naming, the jobs' rights) stays in `config/self-service/app.yaml`, changed by pull request.
 
@@ -467,7 +466,8 @@ The first pull request cannot do both: Terraform needs the apps' identities, and
 
 | What you see | Cause | What to do |
 | --- | --- | --- |
-| A form says there is **no workspace** for the request | The app cannot use that workspace yet: the second pull request (`app_ids`) is not merged, or its Terraform apply failed | Merge it, or re-run the failed apply; the app checks again within 5 minutes |
+| A form says there is **no workspace** for the request | That workspace has no schema job in the hub yet: its Terraform apply or the app's deploy failed | Re-run the failed job in the Deploy run; the app checks again within 5 minutes |
+| A schema request fails: the catalog is **not accessible in this workspace** | The workspace's catalog is not bound to the hub yet (`hub.host` not set when its Terraform last ran) | Re-run its Terraform apply (any change to it, or **Re-run jobs**) |
 | **Validate** says the AI check is unavailable | AI Decide is off in the hub (Before you start, item 3) | Turn it on, or set `ai_check: "off"` |
 | The deploy stops: **the Lakebase project was deleted** | A deleted project is kept 7 days and blocks a new one with the same ID | Undelete it, wait until it is purged, or set another `self_service_app.database.project_id` in `app.yaml` |
 | An app **cannot be deleted** | Its identity is still assigned to served workspaces | Clear `app_ids` in a pull request first, then delete the app |

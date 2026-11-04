@@ -34,8 +34,8 @@ The self-service app is deployed (**Deploy the app**) when a change touches `app
 `config/self-service/`, `scripts/app_build.py`, `scripts/app_deploy.py`, a workspace file, or
 anything every workspace's Terraform reads (a workspace's output may change):
 `scripts/workspaces.py app`. It runs on the runner (`RUNNER`), with the same
-sign-in: it reads each workspace's Terraform output, and reaches the hub, every served workspace
-and the hub's Lakebase database. Like every job that signs in, it runs in no GitHub Environment.
+sign-in: it reads each workspace's Terraform output, and reaches the hub (where it deploys the apps and
+every served workspace's schema job) and the hub's Lakebase database. Like every job that signs in, it runs in no GitHub Environment.
 
 A change to every workspace applies them all, each in its own job: one that fails does not
 stop the others. Fix it in a pull request; or, if a missing prerequisite was fixed, re-run

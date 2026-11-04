@@ -260,11 +260,6 @@ def schema_submit(request: Request, workspace: str = Form("")):
     return sent(workspace, started)
 
 
-def team_groups(request, workspace):
-    """The user's groups a team schema can go to: not the workspace's own (admins, users)."""
-    return [g for g in groups_of(request, workspace) if g not in portal.WORKSPACE_GROUPS]
-
-
 @app.get("/schema/custom", include_in_schema=False)
 def custom_schema(request: Request):
     """Custom schemas are project schemas now; old links and bookmarks still work."""
@@ -273,14 +268,15 @@ def custom_schema(request: Request):
 
 @app.get("/schema/{kind}", response_class=HTMLResponse)
 def named_schema_form(request: Request, kind: str, workspace: str = "", name: str = "", owner_group: str = "", reason: str = "", error: str = ""):
-    """A project schema (the requester's) or a team schema (theirs and one of their groups')."""
+    """A project schema (the requester's) or a team schema (theirs and an Entra group's, typed in:
+    the hub cannot see a person's groups in their workspace, so membership is not checked)."""
     if kind not in ("project", "team"):
         raise HTTPException(404)
     workspaces, why = offered(user_of(request), "personal_schema")
     chosen = workspace if workspace in {w.name for w in workspaces} else (workspaces[0].name if workspaces else "")
     error = error or why
     return page(request, "schema_named.html", nav="catalog", team=kind == "team", workspaces=workspaces, chosen=chosen,
-                my_groups=team_groups(request, chosen) if kind == "team" else [], name=name, owner_group=owner_group,
+                name=name, owner_group=owner_group,
                 reason=reason, error=error)
 
 
@@ -294,17 +290,13 @@ def named_schema_submit(request: Request, kind: str, workspace: str = Form(""), 
         if not name:
             raise portal.RequestError("Give the schema a name.")
         if kind == "team" and not owner_group:
-            raise portal.RequestError("Choose the team (one of your groups) that manages the schema with you.")
-        started = PORTAL.request_schema(workspace, user_of(request), schema=name, owner_group=owner_group,
-                                        groups=team_groups(request, workspace) if owner_group else (), reason=reason)
+            raise portal.RequestError("Give the Entra group that manages the schema with you.")
+        if owner_group in portal.WORKSPACE_GROUPS:
+            raise portal.RequestError(f"{owner_group} is every user of a workspace: give your team's own Entra group.")
+        started = PORTAL.request_schema(workspace, user_of(request), schema=name, owner_group=owner_group, reason=reason)
     except portal.RequestError as e:
         return named_schema_form(request, kind, workspace=workspace, name=name, owner_group=owner_group, reason=reason, error=str(e))
     return sent(workspace, started)
-
-
-def groups_of(request, workspace):
-    """The signed-in user's groups, read with their own token (Databricks Apps forwards it)."""
-    return PORTAL.groups_of(workspace, user_of(request), request.headers.get("x-forwarded-access-token")) if workspace else []
 
 
 @app.get("/folder", response_class=HTMLResponse)

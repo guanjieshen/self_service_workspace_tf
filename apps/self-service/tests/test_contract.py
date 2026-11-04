@@ -1,6 +1,6 @@
 """The contract between the app and the self-service jobs it runs.
 
-The app is one central copy; the jobs are deployed into every workspace it serves. Both
+The app is one central copy; the jobs are deployed to the hub, one per workspace it serves. Both
 check a request, so both must agree on the rules, the parameters and the tags, and a change
 to one side has to change the other in the same pull request. These tests read both sides
 (portal.py, and each job's notebook and its bundle definition) and fail where they differ.
@@ -19,7 +19,8 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import app_build  # noqa: E402
 import yaml  # noqa: E402
 
-JOBS = ("personal_schema", "team_folder")
+JOBS = ("personal_schema", "team_folder")   # their notebooks, and the rules the app shares with them
+DEPLOYED = ("personal_schema",)             # in the jobs bundle (the folder job is not, for now)
 BUNDLE = yaml.safe_load((ROOT / "bundle/jobs/resources/jobs.yml").read_text())["resources"]
 
 
@@ -32,14 +33,23 @@ def checks(kind):
     return {var: pattern for pattern, var in re.findall(r're\.fullmatch\(r"([^"]+)", (\w+)\)', notebook(kind))}
 
 
+def notebook_parameters(kind):
+    """The parameters the notebook reads (its dbutils.widgets.text loop)."""
+    found = re.search(r"for name in \(([^)]*)\):\s*\n\s*dbutils\.widgets\.text", notebook(kind)).group(1)
+    return set(found.replace('"', "").replace(" ", "").split(","))
+
+
 def job_parameters(kind):
-    """The job's parameters, from its bundle definition."""
-    return {p["name"] for p in BUNDLE["jobs"][kind]["parameters"]}
+    """The job's parameters: its bundle definition's, or (not deployed) its notebook's."""
+    if kind in BUNDLE["jobs"]:
+        return {p["name"] for p in BUNDLE["jobs"][kind]["parameters"]}
+    return notebook_parameters(kind)
 
 
 def job_tags(kind):
     """The tag names the job gets: its bundle definition's, and those the build adds per workspace."""
-    s = {"jobs": yaml.safe_load((ROOT / "config/self-service/app.yaml").read_text())["jobs"]}
+    s = {"jobs": yaml.safe_load((ROOT / "config/self-service/app.yaml").read_text())["jobs"],
+         "hub": {"host": "https://adb-9.9.azuredatabricks.net"}}
     w = {"name": "example", "bu": "EX", "host": "https://adb-1.1.azuredatabricks.net", "catalog": "ex_citizen_dev"}
     target = app_build.jobs_target(s, w, [])["targets"]["example"]["resources"]
     return set(BUNDLE["jobs"][kind]["tags"]) | set(target["jobs"][kind]["tags"])
@@ -52,8 +62,8 @@ class SentParameters(unittest.TestCase):
         sent = []
         jobs = type("Jobs", (), {"run_now": lambda self, job_id, job_parameters: sent.append(job_parameters) or type("R", (), {"run_id": 1})(),
                                  "list_runs": lambda self, **kw: []})()
-        tags = {"personal_schema": {"cd_self_service": "personal_schema", "cd_catalog": "c", "cd_prefix": "cd_"},
-                "team_folder": {"cd_self_service": "team_folder", "cd_root": "/Workspace"}}
+        tags = {"personal_schema": {"cd_self_service": "personal_schema", "cd_catalog": "c", "cd_prefix": "cd_", "cd_workspace": "w"},
+                "team_folder": {"cd_self_service": "team_folder", "cd_root": "/Workspace", "cd_workspace": "w"}}
         listed = [type("J", (), {"job_id": i, "settings": type("S", (), {"tags": t})()})() for i, t in enumerate(tags.values())]
         client = type("C", (), {"jobs": jobs})()
         client.jobs.list = lambda: listed
@@ -73,10 +83,9 @@ class SentParameters(unittest.TestCase):
         self.assertEqual(self.sent("team_folder"), job_parameters("team_folder"))
 
     def test_the_notebooks_read_the_same_parameters(self):
-        for kind in JOBS:
+        for kind in DEPLOYED:
             with self.subTest(kind=kind):
-                read = set(re.search(r"for name in \(([^)]*)\):\s*\n\s*dbutils\.widgets\.text", notebook(kind)).group(1).replace('"', "").replace(" ", "").split(","))
-                self.assertEqual(read, job_parameters(kind))
+                self.assertEqual(notebook_parameters(kind), job_parameters(kind))
 
 
 class Rules(unittest.TestCase):
@@ -115,11 +124,11 @@ class Tags(unittest.TestCase):
 
     def test_the_jobs_set_the_tags_the_app_reads(self):
         read = set(re.findall(r'"(cd_\w+)"', (APP / "portal.py").read_text()))
-        set_by_jobs = job_tags("personal_schema") | job_tags("team_folder")
+        set_by_jobs = set().union(*(job_tags(kind) for kind in DEPLOYED)) | {"cd_root"}   # cd_root: the folder job's, not deployed
         self.assertEqual(read - set_by_jobs, set(), "tags the app reads but no job sets")
 
     def test_the_app_finds_every_job_by_its_kind(self):
-        for kind in JOBS:
+        for kind in DEPLOYED:
             with self.subTest(kind=kind):
                 self.assertEqual(BUNDLE["jobs"][kind]["tags"]["cd_self_service"], kind)
                 self.assertIn(kind, portal.TASKS)

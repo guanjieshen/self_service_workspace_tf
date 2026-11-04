@@ -10,7 +10,7 @@ The repository holds two things that share one configuration but are built, test
 
 | | **The workspace baseline** | **The self-service web app** |
 | --- | --- | --- |
-| What it is | Every workspace's settings, personas, compute, usage policy and catalog | The self-service app and the approvals app, their database, and the two jobs they run in each workspace |
+| What it is | Every workspace's settings, personas, compute, usage policy and catalog | The self-service app and the approvals app, their database, and a schema job per workspace they serve, all in the hub |
 | Built with | Terraform | Databricks Asset Bundles |
 | Folders | `terraform/`, `config/defaults/`, `config/workspaces/` | `apps/self-service/`, `bundle/`, `config/self-service/`, `scripts/app_build.py`, `scripts/app_deploy.py` |
 | Guides | [agents/terraform.md](agents/terraform.md), [agents/config.md](agents/config.md) | [agents/app.md](agents/app.md), [agents/design.md](agents/design.md) (look, typography, copy) |

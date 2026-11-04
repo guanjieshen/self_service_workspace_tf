@@ -163,11 +163,13 @@ def deploy_hub(s, spokes, plan):
 
 
 def deploy_jobs(s, w, app_ids, plan):
+    """A served workspace's schema job, deployed to the hub (app_build.jobs_target)."""
     app_build.build_jobs(s, w, app_ids)
+    host = s["hub"]["host"]
     if plan:
-        run(w["host"], JOBS, "databricks", "bundle", "plan", "-t", w["name"])
+        run(host, JOBS, "databricks", "bundle", "plan", "-t", w["name"])
     else:
-        run(w["host"], JOBS, "databricks", "bundle", "deploy", "-t", w["name"], "--auto-approve")
+        run(host, JOBS, "databricks", "bundle", "deploy", "-t", w["name"], "--auto-approve")
 
 
 def main(argv=None):
@@ -181,12 +183,9 @@ def main(argv=None):
     if a.only and not names:
         raise SystemExit(f"{a.only} is not a workspace the app serves: {', '.join(s['spokes']) or 'none'}.")
     spokes = app_build.served(s, json.loads(pathlib.Path(a.outputs).read_text()) if a.outputs else outputs(s["spokes"]))
-    deploy_hub(s, spokes, a.plan)   # first: the apps must exist before the jobs can grant them
-    # The jobs grant only the apps in hub.yaml: Terraform assigns exactly those to each served
-    # workspace, and a job cannot grant a service principal its workspace does not have.
-    app_ids = [i for i in s["app_ids"].values() if i]
-    if not app_ids:
-        print("app_ids are not set yet (a first install): the jobs grant no one besides workspace admins until they are")
+    # First: the apps must exist before the jobs can grant them. The jobs are in the hub too, where
+    # the apps' service principals are, so they grant the apps the hub deploy just found.
+    app_ids = deploy_hub(s, spokes, a.plan)
     for w in spokes:
         if w["name"] in names:
             deploy_jobs(s, w, app_ids, a.plan)

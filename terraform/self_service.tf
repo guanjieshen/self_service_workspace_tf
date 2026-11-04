@@ -20,6 +20,13 @@ locals {
     for k in ["self_service", "approvals"] : try(tostring(local.self_service_hub.app_ids[k]), "")
   ]) : []
 
+  # The hub (hub.yaml host): this workspace's schema job runs there (scripts/app_build.py
+  # jobs_target), so the catalog and the usage policy are bound to it too. null: no hub yet, or
+  # this workspace is the hub, or it is not served.
+  self_service_hub_host_id = try(regex("adb-([0-9]+)\\.", tostring(local.self_service_hub.hub.host))[0], null)
+  self_service_hub_id = (local.self_service_enabled && local.self_service_hub_host_id != null
+  && local.self_service_hub_host_id != local.workspace_id) ? local.self_service_hub_host_id : null
+
   # The usage policy's users are groups (chargeback.tf) plus, here, the identity running
   # Terraform: a service principal in CI (its application ID), a person when run locally.
   pipeline_principal = local.self_service_enabled ? [
@@ -28,6 +35,17 @@ locals {
 }
 
 data "databricks_current_user" "me" {}
+
+# The catalog is bound to this workspace (workspace_only); bound to the hub too, read and write,
+# so the schema job there can create schemas in it. Only principals granted on the catalog can use
+# it there (the pipeline's identity, the platform admins): binding gives nobody access by itself.
+resource "databricks_workspace_binding" "self_service_hub" {
+  count          = local.self_service_hub_id != null && local.catalog != null ? 1 : 0
+  securable_name = module.catalog[0].name
+  securable_type = "catalog"
+  workspace_id   = tonumber(local.self_service_hub_id)
+  binding_type   = "BINDING_TYPE_READ_WRITE"
+}
 
 resource "databricks_permission_assignment" "self_service_app" {
   for_each               = toset(local.self_service_app_ids)

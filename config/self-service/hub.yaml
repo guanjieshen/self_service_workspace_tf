@@ -3,8 +3,9 @@
 # approvals app and their database, and the apps' identities.
 #
 # The app (apps/, bundle/) is deployed by Databricks Asset Bundles, not by Terraform.
-# Terraform reads only app_ids from this file (terraform/self_service.tf): it gives those
-# service principals what they need in each workspace the app serves. Every other key is the
+# Terraform reads only app_ids and hub.host from this file (terraform/self_service.tf): it gives
+# those service principals browse on each served workspace's catalog, and binds that catalog and
+# its usage policy to the hub, where the workspace's schema job runs. Every other key is the
 # app's own (scripts/app_build.py).
 # =============================================================================
 
@@ -21,7 +22,7 @@ database:
   readers: [guanjie.shen@databricks.com]
 
 # The apps' service principals (application IDs). Empty until the hub's first deploy creates
-# the apps; then set them here, in a pull request, so every served workspace grants them.
+# the apps; then set them here, in a pull request, so every served workspace's catalog grants them.
 app_ids:
   self_service: 919a8a38-5f2d-46ae-a6dd-31cf9dd6ce1e   # the self-service app's
   approvals: 8aa9354e-d838-4949-9bba-f96680062e51      # the approvals app's

@@ -7,6 +7,12 @@ variable "workspace_id" {
   type        = number
 }
 
+variable "extra_workspace_ids" {
+  description = "Other workspaces the policies are bound to too (the self-service hub, where this workspace's schema job runs)."
+  type        = list(number)
+  default     = []
+}
+
 variable "policies" {
   description = "Key => { name, tags, groups, principals }: groups (names) and principals (users/<email>, servicePrincipals/<app-id>) may use the policy."
   type        = any

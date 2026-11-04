@@ -35,9 +35,9 @@ class ProjectExists(unittest.TestCase):
             self.assertTrue(app_deploy.project_exists("https://h", "p"))
 
 
-class JobsGrantOnlyTheAssignedApps(unittest.TestCase):
-    """A job cannot grant a service principal its workspace does not have: only hub.yaml's app_ids
-    (the ones Terraform assigned) are granted, never the apps the hub deploy just created."""
+class JobsGrantTheAppsTheHubFound(unittest.TestCase):
+    """The jobs are in the hub, where the apps' service principals are: they grant the apps the hub
+    deploy just found, on a first install too (before app_ids is set in hub.yaml)."""
 
     def run_main(self, app_ids):
         s = {"spokes": ["spoke"], "app_ids": app_ids}
@@ -50,11 +50,11 @@ class JobsGrantOnlyTheAssignedApps(unittest.TestCase):
             app_deploy.main([])
         return granted
 
-    def test_a_first_install_grants_none(self):
-        self.assertEqual(self.run_main({"self_service": None, "approvals": None}), [[]])
+    def test_a_first_install_grants_the_new_apps(self):
+        self.assertEqual(self.run_main({"self_service": None, "approvals": None}), [["new-1", "new-2"]])
 
-    def test_then_the_ids_in_hub_yaml(self):
-        self.assertEqual(self.run_main({"self_service": "a", "approvals": "b"}), [["a", "b"]])
+    def test_and_later_the_same_apps(self):
+        self.assertEqual(self.run_main({"self_service": "new-1", "approvals": "new-2"}), [["new-1", "new-2"]])
 
 
 class FakeDatabricks:
@@ -172,14 +172,16 @@ class OutputsAndJobs(unittest.TestCase):
                     self.assertRaisesRegex(SystemExit, "apply its baseline first"):
                 app_deploy.outputs(["fin"])
 
-    def test_the_jobs_are_planned_or_deployed_to_their_own_workspace(self):
+    def test_each_workspaces_job_is_planned_or_deployed_to_the_hub(self):
         ran = []
         with mock.patch.object(app_deploy.app_build, "build_jobs"), \
                 mock.patch.object(app_deploy, "run", side_effect=lambda host, cwd, *a: ran.append((host, " ".join(a)))):
-            app_deploy.deploy_jobs({}, {"name": "fin", "host": "https://fin"}, ["sp-1"], plan=True)
-            app_deploy.deploy_jobs({}, {"name": "fin", "host": "https://fin"}, ["sp-1"], plan=False)
-        self.assertEqual(ran, [("https://fin", "databricks bundle plan -t fin"),
-                               ("https://fin", "databricks bundle deploy -t fin --auto-approve")])
+            s = {"hub": {"host": "https://hub"}}
+            app_deploy.deploy_jobs(s, {"name": "fin", "host": "https://fin"}, ["sp-1"], plan=True)
+            app_deploy.deploy_jobs(s, {"name": "fin", "host": "https://fin"}, ["sp-1"], plan=False)
+        self.assertEqual(ran, [("https://hub", "databricks bundle plan -t fin"),
+                               ("https://hub", "databricks bundle deploy -t fin --auto-approve")],
+                         "each workspace's job, as its own target, in the hub")
 
 
 class Main(unittest.TestCase):

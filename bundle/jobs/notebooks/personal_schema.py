@@ -17,7 +17,6 @@ import datetime
 import json
 import re
 
-from databricks.sdk import WorkspaceClient
 
 # Written here by scripts/app_build.py from config/self-service/app.yaml and the workspace's
 # Terraform output: change them there. A run cannot change them.
@@ -72,11 +71,9 @@ if not re.fullmatch(r"[A-Za-z0-9._:/-]{0,100}", request_id):
 if not all(re.fullmatch(r"[A-Z_]+", p) for p in privileges):
     raise ValueError(f"not privileges: {privileges}")
 
-# A team schema's group must be one of the user's own (the app checks it too).
-if owner_group:
-    me = list(WorkspaceClient().users.list(filter=f'userName eq "{user}"', attributes="id,userName,groups"))
-    if not me or owner_group not in {g.display for g in me[0].groups or []}:
-        raise ValueError(f"{user} is not in the group {owner_group}")
+# A team schema's group is any Entra account group the requester names: membership is not checked
+# (the job runs in the hub, which does not see a person's groups in their workspace). A name that
+# is not an account group fails at the grant below, before the schema is handed over.
 
 # Only a request the app recorded, for these parameters (off unless jobs.require_request_record).
 check_request_record(request_id, {"kind": f"{kind}_schema", "workspace": workspace_name, "requested_by": user,

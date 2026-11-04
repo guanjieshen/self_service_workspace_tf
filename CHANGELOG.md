@@ -10,6 +10,18 @@ is left alone.
 
 ## Unreleased
 
+- **The self-service app no longer calls other workspaces** (no cross-workspace access needed).
+  Each served workspace's schema job is deployed to the **hub**, and the app talks only to the
+  hub; links people open (Genie One, Discover) still go to their own workspace. Terraform binds
+  each served workspace's catalog and serverless usage policy to the hub too (the first plan
+  shows one workspace binding and the policy's bindings changing). The jobs in the served
+  workspaces are no longer deployed: delete them by hand if you had them (Jobs > `<BU>`
+  personal schema and team folder).
+- **Workspace folders are Coming soon** (a folder is workspace specific): the card is off and the
+  folder job is not deployed.
+- **A team schema's group is typed, and membership is not checked:** any Entra account group can
+  be named (the hub cannot see a person's groups in their workspace).
+
 - **When the app's database does not answer, the app says so:** a person's chosen business unit
   that cannot be read shows "Your business unit can't be read just now. Try again in a minute."
   (503), instead of sending them to choose one they could not save. Forms sent then are not

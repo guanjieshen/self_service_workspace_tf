@@ -18,9 +18,21 @@ warehouse permissions, usage policies, workspace assignment): what the app needs
 browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py (the logic)
                                                                │  as the app's service principal
                                                                ▼
-                         each served workspace: its self-service jobs (Jobs API run_now)
+                         the hub: each served workspace's schema job (Jobs API run_now)
                          the job checks the request again and does the work
+                         in that workspace's catalog (bound to the hub too)
 ```
+
+- **The app calls only the hub** (`Portal.hub()`): finding the jobs, running them, following
+  runs, Unity Catalog lookups. A served workspace's job is in the hub, tagged with the workspace
+  it serves (`cd_workspace`). The workspace's own `host` is used only for the links people open
+  in their browser (Genie One, Discover). So no cross-workspace access is needed.
+- **Workspace folders are off for now:** a folder is workspace specific, so its job is not
+  deployed and the card shows Coming soon (`cards.py`; the job's notebook stays in
+  `bundle/jobs/notebooks/team_folder.py`).
+- **A team schema's group is typed, and membership is not checked:** the hub cannot see a
+  person's groups in their workspace. Any Entra account group can be named; a workspace-local
+  one fails at the grant.
 
 - **The business unit comes first.** Without a lookup function (`bu_lookup`), a person chooses
   their business unit (a served workspace, by its prefix) before any page shows (`main.page`
@@ -61,7 +73,7 @@ browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py
 | `tests/test_db.py` | The database against a real Postgres (`PG_TEST_DSN`; the **Database tests** check) |
 | `tests/test_build.py`, `tests/test_deploy.py` | `scripts/app_build.py` (what each bundle deploys) and `scripts/app_deploy.py` (the order and rules of a deploy) |
 
-Outside `apps/`: `bundle/hub/` (the apps and the Lakebase project), `bundle/jobs/` (the two jobs and their notebooks, deployed to every served workspace), `config/self-service/` (`hub.yaml`, `app.yaml`), and `scripts/app_build.py` / `scripts/app_deploy.py`.
+Outside `apps/`: `bundle/hub/` (the apps and the Lakebase project), `bundle/jobs/` (the schema job and its notebook, one per served workspace, deployed to the hub), `config/self-service/` (`hub.yaml`, `app.yaml`), and `scripts/app_build.py` / `scripts/app_deploy.py`.
 
 ## Rules
 
@@ -209,8 +221,8 @@ own identity, so it sees what you can see, not what the app's service principal 
 ## Deploying
 
 Through a merged pull request, like everything else. `scripts/app_deploy.py` deploys the hub
-(`config/self-service/hub.yaml`: both apps, the database), then the two jobs in every
-workspace the app serves (every workspace file without `self_service: false`), reading what
+(`config/self-service/hub.yaml`: both apps, the database), then a schema job, in the hub, for
+every workspace the app serves (every workspace file without `self_service: false`), reading what
 it needs about each from that workspace's Terraform output `self_service`. To see what a
 deploy would change, signed in with the Databricks CLI: `python3 scripts/app_deploy.py --plan`
 (it changes nothing). Check afterwards that each app's active deployment `SUCCEEDED`
