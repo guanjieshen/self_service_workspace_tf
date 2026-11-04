@@ -73,6 +73,14 @@ class RequestError(ValueError):
     """A request the user has to fix; the message is shown on the form."""
 
 
+class BusinessUnitUnavailable(RequestError):
+    """The person's chosen business unit cannot be read just now (the database does not answer).
+    Never read as "none chosen": that would send them to choose one they cannot save."""
+
+    def __init__(self):
+        super().__init__("Your business unit can't be read just now. Try again in a minute.")
+
+
 @dataclass
 class Workspace:
     name: str
@@ -291,9 +299,9 @@ class Portal:
             return cached[1]
         try:
             bu = self.store.chosen_business_unit(user)
-        except Exception as e:
+        except Exception as e:   # not cached: the next page asks the database again
             warn(f"reading {user}'s business unit", e)
-            return None
+            raise BusinessUnitUnavailable() from e
         bu = bu if bu in self.business_units() else None
         keep(self._chosen, user, bu)
         return bu

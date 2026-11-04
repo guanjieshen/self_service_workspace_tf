@@ -172,6 +172,9 @@ changing a template, `static/app.css` or any text people read.
 - **Failures are never silent.** Where the app works around a failure (a fallback, an unknown
   answer), it logs a warning (`portal.warn`): read the app's Logs in the workspace. A quiet
   fallback once hid a database outage for hours.
+- **A value that cannot be read is never read as "none".** A chosen business unit the database
+  cannot return raises `portal.BusinessUnitUnavailable`: pages show `unavailable.html` (503),
+  forms are refused, and nothing is cached, so the next page asks again.
 - **`/healthz`** checks, as the app's own identity, that its database answers and its jobs are
   found (503 if not). After a deploy, open it: "deploy SUCCEEDED" only means the process started.
 - **Minimum versions in `requirements.txt`.** Databricks Apps may have older packages installed,
