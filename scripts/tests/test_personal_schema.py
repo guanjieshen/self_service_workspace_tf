@@ -123,20 +123,20 @@ class PersonalSchema(unittest.TestCase):
         self.assertTrue(sql[0].startswith("CREATE SCHEMA `fin_citizen_dev`.`team_sandbox`"))
 
     def test_a_project_schema_is_tagged_as_one(self):
-        sql, result = run({"user": "a@contoso.com", "schema": "gtm_integrity"})
-        self.assertEqual((result["schema"], result["kind"]), ("gtm_integrity", "project"))
+        sql, result = run({"user": "a@contoso.com", "schema": "sales_bookings"})
+        self.assertEqual((result["schema"], result["kind"]), ("sales_bookings", "project"))
         self.assertIn("'cd_schema_kind' = 'project'", sql[1])
-        self.assertEqual([s for s in sql if s.startswith("GRANT")], ["GRANT ALL PRIVILEGES, MANAGE ON SCHEMA `fin_citizen_dev`.`gtm_integrity` TO `a@contoso.com`"])
+        self.assertEqual([s for s in sql if s.startswith("GRANT")], ["GRANT ALL PRIVILEGES, MANAGE ON SCHEMA `fin_citizen_dev`.`sales_bookings` TO `a@contoso.com`"])
         _, result = run({"user": "a@contoso.com"})
         self.assertEqual(result["kind"], "personal")
 
     def test_the_reason_is_kept_with_the_run_and_never_reaches_sql(self):
         reason = "Forecast the pipeline'; DROP SCHEMA x; --"
-        sql, result = run({"user": "a@contoso.com", "schema": "gtm_forecast", "reason": reason})
+        sql, result = run({"user": "a@contoso.com", "schema": "sales_forecast", "reason": reason})
         self.assertEqual(result["reason"], reason)
         self.assertFalse(any("DROP" in s for s in sql))
         with self.assertRaisesRegex(ValueError, "at most 1000 characters"):
-            run({"user": "a@contoso.com", "schema": "gtm_forecast", "reason": "x" * 1001})
+            run({"user": "a@contoso.com", "schema": "sales_forecast", "reason": "x" * 1001})
 
     def test_a_team_schema_is_granted_to_the_user_and_their_group(self):
         sql, result = run({"user": "a@contoso.com", "schema": "fin_reporting", "owner_group": "fin-data-eng"})
@@ -224,7 +224,7 @@ class RequestRecord(unittest.TestCase):
             ("request_id is required", {**TEAM, "request_id": ""}, {}),
             ("requested_by differ", {"user": "bo@contoso.com", "request_id": "ss-2"}, {"ss-2": ({**MINE, "name": "cd_bo"}, [])}),
             ("name differ", {**TEAM, "schema": "fin_other"}, {"ss-1": (TEAM_RECORD, approved)}),
-            ("workspace differ", TEAM, {"ss-1": ({**TEAM_RECORD, "workspace": "gtm"}, approved)}),
+            ("workspace differ", TEAM, {"ss-1": ({**TEAM_RECORD, "workspace": "sales"}, approved)}),
             ("always needs a person", TEAM, {"ss-1": (TEAM_RECORD, [("reviewed", None)])}),              # waiting
             ("always needs a person", TEAM, {"ss-1": (TEAM_RECORD, [("rejected", None)])}),              # rejected
         ]

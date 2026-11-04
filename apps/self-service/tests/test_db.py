@@ -93,7 +93,7 @@ class AgainstPostgres(unittest.TestCase):
 
     def request(self, c, rid):
         c.execute("INSERT INTO self_service.requests (id, kind, workspace, bu, requested_by, name, reason) "
-                  "VALUES (%s, 'project_schema', 'fin', 'FIN', 'ana@contoso.com', 'gtm_forecast', 'Forecasting.')", (rid,))
+                  "VALUES (%s, 'project_schema', 'fin', 'FIN', 'ana@contoso.com', 'sales_forecast', 'Forecasting.')", (rid,))
         c.execute("INSERT INTO self_service.request_events (request_id, actor, role, type) VALUES (%s, 'ana@contoso.com', 'requester', 'submitted')", (rid,))
 
     def test_migrations_run_once(self):
