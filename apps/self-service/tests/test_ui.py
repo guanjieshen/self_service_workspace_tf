@@ -137,13 +137,13 @@ class ApprovalsMode(unittest.TestCase):
         self.assertIn("Last 7 days · All business units", page)
         self.assertIn('aria-current="page">7 days', page)
         self.assertIn("Last 30 days", http.get("/approvals/overview?days=12").text, "only the presets")
-        self.assertIn("Last 30 days · GTM", http.get("/approvals/overview?bu=GTM").text)
+        self.assertIn("Last 30 days · SALES", http.get("/approvals/overview?bu=SALES").text)
         self.assertNotIn("none waiting", page)
 
     def test_the_inbox_always_offers_the_business_unit_filter(self):
         page = self.app("approvals").get("/approvals").text
         self.assertIn('aria-label="Business unit"', page)
-        self.assertNotIn(", in GTM", page)
+        self.assertNotIn(", in SALES", page)
 
     def test_an_error_is_shown_to_approvers_not_hidden(self):
         import sample_store
@@ -182,7 +182,7 @@ class LakebaseApprovals(unittest.TestCase):
     def test_a_request_that_ran_links_to_its_job_run(self):
         import approvals_store
         s = self.store([{"id": "b", "kind": "folder", "name": "fin-docs", "state": "run_started", "run": {"workspace": "fin", "run_id": 7}},
-                        {"id": "a", "kind": "project_schema", "name": "gtm_x", "state": "submitted"}])
+                        {"id": "a", "kind": "project_schema", "name": "sales_x", "state": "submitted"}])
         s.run_link = lambda ws, kind, run_id: f"https://adb-1/jobs/{'2' if kind == 'folder' else '1'}/runs/{run_id}" if run_id else None
         got = {r["id"]: r["run_url"] for r in s.all("dana")}
         self.assertEqual(got, {"b": "https://adb-1/jobs/2/runs/7", "a": None})
@@ -208,7 +208,7 @@ class LakebaseApprovals(unittest.TestCase):
 
     def test_a_person_decides_only_the_kinds_in_human_approval(self):
         s = self.store([
-            {"id": "a", "kind": "project_schema", "name": "gtm_x", "state": "submitted"},
+            {"id": "a", "kind": "project_schema", "name": "sales_x", "state": "submitted"},
             {"id": "b", "kind": "folder", "name": "fin-docs", "state": "run_started", "run": {"workspace": "fin", "run_id": 7}},
             {"id": "c", "kind": "team_schema", "name": "fin_y", "state": "needs_info"},
             {"id": "d", "kind": "folder", "name": "fin-new", "state": "submitted"},
@@ -227,7 +227,7 @@ class LakebaseApprovals(unittest.TestCase):
 
     def test_overview_counts_auto_approved_and_waiting(self):
         s = self.store([
-            {"id": "a", "kind": "project_schema", "name": "gtm_x", "state": "submitted"},
+            {"id": "a", "kind": "project_schema", "name": "sales_x", "state": "submitted"},
             {"id": "b", "kind": "folder", "name": "fin-docs", "state": "run_started", "run": {"run_id": 7}},
             {"id": "c", "kind": "personal_schema", "name": "cd_ana", "state": "run_started", "run": {"run_id": 8}},
         ])
@@ -247,7 +247,7 @@ class Inbox(unittest.TestCase):
                                                   "workspace": "fin", "owner_group": None, "status": status,
                                                   "submitted": t - dt.timedelta(hours=hours), "decision": kw.pop("decision", None), **kw}
         return [r("a", "project_schema", "waiting", 5, waiting_since=t - dt.timedelta(hours=1)),   # replied an hour ago
-                r("b", "team_schema", "waiting", 3, bu="GTM", reason="Pipeline snapshots"),
+                r("b", "team_schema", "waiting", 3, bu="SALES", reason="Pipeline snapshots"),
                 r("c", "team_schema", "needs_info", 30),
                 r("d", "project_schema", "approved", 50, decision={"outcome": "approved", "by": "dana@contoso.com"}),
                 r("e", "folder", "completed", 2, needs_person=False)]
@@ -263,7 +263,7 @@ class Inbox(unittest.TestCase):
         import approvals
         ids = lambda **kw: [r["id"] for r in approvals.inbox(self.rows(), **kw)[0]]
         self.assertEqual(ids(view="all", kind="team_schema"), ["b", "c"])
-        self.assertEqual(ids(view="all", bu="GTM"), ["b"])
+        self.assertEqual(ids(view="all", bu="SALES"), ["b"])
         self.assertEqual(ids(view="all", q="pipeline SNAP"), ["b"], "every word, any case, across name, people, reason and ID")
         self.assertEqual(ids(view="review", sort="newest"), ["b", "a"])
         self.assertEqual(ids(view="review", sort="oldest"), ["a", "b"])
@@ -318,13 +318,13 @@ class InboxPages(unittest.TestCase):
 
     def test_the_page_leads_with_what_is_asked_for(self):
         page = self.http.get("/approvals/ss-0002").text
-        self.assertIn('<h1 class="request-title">gtm_data</h1>', page, "the name leads the page, as on the request pages")
-        self.assertIn('<span class="mention">gtm_data</span>', page, "the AI's text marks the name")
+        self.assertIn('<h1 class="request-title">sales_data</h1>', page, "the name leads the page, as on the request pages")
+        self.assertIn('<span class="mention">sales_data</span>', page, "the AI's text marks the name")
         self.assertIn('class="event-time"', page, "the conversation's times are their own column")
 
     def test_a_mention_never_lets_html_through(self):
         main = load_main("approvals")
-        self.assertEqual(str(main.mention("<b>x</b> and gtm_<i>", "gtm_<i>")), "&lt;b&gt;x&lt;/b&gt; and <span class=\"mention\">gtm_&lt;i&gt;</span>")
+        self.assertEqual(str(main.mention("<b>x</b> and sales_<i>", "sales_<i>")), "&lt;b&gt;x&lt;/b&gt; and <span class=\"mention\">sales_&lt;i&gt;</span>")
 
     def test_the_inbox_row_keeps_to_the_headline_and_formal_labels(self):
         page = self.http.get("/approvals").text

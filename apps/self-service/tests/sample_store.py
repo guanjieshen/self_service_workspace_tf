@@ -58,9 +58,9 @@ SUMMARIES = {
                              {"label": "Naming", "level": "low", "detail": "hr_pay_equity is clear, but not tied to a team."}],
                 "questions": ["Do you need social insurance numbers, or would an employee ID do?"], "model": "system.ai.claude-sonnet-5-5"},
     "ss-0002": {"headline": "Team schema for weekly pipeline snapshots by region",
-                "summary": "Sam asks for a team schema for gtm-sales-ops. The reason was vague; their reply says it holds weekly Salesforce pipeline snapshots by region, without customer contacts.",
-                "concerns": [{"label": "Naming", "level": "low", "detail": "gtm_data does not say what it holds."}],
-                "questions": ["Could the schema be named for what it holds, for example gtm_pipeline_snapshots?"], "model": "system.ai.claude-sonnet-5-5"},
+                "summary": "Sam asks for a team schema for sales-ops. The reason was vague; their reply says it holds weekly Salesforce pipeline snapshots by region, without customer contacts.",
+                "concerns": [{"label": "Naming", "level": "low", "detail": "sales_data does not say what it holds."}],
+                "questions": ["Could the schema be named for what it holds, for example sales_pipeline_snapshots?"], "model": "system.ai.claude-sonnet-5-5"},
     "ss-0004": {"headline": "Project schema to write SCADA setpoints for the north line pilot",
                 "summary": "Raj asks for a schema to write new control setpoints back to SCADA for a pilot.",
                 "concerns": [{"label": "Operational impact", "level": "high", "detail": "Writing setpoints to SCADA changes live control systems."}],
@@ -71,16 +71,16 @@ SAMPLE = [
     _req(1, "project_schema", "hr_pay_equity", "fin-citizen-dev", "FIN", "ana.lopez@contoso.com",
          "Load employee salaries and social insurance numbers to analyse pay equity across regions.", 3,
          ai=_ai(data="people")),
-    _req(2, "team_schema", "gtm_data", "gtm-citizen-dev", "GTM", "sam.chen@contoso.com",
-         "Some data for the team.", 26, group="gtm-sales-ops", ai=_ai(contents="general", audience="none", name="generic"),
+    _req(2, "team_schema", "sales_data", "sales-citizen-dev", "SALES", "sam.chen@contoso.com",
+         "Some data for the team.", 26, group="sales-ops", ai=_ai(contents="general", audience="none", name="generic"),
          talk=[(4, "mo.ali@contoso.com", "approver", "needs_info", "What data will it hold, and is any of it about customers?"),
                (20, "sam.chen@contoso.com", "requester", "replied", "Weekly pipeline snapshots from Salesforce, by region. No customer contact details.")]),
     _req(3, "team_schema", "fin_exec_planning", "fin-citizen-dev", "FIN", "jo.martin@contoso.com",
          "Executive compensation planning documents for the next cycle.", 50, group="fin-exec-office", ai=_ai(data="people")),
-    _req(4, "project_schema", "scada_setpoint_writeback", "lpm-citizen-dev", "LPM", "raj.patel@contoso.com",
+    _req(4, "project_schema", "scada_setpoint_writeback", "plant-citizen-dev", "PLANT", "raj.patel@contoso.com",
          "Write new control setpoints back to SCADA for the north line pilot.", 7, ai=_ai(use="live_operations")),
-    _req(5, "team_schema", "gtm_contractor_hours", "gtm-citizen-dev", "GTM", "lee.wong@contoso.com",
-         "Contractor names, hours and rates to check invoices before payment.", 75, group="gtm-finance-ops",
+    _req(5, "team_schema", "sales_contractor_hours", "sales-citizen-dev", "SALES", "lee.wong@contoso.com",
+         "Contractor names, hours and rates to check invoices before payment.", 75, group="sales-finance-ops",
          ai=_ai(data="people")),
     _req(9, "project_schema", "fin_approver_tools", "fin-citizen-dev", "FIN", "dana.owner@contoso.com",
          "Tables the approvers use to review data access requests.", 5, ai=_ai(contents="general")),
@@ -88,18 +88,18 @@ SAMPLE = [
          "Month-end close checks for accounts payable.", 2,
          rules=[{"label": "Name is available", "ok": False, "note": "fin_month_end exists, owned by fin-controllers"}]),
     # Decided: for the history and the overview
-    _req(7, "project_schema", "gtm_customer_contacts", "gtm-citizen-dev", "GTM", "ana.lopez@contoso.com",
+    _req(7, "project_schema", "sales_customer_contacts", "sales-citizen-dev", "SALES", "ana.lopez@contoso.com",
          "Export customer names and phone numbers to send to a marketing agency.", 120, status="rejected",
          ai=_ai(data="customer_or_external"),
          decision={"by": "dana.owner@contoso.com", "at": NOW - dt.timedelta(hours=100), "comment": "Customer PII cannot leave the company. Use the aggregated campaign table instead."}),
-    _req(8, "folder", "lpm-integrity-models", "lpm-citizen-dev", "LPM", "raj.patel@contoso.com",
-         "Models for pipe integrity risk scoring, using inspection results.", 98, group="lpm-integrity",
+    _req(8, "folder", "plant-reliability-models", "plant-citizen-dev", "PLANT", "raj.patel@contoso.com",
+         "Models for equipment failure risk scoring, using inspection results.", 98, group="plant-reliability",
          ai=_ai(contents="general"), status="approved",
          decision={"by": "dana.owner@contoso.com", "at": NOW - dt.timedelta(hours=96), "comment": "Fine: the team confirmed it is inspection data only."}),
 ]
 # The month's totals, for the overview, beyond the sample above.
 AUTO_APPROVED_30D = 143
-APPROVERS = {"FIN": ["dana.owner@contoso.com"], "GTM": ["dana.owner@contoso.com", "mo.ali@contoso.com"], "LPM": ["dana.owner@contoso.com"]}
+APPROVERS = {"FIN": ["dana.owner@contoso.com"], "SALES": ["dana.owner@contoso.com", "mo.ali@contoso.com"], "PLANT": ["dana.owner@contoso.com"]}
 
 
 class MockStore:

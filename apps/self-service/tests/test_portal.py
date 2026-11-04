@@ -268,10 +268,10 @@ class Status(unittest.TestCase):
 class Schemas(unittest.TestCase):
     def test_a_project_schema_runs_the_same_job_with_its_name(self):
         p, fake = make()
-        run_id = p.request_schema("fin", ANA, schema="gtm_integrity", reason=WHY)
-        self.assertEqual((fake.started[0][1]["schema"], fake.started[0][1]["owner_group"]), ("gtm_integrity", ""))
+        run_id = p.request_schema("fin", ANA, schema="sales_bookings", reason=WHY)
+        self.assertEqual((fake.started[0][1]["schema"], fake.started[0][1]["owner_group"]), ("sales_bookings", ""))
         self.assertEqual(p.run("fin", run_id, ANA).task, "Request a project schema")
-        self.assertEqual(p.run("fin", run_id, ANA).resource, "fin_citizen_dev.gtm_integrity")
+        self.assertEqual(p.run("fin", run_id, ANA).resource, "fin_citizen_dev.sales_bookings")
 
     def test_a_team_schema_is_also_its_groups(self):
         p, fake = make()
@@ -287,20 +287,20 @@ class Schemas(unittest.TestCase):
 
     def test_named_schemas_and_folders_say_why_personal_schemas_need_not(self):
         p, fake = make()
-        for call in (lambda r: p.request_schema("fin", ANA, schema="gtm_forecast", reason=r),
+        for call in (lambda r: p.request_schema("fin", ANA, schema="sales_forecast", reason=r),
                      lambda r: p.request_folder("fin", ANA, "fin-docs", reason=r)):
             for r in ("", "because", "x" * 1001):
                 with self.subTest(reason=r[:20]), self.assertRaises(portal.RequestError):
                     call(r)
         self.assertEqual(fake.started, [])
         p.request_schema("fin", ANA)   # a personal schema: no reason needed
-        run_id = p.request_schema("fin", ANA, schema="gtm_forecast", reason=WHY)
+        run_id = p.request_schema("fin", ANA, schema="sales_forecast", reason=WHY)
         self.assertEqual(fake.started[-1][1]["reason"], WHY)
         self.assertEqual(p.run("fin", run_id, ANA).params["reason"], WHY, "kept with the request")
 
     def test_bad_custom_names_are_refused(self):
         p, fake = make()
-        for name in ("GTM Integrity", "gtm-integrity", "cd_bo", "_x", "x" * 101):
+        for name in ("Sales Bookings", "sales-bookings", "cd_bo", "_x", "x" * 101):
             with self.subTest(name=name), self.assertRaises(portal.RequestError):
                 p.request_schema("fin", ANA, schema=name, reason=WHY)
         self.assertEqual(fake.started, [])
@@ -359,7 +359,7 @@ class AICheck(unittest.TestCase):
 
     def check(self, **kw):
         p, fake = make()
-        args = {"ws_name": "fin", "kind": "project_schema", "name": "gtm_pipeline_forecast", "reason": WHY, **kw}
+        args = {"ws_name": "fin", "kind": "project_schema", "name": "sales_pipeline_forecast", "reason": WHY, **kw}
         return p, fake, p.ai_check(**args)
 
     def test_a_clear_request_passes_every_check_in_one_call(self):
@@ -371,13 +371,13 @@ class AICheck(unittest.TestCase):
         self.assertEqual(fake.decided[0]["questions"], portal.checks.questions("project_schema"), "the questions never contain what the person typed")
         self.assertNotIn(WHY, json.dumps(fake.decided[0]["questions"]))
         self.assertEqual(fake.decided[0]["state"]["why_needed"], WHY)
-        p.ai_check("fin", "project_schema", "gtm_pipeline_forecast", WHY)
+        p.ai_check("fin", "project_schema", "sales_pipeline_forecast", WHY)
         self.assertEqual(len(fake.decided), 1, "asking again is answered from the cache")
 
     def test_it_shows_how_to_write_a_good_name_and_reason(self):
         p, fake = make()
         fake.decide.update(name="unclear", reason="unclear")
-        rows = p.ai_check("fin", "project_schema", "gtm_data", WHY)["rows"]
+        rows = p.ai_check("fin", "project_schema", "sales_data", WHY)["rows"]
         self.assertIn((False, "Use a name that says what it holds, for example: sales_forecast_weekly"), rows)
         self.assertIn((False, "Say what it's for and who will use it, for example: weekly sales forecast tables for the sales operations team"), rows)
         p, fake = make()
@@ -390,7 +390,7 @@ class AICheck(unittest.TestCase):
         p, spoke = make()
         hub = FakeClient()
         p.client = lambda host: hub if host is None else spoke
-        p.ai_check("fin", "project_schema", "gtm_pipeline_forecast", WHY)
+        p.ai_check("fin", "project_schema", "sales_pipeline_forecast", WHY)
         self.assertEqual((len(hub.decided), len(spoke.decided)), (1, 0), "AI Decide is enabled in the hub")
 
     def test_rules_come_first_and_cost_no_call(self):
@@ -400,8 +400,8 @@ class AICheck(unittest.TestCase):
         self.assertIn("can't start with cd_", result["rows"][0][1])
         result = p.ai_check("fin", "folder", "fin-docs", "short")
         self.assertEqual(result["rows"], [(False, "Describe what it will be used for in a sentence or two.")])
-        fake.schemas_.add("fin_citizen_dev.gtm_pipeline_forecast")
-        result = p.ai_check("fin", "project_schema", "gtm_pipeline_forecast", WHY)
+        fake.schemas_.add("fin_citizen_dev.sales_pipeline_forecast")
+        result = p.ai_check("fin", "project_schema", "sales_pipeline_forecast", WHY)
         self.assertEqual(result["rows"][0], (False, "The schema name is already taken (fine only if it is yours)"))
 
     def test_a_folder_someone_else_owns_is_taken(self):
@@ -413,16 +413,16 @@ class AICheck(unittest.TestCase):
     def test_a_lookup_that_cannot_answer_never_says_the_name_is_free(self):
         p, fake = make()
         fake.schemas_ = None   # the app cannot see the catalog
-        result = p.ai_check("fin", "project_schema", "gtm_pipeline_forecast", WHY)
+        result = p.ai_check("fin", "project_schema", "sales_pipeline_forecast", WHY)
         self.assertEqual(result["rows"][0], (False, "Could not confirm the schema name is available"))
 
     def test_when_ai_decide_cannot_answer_it_says_so_and_decides_nothing(self):
         p, fake = make()
         fake.decide = None
-        result = p.ai_check("fin", "project_schema", "gtm_pipeline_forecast", WHY)
+        result = p.ai_check("fin", "project_schema", "sales_pipeline_forecast", WHY)
         self.assertEqual(result["error"], "The AI check is unavailable (ConnectionError)")
         fake.decide = dict(portal.checks.SAFE)
-        self.assertEqual(p.ai_check("fin", "project_schema", "gtm_pipeline_forecast", WHY)["error"], "", "a failure is not cached")
+        self.assertEqual(p.ai_check("fin", "project_schema", "sales_pipeline_forecast", WHY)["error"], "", "a failure is not cached")
 
 
 class RequestsInTheDatabase(unittest.TestCase):
@@ -431,9 +431,9 @@ class RequestsInTheDatabase(unittest.TestCase):
     def test_a_request_is_recorded_then_run_then_linked_to_its_run(self):
         db = FakeStore()
         p, fake = make(db)
-        run_id = p.request_schema("fin", ANA, schema="gtm_forecast", reason=WHY)
+        run_id = p.request_schema("fin", ANA, schema="sales_forecast", reason=WHY)
         (rid, r), = db.requests.items()
-        self.assertEqual((r["kind"], r["name"], r["bu"], r["reason"]), ("project_schema", "gtm_forecast", "FIN", WHY))
+        self.assertEqual((r["kind"], r["name"], r["bu"], r["reason"]), ("project_schema", "sales_forecast", "FIN", WHY))
         self.assertEqual(fake.started[0][1]["request_id"], rid, "the job gets the request's ID")
         self.assertEqual([e[1] for e in db.events], ["submitted", "run_started"], "no AI review is kept: approvers read the AI summary")
         self.assertEqual(db.events[-1][2], {"workspace": "fin", "run_id": run_id})
@@ -535,7 +535,7 @@ class RequestsInTheDatabase(unittest.TestCase):
         p, fake = make(db)
         p.run_cache_seconds = 0
         first = p.request_folder("fin", ANA, "fin-docs", reason=WHY)
-        p.request_schema("fin", ANA, schema="gtm_forecast", reason=WHY)
+        p.request_schema("fin", ANA, schema="sales_forecast", reason=WHY)
         fake.runs_[first].state = state("TERMINATED", "SUCCESS")
         for i in range(300):                        # far more runs by others than any one listing of a job's runs
             fake.runs_[1000 + i] = run_of(1000 + i, 2, {"folder": f"x{i}", "requested_by": BO})
@@ -727,9 +727,9 @@ class OneAtATime(unittest.TestCase):
     def test_other_schemas_and_folders_are_separate(self):
         p, fake = make()
         a = p.request_schema("fin", ANA)
-        b = p.request_schema("fin", ANA, schema="gtm_integrity", reason=WHY)
+        b = p.request_schema("fin", ANA, schema="sales_bookings", reason=WHY)
         self.assertNotEqual(a, b)
-        self.assertEqual(p.request_schema("fin", ANA, schema="gtm_integrity", reason=WHY), b)
+        self.assertEqual(p.request_schema("fin", ANA, schema="sales_bookings", reason=WHY), b)
         f1 = p.request_folder("fin", ANA, "fin-docs", reason=WHY)
         self.assertEqual(p.request_folder("fin", ANA, "fin-docs", reason=WHY), f1)
         self.assertNotEqual(p.request_folder("fin", ANA, "fin-other", reason=WHY), f1)
@@ -746,11 +746,11 @@ class OneAtATime(unittest.TestCase):
     def test_a_name_someone_else_is_asking_for_is_refused_until_their_run_ends(self):
         p, fake = make()
         theirs = p.request_folder("fin", BO, "fin-docs", reason=WHY)
-        p.request_schema("fin", BO, schema="gtm_integrity", reason=WHY)
+        p.request_schema("fin", BO, schema="sales_bookings", reason=WHY)
         with self.assertRaisesRegex(portal.RequestError, "Another request for this name is running"):
             p.request_folder("fin", ANA, "fin-docs", reason=WHY)
         with self.assertRaisesRegex(portal.RequestError, "Another request for this name is running"):
-            p.request_schema("fin", ANA, schema="gtm_integrity", reason=WHY)
+            p.request_schema("fin", ANA, schema="sales_bookings", reason=WHY)
         self.assertEqual(len(fake.started), 2, "never two runs racing for one folder or schema")
         fake.runs_[theirs].state = state("TERMINATED", "SUCCESS")
         p.request_folder("fin", ANA, "fin-docs", reason=WHY)   # then the job's own check decides (it is Bo's now)
@@ -930,10 +930,10 @@ class Pages(unittest.TestCase):
     def test_project_schema_form(self):
         r = self.http.post("/schema/project", data={"reason": WHY, "workspace": "fin", "name": "cd_bo"}, headers=self.as_ana)
         self.assertIn("can&#39;t start with cd_", r.text)
-        r = self.http.post("/schema/project", data={"reason": WHY, "workspace": "fin", "name": "gtm_integrity", "owner_group": "fin-data-eng"},
+        r = self.http.post("/schema/project", data={"reason": WHY, "workspace": "fin", "name": "sales_bookings", "owner_group": "fin-data-eng"},
                            headers=self.as_ana, follow_redirects=False)
         self.assertEqual(r.status_code, 303)
-        self.assertEqual((self.fake.started[0][1]["schema"], self.fake.started[0][1]["owner_group"]), ("gtm_integrity", ""),
+        self.assertEqual((self.fake.started[0][1]["schema"], self.fake.started[0][1]["owner_group"]), ("sales_bookings", ""),
                          "a project schema never takes a group, even if one is sent")
 
     def test_team_schema_form(self):
@@ -974,11 +974,11 @@ class Pages(unittest.TestCase):
         try:
             self.assertIn('data-ai-check="team_schema"', self.http.get("/schema/team", headers=self.as_ana).text)
             self.assertIn('data-ai-check="folder"', self.http.get("/folder", headers=self.as_ana).text)
-            r = self.http.post("/api/check", data={"kind": "project_schema", "workspace": "fin", "name": "gtm_forecast", "reason": WHY}, headers=self.as_ana)
+            r = self.http.post("/api/check", data={"kind": "project_schema", "workspace": "fin", "name": "sales_forecast", "reason": WHY}, headers=self.as_ana)
             self.assertNotIn("verdict", r.json(), "the checks only: no verdict")
             self.assertEqual(r.json()["rows"][0], {"ok": True, "text": "The schema name is available"})
             self.assertEqual(self.fake.started, [], "a check runs nothing")
-            r = self.http.post("/schema/project", data={"workspace": "fin", "name": "gtm_forecast", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
+            r = self.http.post("/schema/project", data={"workspace": "fin", "name": "sales_forecast", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
             status = self.http.get(r.headers["location"], headers=self.as_ana).text
             self.assertIn('Not needed', status, "without human_approval a project schema runs when asked")
             self.assertNotIn('Name and reason: ', status, "the check is for the form, not the status page")
@@ -997,9 +997,9 @@ class Pages(unittest.TestCase):
                 send = lambda name: self.http.post("/schema/project", data={"workspace": "fin", "name": name, "reason": WHY},
                                                    headers=self.as_ana, follow_redirects=False)
                 self.fake.decide = {**portal.checks.SAFE, "reason": "unclear"}     # the check finds something
-                self.assertEqual(send(f"gtm_forecast_{mode}").status_code, 303, mode)
+                self.assertEqual(send(f"sales_forecast_{mode}").status_code, 303, mode)
                 self.fake.decide = None                                            # AI Decide cannot answer
-                self.assertEqual(send(f"gtm_forecast_{mode}_two").status_code, 303, "sent anyway: the check is advice")
+                self.assertEqual(send(f"sales_forecast_{mode}_two").status_code, 303, "sent anyway: the check is advice")
             finally:
                 self.main.CONFIG.pop("ai_check")
                 self.fake.decide = dict(portal.checks.SAFE)
@@ -1067,8 +1067,8 @@ class Pages(unittest.TestCase):
         self.assertEqual(r.json()["database"], "AttributeError: no postgres", "the reason a deploy is broken, as the app sees it")
 
     def test_old_custom_schema_links_still_work(self):
-        r = self.http.get("/schema/custom?name=gtm_integrity", headers=self.as_ana, follow_redirects=False)
-        self.assertEqual((r.status_code, r.headers["location"]), (301, "/schema/project?name=gtm_integrity"))
+        r = self.http.get("/schema/custom?name=sales_bookings", headers=self.as_ana, follow_redirects=False)
+        self.assertEqual((r.status_code, r.headers["location"]), (301, "/schema/project?name=sales_bookings"))
 
     def test_the_review_requests_tile_opens_catalog_explorer(self):
         self.assertNotIn("Review data access requests", self.http.get("/", headers=self.as_ana).text)
@@ -1252,7 +1252,7 @@ class ApprovalRequests(unittest.TestCase):
         self.http = TestClient(self.main.app)
         self.as_ana = {"X-Forwarded-Email": ANA}
 
-    def send(self, name="gtm_forecast"):
+    def send(self, name="sales_forecast"):
         return self.http.post("/schema/project", data={"workspace": "fin", "name": name, "reason": WHY}, headers=self.as_ana, follow_redirects=False)
 
     def test_a_project_schema_is_recorded_and_waits_nothing_runs(self):
