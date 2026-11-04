@@ -1,5 +1,8 @@
-# The self-service jobs, the same in every workspace the app serves. What differs by workspace
-# (the catalog tag, who may run them, the usage policy) is in build/<workspace>/target.yml.
+# The self-service jobs: one per workspace the app serves, deployed to the hub. What differs by
+# workspace (the catalog and workspace tags, who may run it, the usage policy) is in
+# build/<workspace>/target.yml. The folder job (notebooks/team_folder.py) is not deployed for now:
+# a folder is workspace specific, and the hub does not call other workspaces. To bring it back,
+# restore its resource here (git history) and its notebook in scripts/app_build.py build_jobs.
 resources:
   # The jobs are the app's interface and its security boundary: the app asks, the job checks
   # and acts. Each runs on serverless, on the workspace's usage policy, 20 requests side by
@@ -29,23 +32,3 @@ resources:
           timeout_seconds: 600
           notebook_task:
             notebook_path: ../build/${bundle.target}/personal_schema.py
-
-    team_folder:
-      name: ${var.business_unit} team folder
-      max_concurrent_runs: 20
-      queue:
-        enabled: true
-      tags:
-        cd_self_service: team_folder
-      parameters:
-        - {name: folder, default: ""}
-        - {name: requested_by, default: ""}
-        - {name: owner_group, default: ""}
-        - {name: reason, default: ""}
-        - {name: request_id, default: ""}
-      tasks:
-        - task_key: create
-          max_retries: 0
-          timeout_seconds: 600
-          notebook_task:
-            notebook_path: ../build/${bundle.target}/team_folder.py

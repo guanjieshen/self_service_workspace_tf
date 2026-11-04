@@ -43,6 +43,27 @@ run "served_workspace" {
     condition     = output.self_service.enabled && output.self_service.prefix == "tst" && output.self_service.id == "1111111111111111" && output.self_service.host == "https://adb-1111111111111111.1.azuredatabricks.net" && output.self_service.catalog == "tst_citizen_dev" && output.self_service.platform_admins == local.platform_admins && length(output.self_service.platform_admins) > 0
     error_message = "The output gives the app's deploy what this workspace's configuration already has."
   }
+  assert {
+    condition     = length(databricks_workspace_binding.self_service_hub) == 1 && databricks_workspace_binding.self_service_hub[0].workspace_id == 9999999999999999 && databricks_workspace_binding.self_service_hub[0].binding_type == "BINDING_TYPE_READ_WRITE" && databricks_workspace_binding.self_service_hub[0].securable_type == "catalog"
+    error_message = "The catalog is bound to the hub too, read and write: this workspace's schema job runs there."
+  }
+  assert {
+    condition     = local.self_service_hub_id == "9999999999999999"
+    error_message = "The usage policy is bound to the hub too (main.tf extra_workspace_ids), so the job runs on it there."
+  }
+}
+
+run "the_hub_never_binds_to_itself" {
+  command = plan
+  variables {
+    workspace        = "basic"
+    self_service_dir = "tests/self-service-hub-is-this-workspace"
+  }
+
+  assert {
+    condition     = length(databricks_workspace_binding.self_service_hub) == 0 && local.self_service_hub_id == null
+    error_message = "The hub's own catalog and policy are already its own: nothing more to bind."
+  }
 }
 
 run "not_served" {
@@ -57,6 +78,10 @@ run "not_served" {
     condition     = length(local.serverless_policies.self_service.principals) == 0 && !output.self_service.enabled
     error_message = "self_service: false: the usage policy keeps its groups only."
   }
+  assert {
+    condition     = length(databricks_workspace_binding.self_service_hub) == 0
+    error_message = "self_service: false: its catalog is not bound to the hub."
+  }
 }
 
 run "before_the_first_deploy" {
@@ -69,5 +94,9 @@ run "before_the_first_deploy" {
   assert {
     condition     = length(databricks_permission_assignment.self_service_app) == 0 && length(local.self_service_app_ids) == 0
     error_message = "No app_ids yet: nothing is assigned or granted."
+  }
+  assert {
+    condition     = length(databricks_workspace_binding.self_service_hub) == 0 && local.self_service_hub_id == null
+    error_message = "No hub yet (hub.host empty): nothing is bound to it."
   }
 }

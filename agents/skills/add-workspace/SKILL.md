@@ -64,4 +64,4 @@ Hand over to the skill **pull-request-from-databricks**. On the pull request, te
 - **Before merging** lists what is hard to undo on a first apply (the default catalog is set; the Starter Warehouse becomes admins only): confirm with them that it is intended.
 - If the plan says something outside the repository is missing (a group not found, the identity not an admin), go back to step 1.
 
-After the merge, the workspace is managed, and (if the self-service app is set up) its business unit appears in the app on the next deploy, with its two jobs.
+After the merge, the workspace is managed, and (if the self-service app is set up) its catalog is bound to the hub and its business unit appears in the app on the next deploy, with its schema job (in the hub).

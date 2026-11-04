@@ -20,7 +20,7 @@ Every onboarded workspace gets the same baseline, with workspace-specific settin
 
 **This project does not create Databricks workspaces.** It applies and maintains the baseline on workspaces that already exist.
 
-**The self-service app is in this repository too** (`apps/`, deployed by Databricks Asset Bundles from `bundle/`, after Terraform, in the same workflow). People open one web app in a central **hub** workspace, choose their business unit (a workspace, by its prefix), and ask for a personal, project or team schema or a workspace folder; two jobs in their workspace do the work, and platform admins approve what needs it in an approvals app. Without it, workspace admins do those by hand: the baseline works either way ([setup, step 12](docs/SETUP.md#12-the-self-service-app); [design](docs/design.md), section 9).
+**The self-service app is in this repository too** (`apps/`, deployed by Databricks Asset Bundles from `bundle/`, after Terraform, in the same workflow). People open one web app in a central **hub** workspace, choose their business unit (a workspace, by its prefix), and ask for a personal, project or team schema (workspace folders are coming). Each business unit's schema job runs in the hub too, since Unity Catalog is shared across the metastore: **the app never calls another workspace**, so no cross-workspace access is needed. Platform admins approve what needs it in an approvals app. Without it, workspace admins do those by hand: the baseline works either way ([setup, step 12](docs/SETUP.md#12-the-self-service-app); [design](docs/design.md), section 9).
 
 ## How it works
 
@@ -112,7 +112,7 @@ Never edit the framework's files in your repository: the next upgrade replaces t
 | `config/self-service/` | The self-service app's configuration: `hub.yaml` (the hub workspace, the apps' identities) and `app.yaml` (what it offers and how). |
 | `terraform/` | Root Terraform configuration and reusable modules. |
 | `apps/self-service/` | The self-service app and the approvals app (one codebase), and their database migrations. |
-| `bundle/` | The Databricks Asset Bundles that deploy them: `hub/` (the apps, the database) and `jobs/` (the two jobs in each workspace). |
+| `bundle/` | The Databricks Asset Bundles that deploy them: `hub/` (the apps, the database) and `jobs/` (one schema job per workspace, deployed to the hub). |
 | `scripts/` | Setup, workspace onboarding and validation, preflight checks, Terraform execution, plan review, and tests. |
 | `.github/` | GitHub Actions workflows (`deploy.yml` and `checks.yml`), `CODEOWNERS`, and the pull request checklist. |
 | `docs/` | Setup, design decisions, workflows, and operational guides. |

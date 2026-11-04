@@ -90,16 +90,19 @@ class Builds(unittest.TestCase):
         first = app_build.hub_target(self.s, database=False)["targets"]["hub"]["resources"]["apps"]
         self.assertEqual(first["self_service"]["resources"], [], "a first install's first pass: no database yet")
 
-    def test_each_served_workspace_gets_its_jobs_for_the_hubs_apps(self):
+    def test_each_served_workspace_gets_its_schema_job_in_the_hub(self):
         out = app_build.build_jobs(self.s, self.spokes[0], ["11111111-1111-1111-1111-111111111111"], root=self.tmp)
         t = self.read(out / "target.yml")["targets"]["fin-citizen-dev"]
-        self.assertEqual(t["workspace"], {"host": "https://adb-2000000000000002.2.azuredatabricks.net", "root_path": "/Workspace/Admin/self-service/bundle/jobs"})
+        self.assertEqual(t["workspace"], {"host": "https://adb-1000000000000001.1.azuredatabricks.net",
+                                          "root_path": "/Workspace/Admin/self-service/bundle/jobs/fin-citizen-dev"},
+                         "in the hub, each workspace's job with its own state")
         self.assertEqual(t["variables"], {"business_unit": "FIN"})
         jobs = t["resources"]["jobs"]
-        self.assertEqual(jobs["personal_schema"]["tags"], {"cd_catalog": "fin_citizen_dev", "cd_prefix": "cd_"})
-        self.assertIn('admin_groups = ["fin_platform_admins"]', (out / "team_folder.py").read_text(), "the workspace's platform admins, from its output")
+        self.assertEqual(set(jobs), {"personal_schema"}, "the folder job is not deployed for now")
+        self.assertFalse((out / "team_folder.py").exists())
+        self.assertEqual(jobs["personal_schema"]["tags"], {"cd_catalog": "fin_citizen_dev", "cd_prefix": "cd_", "cd_workspace": "fin-citizen-dev"})
         self.assertEqual(jobs["personal_schema"]["permissions"], [{"level": "CAN_MANAGE_RUN", "service_principal_name": "11111111-1111-1111-1111-111111111111"}])
-        self.assertEqual(jobs["team_folder"]["usage_policy_id"], "policy-fin", "the jobs run on the workspace's usage policy")
+        self.assertEqual(jobs["personal_schema"]["usage_policy_id"], "policy-fin", "on the workspace's usage policy (bound to the hub too)")
         schema = (out / "personal_schema.py").read_text()
         self.assertNotIn("${", schema)
         self.assertIn('allowed_catalogs = ["fin_citizen_dev"]', schema)
@@ -107,17 +110,14 @@ class Builds(unittest.TestCase):
         self.assertNotIn("usage_policy_id", ops["personal_schema"], "no usage policy: none set")
 
     def test_what_the_jobs_allow_follows_terraform_never_a_fixed_value(self):
-        """The notebooks' settings come from the workspace's Terraform output (and app.yaml): change
-        the catalog or the admins in Terraform, and the next deploy writes the new ones in."""
-        moved = app_build.served(self.s, {**OUTPUTS, "fin-citizen-dev": {**OUTPUTS["fin-citizen-dev"], "catalog": "fin_moved",
-                                                                         "platform_admins": ["fin_new_admins"]}})
+        """The notebook's settings come from the workspace's Terraform output (and app.yaml): change
+        the catalog in Terraform, and the next deploy writes the new one in."""
+        moved = app_build.served(self.s, {**OUTPUTS, "fin-citizen-dev": {**OUTPUTS["fin-citizen-dev"], "catalog": "fin_moved"}})
         out = app_build.build_jobs(self.s, moved[0], [], root=self.tmp)
-        schema, folder = (out / "personal_schema.py").read_text(), (out / "team_folder.py").read_text()
+        schema = (out / "personal_schema.py").read_text()
         self.assertIn('allowed_catalogs = ["fin_moved"]', schema)
         self.assertNotIn("fin_citizen_dev", schema)
-        self.assertIn('admin_groups = ["fin_new_admins"]', folder)
-        for name, text in (("personal_schema", schema), ("team_folder", folder)):
-            self.assertNotIn("${", text, f"{name}: every setting filled in at build")
+        self.assertNotIn("${", schema, "every setting filled in at build")
 
     def test_the_build_never_grants_on_what_terraform_owns(self):
         """Catalogs, warehouses' permissions, usage policies and workspace assignment are Terraform's:

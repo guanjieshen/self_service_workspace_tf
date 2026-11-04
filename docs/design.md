@@ -17,7 +17,7 @@ platform team runs it from Git: YAML only, reviewed in pull requests, applied by
 the workspace catalog, the chargeback tags and serverless usage policy, Genie Code).
 **Out of scope:** creating workspaces and networking (combined mode, future), the
 metastore and shared catalogs, who is in which group (Entra ID), and everything people
-request: schemas and workspace folders (the self-service app today), and team warehouses,
+request: schemas (the self-service app today; workspace folders are coming), and team warehouses,
 project usage policies and access to classic compute (by hand until the app offers them). The rule: Terraform holds what every workspace has
 and rarely changes; anything that changes by ad hoc request belongs to the app.
 
@@ -129,7 +129,7 @@ every entitlement off**, so people can share with them:
 | Request | Path |
 |---|---|
 | A persona (explorer, builder, publisher) | The person asks in Entra (for example an access package), which adds them to the group. No pull request |
-| A schema or a workspace folder | The self-service app's jobs (section 9) |
+| A schema | The self-service app's jobs (section 9). Workspace folders: coming |
 | A team warehouse, a project usage policy, classic compute | The self-service app, not built yet |
 
 ## 5. The workspace catalog
@@ -210,17 +210,18 @@ Catalogs shared between workspaces, storage credentials and external locations s
 
 ## 9. The self-service app
 
-What people request (personal, project and team schemas, workspace folders) comes from the
-self-service app, an approvals app for the requests that need a person, and two jobs in each
-workspace the app serves. They live in this repository (`apps/self-service/`, `bundle/`,
+What people request (personal, project and team schemas; workspace folders are coming) comes
+from the self-service app, an approvals app for the requests that need a person, and a schema job
+for each workspace the app serves, all in the hub: Unity Catalog is shared across the metastore,
+so **the app never calls another workspace** and needs no cross-workspace access. They live in this repository (`apps/self-service/`, `bundle/`,
 `config/self-service/`) but are **not Terraform**: Databricks Asset Bundles deploy them
 (`scripts/app_deploy.py`), because Terraform cannot deploy an app's code or start it, and the
 app changes far more often than the baseline.
 
 | Where | What | Deployed by |
 | --- | --- | --- |
-| **The hub** (`config/self-service/hub.yaml`) | Both apps and their Lakebase database | `bundle/hub/` |
-| **Each served workspace** (a workspace file without `self_service: false`) | The baseline, and the two self-service jobs | Terraform, and `bundle/jobs/` |
+| **The hub** (`config/self-service/hub.yaml`) | Both apps, their Lakebase database, and each served workspace's schema job | `bundle/hub/`, `bundle/jobs/` |
+| **Each served workspace** (a workspace file without `self_service: false`) | The baseline; its catalog and usage policy are bound to the hub too | Terraform |
 
 **Every object has one owner.** Terraform's grants on catalogs, warehouses, usage policies and
 entitlements are authoritative, so anything the bundles granted there would be removed by the
@@ -230,9 +231,10 @@ next apply. What the app needs on those, Terraform grants (`terraform/self_servi
 | --- | --- | --- |
 | Workspace settings, persona groups, entitlements, workspace assignment | Terraform | the bundles touch none |
 | The catalog `{prefix}_citizen_dev` and its grants, including the apps' `USE_CATALOG` and `BROWSE` | Terraform | the bundles and the jobs never grant on the catalog |
-| Schemas in the catalog and their grants; team folders `/Workspace/<team>` | The jobs, on request | Terraform never manages them |
+| Schemas in the catalog and their grants | The jobs, on request | Terraform never manages them |
+| The catalog's and the usage policy's binding to the hub | Terraform (`terraform/self_service.tf`, `main.tf`) | the bundles never bind |
 | The usage policy and who may use it (including the jobs' identity) | Terraform | the bundles only refer to its ID |
-| The apps' service principals' assignment to served workspaces, and their workspace access entitlement | Terraform | the bundles do not assign |
+| The apps' service principals' assignment to served workspaces, and their workspace access entitlement (unused while the app calls only the hub) | Terraform | the bundles do not assign |
 | The jobs, their notebooks and who may run them (the hub's two apps) | `bundle/jobs/` | Terraform never manages them |
 | Both apps, their permissions, the Lakebase project, its database and migrations | `bundle/hub/`, `app_deploy.py` | Terraform never manages them |
 

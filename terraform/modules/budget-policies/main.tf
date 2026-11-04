@@ -3,7 +3,7 @@
 resource "databricks_budget_policy" "this" {
   for_each              = var.policies
   policy_name           = each.value.name
-  binding_workspace_ids = [var.workspace_id]
+  binding_workspace_ids = distinct(concat([var.workspace_id], var.extra_workspace_ids))
   custom_tags           = [for k, v in each.value.tags : { key = k, value = tostring(v) }]
 }
 

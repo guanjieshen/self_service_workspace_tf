@@ -33,7 +33,7 @@ What people may do, and how the app behaves. Read the key's comment in the file 
 | The **Add a group to your workspace** card (otherwise Coming soon) | `links.group_request`: their request form's URL |
 | The default FAQ links and prompt (Settings overrides them) | `faq.<section>`, `onboarding.prompt` |
 | Personal schemas' name prefix or rights | `personal_schema.prefix`, `personal_schema.privileges` (under `jobs:`) |
-| Where team folders are created; who owns new schemas | `folder_root`, `catalog_owner` (under `jobs:`) |
+| Who owns new schemas | `catalog_owner` (under `jobs:`). Workspace folders are off for now (`folder_root` is for when they come back) |
 
 Never change `name`, `approvals.name` or `database.project_id` (they name the apps and the database: changing them makes new ones). Stop and say a maintainer should plan it.
 
@@ -48,8 +48,8 @@ The hub: the central workspace where both apps and their database run.
 | People who may read the requests' data | `database.readers` (emails) |
 
 **Setting the app up for the first time** (the hub's `host` is still `null`): follow `docs/SETUP.md`, step 12, with them. In short, two pull requests:
-1. `hub.name` and `hub.host` (the hub's per-workspace URL), the groups above, and a look at `app.yaml`. The merge creates the apps, their database and the jobs in every workspace; the **Deploy the app** run's log ends with the two apps' IDs.
-2. Those IDs into `app_ids`. The merge lets the apps work in every workspace.
+1. `hub.name` and `hub.host` (the hub's per-workspace URL), the groups above, and a look at `app.yaml`. The merge binds each workspace's catalog to the hub and creates the apps, their database and a schema job per workspace, in the hub; the **Deploy the app** run's log ends with the two apps' IDs.
+2. Those IDs into `app_ids`. The merge lets the apps browse every workspace's catalog (to say whether a schema name is taken).
 
 Check step 12's **Before you start** with them first (serverless, Apps and Lakebase in the hub; the pipeline's identity is admin there).
 

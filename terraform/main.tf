@@ -84,8 +84,10 @@ module "budget_policies" {
 
   account_id   = local.account_id
   workspace_id = local.workspace_id
-  policies     = local.serverless_policies
-  managers     = [for g in local.platform_admins : "groups/${g}"]
+  # The self-service hub too: this workspace's schema job runs there, on this policy (self_service.tf).
+  extra_workspace_ids = local.self_service_hub_id == null ? [] : [tonumber(local.self_service_hub_id)]
+  policies            = local.serverless_policies
+  managers            = [for g in local.platform_admins : "groups/${g}"]
 
   # Invalid input stops at the plain-language checks in checks.tf, not a crash inside a
   # module. Harmless for the plan: config_checks has no inputs, so it only has changes

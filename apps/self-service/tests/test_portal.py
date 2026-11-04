@@ -39,11 +39,13 @@ def run_of(run_id, job_id, params, life="TERMINATED", result="SUCCESS", output=N
 
 
 class FakeClient:
-    """The jobs (tagged as the bundle tags them), runs, users and groups of one workspace."""
+    """The hub: the jobs (tagged as the bundle tags them), runs, schemas and AI Decide the app uses."""
 
     def __init__(self):
-        self.jobs_ = [ns(job_id=1, settings=ns(tags={"cd_self_service": "personal_schema", "cd_catalog": "fin_citizen_dev", "cd_prefix": "cd_"})),
-                      ns(job_id=2, settings=ns(tags={"cd_self_service": "team_folder", "cd_root": "/Workspace"})),
+        # In the hub, each tagged with the workspace it serves (scripts/app_build.py jobs_target).
+        self.jobs_ = [ns(job_id=1, settings=ns(tags={"cd_self_service": "personal_schema", "cd_catalog": "fin_citizen_dev", "cd_prefix": "cd_",
+                                                    "cd_workspace": "fin"})),
+                      ns(job_id=2, settings=ns(tags={"cd_self_service": "team_folder", "cd_root": "/Workspace", "cd_workspace": "fin"})),
                       ns(job_id=3, settings=ns(tags={}))]
         self.runs_ = {}
         self.started, self.get_runs = [], 0
@@ -178,14 +180,21 @@ class FakeStore:
 
 
 class Discovery(unittest.TestCase):
-    def test_finds_the_tagged_jobs_and_reports_unreachable_workspaces(self):
+    def test_finds_each_workspaces_job_in_the_hub_by_its_tag(self):
+        # Every workspace's job is in the hub, tagged with the workspace it serves: one listing,
+        # no call to another workspace (the fake raises for any host but the hub's).
         p, _ = make()
         fin, down = p.workspaces()
         self.assertEqual({k: j["id"] for k, j in fin.jobs.items()}, {"personal_schema": 1, "team_folder": 2})
         self.assertEqual(fin.error, "")
+        self.assertEqual((fin.host, down.host), (HOST, "https://down"), "each keeps its own address, for the links people open")
         self.assertEqual(down.jobs, {})
-        self.assertIn("not reachable: no route to host", down.error)
-        self.assertEqual([w.name for w in p.available("team_folder")], ["fin"])
+        self.assertIn("no self-service job found in the hub", down.error)
+
+    def test_a_hub_that_cannot_be_read_is_said_for_every_workspace(self):
+        p, fake = make()
+        fake.jobs.list = lambda: (_ for _ in ()).throw(ConnectionError("hub down"))
+        self.assertTrue(all("the hub's jobs cannot be read: hub down" in w.error for w in p.workspaces()))
 
 
 class Submitting(unittest.TestCase):
@@ -274,15 +283,15 @@ class Schemas(unittest.TestCase):
         self.assertEqual(p.run("fin", run_id, ANA).resource, "fin_citizen_dev.sales_bookings")
 
     def test_a_team_schema_is_also_its_groups(self):
+        # Any Entra group the requester names: the hub cannot see their groups, so membership is not checked.
         p, fake = make()
-        groups = p.groups_of("fin", ANA)
-        run_id = p.request_schema("fin", ANA, schema="fin_reporting", owner_group="fin-data-eng", groups=groups, reason=WHY)
-        self.assertEqual(fake.started[0][1]["owner_group"], "fin-data-eng")
+        run_id = p.request_schema("fin", ANA, schema="fin_reporting", owner_group="fin-finance", reason=WHY)
+        self.assertEqual(fake.started[0][1]["owner_group"], "fin-finance", "a group they may not be in")
         self.assertEqual(p.run("fin", run_id, ANA).task, "Request a team schema")
-        with self.assertRaisesRegex(portal.RequestError, "Choose one of your groups"):
-            p.request_schema("fin", ANA, schema="fin_other", owner_group="fin-finance", groups=groups, reason=WHY)
+        with self.assertRaisesRegex(portal.RequestError, "must be an Entra group's name"):
+            p.request_schema("fin", ANA, schema="fin_other", owner_group="fin`; DROP", reason=WHY)
         with self.assertRaisesRegex(portal.RequestError, "needs a name"):
-            p.request_schema("fin", ANA, owner_group="fin-data-eng", groups=groups)
+            p.request_schema("fin", ANA, owner_group="fin-data-eng")
         self.assertEqual(len(fake.started), 1)
 
     def test_named_schemas_and_folders_say_why_personal_schemas_need_not(self):
@@ -320,38 +329,6 @@ class Schemas(unittest.TestCase):
         fake.jobs.list_runs = lambda **kw: listed.append(kw.get("active_only")) or []
         self.assertIsNone(p.personal_schema("fin", ANA)["exists"], "unknown, not 0/1")
         self.assertEqual(listed, [True], "only the running requests: no reading the history to guess")
-
-
-class Groups(unittest.TestCase):
-    def test_with_the_users_token_their_groups_come_from_scim_me(self):
-        p, _ = make()
-        seen = {}
-
-        class Response(io.BytesIO):
-            def __enter__(self): return self
-            def __exit__(self, *a): pass
-
-        def urlopen(request, timeout):
-            seen["url"], seen["auth"] = request.full_url, request.headers.get("Authorization")
-            return Response(json.dumps({"userName": seen.get("as", ANA),
-                                        "groups": [{"display": "fin-data-eng"}, {"display": "fin_builder"}]}).encode())
-        with mock.patch.object(portal.urllib.request, "urlopen", urlopen):
-            self.assertEqual(p.groups_of("fin", ANA, token="t0k"), ["fin-data-eng", "fin_builder"])
-            self.assertEqual((seen["url"], seen["auth"]), (f"{HOST}/api/2.0/preview/scim/v2/Me?attributes=userName,groups", "Bearer t0k"))
-            seen["as"] = BO
-            self.assertEqual(p.groups_of("fin", ANA, token="t0k"), [], "a token that is not the signed-in user's gives no groups")
-
-    def test_a_token_the_workspace_refuses_gives_no_groups_not_an_error(self):
-        p, _ = make()
-
-        def urlopen(request, timeout):
-            raise portal.urllib.error.HTTPError(request.full_url, 401, "Unauthorized", {}, None)
-        with mock.patch.object(portal.urllib.request, "urlopen", urlopen):
-            self.assertEqual(p.groups_of("fin", ANA, token="from-another-workspace"), [])
-
-    def test_without_a_token_the_app_looks_the_user_up(self):
-        p, _ = make()
-        self.assertEqual(p.groups_of("fin", ANA), ["fin-data-eng", "fin_builder"])
 
 
 class AICheck(unittest.TestCase):
@@ -889,7 +866,7 @@ class Pages(unittest.TestCase):
 
     def test_tasks_say_how_they_are_approved(self):
         page = self.http.get("/", headers=self.as_ana).text
-        self.assertEqual(page.count("Auto-approved"), 4, "personal, project and team schemas, folder")
+        self.assertEqual(page.count("Auto-approved"), 3, "personal, project and team schemas (folders: Coming soon)")
         self.assertEqual(page.count(">Approval required"), 1, "workspace access (approved in Entra)")
         self.assertIn("Approval required", self.http.get("/persona", headers=self.as_ana).text)
         self.assertIn("Auto-approved", self.http.get("/folder", headers=self.as_ana).text)
@@ -937,23 +914,18 @@ class Pages(unittest.TestCase):
                          "a project schema never takes a group, even if one is sent")
 
     def test_team_schema_form(self):
-        self.fake.users = ns(list=lambda filter, attributes, count=None: [
-            ns(user_name=ANA, groups=[ns(display="fin-data-eng"), ns(display="admins")])])
         page = self.http.get("/schema/team", headers=self.as_ana).text
-        self.assertIn('<option value="fin-data-eng"', page, "the requester's groups are offered as the team")
-        self.assertNotIn('<option value="admins"', page, "not the workspace's own groups: Unity Catalog cannot grant to them")
+        self.assertIn('<input id="owner_group" name="owner_group"', page, "typed: the hub cannot list a person's groups")
         r = self.http.post("/schema/team", data={"reason": WHY, "workspace": "fin", "name": "fin_reporting"}, headers=self.as_ana)
-        self.assertIn("Choose the team", r.text)
-        r = self.http.post("/schema/team", data={"reason": WHY, "workspace": "fin", "name": "fin_reporting", "owner_group": "fin-finance"}, headers=self.as_ana)
-        self.assertIn("Choose one of your groups", r.text)
-        r = self.http.post("/schema/team", data={"reason": WHY, "workspace": "fin", "name": "fin_reporting", "owner_group": "admins"}, headers=self.as_ana)
-        self.assertIn("Choose one of your groups", r.text, "admins is theirs, but not one a schema can go to")
-        r = self.http.post("/schema/team", data={"reason": WHY, "workspace": "fin", "name": "fin_reporting", "owner_group": "fin-data-eng"},
+        self.assertIn("Give the Entra group", r.text)
+        r = self.http.post("/schema/team", data={"reason": WHY, "workspace": "fin", "name": "fin_reporting", "owner_group": "users"}, headers=self.as_ana)
+        self.assertIn("users is every user of a workspace", r.text, "not a workspace's own group: Unity Catalog cannot grant to it")
+        r = self.http.post("/schema/team", data={"reason": WHY, "workspace": "fin", "name": "fin_reporting", "owner_group": "fin-finance"},
                            headers=self.as_ana, follow_redirects=False)
-        self.assertEqual(r.status_code, 303)
-        self.assertEqual(self.fake.started[0][1]["owner_group"], "fin-data-eng")
+        self.assertEqual(r.status_code, 303, "any Entra group: membership is not checked")
+        self.assertEqual(self.fake.started[0][1]["owner_group"], "fin-finance")
         status = self.http.get(r.headers["location"], headers=self.as_ana).text
-        self.assertIn('<span class="k">Can manage</span> You and fin-data-eng', status)
+        self.assertIn('<span class="k">Can manage</span> You and fin-finance', status)
         self.assertEqual(self.http.get("/schema/other", headers=self.as_ana).status_code, 404)
 
     def test_the_reason_is_asked_for_shown_and_kept_for_try_again(self):

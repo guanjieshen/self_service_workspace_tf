@@ -256,19 +256,23 @@ class Portal:
 
     def workspaces(self):
         if self._workspaces is None or time.time() - self._loaded > self.cache_seconds:
-            found = []
-            for ws in self.config["workspaces"]:
-                w = Workspace(ws["name"], ws["bu"], ws["host"])
-                try:
-                    for job in self.client(w.host).jobs.list():
-                        tags = (job.settings.tags or {}) if job.settings else {}
-                        if tags.get("cd_self_service") in TASKS:
-                            w.jobs[tags["cd_self_service"]] = {"id": job.job_id, "tags": tags}
+            # Every workspace's job is in the hub (scripts/app_build.py jobs_target), tagged with the
+            # workspace it serves: one listing, and no call to another workspace. host stays the
+            # workspace's own, for the links people open in it.
+            found = [Workspace(ws["name"], ws["bu"], ws["host"]) for ws in self.config["workspaces"]]
+            by_name = {w.name: w for w in found}
+            try:
+                for job in self.hub().jobs.list():
+                    tags = (job.settings.tags or {}) if job.settings else {}
+                    w = by_name.get(tags.get("cd_workspace"))
+                    if w and tags.get("cd_self_service") in TASKS:
+                        w.jobs[tags["cd_self_service"]] = {"id": job.job_id, "tags": tags}
+                for w in found:
                     if not w.jobs:
-                        w.error = "no self-service jobs found (is the app's service principal in jobs.runners there?)"
-                except Exception as e:   # one unreachable workspace must not break the others
-                    w.error = f"not reachable: {str(e).splitlines()[0][:200]}"
-                found.append(w)
+                        w.error = "no self-service job found in the hub for it (app_deploy.py deploys one per workspace)"
+            except Exception as e:
+                for w in found:
+                    w.error = f"the hub's jobs cannot be read: {str(e).splitlines()[0][:200]}"
             self._workspaces, self._loaded = found, time.time()
         return self._workspaces
 
@@ -404,31 +408,6 @@ class Portal:
 
     # ---- The user's groups ----
 
-    def groups_of(self, ws_name, user, token=None):
-        """The groups the user belongs to (directly) in a workspace, to offer as a folder's owner.
-
-        token: the user's own access token (Databricks Apps forwards it, with the default
-        scope iam.current-user:read). SCIM /Me with it returns their groups; the app's service
-        principal cannot see other users' memberships. Without a token (running locally, as an
-        admin), the app looks the user up itself."""
-        w = next((w for w in self.workspaces() if w.name == ws_name), None)
-        if w is None or not re.fullmatch(EMAIL, user):
-            return []
-        if token:
-            request = urllib.request.Request(f"{w.host.rstrip('/')}/api/2.0/preview/scim/v2/Me?attributes=userName,groups",
-                                             headers={"Authorization": f"Bearer {token}"})
-            try:
-                with urllib.request.urlopen(request, timeout=15) as response:
-                    me = json.load(response)
-            except Exception as e:   # e.g. a token this workspace does not accept: no groups, not an error page
-                warn(f"reading {user}'s groups in {ws_name}", e)
-                return []
-            if (me.get("userName") or "").lower() != user:
-                return []   # the token is not the signed-in user's
-            return sorted({g.get("display") for g in me.get("groups", []) if g.get("display")})
-        found = list(self.client(w.host).users.list(filter=f'userName eq "{user}"', attributes="groups"))
-        return sorted({g.display for g in (found[0].groups or [])} if found else set())
-
     # ---- The user's personal schema: one per workspace ----
 
     def personal_schema(self, ws_name, user):
@@ -452,7 +431,7 @@ class Portal:
             return {"exists": "pending", "name": f"{catalog}.{schema}", "run_id": pending.run_id,
                     "workspace": ws_name, "link": None}
         try:
-            self.client(w.host).schemas.get(f"{catalog}.{schema}")
+            self.hub().schemas.get(f"{catalog}.{schema}")
             exists = True
         except NotFound:
             exists = False
@@ -482,7 +461,7 @@ class Portal:
         cached = self._checks.get(key)
         if cached and time.time() - cached[0] < 600:
             return cached[1]
-        c = self.client(w.host)
+        c = self.hub()
         try:
             if kind == "folder":
                 check_folder(name)
@@ -523,10 +502,10 @@ class Portal:
 
     # ---- Requests ----
 
-    def request_schema(self, ws_name, user, schema="", owner_group="", groups=(), reason=""):
+    def request_schema(self, ws_name, user, schema="", owner_group="", reason=""):
         """Run the personal schema job for the user: their personal schema; with a name, a
-        project schema; with a name and owner_group (one of their groups), a team schema the
-        group can manage too. Returns the run's ID."""
+        project schema; with a name and owner_group (any Entra account group: membership is not
+        checked), a team schema the group can manage too. Returns the run's ID."""
         if not re.fullmatch(EMAIL, user):
             raise RequestError("Your account has no email address the job can use.")
         w = self.workspace(ws_name, "personal_schema")
@@ -537,8 +516,8 @@ class Portal:
             check_reason(reason)   # a personal schema needs none: everyone may have one
         if owner_group and not schema:
             raise RequestError("A team schema needs a name.")
-        if owner_group and owner_group not in groups:
-            raise RequestError(f"Choose one of your groups as the team; {owner_group!r} is not one of them.")
+        if owner_group and not re.fullmatch(GROUP, owner_group):
+            raise RequestError("The team's group must be an Entra group's name: letters, digits, spaces and . _ -.")
         catalog = job["tags"].get("cd_catalog", "")
         resource = f"{catalog}.{schema or schema_name(user, job['tags'].get('cd_prefix', 'cd_'))}"
         pending = self._one_at_a_time(ws_name, user, "personal_schema", resource)
@@ -594,7 +573,7 @@ class Portal:
                                       "name": name, "owner_group": owner_group, "reason": reason})
             return request_id
         try:
-            run_id = self.client(w.host).jobs.run_now(w.jobs[job_kind]["id"], job_parameters={**params, "request_id": request_id}).run_id
+            run_id = self.hub().jobs.run_now(w.jobs[job_kind]["id"], job_parameters={**params, "request_id": request_id}).run_id
         except Exception as e:   # recorded as failed, and the person told so (not an error page)
             warn(f"starting the {job_kind} job for {request_id} in {w.name}", e)
             self._quietly(self.store.start_failed, request_id, "The job could not be started.")
@@ -684,7 +663,7 @@ class Portal:
         kind = "team_folder" if row["kind"] == "folder" else "personal_schema"
         try:   # the workspace too: one that is gone, or has no job now, also marks the request failed
             w = self.workspace(row["workspace"], kind)
-            run_id = self.client(w.host).jobs.run_now(w.jobs[kind]["id"], job_parameters=record_params(row, w)).run_id
+            run_id = self.hub().jobs.run_now(w.jobs[kind]["id"], job_parameters=record_params(row, w)).run_id
         except Exception:
             if self.store:
                 self._quietly(self.store.start_failed, row["id"], "The job could not be started.")
@@ -707,7 +686,7 @@ class Portal:
         w = next((w for w in self.workspaces() if w.name == ws_name and kind in w.jobs), None)
         if w is None:
             return []
-        runs = self.client(w.host).jobs.list_runs(job_id=w.jobs[kind]["id"], active_only=True)
+        runs = self.hub().jobs.list_runs(job_id=w.jobs[kind]["id"], active_only=True)
         return [r for r in (self.describe(w, kind, run, requester(kind, params_of(run)), details=False) for run in runs)
                 if r and r.resource == resource]
 
@@ -744,7 +723,7 @@ class Portal:
         message = ""
         if details and status != "In progress" and run.tasks:
             try:
-                out = self.client(w.host).jobs.get_run_output(run.tasks[0].run_id)
+                out = self.hub().jobs.get_run_output(run.tasks[0].run_id)
                 if status == "Failed":
                     message = failure_reason(out.error) or failure_reason(run.state.state_message)
                 elif kind == "team_folder" and out.notebook_output and out.notebook_output.result:
@@ -775,7 +754,7 @@ class Portal:
             if w is None:
                 return None
             try:
-                run = self.client(w.host).jobs.get_run(int(run_id))
+                run = self.hub().jobs.get_run(int(run_id))
             except NotFound:   # a run that does not exist (or no longer): not found, not an error page
                 return None
             kind = next((k for k, j in w.jobs.items() if j["id"] == run.job_id), None)
@@ -805,7 +784,7 @@ class Portal:
         if w is None:
             return None
         try:   # one call: the status only (the requester's own page reads the details)
-            status = status_of(self.client(w.host).jobs.get_run(int(run_id)).state)
+            status = status_of(self.hub().jobs.get_run(int(run_id)).state)
         except Exception as e:
             if not (isinstance(e, NotFound) or "does not exist" in str(e).lower()):
                 return None

@@ -28,12 +28,11 @@
       {% endcall %}
       {% set check_kind = "team_schema" if team else "project_schema" %}{% include "_reason.html" %}
       {% if team %}
-      {% call field("owner_group", "Team", required=True) %}
-        <select id="owner_group" name="owner_group" required {{ 'disabled' if not my_groups }}>
-          <option value="">Choose one of your groups</option>
-          {% for g in my_groups %}<option value="{{ g }}" {{ 'selected' if owner_group == g }}>{{ g }}</option>{% endfor %}
-        </select>
-        <p class="hint">{% if my_groups %}Your team gets the same access as you.{% else %}You're not in any groups in this workspace. Request a project schema instead.{% endif %}</p>
+      {#- Typed, not chosen: the hub cannot list a person's groups in their workspace. -#}
+      {% call field("owner_group", "Team's Entra group", required=True,
+                    hint="Its exact name, for example sales-analysts. Everyone in it gets the same access as you.") %}
+        <input id="owner_group" name="owner_group" class="mono" required maxlength="200" pattern="[A-Za-z0-9 _.\-]+"
+               value="{{ owner_group }}" placeholder="sales-analysts" autocomplete="off">
       {% endcall %}
       {% endif %}
       {% include "_ai_check.html" %}
@@ -41,7 +40,7 @@
   </div>
   <div class="panel-foot form-foot">
     <div class="form-actions">
-      <button type="submit" class="primary" {{ 'disabled' if not workspaces or (team and not my_groups) }}>{{ "Submit request" if approval["team_schema" if team else "project_schema"] == "required" else "Create schema" }}</button>
+      <button type="submit" class="primary" {{ 'disabled' if not workspaces }}>{{ "Submit request" if approval["team_schema" if team else "project_schema"] == "required" else "Create schema" }}</button>
       <a class="button" href="/">Cancel</a>
     </div>
     <p class="meta">{{ "Your schema will be created once approved." if approval["team_schema" if team else "project_schema"] == "required" else "Your schema will be ready in under a minute." }}</p>

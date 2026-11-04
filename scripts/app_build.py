@@ -169,19 +169,22 @@ def hub_target(s, database=True):
 
 
 def jobs_target(s, w, app_ids):
-    """A served workspace's target in the jobs bundle: its two jobs, which only workspace admins and
-    the hub's two apps (app_ids: their service principals' application IDs) may run."""
+    """A served workspace's target in the jobs bundle: its schema job, deployed to the hub (Unity
+    Catalog is the metastore's, and its catalog is bound to the hub too: terraform/self_service.tf),
+    so the apps never call another workspace. Each business unit has its own state path in the hub,
+    and its job says which workspace it serves (cd_workspace). Only workspace admins and the two
+    apps (app_ids: their service principals' application IDs) may run it."""
     jobs = s["jobs"]
     runners = [{"level": "CAN_MANAGE_RUN", "service_principal_name": i} for i in app_ids]
     policy = {"usage_policy_id": w["usage_policy_id"]} if w.get("usage_policy_id") else {}
     return {"targets": {w["name"]: {
         "mode": "production",
-        "workspace": {"host": w["host"], "root_path": f"{jobs['admin_path']}/bundle/jobs"},
+        "workspace": {"host": s["hub"]["host"].rstrip("/"), "root_path": f"{jobs['admin_path']}/bundle/jobs/{w['name']}"},
         "variables": {"business_unit": w["bu"]},
         "resources": {"jobs": {
-            "personal_schema": {"tags": {"cd_catalog": w["catalog"], "cd_prefix": jobs["personal_schema"]["prefix"]},
+            "personal_schema": {"tags": {"cd_catalog": w["catalog"], "cd_prefix": jobs["personal_schema"]["prefix"],
+                                         "cd_workspace": w["name"]},
                                 "permissions": runners, **policy},
-            "team_folder": {"tags": {"cd_root": jobs["folder_root"]}, "permissions": runners, **policy},
         }},
     }}}
 
@@ -202,7 +205,9 @@ def build_hub(s, spokes, database_host=None, database=True, root=None):
 
 
 def build_jobs(s, w, app_ids, root=None):
-    """bundle/jobs/build/<workspace>/: the two notebooks, with their settings, and target.yml."""
+    """bundle/jobs/build/<workspace>/: the schema job's notebook, with its settings, and target.yml.
+    (The folder job, bundle/jobs/notebooks/team_folder.py, is not deployed for now: a folder is
+    workspace specific, and the hub does not call other workspaces.)"""
     jobs, app = s["jobs"], s["app"]
     out = (root or ROOT) / "bundle/jobs/build" / w["name"]
     shutil.rmtree(out, ignore_errors=True)
@@ -212,7 +217,6 @@ def build_jobs(s, w, app_ids, root=None):
     (out / "personal_schema.py").write_text(notebook("personal_schema", {
         "prefix": jobs["personal_schema"]["prefix"], "privileges": jobs["personal_schema"]["privileges"],
         "owner": jobs.get("catalog_owner") or "", "allowed_catalogs": [w["catalog"]], **record}))
-    (out / "team_folder.py").write_text(notebook("team_folder", {"root": jobs["folder_root"], "admin_groups": w["platform_admins"], **record}))
     (out / "target.yml").write_text(json.dumps(jobs_target(s, w, app_ids), indent=1))
     return out
 

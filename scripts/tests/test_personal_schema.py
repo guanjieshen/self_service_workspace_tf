@@ -149,9 +149,11 @@ class PersonalSchema(unittest.TestCase):
             "GRANT ALL PRIVILEGES, MANAGE ON SCHEMA `fin_citizen_dev`.`fin_reporting` TO `a@contoso.com`",
             "GRANT ALL PRIVILEGES, MANAGE ON SCHEMA `fin_citizen_dev`.`fin_reporting` TO `fin-data-eng`"])
 
-    def test_a_team_schema_needs_a_group_of_the_users_own(self):
-        with self.assertRaisesRegex(ValueError, "is not in the group fin-finance"):
-            run({"user": "a@contoso.com", "schema": "fin_reporting", "owner_group": "fin-finance"})
+    def test_a_team_schema_takes_any_account_group(self):
+        # Membership is not checked (the job runs in the hub, which does not see a person's groups).
+        sql, result = run({"user": "a@contoso.com", "schema": "fin_reporting", "owner_group": "fin-finance"})
+        self.assertEqual(result["owner_group"], "fin-finance", "a group they are not in")
+        self.assertTrue(any(q.startswith("GRANT") and q.endswith("TO `fin-finance`") for q in sql))
         with self.assertRaisesRegex(ValueError, "personal schema is the user's alone"):
             run({"user": "a@contoso.com", "owner_group": "fin-data-eng"})
         with self.assertRaisesRegex(ValueError, "fin-local cannot be given the schema: Unity Catalog grants only to account groups"):

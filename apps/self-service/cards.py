@@ -54,8 +54,10 @@ CARDS = [
          "Create a schema with a name you choose, for a project of yours.", href="/schema/project", icon="schema"),
     Card("team_schema", "workspace", "Request a team schema",
          "Create a schema your team manages together, so it stays when people move on.", href="/schema/team", icon="schema"),
+    # Coming soon for now: a folder is workspace specific, and the hub does not call other
+    # workspaces (its job is not deployed). Set href="/folder" again to bring it back.
     Card("folder", "workspace", "Request a workspace folder",
-         "Create a shared workspace folder and control who can access it.", href="/folder"),
+         "Create a shared workspace folder and control who can access it."),
     Card("group_request", "workspace", "Add a group to your workspace",
          "Ask for an Entra group to be added to your workspace with a persona, so you can share your work with it.",
          link="group_request", icon="group", soon=True, opens="Opens your organization's request form"),
