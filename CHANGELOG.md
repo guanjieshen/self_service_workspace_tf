@@ -10,6 +10,10 @@ is left alone.
 
 ## Unreleased
 
+- **When the app's database does not answer, the app says so:** a person's chosen business unit
+  that cannot be read shows "Your business unit can't be read just now. Try again in a minute."
+  (503), instead of sending them to choose one they could not save. Forms sent then are not
+  sent, and say the same.
 - **A Genie Code skill to upgrade, `upgrade-to-a-new-release`:** it finds your version and the
   new one, reads what changed with you, runs the copy (preview, then copy), helps with the
   Baseline edits and guides the pull request. The README now explains the skills, and releases

@@ -111,17 +111,31 @@ async def business_unit_first(request: Request, call_next):
     """A request sent before choosing a business unit (when one must be chosen) goes to the
     choice instead: the pages ask first (page()), and this covers a form posted anyway."""
     user = (request.headers.get("x-forwarded-email") or LOCAL_USER).strip().lower()   # not signed in: the route says so
-    if MODE != "approvals" and request.method == "POST" and request.url.path != "/business-unit" \
-            and user and PORTAL.needs_bu_choice(user):
-        return RedirectResponse("/business-unit", status_code=303)
+    if MODE != "approvals" and request.method == "POST" and request.url.path != "/business-unit" and user:
+        try:
+            if PORTAL.needs_bu_choice(user):
+                return RedirectResponse("/business-unit", status_code=303)
+        except portal.BusinessUnitUnavailable as e:   # nothing is sent: say so, and keep what they typed (Back)
+            return HTMLResponse(str(e), status_code=503)
     return await call_next(request)
+
+
+def unavailable(request, error):
+    """A page saying something the app needs does not answer just now (503), and to try again."""
+    response = page(request, "unavailable.html", nav="catalog", message=str(error))
+    response.status_code = 503
+    return response
 
 
 def page(request, template, **context):
     # The business unit comes first: until someone has chosen one (when they must), every page
     # sends them to the choice, and back to where they were going.
-    if MODE != "approvals" and template != "business_unit.html" and PORTAL.needs_bu_choice(user_of(request)):
-        return RedirectResponse(f"/business-unit?next={quote(request.url.path)}", status_code=303)
+    if MODE != "approvals" and template not in ("business_unit.html", "unavailable.html"):
+        try:
+            if PORTAL.needs_bu_choice(user_of(request)):
+                return RedirectResponse(f"/business-unit?next={quote(request.url.path)}", status_code=303)
+        except portal.BusinessUnitUnavailable as e:   # the database does not answer: say so, never "choose one"
+            return unavailable(request, e)
     config = settings.apply(CONFIG, SETTINGS() if MODE != "approvals" else {})
     return templates.TemplateResponse(request, template, {
         "config": config, "links": config.get("links", {}), "user": user_of(request), "tasks": portal.TASKS,
@@ -220,8 +234,12 @@ def business_unit_form(request: Request, error: str = "", next: str = "/"):
     units = {}
     for w in CONFIG["workspaces"]:
         units.setdefault(w["bu"].upper(), []).append(w)
+    try:
+        first = PORTAL.needs_bu_choice(user_of(request))
+    except portal.BusinessUnitUnavailable as e:   # saving would fail too: say so instead of a form
+        return unavailable(request, e)
     return page(request, "business_unit.html", nav="catalog", units=[(bu, units[bu]) for bu in PORTAL.business_units()],
-                first=PORTAL.needs_bu_choice(user_of(request)), next=local_path(next), error=error)
+                first=first, next=local_path(next), error=error)
 
 
 @app.post("/business-unit")

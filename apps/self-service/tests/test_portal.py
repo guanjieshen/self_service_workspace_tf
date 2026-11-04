@@ -623,6 +623,17 @@ class BusinessUnitRouting(unittest.TestCase):
         self.assertEqual(portal.genie_one_link("https://dbc-123.cloud.databricks.com/", "Onboard me"),
                          "https://dbc-123.cloud.databricks.com/one/chat?q=Onboard%20me")
 
+    def test_a_choice_that_cannot_be_read_is_never_none(self):
+        p, _ = make()
+        p.choose_bu(ANA, "FIN")
+        p._chosen.clear()
+        with mock.patch.object(p.store, "chosen_business_unit", side_effect=ConnectionError("down")):
+            with self.assertRaises(portal.BusinessUnitUnavailable):
+                p.chosen_bu(ANA)
+            with self.assertRaises(portal.BusinessUnitUnavailable, msg="not cached: asked again"):
+                p.needs_bu_choice(ANA)
+        self.assertEqual(p.chosen_bu(ANA), "FIN", "read again once it answers")
+
     def test_without_the_lookup_every_workspace_is_offered(self):
         p, fake = make()
         self.assertEqual([w.name for w in p.workspaces_for(BO, "team_folder")], ["fin"])
@@ -1122,6 +1133,22 @@ class Pages(unittest.TestCase):
                     mock.patch.dict(self.main.PORTAL.config, {"workspaces": workspaces}):
                 page = self.http.get("/business-unit", headers=self.as_ana).text
                 self.assertIn(f'class="bu-options bu-cols-{cols}"', page)
+
+    def test_a_database_that_does_not_answer_says_so_never_choose_again(self):
+        as_bo = {"X-Forwarded-Email": BO}   # Bo has chosen: the database just cannot say so now
+        self.main.PORTAL.choose_bu(BO, "OPS")
+        self.main.PORTAL._chosen.clear()
+        down = mock.patch.object(self.main.PORTAL.store, "chosen_business_unit", side_effect=ConnectionError("database unreachable"))
+        with down:
+            for path in ("/", "/folder", "/business-unit"):
+                with self.subTest(path=path):
+                    r = self.http.get(path, headers=as_bo, follow_redirects=False)
+                    self.assertEqual(r.status_code, 503, "not a redirect to the choice: it could not be saved either")
+                    self.assertIn("Your business unit can&#39;t be read just now", r.text)
+            r = self.http.post("/folder", data={"workspace": "fin", "folder": "fin-docs", "reason": WHY}, headers=as_bo, follow_redirects=False)
+            self.assertEqual(r.status_code, 503)
+            self.assertEqual(self.fake.started, [], "nothing was sent")
+        self.assertEqual(self.http.get("/", headers=as_bo, follow_redirects=False).status_code, 200, "back: the failure was not kept")
 
     def test_choosing_never_sends_someone_to_another_site(self):
         for nxt in ("https://evil.example.com", "//evil.example.com", "/\\evil.example.com", "/\tevil", "/business-unit"):
