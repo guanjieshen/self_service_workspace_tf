@@ -10,6 +10,21 @@ is left alone.
 
 ## Unreleased
 
+## 1.0.1
+
+Upgrade from 1.0.0 with `install/copy_to_your_repo` (README, Releases and upgrades). The app
+now calls only the hub: no cross-workspace access is needed.
+
+**The first plan** of each served workspace shows its catalog bound to the hub (one workspace
+binding), its usage policy's bindings changing, and the apps' two assignments and two
+entitlements destroyed. **Deploy the app** runs migration `006_guided_tours.sql` and deploys
+each served workspace's schema job to the hub. **By hand, once:** delete the old jobs in each
+served workspace (Jobs > `<BU> personal schema`, `<BU> team folder`) and their files there
+(`<admin_path>/bundle/jobs`; `admin_path` is `/Workspace/Admin/self-service` by default). Folders
+the folder job already created stay.
+
+**Baseline edits:** none (only comments changed in `config/`).
+
 - **The apps are no longer assigned to served workspaces** (Terraform): they call only the hub,
   so the assignment and workspace access entitlement made for the old spoke jobs go. The next
   plan of each served workspace shows two assignments and two entitlements destroyed; the
@@ -31,7 +46,6 @@ is left alone.
   folder job is not deployed.
 - **A team schema's group is typed, and membership is not checked:** any Entra account group can
   be named (the hub cannot see a person's groups in their workspace).
-
 - **When the app's database does not answer, the app says so:** a person's chosen business unit
   that cannot be read shows "Your business unit can't be read just now. Try again in a minute."
   (503), instead of sending them to choose one they could not save. Forms sent then are not
