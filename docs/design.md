@@ -234,7 +234,6 @@ next apply. What the app needs on those, Terraform grants (`terraform/self_servi
 | Schemas in the catalog and their grants | The jobs, on request | Terraform never manages them |
 | The catalog's and the usage policy's binding to the hub | Terraform (`terraform/self_service.tf`, `main.tf`) | the bundles never bind |
 | The usage policy and who may use it (including the jobs' identity) | Terraform | the bundles only refer to its ID |
-| The apps' service principals' assignment to served workspaces, and their workspace access entitlement (unused while the app calls only the hub) | Terraform | the bundles do not assign |
 | The jobs, their notebooks and who may run them (the hub's two apps) | `bundle/jobs/` | Terraform never manages them |
 | Both apps, their permissions, the Lakebase project, its database and migrations | `bundle/hub/`, `app_deploy.py` | Terraform never manages them |
 

@@ -10,6 +10,10 @@ is left alone.
 
 ## Unreleased
 
+- **The apps are no longer assigned to served workspaces** (Terraform): they call only the hub,
+  so the assignment and workspace access entitlement made for the old spoke jobs go. The next
+  plan of each served workspace shows two assignments and two entitlements destroyed; the
+  catalog grants stay.
 - **An Open your workspace card** (Get started) replaces Genie One Onboarding: it opens Genie One
   in the person's workspace, with the onboarding prompt (now the **guided tour**) the first time
   and plain Genie One after that; **Start the guided tour again** on the card asks it again. The
