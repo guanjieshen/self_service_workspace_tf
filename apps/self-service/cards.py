@@ -59,10 +59,10 @@ CARDS = [
          "Create a dedicated schema for your project.", href="/schema/project", icon="schema"),
     Card("team_schema", "workspace", "Request a team schema",
          "Create a shared schema your team can manage together.", href="/schema/team", icon="schema"),
-    # Coming soon for now: a folder is workspace specific, and the hub does not call other
-    # workspaces (its job is not deployed). Set href="/folder" again to bring it back.
+    # Made by hand while its job is not deployed (portal.BY_HAND): a folder is workspace specific, and the hub does not
+    # call other workspaces. The request is tracked in the approvals app like any other.
     Card("folder", "workspace", "Request a workspace folder",
-         "Create a shared workspace folder and control who can access it."),
+         "Create a shared workspace folder and control who can access it.", href="/folder"),
     Card("group_request", "workspace", "Add a group to your workspace",
          "Add an Entra ID group and assign its workspace access level.",
          link="group_request", icon="group", soon=True, opens="Opens your organization's request form"),

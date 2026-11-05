@@ -141,7 +141,7 @@ def page(request, template, **context):
     config = settings.apply(CONFIG, SETTINGS() if MODE != "approvals" else {})
     return templates.TemplateResponse(request, template, {
         "config": config, "links": config.get("links", {}), "user": user_of(request), "tasks": portal.TASKS,
-        "approval": portal.approval_of(CONFIG), "approval_labels": portal.APPROVAL_LABELS, "mode": MODE, "ai_mode": ai_mode(),
+        "approval": portal.approval_of(CONFIG, PORTAL.manual()), "approval_labels": portal.APPROVAL_LABELS, "mode": MODE, "ai_mode": ai_mode(),
         "replies_needed": PORTAL.replies_needed(user_of(request)) if MODE != "approvals" else 0,
         **(business_unit(user_of(request)) if MODE != "approvals" else {}), **context})
 
@@ -424,7 +424,7 @@ def request_status(request: Request, workspace: str, run_id: int):
         raise HTTPException(404, "No such request of yours")
     kind = check_kind(r)
     # Whether a person approved it (its kind needs one: it ran, so one did); None for a personal schema.
-    needs_approval = None if kind is None else portal.approval_of(CONFIG).get(kind) == "required"
+    needs_approval = None if kind is None else portal.approval_of(CONFIG, PORTAL.manual()).get(kind) == "required"
     approver, events = None, []
     if needs_approval:   # who approved it, and the conversation with the approver, from the request's history
         try:
@@ -481,7 +481,7 @@ if MODE == "approvals":
     import approvals_store
     APPROVALS = approvals.register(app, page, user_of, store=approvals_store.LakebaseStore(
         PORTAL.store, {w["bu"] for w in CONFIG.get("workspaces", [])}, PORTAL.run_status, start=PORTAL.run_recorded,
-        human_approval=CONFIG.get("human_approval", ()), summarize=PORTAL.summarize, run_link=PORTAL.run_link), config=CONFIG)
+        human_approval=CONFIG.get("human_approval", ()), summarize=PORTAL.summarize, run_link=PORTAL.run_link, manual=PORTAL.manual), config=CONFIG)
 
 if __name__ == "__main__":
     import uvicorn

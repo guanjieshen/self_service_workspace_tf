@@ -5,7 +5,7 @@
 {%- set noun = "folder" if r.kind == "folder" else "schema" -%}
 {%- set decision = r.events | selectattr("type", "in", ["approved", "rejected"]) | first -%}
 {%- set question = r.events | selectattr("type", "equalto", "needs_info") | list | last -%}
-{%- set status = {"needs_info": "Reply needed", "rejected": "Rejected", "approved": "In progress", "start_failed": "Failed"}.get(r.state, "Pending approval") -%}
+{%- set status = {"needs_info": "Reply needed", "rejected": "Rejected", "approved": "Completed" if r.manual else "In progress", "start_failed": "Failed"}.get(r.state, "Pending approval") -%}
 {% block title %}{{ status }} · {{ label }}{% endblock %}
 {% block content %}
 {{ back("/requests", "My requests") }}
@@ -39,8 +39,9 @@
         <ol class="steps">
           <li class="done"><span class="step-dot">{{ icon("check", "icon step-check") }}</span>Submitted<span class="step-time">{{ r.created_at | local("seconds") }}</span></li>
           <li class="{{ approval_step }}"><span class="step-dot">{{ icon("check", "icon step-check") }}</span>Approval{% if decision %}<span class="step-time">{{ decision.at | local("seconds") }}</span>{% elif question %}<span class="step-time">Question asked</span>{% endif %}</li>
-          <li class="{{ 'current' if decision and decision.type == 'approved' else '' }}"><span class="step-dot">{{ icon("check", "icon step-check") }}</span>Running</li>
-          <li><span class="step-dot">{{ icon("check", "icon step-check") }}</span>Done</li>
+          {#- Made by hand (r.manual): approving it means it is done, so there is no run. -#}
+          {% if not r.manual %}<li class="{{ 'current' if decision and decision.type == 'approved' else '' }}"><span class="step-dot">{{ icon("check", "icon step-check") }}</span>Running</li>{% endif %}
+          <li class="{{ 'done' if r.manual and decision and decision.type == 'approved' else '' }}"><span class="step-dot">{{ icon("check", "icon step-check") }}</span>Done</li>
         </ol>
       </div>
       <div class="card-pad">
@@ -49,6 +50,9 @@
             <div><p class="strong">It was not approved</p>
             {% if decision.body %}<p>{{ decision.body }}</p>{% endif %}
             <p>You can ask again with the changes the approver asked for.</p></div>
+          {% elif decision and r.manual %}
+            <div><p class="strong">Your {{ noun }} is ready</p>
+            <p>A platform admin created it{% if r.path %} at <span class="mono">{{ r.path }}</span>{% endif %} in <span class="mono">{{ r.workspace }}</span>. You can manage it and share it with others in Databricks.</p></div>
           {% elif decision %}
             <div><p class="strong">Approved: your {{ noun }} is being created</p>
             <p>Its status shows under <a href="/requests">My requests</a> in under a minute.</p></div>
@@ -58,7 +62,7 @@
             <div class="live-actions"><a class="button primary" href="#reply">Answer</a></div>
           {% else %}
             <div><p class="strong">With the approvers</p>
-            <p>An approver for your business unit decides it. Any question they ask shows here and under <a href="/requests">My requests</a>.</p></div>
+            <p>An approver for your business unit decides it{% if r.manual %}, and a platform admin creates it{% endif %}. Any question they ask shows here and under <a href="/requests">My requests</a>.</p></div>
           {% endif %}
         </div>
       </div>

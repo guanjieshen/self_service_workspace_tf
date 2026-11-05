@@ -1,6 +1,6 @@
 # =============================================================================
 # SELF-SERVICE APP: the app's settings. The web app people use to ask for a personal,
-# project or team schema (workspace folders are coming), the approvals app, and the schema job
+# project or team schema or a workspace folder (made by hand for now), the approvals app, and the schema job
 # they run for each workspace the app serves (in the hub). Deployed by the Databricks Asset
 # Bundles in bundle/ (not by Terraform): scripts/app_build.py reads this file,
 # config/self-service/hub.yaml and each served workspace's file and Terraform output, and checks
@@ -115,12 +115,12 @@ self_service_app:
 
 # The self-service jobs (bundle/jobs/): one per workspace the app serves, in the hub. The catalog
 # a job creates schemas in is its workspace's own (its Terraform output, bound to the hub too),
-# never set here. folder_root is for the folder job, not deployed for now.
+# never set here. The folder job is not deployed for now: admins make folders by hand, under folder_root.
 jobs:
   # Where the jobs' notebooks live: at the top of the workspace, which grants only workspace
   # admins (the jobs run with admin rights).
   admin_path: /Workspace/Admin/self-service
-  folder_root: /Workspace             # where team folders are made
+  folder_root: /Workspace             # where workspace folders are made (by an admin, for now)
   catalog_owner: null                 # new schemas go to this group; null = the job's identity
   personal_schema:                    # a person's own schema: cd_<email name>
     prefix: cd_

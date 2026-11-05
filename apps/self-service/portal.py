@@ -47,12 +47,19 @@ PROJECT_SCHEMA, TEAM_SCHEMA = "Request a project schema", "Request a team schema
 # How each task is approved, as the catalog and task pages label it. The app's own tasks run
 # straight away (the jobs check every request); a persona is approved in Entra ID.
 APPROVAL = {"schema": "auto", "project_schema": "auto", "team_schema": "auto", "folder": "auto", "persona": "required"}
+# A request whose job is not deployed in the hub is made by hand (Portal.manual): recorded and
+# tracked like the others, always for an approver, who makes it (the approvals app says what) and
+# then approves it, which marks it done. The database's kind -> its job. Today the folder job is
+# not deployed (a folder is workspace specific, and the hub does not call other workspaces);
+# deploy it again and folders run it, with no change here.
+BY_HAND = {"folder": "team_folder"}
 APPROVAL_LABELS = {"auto": "Auto-approved", "required": "Approval required"}
 
 
-def approval_of(config):
-    """Each catalog task's approval, with the kinds an approver decides (app.yaml human_approval)."""
-    people = set(config.get("human_approval", ()))
+def approval_of(config, manual=()):
+    """Each catalog task's approval, with the kinds an approver decides (app.yaml human_approval,
+    and those made by hand: manual)."""
+    people = set(config.get("human_approval", ())) | set(manual)
     task_kind = {"schema": "personal_schema", "project_schema": "project_schema", "team_schema": "team_schema", "folder": "folder"}
     return {**APPROVAL, **{task: "required" for task, kind in task_kind.items() if kind in people}}
 SCHEMA = r"[a-z0-9][a-z0-9_]*"
@@ -198,9 +205,11 @@ def requester(kind, params):
     return params.get("user") if kind == "personal_schema" else params.get("requested_by")
 
 
-def folder_path(w, folder):
-    """Where the team folder job of workspace w puts a folder: under its root (its cd_root tag)."""
-    return f"{w.jobs['team_folder']['tags'].get('cd_root', '/Workspace').rstrip('/')}/{folder}"
+def folder_path(w, folder, root="/Workspace"):
+    """Where a folder of workspace w goes: under the folder job's root (its cd_root tag), or
+    root (app.yaml jobs.folder_root) while folders are made by hand."""
+    tags = (w.jobs.get("team_folder") or {}).get("tags") or {}
+    return f"{tags.get('cd_root', root).rstrip('/')}/{folder}"
 
 
 def keep(cache, key, value, limit=2000):
@@ -280,13 +289,27 @@ class Portal:
         return self._workspaces
 
     def workspace(self, name, kind):
-        for w in self.workspaces():
-            if w.name == name and kind in w.jobs:
+        for w in self.available(kind):
+            if w.name == name:
                 return w
         raise RequestError("Choose a workspace this request is available in.")
 
     def available(self, kind):
-        return [w for w in self.workspaces() if kind in w.jobs]
+        """The workspaces that offer this kind of job: with its job in the hub, or every one for
+        a request made by hand (manual)."""
+        by_hand = any(job == kind for k, job in BY_HAND.items() if k in self.manual())
+        return [w for w in self.workspaces() if (by_hand and not w.error) or kind in w.jobs]
+
+    def manual(self):
+        """The kinds of request made by hand: their job is in none of the hub's jobs. Not while
+        the hub's jobs cannot be read (no workspace without an error): then nothing is offered."""
+        found = [w for w in self.workspaces() if not w.error]
+        if not found:
+            return set()
+        return {k for k, job in BY_HAND.items() if not any(job in w.jobs for w in found)}
+
+    def folder_path(self, w, folder):
+        return folder_path(w, folder, self.config.get("folder_root") or "/Workspace")
 
     # ---- The person's business unit: the lookup function (bu_lookup), or the one they chose ----
 
@@ -498,15 +521,18 @@ class Portal:
             check_reason(reason)
         except RequestError as e:   # a rule says no: no need to ask the AI
             return {"rows": [(False, str(e))], "error": ""}
-        if kind == "folder":
-            taken = self._exists(lambda: c.workspace.get_status(folder_path(w, name)))
-        else:
-            taken = self._exists(lambda: c.schemas.get(f"{w.jobs[kind_job]['tags'].get('cd_catalog', '')}.{name}"))
-        # taken: True, False, or None when the lookup could not answer (then it says so: never "free" by default)
         noun = "folder" if kind == "folder" else "schema"
-        rules = [{True: (False, f"The {noun} name is already taken (fine only if it is yours)"),
-                  False: (True, f"The {noun} name is available"),
-                  None: (False, f"Could not confirm the {noun} name is available")}[taken]]
+        if kind in self.manual():   # a folder is in its own workspace, which the hub does not call: the admin checks
+            rules = []
+        else:
+            if kind == "folder":
+                taken = self._exists(lambda: c.workspace.get_status(self.folder_path(w, name)))
+            else:
+                taken = self._exists(lambda: c.schemas.get(f"{w.jobs[kind_job]['tags'].get('cd_catalog', '')}.{name}"))
+            # taken: True, False, or None when the lookup could not answer (then it says so: never "free" by default)
+            rules = [{True: (False, f"The {noun} name is already taken (fine only if it is yours)"),
+                      False: (True, f"The {noun} name is available"),
+                      None: (False, f"Could not confirm the {noun} name is available")}[taken]]
         model = self.ai_model()
         if not model:   # no AI: the rules' rows only
             return {"rows": rules, "error": ""}
@@ -566,7 +592,7 @@ class Portal:
         check_reason(reason)
         w = self.workspace(ws_name, "team_folder")
         self._check_bu(user, w, "team_folder")
-        pending = self._one_at_a_time(ws_name, user, "team_folder", folder_path(w, folder))
+        pending = None if "folder" in self.manual() else self._one_at_a_time(ws_name, user, "team_folder", self.folder_path(w, folder))
         if pending:   # already asked for: show the one running
             return pending.run_id
         # The job still takes an owner group (its contract): none from the form.
@@ -575,8 +601,8 @@ class Portal:
 
     def needs_approval(self, kind):
         """Whether this kind of request (the database's kinds) waits for an approver before its
-        job runs (app.yaml human_approval)."""
-        return kind in self.config.get("human_approval", ())
+        job runs (app.yaml human_approval), or before an admin makes it by hand (manual)."""
+        return kind in self.config.get("human_approval", ()) or kind in self.manual()
 
     def _start(self, w, job_kind, user, name, owner_group, reason, params):
         """Record the request, then run its job, then link the run to it. Recording comes first,
@@ -673,7 +699,9 @@ class Portal:
         if row is None:
             return None
         events = [e for e in self.store.events_of(request_id) if e["type"] != "reviewed"]
-        return {**row, "events": events, "needs_approval": row["kind"] in self.config.get("human_approval", ())}
+        w = next((w for w in self.workspaces() if w.name == row["workspace"]), None)
+        return {**row, "events": events, "needs_approval": self.needs_approval(row["kind"]), "manual": row["kind"] in self.manual(),
+                "path": self.folder_path(w, row["name"]) if w and row["kind"] == "folder" else ""}
 
     def reply(self, user, request_id, body):
         """The requester answers an approver's question: the request goes back to the approvers."""
@@ -700,7 +728,10 @@ class Portal:
 
     def run_recorded(self, row):
         """Run the job of a request in the database, as it was asked, with its request ID: once
-        an approver approved it (approvals app). Returns the run's ID."""
+        an approver approved it (approvals app). Returns the run's ID; None for a request made by
+        hand (manual): the approver made it, and approving marks it done."""
+        if row["kind"] in self.manual():
+            return None
         kind = "team_folder" if row["kind"] == "folder" else "personal_schema"
         try:   # the workspace too: one that is gone, or has no job now, also marks the request failed
             w = self.workspace(row["workspace"], kind)
@@ -880,8 +911,10 @@ class Portal:
                 return self._request_from_row(row, w, "Rejected", row["state_body"] or "")
             if row["state"] == "needs_info":
                 return self._request_from_row(row, w, "Reply needed", row["state_body"] or "")
-            if row["state"] in ("submitted", "replied") and row["kind"] in self.config.get("human_approval", ()):
+            if row["state"] in ("submitted", "replied") and self.needs_approval(row["kind"]):
                 return self._request_from_row(row, w, "Pending approval", "")
+            if row["state"] == "approved" and row["kind"] in self.manual():   # approved once an admin made it
+                return self._request_from_row(row, w, "Completed", "A platform admin created it")
             return self._request_from_row(row, w, "In progress", "")
 
         with ThreadPoolExecutor(max_workers=8) as pool:
@@ -893,7 +926,7 @@ class Portal:
                 "team_schema": TEAM_SCHEMA, "folder": TASKS["team_folder"]}[row["kind"]]
         params = record_params(row, w)
         if kind == "team_folder":
-            resource = folder_path(w, row["name"]) if w and "team_folder" in w.jobs else row["name"]
+            resource = self.folder_path(w, row["name"]) if w else row["name"]
         else:
             resource = f"{params['catalog']}.{row['name']}" if params["catalog"] else row["name"]
         started = row["created_at"]

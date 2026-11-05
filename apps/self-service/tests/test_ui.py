@@ -158,6 +158,21 @@ class ApprovalsMode(unittest.TestCase):
         self.assertIn("ConnectionError", r.text)
         self.assertIn("could not connect to server: timeout", r.text)
 
+    def test_a_folder_made_by_hand_says_what_to_create_then_approve(self):
+        import sample_store
+        main = load_main("approvals", {"workspaces": [{"name": "plant-citizen-dev", "bu": "PLANT", "host": "https://adb-5.azuredatabricks.net"}],
+                                       "folder_root": "/Workspace/Teams"})
+        http = TestClient(main.app)
+        row = next(r for r in main.APPROVALS._rows.values() if r["kind"] == "folder")
+        row.update(status="waiting", decision=None, manual=True)
+        page = http.get(f"/approvals/{row['id']}").text
+        self.assertIn("Made by hand for now", page)
+        self.assertIn(f"create <span class=\"mono\">/Workspace/Teams/{row['name']}</span>", page)
+        self.assertIn('href="https://adb-5.azuredatabricks.net/browse"', page, "the request's own workspace")
+        self.assertIn(row["requested_by"], page)
+        self.assertIn("Approve once you have created it", page)
+        self.assertIn("None: made by hand", page, "no job URL")
+
     def test_the_self_service_app_has_no_approval_pages(self):
         http = self.app(None)
         for path in ("/approvals", "/approvals/overview", "/approvals/ss-0001"):
@@ -178,6 +193,18 @@ class LakebaseApprovals(unittest.TestCase):
         db = type("DB", (), {"requests_in": lambda self, bus, limit=300: [dict(base, **r) for r in rows if r.get("bu", "FIN") in bus],
                              "events_of": lambda self, rid: []})()
         return approvals_store.LakebaseStore(db, {"FIN"}, lambda ws, run_id: live, human_approval=("project_schema", "team_schema"))
+
+    def test_a_folder_made_by_hand_waits_for_a_person_and_is_completed_once_approved(self):
+        import approvals_store
+        s = self.store([{"id": "f1", "kind": "folder", "name": "fin-close", "state": "submitted"},
+                        {"id": "f2", "kind": "folder", "name": "fin-docs", "state": "approved",
+                         "decision": {"outcome": "approved", "by": "dana", "at": __import__("datetime").datetime.now(), "comment": ""}}])
+        s.manual = lambda: {"folder"}
+        self.assertEqual([r["id"] for r in s.queue("dana")], ["f1"], "always for a person")
+        got = {r["id"]: (r["status"], r["manual"]) for r in s.all("dana")}
+        self.assertEqual(got, {"f1": ("waiting", True), "f2": ("completed", True)})
+        s.manual = lambda: set()
+        self.assertEqual(s.queue("dana"), [], "with its job deployed, a folder runs when asked")
 
     def test_a_request_that_ran_links_to_its_job_run(self):
         import approvals_store

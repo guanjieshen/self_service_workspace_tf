@@ -10,6 +10,12 @@ is left alone.
 
 ## Unreleased
 
+- **Request a workspace folder is back, made by hand for now.** The request is recorded and always
+  waits in the approvals app, which tells the approver what to create: the workspace (a link),
+  `<folder_root>/<name>`, and who gets Can manage. They create it, then **Approve**, which marks it
+  Completed for the requester; nothing runs (the hub does not call other workspaces). Deploy the
+  folder job again and folders run it, with no other change. Validate no longer looks a folder's
+  name up in the hub (it could only ever look in the wrong workspace).
 - **About our business** (`config/defaults/genie-code/our-business.md`) describes Enbridge, from its public 2025
   Annual Report: what it does, its business units, and the terms people use (Mainline, Line 5, Texas
   Eastern, Algonquin, Westcoast, the gas utilities). Public information only. The first plan updates
