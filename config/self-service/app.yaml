@@ -86,8 +86,9 @@ self_service_app:
     model: system.ai.claude-sonnet-5-5   # null = no summary
   # The guided tour: the Open your workspace card opens Genie One in the person's workspace with
   # this question already asked, the first time (and when they start the tour again). Genie One
-  # does not start the onboard-me skill from a link, so the prompt spells out each step. {catalog} (optional) is the person's workspace catalog. Keep it under about 1,500
-  # characters: it travels in the link. Platform admins change it in the approvals app's
+  # does not start the onboard-me skill from a link, so the prompt spells out each step.
+  # {catalog} (optional) is the person's workspace catalog. Keep it under about 1,500 characters:
+  # it travels in the link. Platform admins change it in the approvals app's
   # Settings; "": no tour, Genie One opens with no question.
   onboarding:
     prompt: >-
@@ -124,3 +125,9 @@ jobs:
     prefix: cd_
     privileges: [ALL_PRIVILEGES, MANAGE]
   require_request_record: false       # true: a job runs only for requests the app recorded
+  # A new project or team schema's comment: a sentence or two on what it is for, written from the
+  # request's reason by a foundation model (ai_query, run by the schema job in the hub as the
+  # pipeline's identity, which needs EXECUTE on it). If it cannot answer, the schema keeps its
+  # plain comment ("Team schema of <group> (self-service)"). null = always the plain comment.
+  schema_comment:
+    model: system.ai.claude-sonnet-5-5

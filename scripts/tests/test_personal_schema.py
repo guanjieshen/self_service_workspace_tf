@@ -12,7 +12,9 @@ from notebook_helpers import ROOT, RecordsSpark, render_notebook
 
 NOTEBOOK = (ROOT / "bundle/jobs/notebooks/personal_schema.py").read_text()
 GROUPS = {"a@contoso.com": ["fin-data-eng", "fin-local"], "sam.lee@contoso.com": []}   # each user's groups
-CONFIG = {"prefix": "cd_", "privileges": ["ALL_PRIVILEGES", "MANAGE"], "owner": "fin_platform_admins", "allowed_catalogs": ["fin_citizen_dev"]}
+CONFIG = {"prefix": "cd_", "privileges": ["ALL_PRIVILEGES", "MANAGE"], "owner": "fin_platform_admins", "allowed_catalogs": ["fin_citizen_dev"],
+          "comment_model": ""}
+MODEL = {"comment_model": "system.ai.claude-sonnet-5-5"}
 
 
 
@@ -21,12 +23,18 @@ class Exit(Exception):
 
 
 class FakeSpark:
-    def __init__(self, schemas, raced=()):
-        self.schemas, self.sql_run = schemas, []   # schemas: {name: {tag: value}}
+    def __init__(self, schemas, raced=(), answer="Holds the sales team's weekly forecasts."):
+        self.schemas, self.sql_run, self.asked = schemas, [], []   # schemas: {name: {tag: value}}
         self.raced = set(raced)   # created by another run between this run's check and its CREATE
+        self.answer = answer      # what ai_query answers; an Exception: it fails
 
-    def sql(self, text):
+    def sql(self, text, args=None):
         self.sql_run.append(text)
+        if "ai_query" in text:
+            self.asked.append(args)
+            if isinstance(self.answer, Exception):
+                raise self.answer
+            return types.SimpleNamespace(first=lambda: types.SimpleNamespace(text=self.answer))
         if text.startswith("CREATE SCHEMA") and any(f".`{s}`" in text for s in self.raced):
             raise RuntimeError("[SCHEMA_ALREADY_EXISTS] Cannot create schema because it already exists.")
         if text.startswith("GRANT") and text.endswith("TO `fin-local`"):   # a workspace-local group
@@ -41,12 +49,13 @@ class FakeSpark:
         return types.SimpleNamespace(count=lambda: len(rows), collect=lambda: rows)
 
 
-def run(params, schemas=None, config=None, records=None, raced=()):
+def run(params, schemas=None, config=None, records=None, raced=(), answer=None, asked=None):
     """Run the notebook with these request parameters (catalog defaults to the allowed one);
-    returns (SQL statements, the exit value)."""
+    returns (SQL statements, the exit value). asked, a list: gets each ai_query's parameters."""
     values = {"catalog": "fin_citizen_dev", **params}
     notebook = render_notebook(NOTEBOOK, {**CONFIG, **(config or {})})
-    spark = FakeSpark(schemas or {}, raced)
+    spark = FakeSpark(schemas or {}, raced, **({"answer": answer} if answer is not None else {}))
+    spark.asked = asked if asked is not None else spark.asked
     out = {}
 
     def exit_(value):
@@ -130,13 +139,62 @@ class PersonalSchema(unittest.TestCase):
         _, result = run({"user": "a@contoso.com"})
         self.assertEqual(result["kind"], "personal")
 
-    def test_the_reason_is_kept_with_the_run_and_never_reaches_sql(self):
+    def test_the_reason_is_kept_with_the_run_and_never_sql_text(self):
         reason = "Forecast the pipeline'; DROP SCHEMA x; --"
         sql, result = run({"user": "a@contoso.com", "schema": "sales_forecast", "reason": reason})
         self.assertEqual(result["reason"], reason)
         self.assertFalse(any("DROP" in s for s in sql))
+        asked = []
+        sql, _ = run({"user": "a@contoso.com", "schema": "sales_forecast", "reason": reason}, config=MODEL, asked=asked, answer="Forecasts.")
+        self.assertFalse(any(reason in s for s in sql), "with a model, only ai_query's parameter")
+        self.assertIn(reason, asked[0]["prompt"])
         with self.assertRaisesRegex(ValueError, "at most 1000 characters"):
             run({"user": "a@contoso.com", "schema": "sales_forecast", "reason": "x" * 1001})
+
+    def test_a_new_project_or_team_schema_says_what_it_is_for(self):
+        asked = []
+        sql, result = run({"user": "a@contoso.com", "schema": "sales_forecast", "reason": "Weekly forecasts for the sales team."},
+                          config=MODEL, asked=asked)
+        self.assertTrue(result["created"])
+        self.assertEqual(sql[-2:], ["COMMENT ON SCHEMA `fin_citizen_dev`.`sales_forecast` IS 'Holds the sales team\\'s weekly forecasts.'",
+                                    "ALTER SCHEMA `fin_citizen_dev`.`sales_forecast` OWNER TO `fin_platform_admins`"],
+                         "written before the hand-over, while the job still owns it")
+        self.assertEqual(asked[0]["model"], "system.ai.claude-sonnet-5-5")
+        self.assertIn("project schema named sales_forecast", asked[0]["prompt"])
+        self.assertTrue(asked[0]["prompt"].endswith("Weekly forecasts for the sales team."), "the reason, as a parameter")
+        self.assertTrue(sql[0].endswith("COMMENT 'Project schema of a@contoso.com (self-service)'"), "the plain comment first")
+        sql, _ = run({"user": "a@contoso.com", "schema": "fin_reporting", "owner_group": "fin-data-eng", "reason": "Reports."}, config=MODEL)
+        self.assertTrue(any(s.startswith("COMMENT ON SCHEMA `fin_citizen_dev`.`fin_reporting`") for s in sql), "a team schema too")
+
+    def test_the_models_text_is_one_escaped_line_never_sql(self):
+        sql, _ = run({"user": "a@contoso.com", "schema": "sales_forecast", "reason": "Forecasts."}, config=MODEL,
+                     answer="\"Forecasts\\ for\n sales'; DROP SCHEMA x; --\"" + "x" * 600)
+        comment = next(s for s in sql if s.startswith("COMMENT ON"))
+        self.assertTrue(comment.startswith("COMMENT ON SCHEMA `fin_citizen_dev`.`sales_forecast` IS 'Forecasts\\\\ for sales\\'; DROP SCHEMA x; --"))
+        self.assertNotIn("\n", comment)
+        self.assertLess(len(comment), 600, "at most 500 characters of it")
+
+    def test_without_an_answer_the_schema_keeps_its_plain_comment(self):
+        sql, result = run({"user": "a@contoso.com", "schema": "sales_forecast", "reason": "Forecasts."}, config=MODEL,
+                          answer=RuntimeError("PERMISSION_DENIED: no EXECUTE on the model"))
+        self.assertTrue(result["created"], "never a reason to fail the request")
+        self.assertFalse([s for s in sql if s.startswith("COMMENT ON")])
+        sql, _ = run({"user": "a@contoso.com", "schema": "sales_forecast", "reason": "Forecasts."}, config=MODEL, answer="  ")
+        self.assertFalse([s for s in sql if s.startswith("COMMENT ON")], "an empty answer: no comment")
+
+    def test_only_a_new_project_or_team_schema_with_a_reason_and_a_model_is_described(self):
+        for params, schemas, config, why in (
+                ({"user": "sam.lee@contoso.com", "reason": "Mine."}, None, MODEL, "a personal schema"),
+                ({"user": "a@contoso.com", "schema": "sales_forecast"}, None, MODEL, "no reason"),
+                ({"user": "a@contoso.com", "schema": "sales_forecast", "reason": "Forecasts."}, None, None, "no model"),
+                ({"user": "a@contoso.com", "schema": "sales_forecast", "reason": "Forecasts."},
+                 {"sales_forecast": {"cd_user": "a@contoso.com"}}, MODEL, "run again: it has its comment")):
+            with self.subTest(why):
+                asked = []
+                sql, result = run(params, schemas=schemas, config=config, asked=asked)
+                self.assertIsNotNone(result)
+                self.assertEqual(asked, [])
+                self.assertFalse([s for s in sql if s.startswith("COMMENT ON")])
 
     def test_a_team_schema_is_granted_to_the_user_and_their_group(self):
         sql, result = run({"user": "a@contoso.com", "schema": "fin_reporting", "owner_group": "fin-data-eng"})

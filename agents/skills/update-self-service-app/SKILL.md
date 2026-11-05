@@ -33,6 +33,7 @@ What people may do, and how the app behaves. Read the key's comment in the file 
 | The **Add a group to your workspace** card (otherwise Coming soon) | `links.group_request`: their request form's URL |
 | The default FAQ links and prompt (Settings overrides them) | `faq.<section>`, `onboarding.prompt` |
 | Personal schemas' name prefix or rights | `personal_schema.prefix`, `personal_schema.privileges` (under `jobs:`) |
+| The AI-written comment on new project and team schemas (what each is for, from the reason) | `schema_comment.model` (under `jobs:`; `null` = the plain comment) |
 | Who owns new schemas | `catalog_owner` (under `jobs:`). Workspace folders are off for now (`folder_root` is for when they come back) |
 
 Never change `name`, `approvals.name` or `database.project_id` (they name the apps and the database: changing them makes new ones). Stop and say a maintainer should plan it.
