@@ -10,21 +10,30 @@ is left alone.
 
 ## Unreleased
 
+- **The Open your workspace card is now Open Genie One**, with shorter text ("Explore the data
+  you have access to and try suggested questions to get started"), and its link is **Restart
+  guided tour**. It works as before.
 - **A new project or team schema says what it is for.** The schema job asks a foundation model
   (`ai_query`, in the hub, as the pipeline's identity) for a sentence or two from the request's
   reason, and sets it as the schema's comment before the hand-over. If the model cannot answer,
   the schema keeps its plain comment ("Team schema of <group> (self-service)") and the request
   still succeeds. Personal schemas, and schemas that already exist, are not changed. The reason
   reaches the model only as a query parameter, and its answer is written as an escaped string.
-  **Platform admins choose the model in the approvals app's Settings (AI tab)**, or empty it to
-  turn the comments off; the app sends it with each run, so a change needs no deploy.
-  `app.yaml` gives the default.
+  It uses the AI model (below); the app sends it with each run.
+- **One AI model for every AI feature, set in the approvals app's Settings (AI tab):** Validate,
+  the approvers' summary and new schemas' comments. A change works within 15 seconds, with no
+  deploy; empty turns the AI off (Validate checks the rules only, no summaries, plain comments).
+  `self_service_app.ai_model` in `app.yaml` is the default; an `app.yaml` from 1.0.x keeps
+  working (its `ai_summary.model` is read as the AI model).
+- **Validate no longer needs AI Decide** (a preview): it asks the AI model through the hub's AI
+  gateway, like the summary, with the same two questions (does the name say what it holds; does
+  the reason say what it is for and who will use it). Nothing to turn on in the hub.
 
   **Baseline edits:**
 
   | File | Change |
   | --- | --- |
-  | `config/self-service/app.yaml` | Under `self_service_app:`, after `ai_summary:`, add `schema_comment:` with `model: system.ai.claude-sonnet-5-5` (or your model). Without it, the comments are off until an admin sets a model in Settings |
+  | `config/self-service/app.yaml` | Replace `ai_summary:` (and its `model:`) with `ai_model: system.ai.claude-sonnet-5-5` (or your model). Optional: the old key still works |
 
 ## 1.0.1
 

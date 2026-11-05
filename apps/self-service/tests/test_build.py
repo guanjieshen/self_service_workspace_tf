@@ -76,8 +76,14 @@ class Builds(unittest.TestCase):
             {"name": "ops-citizen-dev", "bu": "OPS", "host": "https://adb-3000000000000003.3.azuredatabricks.net", "id": "3000000000000003", "catalog": "ops_citizen_dev"}])
         self.assertEqual(config["database"]["host"], "ep-example-1.database.canadacentral.azuredatabricks.net")
         self.assertTrue(config["links"]["discover"].startswith("{host}/"), "the app fills in each person's own workspace, not the hub's")
+        self.assertEqual(config["ai"], {"model": self.s["app"]["ai_model"]}, "one model for every AI feature")
         for skipped in ("tests", "db", "AGENTS.md", "__pycache__"):
             self.assertFalse((out / "self-service" / skipped).exists(), skipped)
+
+    def test_an_app_yaml_from_1_0_keeps_its_summary_model_as_the_ai_model(self):
+        self.assertEqual(app_build.ai_model({"ai_summary": {"model": "system.ai.old"}}), "system.ai.old")
+        self.assertEqual(app_build.ai_model({"ai_model": "system.ai.new", "ai_summary": {"model": "system.ai.old"}}), "system.ai.new")
+        self.assertEqual(app_build.ai_model({"ai_summary": {"model": None}}), "", "null: no AI")
 
     def test_the_hub_target(self):
         out = app_build.build_hub(self.s, self.spokes, root=self.tmp)
@@ -133,7 +139,7 @@ class Builds(unittest.TestCase):
         for change, setting in (
                 (lambda s: s["hub"].update(host="adb-1.azuredatabricks.net"), "hub.host"),
                 (lambda s: s["app"].update(ai_check="maybe"), "ai_check"),
-                (lambda s: s["app"].update(schema_comment={"model": "x'); DROP"}), "schema_comment.model"),
+                (lambda s: s["app"].update(ai_model="x'); DROP"), "ai_model"),
                 (lambda s: s["database"].update(readers=["x; DROP TABLE y"]), "database.readers"),
                 (lambda s: s["app_ids"].update(self_service="not-an-id"), "app_ids"),
                 (lambda s: s["app"].update(bu_lookup={"function": "a.b.c"}), "warehouse_id"),

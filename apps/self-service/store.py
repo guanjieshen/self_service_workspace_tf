@@ -169,7 +169,7 @@ class Store:
         with self._conn() as c:
             c.execute("INSERT INTO self_service.business_unit_choices (email, bu) VALUES (%s, %s)", (email.lower(), bu.upper()))
 
-    # ---- The guided tour (the Open your workspace card) ----
+    # ---- The guided tour (the Open Genie One card) ----
 
     def toured(self, email):
         """Whether this person has had the guided tour."""

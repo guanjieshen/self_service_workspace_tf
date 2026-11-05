@@ -71,27 +71,21 @@ self_service_app:
   # (any of personal_schema, project_schema, team_schema, folder). The others run when asked.
   human_approval: [project_schema, team_schema]
   # The AI check of the name and the reason, on the project schema, team schema and folder
-  # forms: the app's rules, then Databricks AI Decide. Validate shows the requester what is
+  # forms: the app's rules, then the AI model (ai_model, below). Validate shows the requester what is
   # unclear. Advice for the requester only: it never approves, refuses or routes a request
   # (human_approval decides who must approve; approvers read the AI summary below).
   #   on:  the Validate check
   #   off: no check
-  # Needs AI Decide in the hub (the apps' own workspace), whichever workspace a request goes to.
   ai_check: "on"
-  # The summary approvers read before a request that waits for them: a headline, what is
-  # asked and why, what is worth checking and questions to ask, written by a foundation model
-  # through the host workspace's AI gateway (the apps' identities need EXECUTE on it; account
-  # users have it on system.ai by default). Advice only; the requester never sees it.
-  ai_summary:
-    model: system.ai.claude-sonnet-5-5   # null = no summary
-  # A new project or team schema's comment: a sentence or two on what it is for, written from the
-  # request's reason by a foundation model (ai_query, run by the schema job in the hub as the
-  # pipeline's identity, which needs EXECUTE on it). If it cannot answer, the schema keeps its
-  # plain comment ("Team schema of <group> (self-service)"). The default: platform admins change
-  # it in the approvals app's Settings (AI), with each run. null = always the plain comment.
-  schema_comment:
-    model: system.ai.claude-sonnet-5-5
-  # The guided tour: the Open your workspace card opens Genie One in the person's workspace with
+  # The AI model every AI feature uses, through the hub's AI gateway: the Validate check (with
+  # ai_check on), the approvers' summary of a request that waits for them (a headline, what is
+  # asked and why, what to check), and the comment on a new project or team schema (what it is
+  # for, from the reason). Advice and descriptions only: it never approves, refuses or routes a
+  # request. The apps' and the pipeline's identities need EXECUTE on it (account users have it on
+  # system.ai by default). The default: platform admins change it in the approvals app's
+  # Settings (AI). null = no AI: Validate checks the rules only, no summaries, plain comments.
+  ai_model: system.ai.claude-sonnet-5-5
+  # The guided tour: the Open Genie One card opens Genie One in the person's workspace with
   # this question already asked, the first time (and when they start the tour again). Genie One
   # does not start the onboard-me skill from a link, so the prompt spells out each step.
   # {catalog} (optional) is the person's workspace catalog. Keep it under about 1,500 characters:
@@ -114,7 +108,7 @@ self_service_app:
   # Settings (Help links).
   faq:
     getting_started: null   # "New here? ... How it works"
-    access: null            # Get started: workspace access, Open your workspace
+    access: null            # Get started: workspace access, Open Genie One
     data: null              # Data: Discover, data access requests
     workspace: null         # Build: schemas and folders
     compute: null           # Compute & cost

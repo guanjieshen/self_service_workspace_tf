@@ -41,10 +41,10 @@ CARDS = [
     Card("persona", "access", "Request workspace access", "Choose the access level you need.", href="/persona"),
     # /open: Genie One in the person's workspace, with the guided tour (the onboarding prompt) the
     # first time (portal.open_workspace).
-    Card("open_workspace", "access", "Open your workspace",
-         "Go to Genie One in your workspace. The first time, Genie shows you the data you have access to and the best questions to start with.",
-         link="workspace", icon="ask", opens="Opens in Databricks (workspace access is required)",
-         more=("Start the guided tour again", "tour")),
+    Card("open_workspace", "access", "Open Genie One",
+         "Explore the data you have access to and try suggested questions to get started.",
+         link="workspace", icon="launch", opens="Opens in Databricks · Workspace access required",
+         more=("Restart guided tour", "tour")),
 
     Card("discover", "data", "Discover data",
          "Browse the data your organization has curated, by business domain, in Databricks.", link="discover", icon="search",

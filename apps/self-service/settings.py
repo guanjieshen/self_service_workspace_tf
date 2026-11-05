@@ -1,9 +1,9 @@
 """Settings platform admins change from the approvals app (Settings), without a pull request:
 the links the self-service app shows and a banner across its pages.
 
-Only what the app says or links to, the guided tour's prompt, and the model that writes new schemas'
-comments. Who can do what (human_approval, approver groups, naming, the approvers' AI summary,
-grants) stays in app.yaml, where a change is reviewed. Each setting's default is
+Only what the app says or links to, the guided tour's prompt, and the AI model (advice and
+descriptions only). Who can do what (human_approval, approver groups, naming, grants) stays in
+app.yaml, where a change is reviewed. Each setting's default is
 app.yaml's value; a change made here overrides it until someone resets it. Changes are
 appended to the database (setting_events: who and when), never rewritten.
 """
@@ -28,7 +28,7 @@ SECTIONS = [
     ("Announcement banner", "Show a message at the top of every page, such as planned maintenance.", [
         ("banner.text", "Message", "text"),
         ("banner.until", "Show until", "date")]),
-    ("Guided tour", "The question Genie One is asked the first time someone opens their workspace (the Open your workspace card), and when they start the guided tour again. Empty: Genie One opens with no question.", [
+    ("Guided tour", "The question Genie One is asked the first time someone opens their workspace (the Open Genie One card), and when they restart the guided tour. Empty: Genie One opens with no question.", [
         ("onboarding.prompt", "Prompt", "prompt")]),
     ("Persona request links", "Links to request each access level, such as a ServiceNow catalog item, for every business unit without links of its own.", [
         (f"persona_request.{p}", p.title(), "url") for p in PERSONAS]),
@@ -36,8 +36,8 @@ SECTIONS = [
         (f"faq.{k}", label, "url") for k, label in FAQS.items()]),
     ("Standard operating procedures", "SOP links shown on each catalog item.", [
         (f"sop.{k}", label, "url") for k, label in SOPS.items()]),
-    ("Schema comments", "The model that writes a new project or team schema's comment, a sentence or two on what it is for, from the request's reason (ai_query, in the hub). Empty: the plain comment.", [
-        ("schema_comment.model", "Model", "model")]),
+    ("AI model", "The model every AI feature uses, through the hub's AI gateway: the Validate check on forms, the approvers' summary, and new project and team schemas' comments. Empty: no AI (Validate checks the rules only, no summaries, plain comments).", [
+        ("ai.model", "Model", "model")]),
 ]
 # The Settings page's tabs: (key, label, the SECTIONS shown). Onboarding holds what the catalog's
 # Onboarding section shows; the change history is a tab of its own (approvals.py).
@@ -45,7 +45,7 @@ TABS = [
     ("announcement", "Announcement", ["Announcement banner"]),
     ("onboarding", "Onboarding", ["Guided tour", "Persona request links"]),
     ("help", "Help links", ["FAQ pages", "Standard operating procedures"]),
-    ("ai", "AI", ["Schema comments"]),
+    ("ai", "AI", ["AI model"]),
 ]
 BUSINESS_UNITS = []   # the business units the app serves (use()): each gets its own persona request links
 
@@ -83,7 +83,7 @@ def defaults(config):
     links = config.get("links") or {}
     persona = links.get("persona_request")
     out = {"banner.text": "", "banner.until": "", "onboarding.prompt": (config.get("onboarding") or {}).get("prompt") or "",
-           "schema_comment.model": (config.get("schema_comment") or {}).get("model") or ""}
+           "ai.model": (config.get("ai") or {}).get("model") or ""}
     for p in PERSONAS:
         out[f"persona_request.{p}"] = (persona.get(p) if isinstance(persona, dict) else persona) or ""
         for bu in BUSINESS_UNITS:
@@ -110,7 +110,7 @@ def apply(config, overrides, today=None):
     faq and banner (None when there is none, or it has ended)."""
     if not overrides:
         d = defaults(config)
-        return {**config, "banner": None, "onboarding": {"prompt": d["onboarding.prompt"]}, "schema_comment": {"model": d["schema_comment.model"]}}
+        return {**config, "banner": None, "onboarding": {"prompt": d["onboarding.prompt"]}, "ai": {"model": d["ai.model"]}}
     v = values(config, overrides)
     links = {**(config.get("links") or {}),
              "persona_request": {p: v[f"persona_request.{p}"] or None for p in PERSONAS},
@@ -121,7 +121,7 @@ def apply(config, overrides, today=None):
     shown = v["banner.text"] and not (until and until < today.isoformat())
     return {**config, "links": links, "faq": {k: v[f"faq.{k}"] or None for k in FAQS},
             "onboarding": {"prompt": v["onboarding.prompt"]},
-            "schema_comment": {"model": v["schema_comment.model"]},
+            "ai": {"model": v["ai.model"]},
             "banner": {"text": v["banner.text"], "until": until} if shown else None}
 
 

@@ -349,7 +349,7 @@ def ask(request: Request):
 
 @app.get("/open", response_class=HTMLResponse)
 def open_workspace(request: Request, tour: bool = False):
-    """Open your workspace: Genie One in the person's own workspace, with the guided tour the first
+    """Open Genie One: Genie One in the person's own workspace, with the guided tour the first
     time or when they ask for it again (portal.open_workspace). Without one for them, as /ask."""
     link = PORTAL.open_workspace(user_of(request), settings.apply(CONFIG, SETTINGS())["onboarding"]["prompt"], tour)
     return RedirectResponse(link, status_code=303) if link else page(request, "ask.html", nav="catalog")
