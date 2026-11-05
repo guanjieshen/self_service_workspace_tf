@@ -11,7 +11,7 @@ is left alone.
 ## Unreleased
 
 - **The apps say Citizen Development, not Self-Service:** the header (`title` in `app.yaml`),
-  the catalog's heading ("Citizen development tasks"), My requests, the approvals app's Settings,
+  the catalog's heading ("Citizen Development Tasks"), My requests, the approvals app's Settings,
   messages, and a new schema's plain comment ("Project schema of <who> (citizen development)").
   Names nobody reads stay as they are: the apps' and the database's names, the schemas' tags
   (`cd_managed_by: self_service`, which the job checks on a schema it made), paths and keys.

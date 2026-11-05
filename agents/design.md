@@ -71,7 +71,8 @@ No bold inside paragraphs.
   0.06em tracking). Never uppercase anything else, and never style a card label by hand.
 - **Sentence case for everything else:** navigation, titles, headings, labels, buttons, badges, table
   headers, tooltips. Capitals only for the first word, proper nouns and acronyms: Databricks,
-  SQL, Genie, ServiceNow, Catalog Explorer, Entra ID, FAQ, SOP, AI.
+  SQL, Genie, ServiceNow, Catalog Explorer, Entra ID, FAQ, SOP, AI, Citizen Development (the
+  app's name). One exception: the catalog's heading is title case, "Citizen Development Tasks".
 - **Punctuation:** no period on titles, headings, navigation, labels, buttons, badges or table
   headers, and no colon after a heading or label. Full sentences in descriptions, helper text,
   errors and notices end with a period. A placeholder ends with one only if it is a full sentence.
