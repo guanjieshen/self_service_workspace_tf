@@ -476,6 +476,18 @@ class RequestsInTheDatabase(unittest.TestCase):
         self.assertEqual(db.events[-1][1:], ("start_failed", {"body": "The job could not be started."}))
         self.assertEqual([(r.status, r.message) for r in p.requests(ANA)], [("Failed", "The job could not be started.")])
 
+    def test_the_schema_job_is_told_the_comment_model_as_the_settings_are_when_it_runs(self):
+        db = FakeStore()
+        p, fake = make(db)
+        shown = {"schema_comment": {"model": "system.ai.claude-sonnet-5-5"}}
+        p.shown = lambda: shown
+        p.request_schema("fin", ANA, schema="sales_forecast", reason=WHY)
+        self.assertEqual(fake.started[-1][1]["comment_model"], "system.ai.claude-sonnet-5-5")
+        shown["schema_comment"]["model"] = ""   # an admin turned it off in Settings
+        p.run_recorded({"id": "ss-p1", "kind": "project_schema", "workspace": "fin", "requested_by": ANA, "name": "sales_more", "reason": WHY})
+        self.assertEqual(fake.started[-1][1]["comment_model"], "")
+        self.assertEqual(p.settings_for("team_folder"), {}, "only the schema job")
+
     def test_an_approved_request_runs_as_it_was_recorded(self):
         """Portal.run_recorded: the approvals app runs the request's job with the request's own ID."""
         db = FakeStore()
@@ -485,7 +497,7 @@ class RequestsInTheDatabase(unittest.TestCase):
         run_id = p.run_recorded(row)
         job_id, params = fake.started[-1]
         self.assertEqual(params, {"user": ANA, "catalog": "fin_citizen_dev", "schema": "fin_reporting",
-                                  "owner_group": "fin-data-eng", "reason": WHY, "request_id": "ss-team1"})
+                                  "owner_group": "fin-data-eng", "reason": WHY, "request_id": "ss-team1", "comment_model": ""})
         self.assertEqual(db.events[-1], ("ss-team1", "run_started", {"workspace": "fin", "run_id": run_id}))
         p.run_recorded({**row, "id": "ss-f1", "kind": "folder", "name": "fin-docs"})
         self.assertEqual(fake.started[-1][1], {"folder": "fin-docs", "requested_by": ANA, "owner_group": "fin-data-eng",

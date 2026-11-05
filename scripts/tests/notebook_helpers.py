@@ -20,7 +20,7 @@ class RecordsSpark:
     def __init__(self, records, then=None):
         self.records, self.then = records, then   # then: the notebook's own spark.sql, for everything else
 
-    def sql(self, text):
+    def sql(self, text, args=None):
         import re
         import types
         m = re.search(r"(?:WHERE id|WHERE request_id) = '([^']*)'", text)
@@ -30,6 +30,6 @@ class RecordsSpark:
             rows = [{"type": t, "data": d} for t, d in self.records.get(m.group(1), ({}, []))[1]
                     if f"'{t}'" in text] if m else []   # only the event types asked for
         else:
-            return self.then(text)
+            return self.then(text, args) if args else self.then(text)
         rows = [types.SimpleNamespace(asDict=lambda r=r: dict(r)) for r in rows]
         return types.SimpleNamespace(collect=lambda: rows, count=lambda: len(rows))

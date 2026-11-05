@@ -17,6 +17,7 @@ These are changed by a platform admin in the **approvals app > Settings** and sh
 | The guided tour's prompt (what Genie One is asked the first time someone opens their workspace) | **Onboarding** > Guided tour |
 | The links to request Explorer, Builder or Publisher access (for example ServiceNow items), for all business units or one | **Onboarding** > Persona request links, with its **Business unit** selector |
 | FAQ links next to each section, or the standard operating procedure behind each task | **Help links** |
+| The model that writes new project and team schemas' comments (what each is for, from the reason), or turn them off (empty) | **AI** > Schema comments |
 | See who changed what, and when | **Change history** |
 
 ## 2. A pull request: `config/self-service/app.yaml`
@@ -29,6 +30,7 @@ What people may do, and how the app behaves. Read the key's comment in the file 
 | Which requests wait for an approver | `human_approval` (from `project_schema`, `team_schema`; the others are created straight away) |
 | The Validate check on forms (AI advice on the name and reason) | `ai_check`: `"on"` or `"off"` (needs AI Decide in the hub) |
 | The approvers' AI summary | `ai_summary.model` (`null` = none) |
+| The default model for new schemas' AI comments (admins change it in Settings > AI) | `schema_comment.model` (`null` = off) |
 | A wiki link in the header, a short link to the app | `links.wiki`, `links.go_link` |
 | The **Add a group to your workspace** card (otherwise Coming soon) | `links.group_request`: their request form's URL |
 | The default FAQ links and prompt (Settings overrides them) | `faq.<section>`, `onboarding.prompt` |
