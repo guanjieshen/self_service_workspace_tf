@@ -535,6 +535,18 @@ class Settings(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.s.check("onboarding.prompt", "x" * 1001)
 
+    def test_the_schema_comment_model_comes_from_app_yaml_until_an_admin_changes_it(self):
+        config = {**self.CONFIG, "schema_comment": {"model": "system.ai.claude-sonnet-5-5"}}
+        self.assertEqual(self.s.apply(config, {})["schema_comment"], {"model": "system.ai.claude-sonnet-5-5"})
+        self.assertEqual(self.s.apply(config, self.over(schema_comment__model="system.ai.gpt-oss-120b"))["schema_comment"],
+                         {"model": "system.ai.gpt-oss-120b"})
+        self.assertEqual(self.s.apply(config, self.over(schema_comment__model=""))["schema_comment"], {"model": ""}, "empty: the plain comment")
+        self.assertEqual(self.s.apply(self.CONFIG, {})["schema_comment"], {"model": ""}, "none in app.yaml: off")
+        self.assertEqual(self.s.check("schema_comment.model", " system.ai.claude-sonnet-5-5 "), "system.ai.claude-sonnet-5-5")
+        for bad in ("x'); DROP", "a b", "m" * 101):
+            with self.subTest(bad=bad), self.assertRaisesRegex(ValueError, "a model's name"):
+                self.s.check("schema_comment.model", bad)
+
     def test_the_last_values_are_used_when_the_database_fails(self):
         calls = []
         def read():
@@ -675,6 +687,13 @@ class SettingsPages(unittest.TestCase):
         section = http.get("/approvals/settings/history?section=FAQ pages").text
         self.assertEqual(section.count('class="row change-row"'), 6)
         self.assertIn("No changes match", http.get("/approvals/settings/history?q=nothing-like-this").text)
+
+    def test_the_ai_tab_sets_the_schema_comment_model(self):
+        http = TestClient(self.load("approvals", {"links": {}, "faq": {}, "schema_comment": {"model": "system.ai.claude-sonnet-5-5"}}).app)
+        page = http.get("/approvals/settings?tab=ai").text
+        self.assertIn("<h2>Schema comments</h2>", page)
+        self.assertIn('<input id="schema_comment.model" name="schema_comment.model" value="system.ai.claude-sonnet-5-5"', page)
+        self.assertIn('placeholder="Off: the plain comment"', page)
 
     def test_the_onboarding_prompt_is_a_text_area(self):
         http = TestClient(self.load("approvals", {"links": {}, "faq": {}, "onboarding": {"prompt": "Onboard me"}}).app)

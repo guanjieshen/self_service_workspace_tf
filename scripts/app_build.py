@@ -66,8 +66,8 @@ def check(s):
     for key, name in (("name", app.get("name")), ("approvals.name", (app.get("approvals") or {}).get("name"))):
         need(re.fullmatch(r"[a-z0-9-]{2,30}", name or ""), f"app.yaml self_service_app.{key}: 2 to 30 lowercase letters, digits and dashes.")
     need(str(app.get("ai_check")) in ("on", "off"), "app.yaml self_service_app.ai_check: on or off.")
-    need(re.fullmatch(r"[\w.-]*", str((jobs.get("schema_comment") or {}).get("model") or "")),
-         "app.yaml jobs.schema_comment.model: a model's name (for example system.ai.claude-sonnet-5-5), or null.")
+    need(re.fullmatch(r"[\w.-]{0,100}", str((app.get("schema_comment") or {}).get("model") or "")),
+         "app.yaml self_service_app.schema_comment.model: a model's name (for example system.ai.claude-sonnet-5-5), or null.")
     need(set(app.get("human_approval") or []) <= set(KINDS), f"app.yaml self_service_app.human_approval lists kinds of request: {', '.join(KINDS)}.")
     need(all(u is None or re.match(r"https?://", u) for u in (app.get("faq") or {}).values()),
          "app.yaml self_service_app.faq: each link starts with https://, or is null for no link.")
@@ -115,6 +115,7 @@ def app_config(s, spokes, mode=None):
         "ai_check": str(app.get("ai_check") or "off"),
         "human_approval": list(app.get("human_approval") or []),
         "ai_summary": {"model": (app.get("ai_summary") or {}).get("model")},
+        "schema_comment": {"model": (app.get("schema_comment") or {}).get("model") or ""},
         "bu_lookup": {"function": lookup["function"], "warehouse_id": hub["warehouse_id"], "host": host}
                      if lookup.get("function") else None,
         "links": dict(app.get("links") or {}),   # {host}, {workspace_id}, {catalog}: the person's workspace's, filled in by the app
@@ -218,8 +219,7 @@ def build_jobs(s, w, app_ids, root=None):
               "human_approval": list(app.get("human_approval") or [])} if jobs.get("require_request_record") else {}
     (out / "personal_schema.py").write_text(notebook("personal_schema", {
         "prefix": jobs["personal_schema"]["prefix"], "privileges": jobs["personal_schema"]["privileges"],
-        "owner": jobs.get("catalog_owner") or "", "allowed_catalogs": [w["catalog"]],
-        "comment_model": (jobs.get("schema_comment") or {}).get("model") or "", **record}))
+        "owner": jobs.get("catalog_owner") or "", "allowed_catalogs": [w["catalog"]], **record}))
     (out / "target.yml").write_text(json.dumps(jobs_target(s, w, app_ids), indent=1))
     return out
 

@@ -50,10 +50,12 @@ def client(host):
 import settings
 import store
 
-PORTAL = portal.Portal(CONFIG, client, store=store.Store.from_config(CONFIG))
+
 # The links and banner approvers change in the approvals app (settings.py), over app.yaml's.
 settings.use(w["bu"] for w in CONFIG["workspaces"])   # a section of persona request links per business unit
-SETTINGS = settings.Cached(PORTAL.store.settings if PORTAL.store else dict)
+STORE = store.Store.from_config(CONFIG)
+SETTINGS = settings.Cached(STORE.settings if STORE else dict)
+PORTAL = portal.Portal(CONFIG, client, store=STORE, shown=lambda: settings.apply(CONFIG, SETTINGS()))
 app = FastAPI(title=CONFIG.get("title", "Self-Service"), docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")

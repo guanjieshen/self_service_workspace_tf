@@ -1,8 +1,9 @@
 """Settings platform admins change from the approvals app (Settings), without a pull request:
 the links the self-service app shows and a banner across its pages.
 
-Only what the app says or links to (and the guided tour's prompt). Who can do what (human_approval, approver groups, naming,
-the model, grants) stays in app.yaml, where a change is reviewed. Each setting's default is
+Only what the app says or links to, the guided tour's prompt, and the model that writes new schemas'
+comments. Who can do what (human_approval, approver groups, naming, the approvers' AI summary,
+grants) stays in app.yaml, where a change is reviewed. Each setting's default is
 app.yaml's value; a change made here overrides it until someone resets it. Changes are
 appended to the database (setting_events: who and when), never rewritten.
 """
@@ -22,7 +23,7 @@ SOPS = {"schema": "Personal schema", "project_schema": "Project schema", "team_s
 # How it works (the "New here?" line), then one FAQ per catalog section, named as it is.
 FAQS = {"getting_started": "How it works", **dict(cards.SECTIONS)}
 
-# Every setting, by section: (key, label, kind). kind: url, text, prompt or date.
+# Every setting, by section: (key, label, kind). kind: url, text, prompt, date or model.
 SECTIONS = [
     ("Announcement banner", "Show a message at the top of every page, such as planned maintenance.", [
         ("banner.text", "Message", "text"),
@@ -35,6 +36,8 @@ SECTIONS = [
         (f"faq.{k}", label, "url") for k, label in FAQS.items()]),
     ("Standard operating procedures", "SOP links shown on each catalog item.", [
         (f"sop.{k}", label, "url") for k, label in SOPS.items()]),
+    ("Schema comments", "The model that writes a new project or team schema's comment, a sentence or two on what it is for, from the request's reason (ai_query, in the hub). Empty: the plain comment.", [
+        ("schema_comment.model", "Model", "model")]),
 ]
 # The Settings page's tabs: (key, label, the SECTIONS shown). Onboarding holds what the catalog's
 # Onboarding section shows; the change history is a tab of its own (approvals.py).
@@ -42,6 +45,7 @@ TABS = [
     ("announcement", "Announcement", ["Announcement banner"]),
     ("onboarding", "Onboarding", ["Guided tour", "Persona request links"]),
     ("help", "Help links", ["FAQ pages", "Standard operating procedures"]),
+    ("ai", "AI", ["Schema comments"]),
 ]
 BUSINESS_UNITS = []   # the business units the app serves (use()): each gets its own persona request links
 
@@ -78,7 +82,8 @@ def defaults(config):
     """Each setting's value from app.yaml ("" when it has none)."""
     links = config.get("links") or {}
     persona = links.get("persona_request")
-    out = {"banner.text": "", "banner.until": "", "onboarding.prompt": (config.get("onboarding") or {}).get("prompt") or ""}
+    out = {"banner.text": "", "banner.until": "", "onboarding.prompt": (config.get("onboarding") or {}).get("prompt") or "",
+           "schema_comment.model": (config.get("schema_comment") or {}).get("model") or ""}
     for p in PERSONAS:
         out[f"persona_request.{p}"] = (persona.get(p) if isinstance(persona, dict) else persona) or ""
         for bu in BUSINESS_UNITS:
@@ -104,7 +109,8 @@ def apply(config, overrides, today=None):
     persona), links.persona_request_by_bu (per business unit, None where it has none), links.sop,
     faq and banner (None when there is none, or it has ended)."""
     if not overrides:
-        return {**config, "banner": None, "onboarding": {"prompt": defaults(config)["onboarding.prompt"]}}
+        d = defaults(config)
+        return {**config, "banner": None, "onboarding": {"prompt": d["onboarding.prompt"]}, "schema_comment": {"model": d["schema_comment.model"]}}
     v = values(config, overrides)
     links = {**(config.get("links") or {}),
              "persona_request": {p: v[f"persona_request.{p}"] or None for p in PERSONAS},
@@ -115,6 +121,7 @@ def apply(config, overrides, today=None):
     shown = v["banner.text"] and not (until and until < today.isoformat())
     return {**config, "links": links, "faq": {k: v[f"faq.{k}"] or None for k in FAQS},
             "onboarding": {"prompt": v["onboarding.prompt"]},
+            "schema_comment": {"model": v["schema_comment.model"]},
             "banner": {"text": v["banner.text"], "until": until} if shown else None}
 
 
@@ -130,6 +137,8 @@ def check(key, value):
         raise ValueError(f"{LABELS[key]}: keep it under 200 characters.")
     if kind == "prompt" and len(value) > 1000:
         raise ValueError(f"{LABELS[key]}: keep it under 1,000 characters.")
+    if kind == "model" and not re.fullmatch(r"[\w.-]{0,100}", value):
+        raise ValueError(f"{LABELS[key]}: a model's name, for example system.ai.claude-sonnet-5-5.")
     if kind == "date" and value:
         try:
             dt.date.fromisoformat(value)

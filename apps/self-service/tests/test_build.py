@@ -106,7 +106,7 @@ class Builds(unittest.TestCase):
         schema = (out / "personal_schema.py").read_text()
         self.assertNotIn("${", schema)
         self.assertIn('allowed_catalogs = ["fin_citizen_dev"]', schema)
-        self.assertIn(f'comment_model = "{self.s["jobs"]["schema_comment"]["model"]}"', schema, "app.yaml jobs.schema_comment.model")
+        self.assertNotIn('comment_model = "', schema, "a run parameter (the app's Settings), not written in")
         ops = app_build.jobs_target(self.s, self.spokes[1], [])["targets"]["ops-citizen-dev"]["resources"]["jobs"]
         self.assertNotIn("usage_policy_id", ops["personal_schema"], "no usage policy: none set")
 
@@ -133,7 +133,7 @@ class Builds(unittest.TestCase):
         for change, setting in (
                 (lambda s: s["hub"].update(host="adb-1.azuredatabricks.net"), "hub.host"),
                 (lambda s: s["app"].update(ai_check="maybe"), "ai_check"),
-                (lambda s: s["jobs"].update(schema_comment={"model": "x'); DROP"}), "schema_comment.model"),
+                (lambda s: s["app"].update(schema_comment={"model": "x'); DROP"}), "schema_comment.model"),
                 (lambda s: s["database"].update(readers=["x; DROP TABLE y"]), "database.readers"),
                 (lambda s: s["app_ids"].update(self_service="not-an-id"), "app_ids"),
                 (lambda s: s["app"].update(bu_lookup={"function": "a.b.c"}), "warehouse_id"),

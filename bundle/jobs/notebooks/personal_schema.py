@@ -8,8 +8,8 @@
 # MAGIC (empty = their personal schema, `cd_<email before @>`; a name = a project or team schema,
 # MAGIC which may not start with the personal prefix), `owner_group` (optional, a team schema: a group
 # MAGIC the user belongs to, which gets the same rights), `reason` (why they need it; kept with the run) and
-# MAGIC `request_id` (optional). A new project or team schema's comment says what it is for, written by a
-# MAGIC foundation model (`ai_query`) from the reason. Edit this notebook
+# MAGIC `request_id` (optional), and `comment_model` (optional: the model, from the app's Settings, that writes
+# MAGIC a new project or team schema's comment from the reason with `ai_query`; empty = the plain comment). Edit this notebook
 # MAGIC in the repository (bundle/jobs/notebooks/personal_schema.py): the next deploy replaces it.
 
 # COMMAND ----------
@@ -25,9 +25,6 @@ prefix = ${jsonencode(prefix)}
 privileges = ${jsonencode(privileges)}
 owner = ${jsonencode(owner)}
 allowed_catalogs = ${jsonencode(allowed_catalogs)}
-# The model that writes a new project or team schema's comment from the reason (ai_query, in the
-# hub, as the job's identity); empty = the plain comment.
-comment_model = ${jsonencode(comment_model)}
 # The request record check (below): the app's records, this workspace's name in them, and
 # the kinds that always need an approver. requests_catalog empty = off.
 requests_catalog = ${jsonencode(requests_catalog)}
@@ -41,7 +38,7 @@ ${request_record_check}
 # COMMAND ----------
 
 # The request.
-for name in ("user", "schema", "catalog", "owner_group", "reason", "request_id"):
+for name in ("user", "schema", "catalog", "owner_group", "reason", "request_id", "comment_model"):
     dbutils.widgets.text(name, "")
 user = dbutils.widgets.get("user").strip().lower()
 schema = dbutils.widgets.get("schema").strip().lower()
@@ -49,6 +46,7 @@ catalog = dbutils.widgets.get("catalog").strip()
 owner_group = dbutils.widgets.get("owner_group").strip()
 reason = dbutils.widgets.get("reason").strip()   # why they need it: kept with the run, and only a query parameter
 request_id = dbutils.widgets.get("request_id").strip()
+comment_model = dbutils.widgets.get("comment_model").strip()
 personal = prefix + re.sub(r"[^a-z0-9]+", "_", user.split("@")[0]).strip("_")
 kind = "personal" if not schema or schema == personal else "team" if owner_group else "project"
 schema = schema or personal
@@ -72,6 +70,8 @@ if len(reason) > 1000:
     raise ValueError(f"reason is at most 1000 characters, not {len(reason)}")
 if not re.fullmatch(r"[A-Za-z0-9._:/-]{0,100}", request_id):
     raise ValueError(f"request_id may only contain letters, digits and . _ : / -, not {request_id!r}")
+if not re.fullmatch(r"[\w.-]{0,100}", comment_model):
+    raise ValueError(f"comment_model must be a model's name, not {comment_model!r}")
 if not all(re.fullmatch(r"[A-Z_]+", p) for p in privileges):
     raise ValueError(f"not privileges: {privileges}")
 

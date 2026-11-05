@@ -16,12 +16,15 @@ is left alone.
   the schema keeps its plain comment ("Team schema of <group> (self-service)") and the request
   still succeeds. Personal schemas, and schemas that already exist, are not changed. The reason
   reaches the model only as a query parameter, and its answer is written as an escaped string.
+  **Platform admins choose the model in the approvals app's Settings (AI tab)**, or empty it to
+  turn the comments off; the app sends it with each run, so a change needs no deploy.
+  `app.yaml` gives the default.
 
   **Baseline edits:**
 
   | File | Change |
   | --- | --- |
-  | `config/self-service/app.yaml` | Under `jobs:`, add `schema_comment:` with `model: system.ai.claude-sonnet-5-5` (or your model). Without it, schemas keep the plain comment |
+  | `config/self-service/app.yaml` | Under `self_service_app:`, after `ai_summary:`, add `schema_comment:` with `model: system.ai.claude-sonnet-5-5` (or your model). Without it, the comments are off until an admin sets a model in Settings |
 
 ## 1.0.1
 
