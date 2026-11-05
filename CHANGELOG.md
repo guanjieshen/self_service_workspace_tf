@@ -16,7 +16,7 @@ is left alone.
   and costs (a budget policy attributes usage, it does not bill a team). Every card that opens
   Databricks says "Opens in Databricks · Workspace access required"; the personal schema's quota
   reads "0 of 1 used"; sections no longer show a count. What each card does is unchanged.
-- **The Open your workspace card is now Open Genie One**, with shorter text ("Explore the data
+- **The Open your workspace card is now Open Databricks Genie One**, with shorter text ("Explore the data
   you have access to and try suggested questions to get started"), and its link is **Restart
   guided tour**. It works as before.
 - **A new project or team schema says what it is for.** The schema job asks a foundation model

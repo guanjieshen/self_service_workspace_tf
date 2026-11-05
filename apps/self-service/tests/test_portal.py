@@ -1210,7 +1210,7 @@ class Pages(unittest.TestCase):
 
     def test_open_your_workspace_gives_the_tour_once_and_again_on_request(self):
         page = self.http.get("/", headers=self.as_ana).text
-        self.assertIn('href="/open" target="_blank" rel="noopener">Open Genie One</a>', page)
+        self.assertIn('href="/open" target="_blank" rel="noopener">Open Databricks Genie One</a>', page)
         self.assertNotIn("Restart guided tour", page, "no prompt: no tour")
         r = self.http.get("/open", headers=self.as_ana, follow_redirects=False)
         self.assertEqual((r.status_code, r.headers["location"]), (303, "https://adb-1.azuredatabricks.net/one/chat?o=1"))
@@ -1227,7 +1227,7 @@ class Pages(unittest.TestCase):
                                                 "https://adb-1.azuredatabricks.net/one/chat?o=1",
                                                 "https://adb-1.azuredatabricks.net/one/chat?o=1&q=Onboard%20me"))
         with mock.patch.object(self.main.PORTAL, "my_workspace", return_value=None):
-            self.assertNotIn("Open Genie One", self.http.get("/", headers=self.as_ana).text, "no workspace for them: no card")
+            self.assertNotIn("Open Databricks Genie One", self.http.get("/", headers=self.as_ana).text, "no workspace for them: no card")
             page = self.http.get("/open", headers=self.as_ana)
         self.assertEqual(page.status_code, 200)
         self.assertIn("Contact your platform admin", page.text, "where to go instead")
@@ -1241,7 +1241,7 @@ class Pages(unittest.TestCase):
         self.assertEqual([h for h in ("<h2>Get started<", "<h2>Data<", "<h2>Build<", "<h2>Compute &amp; cost<") if h in page],
                          ["<h2>Get started<", "<h2>Data<", "<h2>Build<", "<h2>Compute &amp; cost<"])
         self.assertNotIn('class="group-faq"', page, "no FAQ pages set, no FAQ links")
-        self.assertIn('New here? Start with <a href="/persona">Request workspace access</a></p>', page, "no Ask a question: Open Genie One is the card")
+        self.assertIn('New here? Start with <a href="/persona">Request workspace access</a></p>', page, "no Ask a question: Open Databricks Genie One is the card")
         self.main.CONFIG["faq"] = {"getting_started": "https://wiki.contoso.com/start", "access": "https://wiki.contoso.com/access",
                                    "data": None, "workspace": "https://wiki.contoso.com/workspace"}
         try:
