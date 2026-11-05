@@ -85,7 +85,7 @@ self_service_app:
   # system.ai by default). The default: platform admins change it in the approvals app's
   # Settings (AI). null = no AI: Validate checks the rules only, no summaries, plain comments.
   ai_model: system.ai.claude-sonnet-5-5
-  # The guided tour: the Open Genie One card opens Genie One in the person's workspace with
+  # The guided tour: the Open Databricks Genie One card opens Genie One in the person's workspace with
   # this question already asked, the first time (and when they start the tour again). Genie One
   # does not start the onboard-me skill from a link, so the prompt spells out each step.
   # {catalog} (optional) is the person's workspace catalog. Keep it under about 1,500 characters:
@@ -108,7 +108,7 @@ self_service_app:
   # Settings (Help links).
   faq:
     getting_started: null   # "New here? ... How it works"
-    access: null            # Get started: workspace access, Open Genie One
+    access: null            # Get started: workspace access, Open Databricks Genie One
     data: null              # Data: Discover, data access requests
     workspace: null         # Build: schemas and folders
     compute: null           # Compute & cost

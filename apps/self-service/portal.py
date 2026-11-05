@@ -40,7 +40,7 @@ RESERVED_FOLDERS = ("users", "shared", "repos", "admin", "workspace")
 # The workspace's own groups: a folder can be shared with them, but Unity Catalog grants only
 # to account groups, so a team schema cannot go to these.
 WORKSPACE_GROUPS = ("admins", "users")
-TASKS = {"personal_schema": "Request a personal schema", "team_folder": "Request a workspace folder"}
+TASKS = {"personal_schema": "Create a personal schema", "team_folder": "Request a workspace folder"}
 # The personal schema job also makes named schemas: a project schema (the requester's) and a
 # team schema (the requester's and one of their groups').
 PROJECT_SCHEMA, TEAM_SCHEMA = "Request a project schema", "Request a team schema"
@@ -548,7 +548,7 @@ class Portal:
         if owner_group and not schema:
             raise RequestError("A team schema needs a name.")
         if owner_group and not re.fullmatch(GROUP, owner_group):
-            raise RequestError("The team's group must be an Entra group's name: letters, digits, spaces and . _ -.")
+            raise RequestError("The team's group must be an Entra ID group's name: letters, digits, spaces and . _ -.")
         catalog = job["tags"].get("cd_catalog", "")
         resource = f"{catalog}.{schema or schema_name(user, job['tags'].get('cd_prefix', 'cd_'))}"
         pending = self._one_at_a_time(ws_name, user, "personal_schema", resource)

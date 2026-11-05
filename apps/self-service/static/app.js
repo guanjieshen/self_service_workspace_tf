@@ -22,7 +22,6 @@ if (catalogSearch) {
     document.querySelectorAll("[data-group]").forEach(group => {
       const shown = group.querySelectorAll(".card.task:not([hidden])").length;
       group.hidden = shown === 0;
-      group.querySelector(".count").textContent = shown;
     });
   });
 }
