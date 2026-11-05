@@ -281,7 +281,7 @@ class Portal:
                         w.jobs[tags["cd_self_service"]] = {"id": job.job_id, "tags": tags}
                 for w in found:
                     if not w.jobs:
-                        w.error = "no self-service job found in the hub for it (app_deploy.py deploys one per workspace)"
+                        w.error = "no Citizen Development job found in the hub for it (app_deploy.py deploys one per workspace)"
             except Exception as e:
                 for w in found:
                     w.error = f"the hub's jobs cannot be read: {str(e).splitlines()[0][:200]}"

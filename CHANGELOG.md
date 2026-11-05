@@ -10,6 +10,18 @@ is left alone.
 
 ## Unreleased
 
+- **The apps say Citizen Development, not Self-Service:** the header (`title` in `app.yaml`),
+  the catalog's heading ("Citizen development tasks"), My requests, the approvals app's Settings,
+  messages, and a new schema's plain comment ("Project schema of <who> (citizen development)").
+  Names nobody reads stay as they are: the apps' and the database's names, the schemas' tags
+  (`cd_managed_by: self_service`, which the job checks on a schema it made), paths and keys.
+
+  **Baseline edits:**
+
+  | File | Change |
+  | --- | --- |
+  | `config/self-service/app.yaml` | `title: Databricks Citizen Development` (was `Databricks Self-Service`), if you want the new name |
+
 - **Request a workspace folder is back, made by hand for now.** The request is recorded and always
   waits in the approvals app, which tells the approver what to create: the workspace (a link),
   `<folder_root>/<name>`, and who gets Can manage. They create it, then **Approve**, which marks it

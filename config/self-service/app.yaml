@@ -9,7 +9,7 @@
 
 self_service_app:
   name: cd-self-service                  # the app's name (lowercase letters, digits, dashes)
-  title: Databricks Self-Service         # shown in the header
+  title: Databricks Citizen Development  # shown in the header
   # Links shown in the app. null = not shown. With the approvals app, approvers can override
   # persona_request, sop and faq in its Settings page (these are then the defaults).
   links:

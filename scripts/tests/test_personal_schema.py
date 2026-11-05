@@ -92,7 +92,7 @@ class PersonalSchema(unittest.TestCase):
         self.assertEqual(result, {"catalog": "fin_citizen_dev", "schema": "cd_sam_lee", "kind": "personal",
                                   "user": "sam.lee@contoso.com", "owner_group": "", "reason": "", "created": True})
         self.assertEqual(sql[0], "CREATE SCHEMA `fin_citizen_dev`.`cd_sam_lee` "
-                                 "COMMENT 'Personal schema of sam.lee@contoso.com (self-service)'")
+                                 "COMMENT 'Personal schema of sam.lee@contoso.com (citizen development)'")
         self.assertIn("'cd_managed_by' = 'self_service', 'cd_user' = 'sam.lee@contoso.com', 'cd_schema_kind' = 'personal', 'cd_created' = ", sql[1])
         self.assertIn("'cd_request_id' = 'REQ-42'", sql[1])
         self.assertEqual(sql[2], "GRANT ALL PRIVILEGES, MANAGE ON SCHEMA `fin_citizen_dev`.`cd_sam_lee` TO `sam.lee@contoso.com`",
@@ -161,7 +161,7 @@ class PersonalSchema(unittest.TestCase):
         self.assertEqual(asked[0]["model"], "system.ai.claude-sonnet-5-5")
         self.assertIn("project schema named sales_forecast", asked[0]["prompt"])
         self.assertTrue(asked[0]["prompt"].endswith("Weekly forecasts for the sales team."), "the reason, as a parameter")
-        self.assertTrue(sql[0].endswith("COMMENT 'Project schema of a@contoso.com (self-service)'"), "the plain comment first")
+        self.assertTrue(sql[0].endswith("COMMENT 'Project schema of a@contoso.com (citizen development)'"), "the plain comment first")
         sql, _ = run({"user": "a@contoso.com", "schema": "fin_reporting", "owner_group": "fin-data-eng", "reason": "Reports.", **MODEL})
         self.assertTrue(any(s.startswith("COMMENT ON SCHEMA `fin_citizen_dev`.`fin_reporting`") for s in sql), "a team schema too")
 
@@ -205,7 +205,7 @@ class PersonalSchema(unittest.TestCase):
         self.assertIn("'cd_schema_kind' = 'team'", sql[1])
         self.assertEqual(sql[-2], "ALTER SCHEMA `fin_citizen_dev`.`fin_reporting` SET TAGS ('cd_owner_group' = 'fin-data-eng')",
                          "the group is recorded once it has the schema")
-        self.assertIn("COMMENT 'Team schema of fin-data-eng (self-service)'", sql[0])
+        self.assertIn("COMMENT 'Team schema of fin-data-eng (citizen development)'", sql[0])
         self.assertEqual([s for s in sql if s.startswith("GRANT")], [
             "GRANT ALL PRIVILEGES, MANAGE ON SCHEMA `fin_citizen_dev`.`fin_reporting` TO `a@contoso.com`",
             "GRANT ALL PRIVILEGES, MANAGE ON SCHEMA `fin_citizen_dev`.`fin_reporting` TO `fin-data-eng`"])
@@ -283,7 +283,7 @@ class RequestRecord(unittest.TestCase):
     def test_anything_else_is_refused(self):
         approved = [("approved", None)]
         cases = [
-            ("is not a request the self-service app recorded", {**TEAM, "request_id": "ss-404"}, {}),
+            ("is not a request the Citizen Development app recorded", {**TEAM, "request_id": "ss-404"}, {}),
             ("request_id is required", {**TEAM, "request_id": ""}, {}),
             ("requested_by differ", {"user": "bo@contoso.com", "request_id": "ss-2"}, {"ss-2": ({**MINE, "name": "cd_bo"}, [])}),
             ("name differ", {**TEAM, "schema": "fin_other"}, {"ss-1": (TEAM_RECORD, approved)}),

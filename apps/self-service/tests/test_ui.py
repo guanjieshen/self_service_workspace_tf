@@ -99,7 +99,7 @@ def load_main(mode, config=None):
     tests/sample_store.py's sample requests instead of a database."""
     import sample_store
     cfg = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
-    json.dump({"title": "Self-Service", "links": {}, "workspaces": [], **(config or {})}, cfg)
+    json.dump({"title": "Citizen Development", "links": {}, "workspaces": [], **(config or {})}, cfg)
     cfg.close()
     with mock.patch.dict(os.environ, {"PORTAL_CONFIG": cfg.name, "PORTAL_USER": "dana.owner@contoso.com"}), \
             mock.patch("approvals_store.LakebaseStore", lambda *a, **k: sample_store.MockStore()):

@@ -5,7 +5,7 @@
 {% block title %}Settings · Approvals{% endblock %}
 {% block content %}
 {% include "approvals/_settings_head.html" %}
-{% if saved %}{% call callout("success", role="status") %}Saved. The self-service app shows it within 15 seconds.{% endcall %}{% endif %}
+{% if saved %}{% call callout("success", role="status") %}Saved. The Citizen Development app shows it within 15 seconds.{% endcall %}{% endif %}
 {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
 
 {#- Reset buttons belong to their own form: Enter in a field must save (the main form's first
