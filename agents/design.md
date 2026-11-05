@@ -90,6 +90,23 @@ No bold inside paragraphs.
 - **Say only what is true.** Check the code or the job before describing a rule (a name
   prefix, who can manage something, how long it takes).
 - **Leave clear text alone.** A pass is for consistency, not rewriting.
+- **Catalog cards** (`cards.py`): the title starts with the verb that says what happens, in 2 to
+  5 words; the description is one sentence of about 8 to 15 words on the outcome, without
+  repeating the title. Never write a card's approval into its text: the foot shows it from
+  `human_approval` (a customer can change it).
+
+  | Verb | When |
+  | --- | --- |
+  | Request | Starts a request that may wait for an approver |
+  | Create | Makes something straight away (no approver) |
+  | Open | Goes to a tool, such as Genie One |
+  | View | Shows information: a page or a dashboard |
+  | Manage | Changes or administers something |
+  | Discover | Explores what is available |
+  | Add | Adds something that exists, such as an Entra ID group |
+
+  A card that opens Databricks says "Opens in Databricks · Workspace access required" in its
+  foot. A quota says what it counts ("0 of 1 used"), never a bare "1/1".
 
 ## Components
 

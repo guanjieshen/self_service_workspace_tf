@@ -24,7 +24,7 @@
 {% for section, title, cards in groups %}
 <section class="task-group" data-group>
   <div class="group-head">
-    <h2>{{ title }}<span class="count">{{ cards | length }}</span></h2>
+    <h2>{{ title }}</h2>
     {% if faq[section] %}<a class="group-faq" href="{{ faq[section] }}" target="_blank" rel="noopener">FAQ {{ icon("external", "icon icon-xs") }}</a>{% endif %}
   </div>
   <div class="cards">
@@ -38,7 +38,7 @@
         <span class="task-icon">{{ icon(c.icon or key) }}</span>
         <h3>{% if ready %}<a class="stretched" href="{{ href }}" {% if external %}target="_blank" rel="noopener"{% endif %}>{{ name }}</a>{% else %}{{ name }}{% endif %}</h3>
         {% if asked %}<span class="quota pending" title="Your request is in progress">Requested</span>
-        {% elif key == "schema" and personal.exists is not none %}<span class="quota {{ 'full' if have }}" title="{{ 'You have your personal schema' if have else 'One personal schema per person' }}">{{ '1/1' if have else '0/1' }}</span>{% endif %}
+        {% elif key == "schema" and personal.exists is not none %}<span class="quota {{ 'full' if have }}" title="{{ 'You have your personal schema' if have else 'One personal schema per person' }}">{{ '1 of 1 used' if have else '0 of 1 used' }}</span>{% endif %}
         {% if not ready %}<span class="soon">Coming soon</span>{% else %}{{ icon("external" if external else "arrow", "icon task-arrow") }}{% endif %}
       </div>
       <p>{{ text }}</p>
@@ -49,7 +49,7 @@
         {% elif ready %}
         {{ approval_label(approval.get(key), approval_labels,
              "Approved in Entra ID before your access changes" if approval.get(key) == "required" else "Runs straight away; the job checks the request") }}
-        {% if approval.get(key) == "auto" %}<span class="meta">&lt; 1 min</span>{% endif %}
+        {% if approval.get(key) == "auto" %}<span class="meta">Under 1 min</span>{% endif %}
         {% endif %}
         {% if ready and links.sop and links.sop[key] %}<a class="task-sop" href="{{ links.sop[key] }}" target="_blank" rel="noopener">SOP {{ icon("external", "icon icon-xs") }}</a>{% endif %}
       </div>

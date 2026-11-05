@@ -294,9 +294,9 @@ def named_schema_submit(request: Request, kind: str, workspace: str = Form(""), 
         if not name:
             raise portal.RequestError("Give the schema a name.")
         if kind == "team" and not owner_group:
-            raise portal.RequestError("Give the Entra group that manages the schema with you.")
+            raise portal.RequestError("Give the Entra ID group that manages the schema with you.")
         if owner_group in portal.WORKSPACE_GROUPS:
-            raise portal.RequestError(f"{owner_group} is every user of a workspace: give your team's own Entra group.")
+            raise portal.RequestError(f"{owner_group} is every user of a workspace: give your team's own Entra ID group.")
         started = PORTAL.request_schema(workspace, user_of(request), schema=name, owner_group=owner_group, reason=reason)
     except portal.RequestError as e:
         return named_schema_form(request, kind, workspace=workspace, name=name, owner_group=owner_group, reason=reason, error=str(e))
