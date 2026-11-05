@@ -12,7 +12,7 @@ from notebook_helpers import ROOT, RecordsSpark, render_notebook
 
 NOTEBOOK = (ROOT / "bundle/jobs/notebooks/personal_schema.py").read_text()
 GROUPS = {"a@contoso.com": ["fin-data-eng", "fin-local"], "sam.lee@contoso.com": []}   # each user's groups
-CONFIG = {"prefix": "cd_", "privileges": ["ALL_PRIVILEGES", "MANAGE"], "owner": "fin_platform_admins", "allowed_catalogs": ["fin_citizen_dev"]}
+CONFIG = {"prefix": "cd_", "privileges": ["ALL_PRIVILEGES", "MANAGE"], "owner": "fin_platform_admins", "allowed_catalogs": ["fin_citizen_dev"], "temporary_days": 30}
 MODEL = {"comment_model": "system.ai.claude-sonnet-5-5"}   # a run parameter, from the app's Settings
 
 
@@ -40,6 +40,9 @@ class FakeSpark:
             raise RuntimeError("[PRINCIPAL_DOES_NOT_EXIST] Could not find principal with name fin-local")
         if "information_schema.schemata" in text:
             rows = [1 for s in self.schemas if f"schema_name = '{s}'" in text]
+        elif "information_schema.schema_tags" in text and "tag_name IN" in text:   # every schema's tags of these names
+            rows = [types.SimpleNamespace(schema_name=s, tag_name=k, tag_value=v) for s, tags in self.schemas.items()
+                    for k, v in tags.items() if f"'{k}'" in text]
         elif "information_schema.schema_tags" in text:
             rows = [types.SimpleNamespace(tag_value=v) for s, tags in self.schemas.items() for k, v in tags.items()
                     if f"schema_name = '{s}'" in text and f"tag_name = '{k}'" in text]
@@ -108,6 +111,51 @@ class PersonalSchema(unittest.TestCase):
         sql, result = run({"user": "a@contoso.com"}, {"cd_a": {"cd_user": "a@contoso.com", "cd_created": "2026-01-01"}})
         self.assertFalse(result["created"])
         self.assertNotIn("cd_created", sql[1])
+
+    def test_a_temporary_schema_is_the_users_and_tagged_to_expire(self):
+        import datetime as dt
+        sql, result = run({"user": "a@contoso.com", "schema": "cd_tmp_try_this", "temporary": "true", "reason": "Trying a join."})
+        expires = (dt.date.today() + dt.timedelta(days=30)).isoformat()
+        self.assertEqual((result["schema"], result["kind"], result["expires"]), ("cd_tmp_try_this", "temporary", expires))
+        self.assertEqual(sql[0], f"CREATE SCHEMA `fin_citizen_dev`.`cd_tmp_try_this` COMMENT 'Temporary schema of a@contoso.com, until {expires} (citizen development)'")
+        self.assertIn("'cd_schema_kind' = 'temporary'", sql[1])
+        self.assertIn(f"'cd_expires' = '{expires}'", sql[1])
+        self.assertEqual([s for s in sql if s.startswith("GRANT")], ["GRANT ALL PRIVILEGES, MANAGE ON SCHEMA `fin_citizen_dev`.`cd_tmp_try_this` TO `a@contoso.com`"],
+                         "the user's alone")
+        _, result = run({"user": "a@contoso.com", "schema": "cd_tmp_try_this", "temporary": "true"}, config={"temporary_days": 7})
+        self.assertEqual(result["expires"], (dt.date.today() + dt.timedelta(days=7)).isoformat(), "app.yaml jobs.temporary_schema.days")
+
+    def test_running_a_temporary_schema_again_keeps_its_date(self):
+        mine = {"cd_tmp_x": {"cd_user": "a@contoso.com", "cd_schema_kind": "temporary", "cd_expires": "2099-01-01"}}
+        sql, result = run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true"}, mine)
+        self.assertFalse(result["created"])
+        self.assertNotIn("cd_expires", sql[0], "its date stays: a run again never extends it")
+
+    def test_one_temporary_schema_at_a_time_until_it_expires(self):
+        import datetime as dt
+        today = dt.date.today()
+        live = {"cd_tmp_old": {"cd_user": "a@contoso.com", "cd_schema_kind": "temporary", "cd_expires": (today + dt.timedelta(days=3)).isoformat()}}
+        with self.assertRaisesRegex(ValueError, f"already have a temporary schema, fin_citizen_dev.cd_tmp_old, until {(today + dt.timedelta(days=3)).isoformat()}"):
+            run({"user": "a@contoso.com", "schema": "cd_tmp_new", "temporary": "true"}, live)
+        for others, why in (({"cd_tmp_old": {**live["cd_tmp_old"], "cd_expires": (today - dt.timedelta(days=1)).isoformat()}}, "expired"),
+                            ({"cd_tmp_old": {**live["cd_tmp_old"], "cd_user": "sam.lee@contoso.com"}}, "someone else's"),
+                            ({"cd_tmp_old": {**live["cd_tmp_old"], "cd_schema_kind": "project"}}, "not a temporary one")):
+            with self.subTest(why):
+                _, result = run({"user": "a@contoso.com", "schema": "cd_tmp_new", "temporary": "true"}, others)
+                self.assertTrue(result["created"])
+        _, result = run({"user": "a@contoso.com"}, live)
+        self.assertEqual(result["kind"], "personal", "other kinds are not counted")
+
+    def test_a_temporary_schema_is_named_and_alone(self):
+        for params, message in (({"schema": "try_this"}, "named cd_tmp_<name>"),
+                                ({"schema": "cd_tmp_x", "owner_group": "fin-data-eng"}, "the user's alone")):
+            with self.subTest(params=params), self.assertRaisesRegex(ValueError, message):
+                run({"user": "a@contoso.com", "temporary": "true", **params})
+
+    def test_a_run_again_never_changes_a_schemas_kind(self):
+        with self.assertRaisesRegex(ValueError, "already a personal schema, not a temporary one"):
+            run({"user": "tmp_x@contoso.com", "schema": "cd_tmp_x", "temporary": "true"},
+                {"cd_tmp_x": {"cd_user": "tmp_x@contoso.com", "cd_schema_kind": "personal"}})
 
     def test_an_existing_schema_that_is_not_the_users_is_refused(self):
         for schemas in ({"cd_a": {"cd_user": "someone.else@contoso.com"}},   # another person's

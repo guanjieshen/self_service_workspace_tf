@@ -10,6 +10,20 @@ is left alone.
 
 ## Unreleased
 
+- **Temporary schemas.** A new card, **Create a temporary schema** (Build), for short-term work:
+  the person names it (`cd_tmp_<name>`) and says what it is for; it is created straight away,
+  theirs alone, and tagged `cd_schema_kind=temporary` and `cd_expires=<date>` (30 days ahead,
+  `jobs.temporary_schema.days`). One at a time: the job refuses another while theirs has not
+  expired. **Nothing is deleted when it expires**: the tag is for admins (or a cleanup job later).
+  Deploy the app runs migration `007_temporary_schemas.sql` (a new kind of request). The schema
+  job also now refuses a run again that would change a schema's kind.
+
+  **Baseline edits:**
+
+  | File | Change |
+  | --- | --- |
+  | `config/self-service/app.yaml` | Optional: under `jobs:`, `temporary_schema: {days: 30}` (30 when it is missing) |
+
 - **The apps say Citizen Development, not Self-Service:** the header (`title` in `app.yaml`),
   the catalog's heading ("Citizen Development Tasks"), My requests, the approvals app's Settings,
   messages, and a new schema's plain comment ("Project schema of <who> (citizen development)").

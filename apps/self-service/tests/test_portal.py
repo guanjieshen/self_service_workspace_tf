@@ -515,7 +515,8 @@ class RequestsInTheDatabase(unittest.TestCase):
         run_id = p.run_recorded(row)
         job_id, params = fake.started[-1]
         self.assertEqual(params, {"user": ANA, "catalog": "fin_citizen_dev", "schema": "fin_reporting",
-                                  "owner_group": "fin-data-eng", "reason": WHY, "request_id": "ss-team1", "comment_model": "system.ai.claude-sonnet-5-5"})
+                                  "owner_group": "fin-data-eng", "reason": WHY, "request_id": "ss-team1", "temporary": "",
+                                  "comment_model": "system.ai.claude-sonnet-5-5"})
         self.assertEqual(db.events[-1], ("ss-team1", "run_started", {"workspace": "fin", "run_id": run_id}))
         p.run_recorded({**row, "id": "ss-f1", "kind": "folder", "name": "fin-docs"})
         self.assertEqual(fake.started[-1][1], {"folder": "fin-docs", "requested_by": ANA, "owner_group": "fin-data-eng",
@@ -929,7 +930,7 @@ class Pages(unittest.TestCase):
 
     def test_tasks_say_how_they_are_approved(self):
         page = self.http.get("/", headers=self.as_ana).text
-        self.assertEqual(page.count("Auto-approved"), 4, "personal, project and team schemas, and folders (their job is in this hub)")
+        self.assertEqual(page.count("Auto-approved"), 5, "personal, project, team and temporary schemas, and folders (their job is in this hub)")
         self.assertEqual(page.count(">Approval required"), 1, "workspace access (approved in Entra)")
         self.assertIn("Approval required", self.http.get("/persona", headers=self.as_ana).text)
         self.assertIn("Auto-approved", self.http.get("/folder", headers=self.as_ana).text)
@@ -1281,6 +1282,67 @@ class Pages(unittest.TestCase):
 
 
 @unittest.skipIf(TestClient is None, "FastAPI is not installed")
+class TemporarySchemas(unittest.TestCase):
+    """A temporary schema: the requester's, <prefix>tmp_<name>, tagged to expire; one at a time (the job checks)."""
+
+    def setUp(self):
+        import importlib
+        import os
+        import tempfile
+        cfg = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+        json.dump({**CONFIG, "temporary_days": 14, "ai_check": "on"}, cfg)
+        cfg.close()
+        os.environ["PORTAL_CONFIG"] = cfg.name
+        sys.modules.pop("main", None)
+        self.main = importlib.import_module("main")
+        self.db = FakeStore()
+        self.main.PORTAL, self.fake = make(self.db)
+        self.main.PORTAL.config = self.main.CONFIG
+        self.main.PORTAL.choose_bu(ANA, "FIN")
+        self.http = TestClient(self.main.app)
+        self.as_ana = {"X-Forwarded-Email": ANA}
+
+    def test_the_card_and_the_form(self):
+        page = self.http.get("/", headers=self.as_ana).text
+        self.assertIn('href="/schema/temporary"', page)
+        self.assertIn(">Create a temporary schema</a>", page)
+        form = self.http.get("/schema/temporary", headers=self.as_ana).text
+        self.assertIn("fin_citizen_dev.cd_tmp_</span>", form, "they type what follows cd_tmp_")
+        self.assertIn("It's yours for 14 days", form, "app.yaml jobs.temporary_schema.days")
+        self.assertIn("one temporary schema at a time", form)
+        self.assertIn('data-ai-check="temporary_schema"', form)
+
+    def test_a_temporary_schema_runs_the_schema_job_with_its_full_name(self):
+        r = self.http.post("/schema/temporary", data={"workspace": "fin", "name": "try_join", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
+        self.assertEqual(r.status_code, 303, r.text[:300])
+        job_id, params = self.fake.started[-1]
+        self.assertEqual((job_id, params["schema"], params["temporary"], params["owner_group"]), (1, "cd_tmp_try_join", "true", ""))
+        (rid, row), = self.db.requests.items()
+        self.assertEqual((row["kind"], row["name"]), ("temporary_schema", "cd_tmp_try_join"))
+        self.assertEqual(portal.record_params(row, self.main.PORTAL.workspaces()[0])["temporary"], "true", "run again as a temporary one")
+
+    def test_the_name_and_reason_follow_the_rules(self):
+        for data, message in (({"name": "cd_x", "reason": WHY}, "start with cd_"), ({"name": "x", "reason": "short"}, "Describe what it will be used for"),
+                              ({"name": "", "reason": WHY}, "Give the schema a name")):
+            with self.subTest(data=data):
+                r = self.http.post("/schema/temporary", data={"workspace": "fin", **data}, headers=self.as_ana)
+                self.assertIn(message, r.text)
+        self.assertEqual(self.fake.started, [])
+
+    def test_validate_looks_up_the_full_name(self):
+        self.fake.schemas_.add("fin_citizen_dev.cd_tmp_taken")
+        rows = self.main.PORTAL.ai_check("fin", "temporary_schema", "taken", WHY)["rows"]
+        self.assertEqual(rows[0], (False, "The schema name is already taken (fine only if it is yours)"))
+        asked = json.loads(self.fake.decided[-1]["messages"][1]["content"])
+        self.assertEqual((asked["request_type"], asked["name"]), ("temporary schema", "cd_tmp_taken"), "the model reads it as a temporary schema")
+
+    def test_a_failed_one_is_asked_again_on_its_form(self):
+        r = portal.Request("Create a temporary schema", "fin", "fin_citizen_dev.cd_tmp_try", "ss-1", "", "Failed", "", kind="personal_schema",
+                           params={"schema": "cd_tmp_try", "temporary": "true", "reason": WHY})
+        self.assertEqual(self.main.retry_link(r), "/schema/temporary?" + __import__("urllib.parse").parse.urlencode({"workspace": "fin", "name": "try", "reason": WHY}))
+        self.assertEqual(self.main.check_kind(r), "temporary_schema")
+
+
 class ManualFolders(unittest.TestCase):
     """With no folder job in the hub, a folder is made by hand: recorded, always for an approver,
     who creates it and approves it, which marks it done. Nothing runs."""

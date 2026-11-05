@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Personal, project or team schema
+# MAGIC # Personal, project, team or temporary schema
 # MAGIC Creates a schema for one user, grants it to them (all privileges and MANAGE, so they can share
 # MAGIC it themselves), and to their group for a team schema, and tags it for self-service tracking.
 # MAGIC Run by the `<BU> schema requests` job when the self-service app asks; safe to run again.
@@ -8,7 +8,8 @@
 # MAGIC (empty = their personal schema, `cd_<email before @>`; a name = a project or team schema,
 # MAGIC which may not start with the personal prefix), `owner_group` (optional, a team schema: a group
 # MAGIC the user belongs to, which gets the same rights), `reason` (why they need it; kept with the run) and
-# MAGIC `request_id` (optional), and `comment_model` (optional: the model, from the app's Settings, that writes
+# MAGIC `request_id` (optional), `temporary` ("true": a temporary schema, named `<prefix>tmp_<name>`, tagged
+# MAGIC `cd_expires` a set number of days ahead; one per person until it expires), and `comment_model` (optional: the model, from the app's Settings, that writes
 # MAGIC a new project or team schema's comment from the reason with `ai_query`; empty = the plain comment). Edit this notebook
 # MAGIC in the repository (bundle/jobs/notebooks/personal_schema.py): the next deploy replaces it.
 
@@ -25,6 +26,7 @@ prefix = ${jsonencode(prefix)}
 privileges = ${jsonencode(privileges)}
 owner = ${jsonencode(owner)}
 allowed_catalogs = ${jsonencode(allowed_catalogs)}
+temporary_days = ${jsonencode(temporary_days)}   # how long a temporary schema lasts: its cd_expires tag
 # The request record check (below): the app's records, this workspace's name in them, and
 # the kinds that always need an approver. requests_catalog empty = off.
 requests_catalog = ${jsonencode(requests_catalog)}
@@ -38,7 +40,7 @@ ${request_record_check}
 # COMMAND ----------
 
 # The request.
-for name in ("user", "schema", "catalog", "owner_group", "reason", "request_id", "comment_model"):
+for name in ("user", "schema", "catalog", "owner_group", "reason", "request_id", "temporary", "comment_model"):
     dbutils.widgets.text(name, "")
 user = dbutils.widgets.get("user").strip().lower()
 schema = dbutils.widgets.get("schema").strip().lower()
@@ -47,9 +49,11 @@ owner_group = dbutils.widgets.get("owner_group").strip()
 reason = dbutils.widgets.get("reason").strip()   # why they need it: kept with the run, and only a query parameter
 request_id = dbutils.widgets.get("request_id").strip()
 comment_model = dbutils.widgets.get("comment_model").strip()
+temporary = dbutils.widgets.get("temporary").strip().lower() == "true"
 personal = prefix + re.sub(r"[^a-z0-9]+", "_", user.split("@")[0]).strip("_")
-kind = "personal" if not schema or schema == personal else "team" if owner_group else "project"
+kind = "temporary" if temporary else "personal" if not schema or schema == personal else "team" if owner_group else "project"
 schema = schema or personal
+today = datetime.date.today()
 
 # COMMAND ----------
 
@@ -58,8 +62,14 @@ if not re.fullmatch(r"[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]+", user):
     raise ValueError(f"user must be an email address, not {user!r}")
 if not re.fullmatch(r"[a-z0-9][a-z0-9_]*", schema):
     raise ValueError(f"schema must be lowercase letters, digits and _, not {schema!r}")
-if kind != "personal" and schema.startswith(prefix):
+if kind == "temporary" and not re.fullmatch(f"{prefix}tmp_[a-z0-9][a-z0-9_]*", schema):
+    raise ValueError(f"a temporary schema is named {prefix}tmp_<name>, not {schema!r}")
+if kind in ("project", "team") and schema.startswith(prefix):
     raise ValueError(f"a project or team schema may not start with {prefix} (personal schemas are named {prefix}<name>)")
+if temporary and owner_group:
+    raise ValueError("a temporary schema is the user's alone: owner_group is for a team schema")
+if not isinstance(temporary_days, int) or not 1 <= temporary_days <= 365:
+    raise ValueError(f"temporary_days is 1 to 365, not {temporary_days!r}")
 if owner_group and kind == "personal":
     raise ValueError("a personal schema is the user's alone: owner_group is for a team schema")
 if owner_group and not re.fullmatch(r"[A-Za-z0-9 _.-]+", owner_group):
@@ -89,14 +99,34 @@ tagged = spark.sql(f"SELECT tag_value FROM `{catalog}`.information_schema.schema
                    f"WHERE schema_name = '{schema}' AND tag_name = 'cd_user'").collect()
 if exists and [r.tag_value for r in tagged] != [user]:
     raise ValueError(f"{catalog}.{schema} already exists and is not {user}'s")
+# ... and of the same kind: a run again never turns one kind of schema into another.
+was = spark.sql(f"SELECT tag_value FROM `{catalog}`.information_schema.schema_tags "
+                f"WHERE schema_name = '{schema}' AND tag_name = 'cd_schema_kind'").collect()
+if exists and was and was[0].tag_value != kind:
+    raise ValueError(f"{catalog}.{schema} is already a {was[0].tag_value} schema, not a {kind} one")
+
+# One temporary schema per person at a time: another of theirs that has not expired yet refuses it.
+if kind == "temporary":
+    found = {}
+    for r in spark.sql(f"SELECT schema_name, tag_name, tag_value FROM `{catalog}`.information_schema.schema_tags "
+                       "WHERE tag_name IN ('cd_user', 'cd_schema_kind', 'cd_expires')").collect():
+        found.setdefault(r.schema_name, {})[r.tag_name] = r.tag_value
+    live = sorted((t.get("cd_expires", ""), s) for s, t in found.items() if s != schema and t.get("cd_user") == user
+                  and t.get("cd_schema_kind") == "temporary" and t.get("cd_expires", "") >= today.isoformat())
+    if live:
+        raise ValueError(f"You already have a temporary schema, {catalog}.{live[0][1]}, until {live[0][0]}. "
+                         "Ask for another once it expires.")
 
 # COMMAND ----------
 
 # Create and tag first (so a failed run can be run again), then grant and hand it to the owner.
 name = f"`{catalog}`.`{schema}`"
 tags = {"cd_managed_by": "self_service", "cd_user": user, "cd_schema_kind": kind}
+expires = (today + datetime.timedelta(days=temporary_days)).isoformat()
 if not exists:
-    tags["cd_created"] = datetime.date.today().isoformat()
+    tags["cd_created"] = today.isoformat()
+    if kind == "temporary":   # a run again keeps its date
+        tags["cd_expires"] = expires
 if request_id:
     tags["cd_request_id"] = request_id
 
@@ -105,7 +135,8 @@ if request_id:
 # never handed to two people. An existing one (checked above: this user's) is a run again.
 if not exists:
     try:
-        spark.sql(f"CREATE SCHEMA {name} COMMENT '{kind.capitalize()} schema of {owner_group or user} (citizen development)'")
+        until = f", until {expires}" if kind == "temporary" else ""
+        spark.sql(f"CREATE SCHEMA {name} COMMENT '{kind.capitalize()} schema of {owner_group or user}{until} (citizen development)'")
     except Exception as e:
         if "ALREADY_EXISTS" in str(e) or "already exists" in str(e):
             raise ValueError(f"{catalog}.{schema} was just created by another request: choose another name") from e
@@ -145,4 +176,5 @@ if not exists and kind != "personal" and comment_model and reason:
 if owner:
     spark.sql(f"ALTER SCHEMA {name} OWNER TO `{owner}`")
 
-dbutils.notebook.exit(json.dumps({"catalog": catalog, "schema": schema, "kind": kind, "user": user, "owner_group": owner_group, "reason": reason, "created": not exists}))
+dbutils.notebook.exit(json.dumps({"catalog": catalog, "schema": schema, "kind": kind, "user": user, "owner_group": owner_group, "reason": reason, "created": not exists,
+                                  **({"expires": tags.get("cd_expires") or ""} if kind == "temporary" else {})}))

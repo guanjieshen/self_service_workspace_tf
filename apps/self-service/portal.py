@@ -44,9 +44,12 @@ TASKS = {"personal_schema": "Create a personal schema", "team_folder": "Request 
 # The personal schema job also makes named schemas: a project schema (the requester's) and a
 # team schema (the requester's and one of their groups').
 PROJECT_SCHEMA, TEAM_SCHEMA = "Request a project schema", "Request a team schema"
+# ... and a temporary schema: the requester's alone, <prefix>tmp_<name>, tagged to expire (one at a time).
+TEMPORARY_SCHEMA = "Create a temporary schema"
 # How each task is approved, as the catalog and task pages label it. The app's own tasks run
 # straight away (the jobs check every request); a persona is approved in Entra ID.
-APPROVAL = {"schema": "auto", "project_schema": "auto", "team_schema": "auto", "folder": "auto", "persona": "required"}
+APPROVAL = {"schema": "auto", "project_schema": "auto", "team_schema": "auto", "temporary_schema": "auto", "folder": "auto",
+            "persona": "required"}
 # A request whose job is not deployed in the hub is made by hand (Portal.manual): recorded and
 # tracked like the others, always for an approver, who makes it (the approvals app says what) and
 # then approves it, which marks it done. The database's kind -> its job. Today the folder job is
@@ -60,7 +63,8 @@ def approval_of(config, manual=()):
     """Each catalog task's approval, with the kinds an approver decides (app.yaml human_approval,
     and those made by hand: manual)."""
     people = set(config.get("human_approval", ())) | set(manual)
-    task_kind = {"schema": "personal_schema", "project_schema": "project_schema", "team_schema": "team_schema", "folder": "folder"}
+    task_kind = {"schema": "personal_schema", "project_schema": "project_schema", "team_schema": "team_schema",
+                 "temporary_schema": "temporary_schema", "folder": "folder"}
     return {**APPROVAL, **{task: "required" for task, kind in task_kind.items() if kind in people}}
 SCHEMA = r"[a-z0-9][a-z0-9_]*"
 # Where a run is, as the status page shows it: waiting for serverless compute, or running.
@@ -126,7 +130,7 @@ def load_config(path):
 
 # Each kind of request, as the requester reads it.
 APPROVAL_TYPES = {"personal_schema": "Personal schema", "project_schema": "Project schema", "team_schema": "Team schema",
-                  "folder": "Workspace folder"}
+                  "temporary_schema": "Temporary schema", "folder": "Workspace folder"}
 # The states in which a request waits for a person (the database's request_status).
 WAITING = ("submitted", "replied", "needs_info")
 
@@ -139,7 +143,8 @@ def record_params(row, w):
     else:
         catalog = w.jobs["personal_schema"]["tags"].get("cd_catalog", "") if w and "personal_schema" in w.jobs else ""
         params = {"user": row["requested_by"], "catalog": catalog,
-                  "schema": "" if row["kind"] == "personal_schema" else row["name"]}
+                  "schema": "" if row["kind"] == "personal_schema" else row["name"],
+                  "temporary": "true" if row["kind"] == "temporary_schema" else ""}
     return {**params, "owner_group": row.get("owner_group") or "", "reason": row.get("reason") or "", "request_id": row["id"]}
 
 
@@ -172,6 +177,11 @@ def new_request_id():
 def schema_name(email, prefix="cd_"):
     """The personal schema's name: cd_ plus the email before the @ (as the job names it)."""
     return prefix + re.sub(r"[^a-z0-9]+", "_", email.split("@")[0].lower()).strip("_")
+
+
+def temporary_prefix(prefix):
+    """How a temporary schema's name starts: the personal prefix, then tmp_ (cd_tmp_)."""
+    return f"{prefix}tmp_"
 
 
 def check_schema(name, prefix):
@@ -521,6 +531,8 @@ class Portal:
             check_reason(reason)
         except RequestError as e:   # a rule says no: no need to ask the AI
             return {"rows": [(False, str(e))], "error": ""}
+        if kind == "temporary_schema":   # the form asks for what follows <prefix>tmp_
+            name = temporary_prefix(w.jobs[kind_job]["tags"].get("cd_prefix", "cd_")) + name
         noun = "folder" if kind == "folder" else "schema"
         if kind in self.manual():   # a folder is in its own workspace, which the hub does not call: the admin checks
             rules = []
@@ -559,17 +571,26 @@ class Portal:
 
     # ---- Requests ----
 
-    def request_schema(self, ws_name, user, schema="", owner_group="", reason=""):
+    def request_schema(self, ws_name, user, schema="", owner_group="", reason="", temporary=False):
         """Run the personal schema job for the user: their personal schema; with a name, a
         project schema; with a name and owner_group (any Entra account group: membership is not
-        checked), a team schema the group can manage too. Returns the run's ID."""
+        checked), a team schema the group can manage too; temporary, with a name (what follows
+        <prefix>tmp_), a temporary schema: theirs alone, one at a time (the job checks). Returns
+        the run's ID."""
         if not re.fullmatch(EMAIL, user):
             raise RequestError("Your account has no email address the job can use.")
         w = self.workspace(ws_name, "personal_schema")
         self._check_bu(user, w, "personal_schema")
         job = w.jobs["personal_schema"]
+        prefix = job["tags"].get("cd_prefix", "cd_")
+        if temporary:
+            if not schema or owner_group:
+                raise RequestError("A temporary schema needs a name, and is yours alone.")
+            check_schema(schema, prefix)
+            schema = temporary_prefix(prefix) + schema
+        elif schema:
+            check_schema(schema, prefix)
         if schema:
-            check_schema(schema, job["tags"].get("cd_prefix", "cd_"))
             check_reason(reason)   # a personal schema needs none: everyone may have one
         if owner_group and not schema:
             raise RequestError("A team schema needs a name.")
@@ -582,7 +603,8 @@ class Portal:
             return pending.run_id
         self._personal.pop((ws_name, user), None)
         return self._start(w, "personal_schema", user, schema or resource.split(".", 1)[1], owner_group, reason, {
-            "user": user, "catalog": catalog, "schema": schema, "owner_group": owner_group, "reason": reason})
+            "user": user, "catalog": catalog, "schema": schema, "owner_group": owner_group, "reason": reason,
+            "temporary": "true" if temporary else ""})
 
     def request_folder(self, ws_name, user, folder, reason=""):
         """Run the team folder job for the user's folder: they and the workspace's platform admins
@@ -804,7 +826,9 @@ class Portal:
                 message = failure_reason(getattr(run.state, "state_message", "")) if status == "Failed" else ""
         life = getattr(getattr(run.state, "life_cycle_state", None), "value", "") or ""
         task = TASKS[kind]
-        if kind == "personal_schema" and params.get("schema"):
+        if kind == "personal_schema" and params.get("temporary") == "true":
+            task = TEMPORARY_SCHEMA
+        elif kind == "personal_schema" and params.get("schema"):
             task = TEAM_SCHEMA if params.get("owner_group") else PROJECT_SCHEMA
         return Request(task, w.name, resource, params.get("request_id") or str(run.run_id),
                        when(run.start_time or 0),
@@ -923,7 +947,7 @@ class Portal:
     def _request_from_row(self, row, w, status, message):
         kind = "team_folder" if row["kind"] == "folder" else "personal_schema"
         task = {"personal_schema": TASKS["personal_schema"], "project_schema": PROJECT_SCHEMA,
-                "team_schema": TEAM_SCHEMA, "folder": TASKS["team_folder"]}[row["kind"]]
+                "team_schema": TEAM_SCHEMA, "temporary_schema": TEMPORARY_SCHEMA, "folder": TASKS["team_folder"]}[row["kind"]]
         params = record_params(row, w)
         if kind == "team_folder":
             resource = self.folder_path(w, row["name"]) if w else row["name"]

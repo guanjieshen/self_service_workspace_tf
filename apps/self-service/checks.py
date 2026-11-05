@@ -39,7 +39,8 @@ EXAMPLES = {   # noun -> (a good name, a good reason)
     "schema": ("sales_forecast_weekly", "weekly sales forecast tables for the sales operations team"),
     "folder": ("sales-forecast", "notebooks and dashboards for the weekly sales forecast, used by the sales operations team"),
 }
-KINDS = {"project_schema": "project schema", "team_schema": "team schema", "folder": "workspace folder"}
+KINDS = {"project_schema": "project schema", "team_schema": "team schema", "temporary_schema": "temporary schema",
+         "folder": "workspace folder"}
 
 
 def check(client, model, kind, name, reason, owner_group="", workspace=""):

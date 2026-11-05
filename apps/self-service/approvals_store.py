@@ -5,7 +5,7 @@ import datetime as dt
 from concurrent.futures import ThreadPoolExecutor
 
 # Every kind of request, as approvers read it (the database's kinds).
-TYPES = {"personal_schema": "Personal schema", "project_schema": "Project schema", "team_schema": "Team schema", "folder": "Workspace folder"}
+TYPES = {"personal_schema": "Personal schema", "project_schema": "Project schema", "team_schema": "Team schema", "temporary_schema": "Temporary schema", "folder": "Workspace folder"}
 WAITING = ("submitted", "replied", "needs_info")   # states in which a request that needs a person waits
 
 

@@ -18,7 +18,7 @@ import cards
 log = logging.getLogger(__name__)
 
 PERSONAS = ("explorer", "builder", "publisher")
-SOPS = {"schema": "Personal schema", "project_schema": "Project schema", "team_schema": "Team schema",
+SOPS = {"schema": "Personal schema", "project_schema": "Project schema", "team_schema": "Team schema", "temporary_schema": "Temporary schema",
         "persona": "Workspace access", "folder": "Workspace folder", "warehouses": "SQL warehouses"}
 # How it works (the "New here?" line), then one FAQ per catalog section, named as it is.
 FAQS = {"getting_started": "How it works", **dict(cards.SECTIONS)}

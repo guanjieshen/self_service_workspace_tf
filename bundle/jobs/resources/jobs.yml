@@ -12,7 +12,7 @@ resources:
   # (scripts/app_build.py).
   jobs:
     personal_schema:
-      # One job for every schema: personal, project and team (the notebook tells them apart).
+      # One job for every schema: personal, project, team and temporary (the notebook tells them apart).
       name: ${var.business_unit} schema requests
       max_concurrent_runs: 20
       queue:
@@ -27,6 +27,7 @@ resources:
         - {name: owner_group, default: ""}
         - {name: reason, default: ""}
         - {name: request_id, default: ""}
+        - {name: temporary, default: ""}
         - {name: comment_model, default: ""}
       tasks:
         - task_key: create
