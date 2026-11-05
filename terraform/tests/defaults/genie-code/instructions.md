@@ -32,7 +32,8 @@ This is a **self-service** workspace: many people here are business users, and s
 
 Rules for anything you build or change here. Say so when one applies, in a sentence, and help the person meet it; do not refuse their request because of it.
 
-- **Every job and pipeline carries tags** that say what it is for, as well as the chargeback tags ({TAGS}): what it does and for whom, in a few words (for example `PURPOSE: WEEKLY_SALES_REPORT`). Suggest values from what the person told you, and confirm them before you set them. Never invent an owner, a team or a project: ask. Keep the tags when you change an existing job or pipeline.
+- **Serverless first, with a usage policy.** Run notebooks, jobs and pipelines on serverless compute, and select a serverless usage policy: `{PREFIX}-0-SELF-SERVICE` for general work in this workspace, or the person's project policy if they have one (the self-service app creates project policies). The policy adds this workspace's tags for them.
+- **Every job and pipeline carries tags.** This workspace's default tags are {WORKSPACE_TAGS}: the usage policy sets them on serverless work; on anything else (a classic cluster, a job's own tags) set them yourself, along with every chargeback tag ({TAGS}). Add tags that say what the work is for, in a few words (for example `PURPOSE: WEEKLY_SALES_REPORT`). Suggest values from what the person told you, and confirm them before you set them. Never invent an owner, a team or a project: ask. Keep the tags when you change an existing job or pipeline.
 
 ## Data
 
@@ -45,14 +46,13 @@ Rules for anything you build or change here. Say so when one applies, in a sente
 ## Compute
 
 - For SQL, use the `{WAREHOUSE}` SQL warehouse.
-- For notebooks, jobs and pipelines, prefer serverless compute.
+- For notebooks, jobs and pipelines, serverless compute (see Guardrails).
 - Classic compute is the exception. When it is needed, use the classic cluster policy for the kind of cluster: `{PREFIX} Classic Interactive` for notebooks, `{PREFIX} Classic Jobs` for job clusters, `{PREFIX} Classic Pipelines` for pipelines (access is requested through the self-service app). Each sets the tags and limits, and asks for the tags you fill in; each allows one cluster per person.
 - Avoid the Personal Compute policy for shared or scheduled work: its clusters do not carry the chargeback tags.
 
 ## Cost attribution
 
-- Every workload is charged back with the tags {TAGS}. Set for you: {WORKSPACE_TAGS}. Keep the tags on any cluster or job you define.
-- For serverless jobs, pipelines and notebooks, select a serverless usage policy: `{PREFIX}-0-SELF-SERVICE` for general work, or your project's policy if you have one.
+- Every workload is charged back to the team that owns it, with the tags {TAGS}: that is why the guardrails ask for a usage policy and tags. Usage policies tag usage; they do not cap it.
 
 ## Sharing work
 

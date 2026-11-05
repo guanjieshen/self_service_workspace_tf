@@ -14,9 +14,10 @@ is left alone.
   to Databricks, so answer first, match their level, and ask about their role and priorities at
   most once, saving the answer to Genie Code memory. The `onboard-me` skill keeps its profile in
   Genie Code memory instead of a file in the user's folder.
-- A **Guardrails** section in the default Genie Code instructions. The first: every job and pipeline
-  carries tags that say what it is for, besides the chargeback tags; Genie Code suggests the values
-  and the person confirms them.
+- A **Guardrails** section in the default Genie Code instructions: serverless first, with the
+  workspace's usage policy (`{PREFIX}-0-SELF-SERVICE`) or a project's; and every job and pipeline
+  carries the workspace's default tags plus tags that say what it is for, which Genie Code suggests
+  and the person confirms.
 
 ## 1.0.1
 
