@@ -28,7 +28,8 @@ VIEWS = {
 }
 PERIODS = (7, 30, 90)   # the Overview's presets, in days
 SORTS = {"waiting": "Longest waiting", "newest": "Newest first", "oldest": "Oldest first"}
-DONE = {"approved": "Approved: its job is running.", "rejected": "Rejected: the requester sees why.",
+DONE = {"approved": "Approved: its job is running.", "completed": "Approved: the requester sees it as created.",
+        "rejected": "Rejected: the requester sees why.",
         "needs_info": "Question sent to the requester."}
 
 
@@ -208,12 +209,13 @@ def register(app, page, user_of, store, config=None):
         try:
             if action not in OUTCOMES:
                 raise HTTPException(400)
-            store.decide(user_of(request), request_id, OUTCOMES[action], comment)
+            decided = store.decide(user_of(request), request_id, OUTCOMES[action], comment)
         except PermissionError:
             raise HTTPException(404, "Not a request you approve")
         except ValueError as e:
             return detail(request, request_id, error=str(e), back=back)
         sep = "&" if back else ""
-        return RedirectResponse(f"/approvals?{back}{sep}{urlencode({'done': request_id, 'outcome': OUTCOMES[action]})}", status_code=303)
+        outcome = "completed" if decided.get("manual") and OUTCOMES[action] == "approved" else OUTCOMES[action]
+        return RedirectResponse(f"/approvals?{back}{sep}{urlencode({'done': request_id, 'outcome': outcome})}", status_code=303)
 
     return store

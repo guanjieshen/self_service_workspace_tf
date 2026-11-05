@@ -27,9 +27,12 @@ browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py
   runs, Unity Catalog lookups. A served workspace's job is in the hub, tagged with the workspace
   it serves (`cd_workspace`). The workspace's own `host` is used only for the links people open
   in their browser (Genie One, Discover). So no cross-workspace access is needed.
-- **Workspace folders are off for now:** a folder is workspace specific, so its job is not
-  deployed and the card shows Coming soon (`cards.py`; the job's notebook stays in
-  `bundle/jobs/notebooks/team_folder.py`).
+- **Workspace folders are made by hand for now:** a folder is workspace specific, so its job is
+  not deployed (its notebook stays in `bundle/jobs/notebooks/team_folder.py`). A kind whose job
+  is in none of the hub's jobs is made by hand (`portal.BY_HAND`, `Portal.manual`): the request
+  is recorded, always waits for an approver, and the approvals app says what to create (the
+  workspace, `jobs.folder_root`/<name>, who gets Can manage). The approver creates it, then
+  approves, which marks it Completed; nothing runs. Deploy the job again and folders run it.
 - **A team schema's group is typed, and membership is not checked:** the hub cannot see a
   person's groups in their workspace. Any Entra account group can be named; a workspace-local
   one fails at the grant.

@@ -674,3 +674,6 @@ aside .kv dd { text-align: right; }
 .row.request .status { min-width: 0; }
 .row-note { color: var(--text-2); font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-note .k { font-weight: var(--medium); margin-right: var(--s1); }
+
+/* The steps for a request made by hand (approvals detail) */
+.manual-steps { margin: var(--s2) 0 0; padding-left: var(--s5); display: grid; gap: var(--s1); }

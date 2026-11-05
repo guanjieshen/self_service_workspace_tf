@@ -5,7 +5,7 @@
 {% block title %}{{ r.name }} · Approvals{% endblock %}
 {#- The Approval card's facts, one row each: the decision, who and when, then the job and its URL. -#}
 {%- macro approval_rows(decision, by, at) -%}
-{%- set job -%}{% if r.run %}{{ status(r.status) }}{% endif %}{%- endset -%}
+{%- set job -%}{% if r.run %}{{ status(r.status) }}{% elif r.manual %}None: made by hand{% endif %}{%- endset -%}
 {%- set url -%}{% if r.run_url %}<a class="text-link" href="{{ r.run_url }}" target="_blank" rel="noopener">Open job run {{ icon("external", "icon icon-xs") }}</a>{% endif %}{%- endset -%}
 <div class="kv-side">{{ kv([("Decision", decision), ("By", by), ("When", at), ("Job status", job | trim)]) }}</div>
 {%- endmacro -%}
@@ -78,6 +78,17 @@
       {% else %}
         <h2 class="panel-title">Review and approve</h2>
         {% if r.status == "needs_info" %}{% call callout() %}Waiting for the requester's answer. You can still approve or reject.{% endcall %}{% endif %}
+        {% if r.manual %}
+        {#- No job makes it yet (portal.MANUAL): the approver does, then approves, which marks it done. -#}
+        {%- set w = config.workspaces | selectattr("name", "equalto", r.workspace) | first -%}
+        {%- set path = (config.folder_root or "/Workspace") | trim("/") -%}
+        {% call callout() %}<p class="strong">Made by hand for now</p>
+          <ol class="manual-steps">
+            <li>In {% if w %}<a class="text-link" href="{{ w.host }}/browse" target="_blank" rel="noopener">{{ r.workspace }} {{ icon("external", "icon icon-xs") }}</a>{% else %}<span class="mono">{{ r.workspace }}</span>{% endif %}, create <span class="mono">/{{ path }}/{{ r.name }}</span> {{ copy_button("/" ~ path ~ "/" ~ r.name, "Copy the path") }}</li>
+            <li>Share it: <span class="mono">{{ r.requested_by }}</span> and the workspace's platform admins, Can manage</li>
+            <li>Approve: the requester sees it as created</li>
+          </ol>{% endcall %}
+        {% endif %}
         <form method="post" action="/approvals/{{ r.id }}" class="decision-form">
           <input type="hidden" name="back" value="{{ back }}">
           <label for="comment">Message to the requester <span class="meta">(needed to reject or ask a question)</span></label>
@@ -87,7 +98,7 @@
             <button type="submit" name="action" value="ask" class="button">Ask a question</button>
             <button type="submit" name="action" value="reject" class="button danger">Reject</button>
           </div>
-          <p class="meta">Approve creates the {{ "folder" if r.kind == "folder" else "schema" }} in under a minute.</p>
+          <p class="meta">{% if r.manual %}Approve once you have created it: the requester sees it as created.{% else %}Approve creates the {{ "folder" if r.kind == "folder" else "schema" }} in under a minute.{% endif %}</p>
         </form>
         {% if r.summary and r.summary.questions %}
         <div class="suggested">
@@ -111,7 +122,7 @@
     <div class="card-head"><h2 class="card-label">Request details</h2>{{ copy_button(r.id, "Copy the request ID") }}</div>
     {%- set rid -%}<span class="id-chip">{{ r.id }}</span>{%- endset -%}
     {%- set ws -%}<span class="mono">{{ r.workspace }}</span>{%- endset -%}
-    {%- set url -%}{% if r.run_url %}<a class="text-link" href="{{ r.run_url }}" target="_blank" rel="noopener">Open job run {{ icon("external", "icon icon-xs") }}</a>{% endif %}{%- endset -%}
+    {%- set url -%}{% if r.run_url %}<a class="text-link" href="{{ r.run_url }}" target="_blank" rel="noopener">Open job run {{ icon("external", "icon icon-xs") }}</a>{% elif r.manual %}None: made by hand{% endif %}{%- endset -%}
     <div class="kv-side">{{ kv([("Request ID", rid), ("Submitted", r.submitted | local), ("Target workspace", ws), ("Job URL", url | trim)]) }}</div>
   </section>
   </aside>

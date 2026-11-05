@@ -105,7 +105,7 @@ class Builds(unittest.TestCase):
                          "in the hub, each workspace's job with its own state")
         self.assertEqual(t["variables"], {"business_unit": "FIN"})
         jobs = t["resources"]["jobs"]
-        self.assertEqual(set(jobs), {"personal_schema"}, "the folder job is not deployed for now")
+        self.assertEqual(set(jobs), {"personal_schema"}, "the folder job is not deployed for now: folders are made by hand")
         self.assertFalse((out / "team_folder.py").exists())
         self.assertEqual(jobs["personal_schema"]["tags"], {"cd_catalog": "fin_citizen_dev", "cd_prefix": "cd_", "cd_workspace": "fin-citizen-dev"})
         self.assertEqual(jobs["personal_schema"]["permissions"], [{"level": "CAN_MANAGE_RUN", "service_principal_name": "11111111-1111-1111-1111-111111111111"}])

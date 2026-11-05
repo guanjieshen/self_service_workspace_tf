@@ -8,7 +8,7 @@
 <div class="page-grid form-grid">
 <form class="panel" method="post" action="/folder" data-submit>
   <div class="panel-body">
-    {% call callout() %}You can manage this folder, and share it with others in Databricks once it's created. Your workspace's platform admins can manage it too.{% endcall %}
+    {% call callout() %}A platform admin creates this folder for you once they approve it. You can manage it, and share it with others in Databricks once it's created. Your workspace's platform admins can manage it too.{% endcall %}
     {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
     {% if not workspaces %}
       {% if not error %}{% call callout("error") %}No workspace offers folders yet.{% endcall %}{% endif %}

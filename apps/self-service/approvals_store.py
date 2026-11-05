@@ -13,7 +13,7 @@ class LakebaseStore:
     """The approvals app's data, from the requests database (store.Store). A request's run
     status comes from its job run (run_status: the Jobs API), never from a copy."""
 
-    def __init__(self, db, bus, run_status=None, start=None, human_approval=(), summarize=None, run_link=None):
+    def __init__(self, db, bus, run_status=None, start=None, human_approval=(), summarize=None, run_link=None, manual=()):
         """start(row): runs an approved request's job (portal.Portal.run_recorded). human_approval:
         the kinds a person must always approve (app.yaml); they wait here instead of running.
         summarize(row): writes the AI summary of a request that has none (portal.Portal.summarize)."""
@@ -22,6 +22,7 @@ class LakebaseStore:
         self.run_link = run_link or (lambda workspace, kind, run_id: None)   # the run in Databricks (portal.Portal.run_link)
         self.start = start
         self.human_approval = set(human_approval)
+        self.manual = manual if callable(manual) else (lambda: set(manual))   # kinds made by hand (Portal.manual): approving marks them done
         self.summarize = summarize
 
     @staticmethod
@@ -43,7 +44,7 @@ class LakebaseStore:
                 "status": status,
                 "run": row["run"], "run_url": self.run_link(row["workspace"], row["kind"], (row["run"] or {}).get("run_id")),
                 "decision": d and {**d, "at": d["at"].replace(tzinfo=None)},
-                "needs_person": self.needs_person(row), "summary": row.get("summary"),
+                "needs_person": self.needs_person(row), "manual": row["kind"] in self.manual(), "summary": row.get("summary"),
                 "waiting_since": (row["state_at"] if row["state"] in ("submitted", "replied") else row["created_at"]).replace(tzinfo=None),
                 "events": [{**e, "at": e["at"].replace(tzinfo=None)} for e in (events or [])]}
 
@@ -54,6 +55,8 @@ class LakebaseStore:
             return {"In progress": "running", "Completed": "completed", "Failed": "failed", "Finished": "finished"}.get(live, "unknown")
         if row["state"] == "start_failed":
             return "failed"
+        if row["state"] == "approved" and row["kind"] in self.manual():   # made by hand, then approved
+            return "completed"
         if row["state"] in ("approved", "rejected", "needs_info"):
             return row["state"]
         return "waiting"
@@ -68,8 +71,9 @@ class LakebaseStore:
         return rows
 
     def needs_person(self, row):
-        """A request a person decides: its kind needs one (human_approval), and no job has run for it."""
-        return not row["run"] and row["kind"] in self.human_approval
+        """A request a person decides: its kind needs one (human_approval, or made by hand), and no
+        job has run for it."""
+        return not row["run"] and (row["kind"] in self.human_approval or row["kind"] in self.manual())
 
     def needs_review(self, row):
         """A request waiting for a person, undecided."""

@@ -117,6 +117,7 @@ def app_config(s, spokes, mode=None):
     config = {
         "title": app["title"],
         "hub_host": host,   # where the jobs run: an admin's link to a request's run opens there
+        "folder_root": s["jobs"].get("folder_root") or "/Workspace",   # where folders go (made by hand for now)
         "faq": dict(app.get("faq") or {}),
         "ai_check": str(app.get("ai_check") or "off"),
         "human_approval": list(app.get("human_approval") or []),

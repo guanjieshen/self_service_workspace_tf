@@ -434,7 +434,7 @@ For when CI cannot run (GitHub is down, the runner is broken) and a workspace ne
 
 **Who:** the platform team. **Optional:** the baseline works without it.
 
-The app lets people ask for what they need (a personal, project or team schema; workspace folders are coming) in a web page, and an approvals app lets platform admins approve, change settings and answer questions. Both apps, their database **and each served workspace's schema job** run in one **hub** workspace: Unity Catalog is shared across the metastore, and each served workspace's catalog is bound to the hub too, so **the app never calls another workspace**. The Deploy workflow deploys all of it (**Deploy the app**), from `config/self-service/`, after Terraform: nothing is deployed by hand.
+The app lets people ask for what they need (a personal, project or team schema, or a workspace folder, which a platform admin creates by hand for now) in a web page, and an approvals app lets platform admins approve, change settings and answer questions. Both apps, their database **and each served workspace's schema job** run in one **hub** workspace: Unity Catalog is shared across the metastore, and each served workspace's catalog is bound to the hub too, so **the app never calls another workspace**. The Deploy workflow deploys all of it (**Deploy the app**), from `config/self-service/`, after Terraform: nothing is deployed by hand.
 
 ### Before you start
 

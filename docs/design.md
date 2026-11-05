@@ -17,7 +17,7 @@ platform team runs it from Git: YAML only, reviewed in pull requests, applied by
 the workspace catalog, the chargeback tags and serverless usage policy, Genie Code).
 **Out of scope:** creating workspaces and networking (combined mode, future), the
 metastore and shared catalogs, who is in which group (Entra ID), and everything people
-request: schemas (the self-service app today; workspace folders are coming), and team warehouses,
+request: schemas and workspace folders (the self-service app today; folders made by hand for now), and team warehouses,
 project usage policies and access to classic compute (by hand until the app offers them). The rule: Terraform holds what every workspace has
 and rarely changes; anything that changes by ad hoc request belongs to the app.
 
@@ -129,7 +129,7 @@ every entitlement off**, so people can share with them:
 | Request | Path |
 |---|---|
 | A persona (explorer, builder, publisher) | The person asks in Entra (for example an access package), which adds them to the group. No pull request |
-| A schema | The self-service app's jobs (section 9). Workspace folders: coming |
+| A schema | The self-service app's jobs (section 9). Workspace folders: a platform admin, by hand, tracked in the approvals app |
 | A team warehouse, a project usage policy, classic compute | The self-service app, not built yet |
 
 ## 5. The workspace catalog
@@ -210,7 +210,7 @@ Catalogs shared between workspaces, storage credentials and external locations s
 
 ## 9. The self-service app
 
-What people request (personal, project and team schemas; workspace folders are coming) comes
+What people request (personal, project and team schemas; workspace folders, made by hand for now) comes
 from the self-service app, an approvals app for the requests that need a person, and a schema job
 for each workspace the app serves, all in the hub: Unity Catalog is shared across the metastore,
 so **the app never calls another workspace** and needs no cross-workspace access. They live in this repository (`apps/self-service/`, `bundle/`,

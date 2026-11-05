@@ -929,7 +929,7 @@ class Pages(unittest.TestCase):
 
     def test_tasks_say_how_they_are_approved(self):
         page = self.http.get("/", headers=self.as_ana).text
-        self.assertEqual(page.count("Auto-approved"), 3, "personal, project and team schemas (folders: Coming soon)")
+        self.assertEqual(page.count("Auto-approved"), 4, "personal, project and team schemas, and folders (their job is in this hub)")
         self.assertEqual(page.count(">Approval required"), 1, "workspace access (approved in Entra)")
         self.assertIn("Approval required", self.http.get("/persona", headers=self.as_ana).text)
         self.assertIn("Auto-approved", self.http.get("/folder", headers=self.as_ana).text)
@@ -1281,6 +1281,83 @@ class Pages(unittest.TestCase):
 
 
 @unittest.skipIf(TestClient is None, "FastAPI is not installed")
+class ManualFolders(unittest.TestCase):
+    """With no folder job in the hub, a folder is made by hand: recorded, always for an approver,
+    who creates it and approves it, which marks it done. Nothing runs."""
+
+    def setUp(self):
+        import importlib
+        import os
+        import tempfile
+        cfg = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+        json.dump({**CONFIG, "human_approval": ["project_schema", "team_schema"], "folder_root": "/Workspace/Teams"}, cfg)
+        cfg.close()
+        os.environ["PORTAL_CONFIG"] = cfg.name
+        sys.modules.pop("main", None)
+        self.main = importlib.import_module("main")
+        self.db = FakeStore()
+        self.main.PORTAL, self.fake = make(self.db)
+        self.fake.jobs_ = [j for j in self.fake.jobs_ if j.settings.tags.get("cd_self_service") != "team_folder"]   # not deployed
+        self.main.PORTAL.config = self.main.CONFIG
+        self.main.PORTAL.choose_bu(ANA, "FIN")
+        self.http = TestClient(self.main.app)
+        self.as_ana = {"X-Forwarded-Email": ANA}
+
+    def send(self, folder="fin-close"):
+        return self.http.post("/folder", data={"workspace": "fin", "folder": folder, "reason": WHY}, headers=self.as_ana, follow_redirects=False)
+
+    def test_folders_are_made_by_hand_only_while_their_job_is_not_deployed(self):
+        p = self.main.PORTAL
+        self.assertEqual(p.manual(), {"folder"})
+        self.assertEqual([w.name for w in p.available("team_folder")], ["fin"], "offered without its job")
+        with_job, _ = make()
+        self.assertEqual(with_job.manual(), set(), "the job is deployed again: folders run it")
+        unread = [portal.Workspace("fin", "FIN", HOST), portal.Workspace("down", "OPS", "https://down")]
+        for w in unread:
+            w.error = "the hub's jobs cannot be read"
+        with mock.patch.object(p, "workspaces", return_value=unread):
+            self.assertEqual(p.manual(), set(), "the hub's jobs cannot be read: not a reason to make anything by hand")
+
+    def test_the_card_and_the_form_say_an_approver_creates_it(self):
+        page = self.http.get("/", headers=self.as_ana).text
+        card = page[page.index("Request a workspace folder") - 300:page.index("Request a workspace folder") + 600]
+        self.assertIn('href="/folder"', card)
+        self.assertIn("Approval required", card)
+        self.assertIn("An approver decides it in the approvals app", card)
+        form = self.http.get("/folder", headers=self.as_ana).text
+        self.assertIn("A platform admin creates this folder for you once they approve it", form)
+        self.assertIn(">Submit request</button>", form)
+
+    def test_a_folder_request_is_recorded_and_waits_nothing_runs(self):
+        r = self.send()
+        self.assertEqual(self.fake.started, [], "no job")
+        self.assertRegex(r.headers["location"], r"^/request/ss-[0-9a-f]{8}$")
+        (rid, row), = self.db.requests.items()
+        self.assertEqual((row["kind"], row["name"]), ("folder", "fin-close"))
+        page = self.http.get(r.headers["location"], headers=self.as_ana).text
+        self.assertIn("Pending approval", page)
+        self.assertIn("a platform admin creates it", page)
+        self.assertNotIn(">Running<", page, "no run to wait for")
+        self.assertEqual(self.send().headers["location"], r.headers["location"], "asked again: the one waiting")
+
+    def test_approving_it_marks_it_done_and_runs_nothing(self):
+        rid = self.send().headers["location"].rsplit("/", 1)[1]
+        self.assertIsNone(self.main.PORTAL.run_recorded({**self.db.requests[rid], "id": rid}))
+        self.assertEqual(self.fake.started, [])
+        self.db.event(rid, "approved", actor="dana@contoso.com")
+        page = self.http.get(f"/request/{rid}", headers=self.as_ana).text
+        self.assertIn("Your folder is ready", page)
+        self.assertIn("/Workspace/Teams/fin-close", page, "where the admin made it (app.yaml jobs.folder_root)")
+        self.assertIn("Completed", page)
+        mine = self.http.get("/requests", headers=self.as_ana).text
+        self.assertIn("Completed", mine)
+
+    def test_validate_never_looks_a_folder_up_in_the_hub(self):
+        with mock.patch.object(self.fake.workspace, "get_status", side_effect=AssertionError("the hub has no folders of a spoke")):
+            rows = self.main.PORTAL.ai_check("fin", "folder", "fin-close", WHY)["rows"]
+        self.assertEqual(rows, [(True, "The name matches the reason"), (True, "The reason says what it's for and who will use it")])
+
+
 class ApprovalRequests(unittest.TestCase):
     """human_approval: project and team schemas wait for an approver; the requester follows them
     on the request's page, answers questions there, and sees the decision."""
