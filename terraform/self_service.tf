@@ -1,16 +1,16 @@
-# What the self-service app needs in a workspace it serves (a spoke), granted here because
+# What the self-service app needs from a workspace it serves (a spoke), granted here because
 # Terraform owns these objects, authoritatively: the app's own deploy (a Databricks Asset
-# Bundle) deploys the app and its jobs and never grants on them itself.
+# Bundle) deploys the app and its jobs and never grants on them itself. The app and the
+# workspace's schema job run in the hub, so nothing is assigned in the workspace itself:
 #
-#   - its two service principals (config/self-service/hub.yaml app_ids) are assigned to the
-#     workspace, with workspace access (the baseline gives the users group no entitlements, so
-#     without it they could not use the Jobs API), and may see the catalog (USE CATALOG,
-#     BROWSE: the app checks whether a person's schema exists);
-#   - the identity running Terraform, which also deploys and runs the self-service jobs, may use
-#     the workspace's serverless usage policy, so the jobs can run on it.
+#   - its two service principals (config/self-service/hub.yaml app_ids) may see the catalog
+#     (USE CATALOG, BROWSE, access.tf: the app checks whether a person's schema exists);
+#   - the catalog and the serverless usage policy are bound to the hub too;
+#   - the identity running Terraform, which also deploys and runs the schema job, may use the
+#     usage policy, so the job can run on it.
 #
 # A workspace opts out with self_service: false in its file (for example the hub itself).
-# Nothing here exists until app_ids are set, after the app's first deploy.
+# The grants wait for app_ids, set after the app's first deploy; the bindings for hub.host.
 
 locals {
   self_service_dir     = coalesce(var.self_service_dir, "${local.project_root}/config/self-service")
@@ -45,34 +45,6 @@ resource "databricks_workspace_binding" "self_service_hub" {
   securable_type = "catalog"
   workspace_id   = tonumber(local.self_service_hub_id)
   binding_type   = "BINDING_TYPE_READ_WRITE"
-}
-
-resource "databricks_permission_assignment" "self_service_app" {
-  for_each               = toset(local.self_service_app_ids)
-  service_principal_name = each.value
-  permissions            = ["USER"]
-
-  depends_on = [terraform_data.config_checks]
-}
-
-# Workspace access, so the apps can call the Jobs API here: list the self-service jobs (they
-# may run only those, by the jobs' own permissions) and follow their runs.
-data "databricks_service_principal" "self_service_app" {
-  for_each       = toset(local.self_service_app_ids)
-  application_id = each.value
-  depends_on     = [databricks_permission_assignment.self_service_app]
-}
-
-resource "databricks_entitlements" "self_service_app" {
-  for_each             = toset(local.self_service_app_ids)
-  service_principal_id = data.databricks_service_principal.self_service_app[each.value].id
-  workspace_access     = true
-
-  # The lookup waits for the assignment, so the ID is unknown while one is planned; it never
-  # changes for an application ID, so a planned assignment must not replace this.
-  lifecycle {
-    ignore_changes = [service_principal_id]
-  }
 }
 
 # What the self-service app's deploy reads, so it never repeats a value

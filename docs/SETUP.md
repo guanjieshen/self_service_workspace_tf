@@ -470,5 +470,4 @@ The first pull request cannot do both: Terraform needs the apps' identities for 
 | A schema request fails: the catalog is **not accessible in this workspace** | The workspace's catalog is not bound to the hub yet (`hub.host` not set when its Terraform last ran) | Re-run its Terraform apply (any change to it, or **Re-run jobs**) |
 | **Validate** says the AI check is unavailable | AI Decide is off in the hub (Before you start, item 3) | Turn it on, or set `ai_check: "off"` |
 | The deploy stops: **the Lakebase project was deleted** | A deleted project is kept 7 days and blocks a new one with the same ID | Undelete it, wait until it is purged, or set another `self_service_app.database.project_id` in `app.yaml` |
-| An app **cannot be deleted** | Its identity is still assigned to served workspaces | Clear `app_ids` in a pull request first, then delete the app |
 | The deploy says the apps' identities **do not match** `app_ids` | The apps were recreated | Put the new IDs (in the deploy's log) into `app_ids` |

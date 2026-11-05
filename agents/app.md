@@ -235,11 +235,12 @@ deploy would change, signed in with the Databricks CLI: `python3 scripts/app_dep
   checked in `app_build.check()` with a test in `apps/self-service/tests/test_build.py`.
 - **The apps' identities** (`app_ids` in `hub.yaml`) are set once, after the hub's first deploy
   creates the apps; the deploy prints them, and fails if they no longer match. A first install
-  is two pull requests: the first creates everything (the jobs grant no one yet: a job cannot
-  grant a service principal its workspace does not have); the second sets `app_ids`, so
-  Terraform assigns the apps to each served workspace and the deploy grants them the jobs.
-- **Tearing the hub down:** first clear `app_ids` and let Terraform apply (an app cannot be
-  deleted while its service principal is assigned to another workspace), then delete the apps
+  is two pull requests: the first creates everything (the jobs grant no one yet: the apps'
+  IDs are not known); the second sets `app_ids`, so Terraform grants the apps browse on each
+  served workspace's catalog and the deploy grants them the jobs. The apps are never assigned
+  to a served workspace: they call only the hub.
+- **Tearing the hub down:** first clear `app_ids` and let Terraform apply (it removes the apps'
+  catalog grants), then delete the apps
   and the Lakebase project. A deleted project is kept for 7 days and blocks a new one with the
   same ID: purge it (`databricks postgres delete-project projects/<id> --purge`) or undelete it.
 

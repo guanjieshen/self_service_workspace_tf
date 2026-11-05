@@ -20,8 +20,8 @@ grants, workspace assignment, the usage policy) Terraform grants (terraform/self
       deploying identity: it must own the database or be a Lakebase superuser there (a first
       install makes it the owner; run every deploy as the same one);
    d. deploy the bundle, then each app's new code, so new code never meets an old database.
-3. Each served workspace: its two jobs, which only the hub's two apps may run (app_ids in
-   hub.yaml, the ones Terraform assigned to the workspace). A first install has none yet: the
+3. Each served workspace: its schema job, in the hub, which only the hub's two apps may run
+   (app_ids in hub.yaml). A first install has none yet: the
    deploy prints them; set them in a pull request, whose deploy then grants them.
 """
 import argparse
