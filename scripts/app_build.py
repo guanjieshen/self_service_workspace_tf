@@ -56,6 +56,12 @@ def load(config_dir=None, workspaces_dir=None):
     return s
 
 
+def ai_model(app):
+    """The model every AI feature uses (app.yaml ai_model). An app.yaml from 1.0.x names it as the
+    summary's (ai_summary.model): still read, so an upgrade keeps it."""
+    return str(app.get("ai_model") or (app.get("ai_summary") or {}).get("model") or "")
+
+
 def check(s):
     """Settings that would fail later (in a deploy, or in the app), refused now, naming the setting."""
     app, hub, db, jobs = s["app"], s["hub"], s["database"], s["jobs"]
@@ -66,8 +72,7 @@ def check(s):
     for key, name in (("name", app.get("name")), ("approvals.name", (app.get("approvals") or {}).get("name"))):
         need(re.fullmatch(r"[a-z0-9-]{2,30}", name or ""), f"app.yaml self_service_app.{key}: 2 to 30 lowercase letters, digits and dashes.")
     need(str(app.get("ai_check")) in ("on", "off"), "app.yaml self_service_app.ai_check: on or off.")
-    need(re.fullmatch(r"[\w.-]{0,100}", str((app.get("schema_comment") or {}).get("model") or "")),
-         "app.yaml self_service_app.schema_comment.model: a model's name (for example system.ai.claude-sonnet-5-5), or null.")
+    need(re.fullmatch(r"[\w.-]{0,100}", ai_model(app)), "app.yaml self_service_app.ai_model: a model's name (for example system.ai.claude-sonnet-5-5), or null.")
     need(set(app.get("human_approval") or []) <= set(KINDS), f"app.yaml self_service_app.human_approval lists kinds of request: {', '.join(KINDS)}.")
     need(all(u is None or re.match(r"https?://", u) for u in (app.get("faq") or {}).values()),
          "app.yaml self_service_app.faq: each link starts with https://, or is null for no link.")
@@ -114,8 +119,7 @@ def app_config(s, spokes, mode=None):
         "faq": dict(app.get("faq") or {}),
         "ai_check": str(app.get("ai_check") or "off"),
         "human_approval": list(app.get("human_approval") or []),
-        "ai_summary": {"model": (app.get("ai_summary") or {}).get("model")},
-        "schema_comment": {"model": (app.get("schema_comment") or {}).get("model") or ""},
+        "ai": {"model": ai_model(app)},
         "bu_lookup": {"function": lookup["function"], "warehouse_id": hub["warehouse_id"], "host": host}
                      if lookup.get("function") else None,
         "links": dict(app.get("links") or {}),   # {host}, {workspace_id}, {catalog}: the person's workspace's, filled in by the app

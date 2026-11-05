@@ -442,8 +442,7 @@ The app lets people ask for what they need (a personal, project or team schema; 
 | --- | --- | --- |
 | 1 | **A hub workspace**: Premium, with **serverless**, **Databricks Apps** and **Lakebase** available (Lakebase is regional: check your region). A dedicated workspace is simplest; it need not be one of the workspaces in `config/workspaces/` | Databricks account admin |
 | 2 | The pipeline's service principal (step 4) is **workspace admin in the hub**, as in every served workspace (step 6). The hub shares the served workspaces' **Unity Catalog metastore** | Databricks account admin |
-| 3 | For **Validate** (`ai_check: "on"` in `config/self-service/app.yaml`): **AI Decide** enabled in the hub (Previews). Otherwise set `ai_check: "off"` | Workspace admin |
-| 4 | For the approvers' **AI summary** (`ai_summary.model`): the model served in the hub, which the apps' identities may use. Otherwise set `model: null` | Workspace admin |
+| 3 | For the **AI features** (Validate, the approvers' summary, new schemas' comments): the model in `ai_model` (`config/self-service/app.yaml`) served through the hub's **AI gateway**, which the apps' and the pipeline's identities may use (account users may use `system.ai` models by default). Otherwise set `ai_model: null`; platform admins can change it later in the approvals app's **Settings > AI** | Workspace admin |
 
 ### Install: two pull requests
 
@@ -468,6 +467,6 @@ The first pull request cannot do both: Terraform needs the apps' identities for 
 | --- | --- | --- |
 | A form says there is **no workspace** for the request | That workspace has no schema job in the hub yet: its Terraform apply or the app's deploy failed | Re-run the failed job in the Deploy run; the app checks again within 5 minutes |
 | A schema request fails: the catalog is **not accessible in this workspace** | The workspace's catalog is not bound to the hub yet (`hub.host` not set when its Terraform last ran) | Re-run its Terraform apply (any change to it, or **Re-run jobs**) |
-| **Validate** says the AI check is unavailable | AI Decide is off in the hub (Before you start, item 3) | Turn it on, or set `ai_check: "off"` |
+| **Validate** says the AI check is unavailable | The AI model cannot be reached through the hub's AI gateway, or the apps may not use it (Before you start, item 3) | Grant the apps EXECUTE on it, choose another model in **Settings > AI**, or empty it (no AI) |
 | The deploy stops: **the Lakebase project was deleted** | A deleted project is kept 7 days and blocks a new one with the same ID | Undelete it, wait until it is purged, or set another `self_service_app.database.project_id` in `app.yaml` |
 | The deploy says the apps' identities **do not match** `app_ids` | The apps were recreated | Put the new IDs (in the deploy's log) into `app_ids` |

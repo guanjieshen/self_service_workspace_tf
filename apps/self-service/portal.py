@@ -236,7 +236,7 @@ class Portal:
     def __init__(self, config, client, cache_seconds=300, run_cache_seconds=3, store=None, shown=None):
         self.config = config
         # config with the approvals app's Settings in it (settings.apply), read when a job runs.
-        self.shown = shown or (lambda: config)
+        self.shown = shown or (lambda: self.config)
         self.client = client
         # The app's database (store.Store): the only list of requests. None only when config.json
         # has none (a misconfigured or local run): then nothing is sent, and the pages say why.
@@ -471,14 +471,14 @@ class Portal:
         return found
 
     def hub(self):
-        """The app's own workspace (the hub), where the AI calls run: AI Decide for the check,
+        """The app's own workspace (the hub), where the AI calls run: the Validate check,
         the AI gateway for the summaries. Not the workspace a request goes to."""
         return self.client(None)
 
     # ---- The AI check of a name and reason (advice for the requester; it decides nothing) ----
 
     def ai_check(self, ws_name, kind, name, reason, owner_group="", user=None):
-        """Rules first (exact, free), then one AI Decide call. Returns checks.check()'s result,
+        """Rules first (exact, free), then one call to the AI model (none when it is off). Returns checks.check()'s result,
         with the rules' rows first. Cached for 10 minutes: asking again costs nothing. user: the
         person asking, so a name is only looked up in their own business unit's workspace."""
         kind_job = "team_folder" if kind == "folder" else "personal_schema"
@@ -507,7 +507,10 @@ class Portal:
         rules = [{True: (False, f"The {noun} name is already taken (fine only if it is yours)"),
                   False: (True, f"The {noun} name is available"),
                   None: (False, f"Could not confirm the {noun} name is available")}[taken]]
-        result = checks.check(self.hub(), kind, name, reason, owner_group, ws_name)
+        model = self.ai_model()
+        if not model:   # no AI: the rules' rows only
+            return {"rows": rules, "error": ""}
+        result = checks.check(self.hub(), model, kind, name, reason, owner_group, ws_name)
         result = {**result, "rows": rules + result["rows"]}
         if not result["error"]:
             keep(self._checks, key, result, limit=500)
@@ -613,7 +616,7 @@ class Portal:
     def summarize(self, row):
         """The approver's summary of a request that has none yet (the approvals app, on opening
         it): written now, kept with the request. None when it is off or the model cannot answer."""
-        model = (self.config.get("ai_summary") or {}).get("model")
+        model = self.ai_model()
         if not model:
             return None
         try:
@@ -628,7 +631,7 @@ class Portal:
     def _summarize_later(self, r):
         """The approver's summary (summary.py), written in the background so sending is not
         slowed down; the approvals app writes it when it opens a request that has none."""
-        model = (self.config.get("ai_summary") or {}).get("model")
+        model = self.ai_model()
         if not (model and self.store):
             return
         def run():
@@ -685,12 +688,15 @@ class Portal:
         self.store.event(request_id, "replied", actor=user, role="requester", body=body)
         self._replies.pop(user, None)
 
+    def ai_model(self):
+        """The model every AI feature uses, as the Settings are now (app.yaml ai_model until an admin
+        changes it); empty: no AI."""
+        return (self.shown().get("ai") or {}).get("model") or ""
+
     def settings_for(self, job_kind):
         """What a job is told from the Settings, as they are when it runs: the schema job, the model
         that writes a new schema's comment (empty: the plain comment)."""
-        if job_kind != "personal_schema":
-            return {}
-        return {"comment_model": (self.shown().get("schema_comment") or {}).get("model") or ""}
+        return {"comment_model": self.ai_model()} if job_kind == "personal_schema" else {}
 
     def run_recorded(self, row):
         """Run the job of a request in the database, as it was asked, with its request ID: once

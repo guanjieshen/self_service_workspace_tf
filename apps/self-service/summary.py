@@ -1,5 +1,5 @@
 """A summary of a request for the approver, written by a foundation model (app.yaml
-self_service_app.ai_summary: Claude Sonnet through the workspace's AI gateway).
+self_service_app.ai_model, or the approvals app's Settings > AI, through the hub's AI gateway).
 
 The approver reads it before the request: a one-line headline, what is being asked and why,
 what is worth checking, and questions they could ask the requester. Advice only: it decides
