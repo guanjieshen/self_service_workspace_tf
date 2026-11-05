@@ -47,7 +47,7 @@ These apply to anything you build or change here. When one applies, mention it i
 
 ## Compute
 
-- **SQL** runs on the shared `{WAREHOUSE}` warehouse.
+- **SQL** runs on the shared warehouse, `{WAREHOUSE}`.
 - **Notebooks, jobs and pipelines** run on serverless compute (see Guardrails).
 - **Classic compute is the exception.** When it's needed, use the classic cluster policy for the kind of cluster: `{PREFIX} Classic Interactive` for notebooks, `{PREFIX} Classic Jobs` for job clusters, `{PREFIX} Classic Pipelines` for pipelines. Each one sets the tags and limits, and asks for the tags people fill in. Access comes from their workspace's platform team.
 - **Avoid the Personal Compute policy** for shared or scheduled work: its clusters don't carry the chargeback tags.

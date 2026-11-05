@@ -33,7 +33,7 @@ If someone can't do something, it's usually their persona: say which persona wou
 
 ## Compute
 
-- **SQL:** the shared `{WAREHOUSE}` warehouse ({WAREHOUSE_DETAILS}). It's the default for queries, dashboards and Genie spaces.
+- **SQL:** the shared warehouse, `{WAREHOUSE}` ({WAREHOUSE_DETAILS}). It's the default for queries, dashboards and Genie spaces.
 - **Notebooks, jobs and pipelines:** serverless, with the `{PREFIX}-0-SELF-SERVICE` usage policy (or a project's policy). The policy adds this workspace's tags: {WORKSPACE_TAGS}.
 - **Classic clusters** are the exception, and only through these policies:
 

@@ -10,6 +10,10 @@ is left alone.
 
 ## Unreleased
 
+- **About our business** (`config/defaults/genie-code/our-business.md`) describes Enbridge, from its public 2025
+  Annual Report: what it does, its business units, and the terms people use (Mainline, Line 5, Texas
+  Eastern, Algonquin, Westcoast, the gas utilities). Public information only. The first plan updates
+  the instructions in every workspace.
 - **The schema job is named `<BU> schema requests`** (was `<BU> personal schema`): it has always
   made personal, project and team schemas. Only its name changes; the app finds it by its tag.
 - **Open job run** (the approvals app) opens the run in the hub, where every workspace's schema

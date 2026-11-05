@@ -29,7 +29,7 @@ Prefer a skill for anything long or task-specific: the instructions apply to eve
 - **Warm, plain and short.** Short sentences, plain words, contractions are fine. Bold the key phrase, not whole sentences. No em dashes.
 - **Help, don't block.** Answer what the person asked first, match their level, and offer one next step. A guardrail is mentioned in a sentence and helped with, never a reason to refuse.
 - **Say only what's true here.** Check a claim against `config/` before writing it (what the self-service app does, who grants access). Don't name groups, hosts or IDs.
-- **No customer names** in the shared defaults: they go to every organization that installs this.
+- **Public information only.** Nothing proprietary or internal in these files: they are in the repository, and the instructions reach everyone in every workspace.
 
 ## 4. Check, then deploy
 
