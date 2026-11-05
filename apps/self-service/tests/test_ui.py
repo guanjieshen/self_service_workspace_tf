@@ -679,7 +679,7 @@ class SettingsPages(unittest.TestCase):
     def test_the_onboarding_prompt_is_a_text_area(self):
         http = TestClient(self.load("approvals", {"links": {}, "faq": {}, "onboarding": {"prompt": "Onboard me"}}).app)
         page = http.get("/approvals/settings?tab=onboarding").text
-        self.assertIn('<textarea id="onboarding.prompt" name="onboarding.prompt" rows="6" maxlength="1000" placeholder="No Genie One Onboarding card">Onboard me</textarea>', page)
+        self.assertIn('<textarea id="onboarding.prompt" name="onboarding.prompt" rows="6" maxlength="1000" placeholder="No guided tour">Onboard me</textarea>', page)
 
     def test_a_bad_link_is_refused_with_what_was_typed(self):
         http = TestClient(self.load("approvals", {"links": {}, "faq": {}}).app)

@@ -61,7 +61,7 @@ browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py
 | `approvals.py`, `approvals_store.py` | The approvals app (the same code, `mode: approvals`): its pages, and its data (`LakebaseStore`; tests use `tests/sample_store.py`) |
 | `store.py`, `db/` | The requests database: `store.Store` (every query), `db/migrations/` (numbered SQL, run once each by `db/migrate.py` at deploy), `db/grants.sql` (each role's rights: the app adds and reads, never rewrites) |
 | `cards.py` | The catalog's sections and cards, in order: add a card here (a task, a Databricks link, or Coming soon) |
-| `settings.py` | What approvers change in the approvals app's Settings (links per business unit, FAQs, SOPs, the onboarding prompt, the banner): the list, checks, and how they override app.yaml |
+| `settings.py` | What approvers change in the approvals app's Settings (links per business unit, FAQs, SOPs, the guided tour's prompt, the banner): the list, checks, and how they override app.yaml |
 | `checks.py` | The AI check behind Validate on the forms: one AI Decide call in the hub, two questions (does the name say what it holds; does the reason say what it is for and who will use it), with an example to copy; advice for the requester only |
 | `summary.py` | The AI summary for approvers (a foundation model): the only AI an approver reads |
 | `templates/` | Jinja pages; `base.html` is the layout, `_icons.html` the icon and approval macros |
@@ -137,8 +137,8 @@ changing a template, `static/app.css` or any text people read.
 - **Store only what nothing else keeps; read everything else from its source of truth**
   (decided 2026-10-22). The database holds what the apps create: each request as asked (with
   its BU at the time, the audit record), the AI review and summary, comments, questions,
-  replies, decisions, the link to the job run (or that it could not start), and settings
-  overrides. Never copied in: a run's status or outcome (the Jobs API), whether a schema or
+  replies, decisions, the link to the job run (or that it could not start), settings
+  overrides, the business unit people chose, and who had the guided tour. Never copied in: a run's status or outcome (the Jobs API), whether a schema or
   folder exists (Unity Catalog, the workspace), a person's groups (SCIM), workspaces and their
   jobs (job tags), users and BUs (Entra, or the BU source). A copy goes stale and needs a sync,
   so it is the exception: only when fetching from the source is extremely convoluted (many

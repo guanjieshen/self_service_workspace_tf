@@ -10,6 +10,8 @@ GRANT SELECT ON self_service.settings TO {self_service};
 -- The business unit people chose (without a lookup function): the self-service app records it.
 GRANT SELECT, INSERT ON self_service.business_unit_choices TO {self_service};
 GRANT SELECT ON self_service.chosen_business_units TO {self_service};
+-- Who has had the guided tour (the Open your workspace card): the self-service app records it.
+GRANT SELECT, INSERT ON self_service.guided_tours TO {self_service};
 GRANT USAGE ON SCHEMA self_service TO {approvals};
 GRANT SELECT ON self_service.requests, self_service.request_status TO {approvals};
 GRANT SELECT, INSERT ON self_service.request_events TO {approvals};
@@ -21,3 +23,4 @@ GRANT USAGE ON SCHEMA self_service TO {readers};
 GRANT SELECT ON self_service.requests, self_service.request_events, self_service.request_status TO {readers};
 GRANT SELECT ON self_service.setting_events, self_service.settings TO {readers};
 GRANT SELECT ON self_service.business_unit_choices, self_service.chosen_business_units TO {readers};
+GRANT SELECT ON self_service.guided_tours TO {readers};

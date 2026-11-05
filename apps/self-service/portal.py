@@ -251,6 +251,7 @@ class Portal:
         self._statuses = {}   # (workspace, run_id) -> (time read, status), for the approvals app
         self._bus = {}        # person -> (time read, their business unit or None), for the BU lookup
         self._chosen = {}     # person -> (time read, the business unit they chose or None), without it
+        self._toured = {}     # person -> (time read, True): had the guided tour, which stays so
 
     # ---- Workspaces and their jobs ----
 
@@ -371,9 +372,36 @@ class Portal:
             raise RequestError(f"Your business unit ({bu}) has no workspace for this request yet. Contact your platform admin.")
         return mine
 
-    def onboarding_link(self, user, prompt):
-        """Genie One with the onboarding prompt filled in; None when there is no prompt."""
-        return self.genie_one(user, prompt) if prompt else None
+    def open_workspace(self, user, prompt, tour=False):
+        """Genie One in the person's own workspace: the guided tour (with the onboarding prompt)
+        the first time, or when they ask for it again (tour); plain Genie One after that, or when
+        there is no prompt. None when there is no workspace for them."""
+        if not prompt or (not tour and self.toured(user)):
+            return self.genie_one(user)
+        link = self.genie_one(user, prompt)
+        if link and hasattr(self.store, "record_tour"):
+            try:
+                self.store.record_tour(user)
+                keep(self._toured, user, True)
+            except Exception as e:   # they get the tour again next time: better than none
+                warn(f"recording {user}'s guided tour", e)
+        return link
+
+    def toured(self, user):
+        """Whether the person has had the guided tour. Without a database, or when it cannot be
+        read, not: the tour again is better than none."""
+        if user in self._toured:
+            return True
+        if not hasattr(self.store, "toured"):
+            return False
+        try:
+            done = self.store.toured(user)
+        except Exception as e:
+            warn(f"reading whether {user} had the guided tour", e)
+            return False
+        if done:
+            keep(self._toured, user, True)
+        return done
 
     def my_workspace(self, user):
         """The person's own workspace in config.json (their business unit's; the first one until
@@ -405,8 +433,6 @@ class Portal:
         no other; this refuses one sent anyway)."""
         if w.name not in {x.name for x in self.workspaces_for(user, kind)}:
             raise RequestError("Requests go to your own business unit's workspace. Choose that one.")
-
-    # ---- The user's groups ----
 
     # ---- The user's personal schema: one per workspace ----
 

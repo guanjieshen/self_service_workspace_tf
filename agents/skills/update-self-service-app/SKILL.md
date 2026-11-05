@@ -14,7 +14,7 @@ These are changed by a platform admin in the **approvals app > Settings** and sh
 | They want to... | Settings tab |
 | --- | --- |
 | A banner across every page (planned maintenance, ...) | **Announcement** |
-| The Genie One Onboarding prompt | **Onboarding** |
+| The guided tour's prompt (what Genie One is asked the first time someone opens their workspace) | **Onboarding** > Guided tour |
 | The links to request Explorer, Builder or Publisher access (for example ServiceNow items), for all business units or one | **Onboarding** > Persona request links, with its **Business unit** selector |
 | FAQ links next to each section, or the standard operating procedure behind each task | **Help links** |
 | See who changed what, and when | **Change history** |

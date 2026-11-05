@@ -13,7 +13,7 @@
 
 {#- Most people who open the app for the first time can only ask for access. -#}
 {#- Without a lookup function, people say which business unit they are in, once (changeable from the header). -#}
-<p class="new-here">New here? Start with <a href="/persona">Request workspace access</a>{% if faq.getting_started %} · <a href="{{ faq.getting_started }}" target="_blank" rel="noopener">How it works {{ icon("external", "icon icon-xs") }}</a>{% endif %} · <a href="/ask" target="_blank" rel="noopener">Ask a question {{ icon("external", "icon icon-xs") }}</a></p>
+<p class="new-here">New here? Start with <a href="/persona">Request workspace access</a>{% if faq.getting_started %} · <a href="{{ faq.getting_started }}" target="_blank" rel="noopener">How it works {{ icon("external", "icon icon-xs") }}</a>{% endif %}</p>
 
 {#- A quick filter of the cards below, as you type (app.js); hidden until the script shows it. -#}
 <label class="search catalog-search" id="catalog-search-box" hidden>
@@ -45,6 +45,7 @@
       {#- Every card has a foot, so they all have the same shape: how it is approved, or where it opens. -#}
       <div class="task-foot">
         {% if ready and external %}<span class="meta">{{ c.opens }}</span>
+        {% if item.more %}<a class="task-sop" href="{{ item.more[1] }}" target="_blank" rel="noopener">{{ item.more[0] }} {{ icon("external", "icon icon-xs") }}</a>{% endif %}
         {% elif ready %}
         {{ approval_label(approval.get(key), approval_labels,
              "Approved in Entra ID before your access changes" if approval.get(key) == "required" else "Runs straight away; the job checks the request") }}

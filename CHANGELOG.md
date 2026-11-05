@@ -10,6 +10,12 @@ is left alone.
 
 ## Unreleased
 
+- **An Open your workspace card** (Get started) replaces Genie One Onboarding: it opens Genie One
+  in the person's workspace, with the onboarding prompt (now the **guided tour**) the first time
+  and plain Genie One after that; **Start the guided tour again** on the card asks it again. The
+  app records who had the tour (migration `006_guided_tours.sql`). The Settings section is now
+  **Guided tour**; an empty prompt means no tour, not no card. "Ask a question" leaves the
+  New here? line (`/ask` still works).
 - **The self-service app no longer calls other workspaces** (no cross-workspace access needed).
   Each served workspace's schema job is deployed to the **hub**, and the app talks only to the
   hub; links people open (Genie One, Discover) still go to their own workspace. Terraform binds
