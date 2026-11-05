@@ -37,7 +37,7 @@
       {% call field(key, label) %}
         {% if kind == "prompt" %}<textarea id="{{ key }}" name="{{ key }}" rows="6" maxlength="1000" placeholder="No guided tour">{{ values[key] }}</textarea>
         {% else %}<input id="{{ key }}" name="{{ key }}" value="{{ values[key] }}"
-               {% if kind == "url" %}type="url" placeholder="https://" class="mono"{% elif kind == "date" %}type="date"{% elif kind == "model" %}class="mono" maxlength="100" placeholder="Off: the plain comment"{% else %}maxlength="200" placeholder="No banner"{% endif %}>{% endif %}
+               {% if kind == "url" %}type="url" placeholder="https://" class="mono"{% elif kind == "date" %}type="date"{% elif kind == "model" %}class="mono" maxlength="100" placeholder="No AI"{% else %}maxlength="200" placeholder="No banner"{% endif %}>{% endif %}
         {% if changed %}<p class="hint settings-hint">Last updated {{ changed.at | local }} by {{ changed.by }}
           <button type="submit" class="link-button" form="settings-reset" name="reset" value="{{ key }}">Reset</button></p>
         {% elif kind == "date" %}<p class="hint">Optional. The banner will automatically disappear after this date.</p>

@@ -18,7 +18,7 @@ import portal  # noqa: E402
 from databricks.sdk.errors import NotFound  # noqa: E402
 
 HOST = "https://adb-1.azuredatabricks.net"
-CONFIG = {"title": "Self-Service", "links": {}, "workspaces": [
+CONFIG = {"title": "Self-Service", "links": {}, "ai": {"model": "system.ai.claude-sonnet-5-5"}, "workspaces": [
     {"name": "fin", "bu": "FIN", "host": HOST}, {"name": "down", "bu": "OPS", "host": "https://down"}]}
 ANA, BO = "ana@contoso.com", "bo@contoso.com"
 WHY = "Monthly reconciliation reports for the team."   # every named schema and folder needs a reason
@@ -39,7 +39,7 @@ def run_of(run_id, job_id, params, life="TERMINATED", result="SUCCESS", output=N
 
 
 class FakeClient:
-    """The hub: the jobs (tagged as the bundle tags them), runs, schemas and AI Decide the app uses."""
+    """The hub: the jobs (tagged as the bundle tags them), runs, schemas and the AI gateway the app uses."""
 
     def __init__(self):
         # In the hub, each tagged with the workspace it serves (scripts/app_build.py jobs_target).
@@ -60,7 +60,8 @@ class FakeClient:
         self.schemas = ns(get=self.get_schema)
         self.folders_ = {}             # path -> "mine" or "theirs" (the app sees theirs as permission denied)
         self.workspace = ns(get_status=self.get_status)
-        # AI Decide: the choice for each question (None = it cannot be reached), and what was asked.
+        # The AI gateway, for the Validate check: the answer to each question (None = it cannot be
+        # reached), and what was asked.
         self.decide, self.decided = dict(portal.checks.SAFE), []
         self.api_client = ns(do=self.api)
         # The BU lookup (SQL statements): person -> business unit; None = the warehouse cannot answer.
@@ -72,13 +73,14 @@ class FakeClient:
             if self.bus_ is None:
                 raise ConnectionError("warehouse unreachable")
             return {"status": {"state": "SUCCEEDED"}, "result": {"data_array": [[self.bus_.get(body["parameters"][0]["value"])]]}}
-        return self.ai_decide(method, path, body)
+        return self.ai_gateway(method, path, body)
 
-    def ai_decide(self, method, path, body=None):
+    def ai_gateway(self, method, path, body=None):
+        assert path == portal.checks.API, path
         if self.decide is None:
-            raise ConnectionError("AI Decide is not reachable")
+            raise ConnectionError("the AI gateway is not reachable")
         self.decided.append(body)
-        return {"response": {"answers": {q: {"type": "choice", "choice": c} for q, c in self.decide.items()}}}
+        return {"choices": [{"message": {"content": "Sure: " + json.dumps(self.decide)}}]}
 
     def get_status(self, path):
         from databricks.sdk.errors import PermissionDenied
@@ -338,7 +340,7 @@ class Schemas(unittest.TestCase):
 
 
 class AICheck(unittest.TestCase):
-    """Validate: rules first, then one AI Decide call; advice for the requester, it decides nothing."""
+    """Validate: rules first, then one call to the AI model; advice for the requester, it decides nothing."""
 
     def check(self, **kw):
         p, fake = make()
@@ -350,10 +352,12 @@ class AICheck(unittest.TestCase):
         self.assertEqual(result["rows"], [(True, "The schema name is available"), (True, "The name matches the reason"),
                                           (True, "The reason says what it's for and who will use it")])
         self.assertEqual(len(fake.decided), 1, "one call, two questions")
-        self.assertEqual(set(fake.decided[0]["questions"]), {"name", "reason"}, "about the name and the reason only")
-        self.assertEqual(fake.decided[0]["questions"], portal.checks.questions("project_schema"), "the questions never contain what the person typed")
-        self.assertNotIn(WHY, json.dumps(fake.decided[0]["questions"]))
-        self.assertEqual(fake.decided[0]["state"]["why_needed"], WHY)
+        body = fake.decided[0]
+        self.assertEqual(body["model"], "system.ai.claude-sonnet-5-5", "the AI model (Settings > AI)")
+        system, asked = body["messages"]
+        self.assertEqual(system["content"], portal.checks.PROMPT.replace("{noun}", "schema"), "the instructions never contain what the person typed")
+        self.assertNotIn(WHY, system["content"])
+        self.assertEqual(json.loads(asked["content"])["why_needed"], WHY, "the request, as data")
         p.ai_check("fin", "project_schema", "sales_pipeline_forecast", WHY)
         self.assertEqual(len(fake.decided), 1, "asking again is answered from the cache")
 
@@ -367,14 +371,27 @@ class AICheck(unittest.TestCase):
         fake.decide.update(reason="unclear")
         rows = p.ai_check("fin", "folder", "fin-docs", WHY)["rows"]
         self.assertIn((False, "Say what it's for and who will use it, for example: notebooks and dashboards for the weekly sales forecast, used by the sales operations team"), rows)
-        self.assertIn("folder", fake.decided[0]["questions"]["reason"]["instructions"], "a folder is asked about as a folder")
+        self.assertIn("Databricks folder", fake.decided[0]["messages"][0]["content"], "a folder is asked about as a folder")
 
-    def test_ai_decide_runs_in_the_hub_not_the_requests_workspace(self):
+    def test_an_answer_that_is_not_one_of_the_choices_is_not_a_pass(self):
+        p, fake = make()
+        fake.decide = {"name": "great", "reason": "clear"}
+        rows = p.ai_check("fin", "project_schema", "sales_pipeline_forecast", WHY)["rows"]
+        self.assertIn((False, "The name could not be checked"), rows)
+        self.assertIn((True, "The reason says what it's for and who will use it"), rows)
+
+    def test_without_an_ai_model_validate_checks_the_rules_only(self):
+        p, fake = make()
+        p.config = {**p.config, "ai": {"model": ""}}
+        result = p.ai_check("fin", "project_schema", "sales_pipeline_forecast", WHY)
+        self.assertEqual((result["rows"], result["error"], fake.decided), ([(True, "The schema name is available")], "", []))
+
+    def test_the_ai_check_runs_in_the_hub_not_the_requests_workspace(self):
         p, spoke = make()
         hub = FakeClient()
         p.client = lambda host: hub if host is None else spoke
         p.ai_check("fin", "project_schema", "sales_pipeline_forecast", WHY)
-        self.assertEqual((len(hub.decided), len(spoke.decided)), (1, 0), "AI Decide is enabled in the hub")
+        self.assertEqual((len(hub.decided), len(spoke.decided)), (1, 0), "through the hub's AI gateway")
 
     def test_rules_come_first_and_cost_no_call(self):
         p, fake = make()
@@ -399,7 +416,7 @@ class AICheck(unittest.TestCase):
         result = p.ai_check("fin", "project_schema", "sales_pipeline_forecast", WHY)
         self.assertEqual(result["rows"][0], (False, "Could not confirm the schema name is available"))
 
-    def test_when_ai_decide_cannot_answer_it_says_so_and_decides_nothing(self):
+    def test_when_the_model_cannot_answer_it_says_so_and_decides_nothing(self):
         p, fake = make()
         fake.decide = None
         result = p.ai_check("fin", "project_schema", "sales_pipeline_forecast", WHY)
@@ -459,7 +476,7 @@ class RequestsInTheDatabase(unittest.TestCase):
     def test_an_ai_summary_that_fails_never_blocks_a_request(self):
         db = FakeStore()
         p, fake = make(db)
-        p.config = {**p.config, "human_approval": ["project_schema"], "ai_summary": {"model": "system.ai.some-model"}}
+        p.config = {**p.config, "human_approval": ["project_schema"], "ai": {"model": "system.ai.some-model"}}
         with mock.patch.object(portal.summary_module, "summarize", side_effect=ConnectionError("model down")):
             request_id = p.request_schema("fin", ANA, schema="fin_forecast", reason=WHY)
             self.assertRegex(request_id, r"^ss-", "recorded and waiting for an approver")
@@ -479,11 +496,11 @@ class RequestsInTheDatabase(unittest.TestCase):
     def test_the_schema_job_is_told_the_comment_model_as_the_settings_are_when_it_runs(self):
         db = FakeStore()
         p, fake = make(db)
-        shown = {"schema_comment": {"model": "system.ai.claude-sonnet-5-5"}}
+        shown = {"ai": {"model": "system.ai.claude-sonnet-5-5"}}
         p.shown = lambda: shown
         p.request_schema("fin", ANA, schema="sales_forecast", reason=WHY)
         self.assertEqual(fake.started[-1][1]["comment_model"], "system.ai.claude-sonnet-5-5")
-        shown["schema_comment"]["model"] = ""   # an admin turned it off in Settings
+        shown["ai"]["model"] = ""   # an admin turned AI off in Settings
         p.run_recorded({"id": "ss-p1", "kind": "project_schema", "workspace": "fin", "requested_by": ANA, "name": "sales_more", "reason": WHY})
         self.assertEqual(fake.started[-1][1]["comment_model"], "")
         self.assertEqual(p.settings_for("team_folder"), {}, "only the schema job")
@@ -497,7 +514,7 @@ class RequestsInTheDatabase(unittest.TestCase):
         run_id = p.run_recorded(row)
         job_id, params = fake.started[-1]
         self.assertEqual(params, {"user": ANA, "catalog": "fin_citizen_dev", "schema": "fin_reporting",
-                                  "owner_group": "fin-data-eng", "reason": WHY, "request_id": "ss-team1", "comment_model": ""})
+                                  "owner_group": "fin-data-eng", "reason": WHY, "request_id": "ss-team1", "comment_model": "system.ai.claude-sonnet-5-5"})
         self.assertEqual(db.events[-1], ("ss-team1", "run_started", {"workspace": "fin", "run_id": run_id}))
         p.run_recorded({**row, "id": "ss-f1", "kind": "folder", "name": "fin-docs"})
         self.assertEqual(fake.started[-1][1], {"folder": "fin-docs", "requested_by": ANA, "owner_group": "fin-data-eng",
@@ -819,7 +836,7 @@ class Cards(unittest.TestCase):
         self.assertEqual([(c["href"], c["more"]) for c in opened], [("/open", None)], "no tour link without its link")
         toured = cards.groups({"workspace": "/open", "tour": "/open?tour=1"})
         self.assertEqual([c["more"] for _, _, cs in toured for c in cs if c["card"].key == "open_workspace"],
-                         [("Start the guided tour again", "/open?tour=1")])
+                         [("Restart guided tour", "/open?tour=1")])
         only_data = [(k, t, [c for c in cs if c["card"].section == "data"]) for k, t, cs in cards.groups({})]
         self.assertEqual([k for k, _, cs in cards.groups({}) if k == "data"], [], "Data has only link cards: hidden without links")
 
@@ -833,7 +850,7 @@ class Cards(unittest.TestCase):
         self.assertEqual(set_["card"].opens, "Opens your organization's request form", "not Databricks")
         opens = {c.key: c.opens for c in cards.CARDS}
         self.assertEqual(opens["discover"], "Opens in Databricks (workspace access is required)")
-        self.assertEqual(opens["open_workspace"], "Opens in Databricks (workspace access is required)")
+        self.assertEqual(opens["open_workspace"], "Opens in Databricks · Workspace access required")
         self.assertNotIn("group_request", settings.KINDS, "set in app.yaml (links.group_request), not in Settings, for now")
 
     def test_every_section_has_an_faq_setting(self):
@@ -1013,7 +1030,7 @@ class Pages(unittest.TestCase):
                                                    headers=self.as_ana, follow_redirects=False)
                 self.fake.decide = {**portal.checks.SAFE, "reason": "unclear"}     # the check finds something
                 self.assertEqual(send(f"sales_forecast_{mode}").status_code, 303, mode)
-                self.fake.decide = None                                            # AI Decide cannot answer
+                self.fake.decide = None                                            # the model cannot answer
                 self.assertEqual(send(f"sales_forecast_{mode}_two").status_code, 303, "sent anyway: the check is advice")
             finally:
                 self.main.CONFIG.pop("ai_check")
@@ -1193,8 +1210,8 @@ class Pages(unittest.TestCase):
 
     def test_open_your_workspace_gives_the_tour_once_and_again_on_request(self):
         page = self.http.get("/", headers=self.as_ana).text
-        self.assertIn('href="/open" target="_blank" rel="noopener">Open your workspace</a>', page)
-        self.assertNotIn("Start the guided tour again", page, "no prompt: no tour")
+        self.assertIn('href="/open" target="_blank" rel="noopener">Open Genie One</a>', page)
+        self.assertNotIn("Restart guided tour", page, "no prompt: no tour")
         r = self.http.get("/open", headers=self.as_ana, follow_redirects=False)
         self.assertEqual((r.status_code, r.headers["location"]), (303, "https://adb-1.azuredatabricks.net/one/chat?o=1"))
         self.main.CONFIG["onboarding"] = {"prompt": "Onboard me"}
@@ -1205,12 +1222,12 @@ class Pages(unittest.TestCase):
             again = self.http.get("/open?tour=1", headers=self.as_ana, follow_redirects=False).headers["location"]
         finally:
             self.main.CONFIG.pop("onboarding")
-        self.assertIn('href="/open?tour=1" target="_blank" rel="noopener">Start the guided tour again', page)
+        self.assertIn('href="/open?tour=1" target="_blank" rel="noopener">Restart guided tour', page)
         self.assertEqual((first, then, again), ("https://adb-1.azuredatabricks.net/one/chat?o=1&q=Onboard%20me",
                                                 "https://adb-1.azuredatabricks.net/one/chat?o=1",
                                                 "https://adb-1.azuredatabricks.net/one/chat?o=1&q=Onboard%20me"))
         with mock.patch.object(self.main.PORTAL, "my_workspace", return_value=None):
-            self.assertNotIn("Open your workspace", self.http.get("/", headers=self.as_ana).text, "no workspace for them: no card")
+            self.assertNotIn("Open Genie One", self.http.get("/", headers=self.as_ana).text, "no workspace for them: no card")
             page = self.http.get("/open", headers=self.as_ana)
         self.assertEqual(page.status_code, 200)
         self.assertIn("Contact your platform admin", page.text, "where to go instead")
@@ -1224,7 +1241,7 @@ class Pages(unittest.TestCase):
         self.assertEqual([h for h in ("<h2>Get started<", "<h2>Data<", "<h2>Build<", "<h2>Compute &amp; cost<") if h in page],
                          ["<h2>Get started<", "<h2>Data<", "<h2>Build<", "<h2>Compute &amp; cost<"])
         self.assertNotIn('class="group-faq"', page, "no FAQ pages set, no FAQ links")
-        self.assertIn('New here? Start with <a href="/persona">Request workspace access</a></p>', page, "no Ask a question: Open your workspace is the card")
+        self.assertIn('New here? Start with <a href="/persona">Request workspace access</a></p>', page, "no Ask a question: Open Genie One is the card")
         self.main.CONFIG["faq"] = {"getting_started": "https://wiki.contoso.com/start", "access": "https://wiki.contoso.com/access",
                                    "data": None, "workspace": "https://wiki.contoso.com/workspace"}
         try:
@@ -1345,7 +1362,7 @@ class ApprovalRequests(unittest.TestCase):
 
     def test_the_summary_is_written_in_the_background_for_approvers(self):
         import threading
-        self.main.PORTAL.config = {**self.main.CONFIG, "ai_summary": {"model": "system.ai.claude-sonnet-5-5"}}
+        self.main.CONFIG["ai"] = {"model": "system.ai.claude-sonnet-5-5"}   # Settings > AI, app.yaml's until changed
         self.fake.api_client = type("A", (), {"do": staticmethod(lambda method, path, body=None:
             {"choices": [{"message": {"content": '{"headline": "Project schema for forecasts", "summary": "s", "concerns": [], "questions": []}'}}]})})()
         rid = self.send().headers["location"].rsplit("/", 1)[1]
