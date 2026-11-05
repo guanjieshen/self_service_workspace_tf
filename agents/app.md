@@ -61,7 +61,7 @@ browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py
 | `approvals.py`, `approvals_store.py` | The approvals app (the same code, `mode: approvals`): its pages, and its data (`LakebaseStore`; tests use `tests/sample_store.py`) |
 | `store.py`, `db/` | The requests database: `store.Store` (every query), `db/migrations/` (numbered SQL, run once each by `db/migrate.py` at deploy), `db/grants.sql` (each role's rights: the app adds and reads, never rewrites) |
 | `cards.py` | The catalog's sections and cards, in order: add a card here (a task, a Databricks link, or Coming soon) |
-| `settings.py` | What approvers change in the approvals app's Settings (links per business unit, FAQs, SOPs, the guided tour's prompt, the banner): the list, checks, and how they override app.yaml |
+| `settings.py` | What approvers change in the approvals app's Settings (links per business unit, FAQs, SOPs, the guided tour's prompt, the schema comment model, the banner): the list, checks, and how they override app.yaml |
 | `checks.py` | The AI check behind Validate on the forms: one AI Decide call in the hub, two questions (does the name say what it holds; does the reason say what it is for and who will use it), with an example to copy; advice for the requester only |
 | `summary.py` | The AI summary for approvers (a foundation model): the only AI an approver reads |
 | `templates/` | Jinja pages; `base.html` is the layout, `_icons.html` the icon and approval macros |

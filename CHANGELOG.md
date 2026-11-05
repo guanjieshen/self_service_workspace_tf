@@ -10,6 +10,22 @@ is left alone.
 
 ## Unreleased
 
+- **A new project or team schema says what it is for.** The schema job asks a foundation model
+  (`ai_query`, in the hub, as the pipeline's identity) for a sentence or two from the request's
+  reason, and sets it as the schema's comment before the hand-over. If the model cannot answer,
+  the schema keeps its plain comment ("Team schema of <group> (self-service)") and the request
+  still succeeds. Personal schemas, and schemas that already exist, are not changed. The reason
+  reaches the model only as a query parameter, and its answer is written as an escaped string.
+  **Platform admins choose the model in the approvals app's Settings (AI tab)**, or empty it to
+  turn the comments off; the app sends it with each run, so a change needs no deploy.
+  `app.yaml` gives the default.
+
+  **Baseline edits:**
+
+  | File | Change |
+  | --- | --- |
+  | `config/self-service/app.yaml` | Under `self_service_app:`, after `ai_summary:`, add `schema_comment:` with `model: system.ai.claude-sonnet-5-5` (or your model). Without it, the comments are off until an admin sets a model in Settings |
+
 ## 1.0.1
 
 Upgrade from 1.0.0 with `install/copy_to_your_repo` (README, Releases and upgrades). The app

@@ -26,6 +26,7 @@ resources:
         - {name: owner_group, default: ""}
         - {name: reason, default: ""}
         - {name: request_id, default: ""}
+        - {name: comment_model, default: ""}
       tasks:
         - task_key: create
           max_retries: 0

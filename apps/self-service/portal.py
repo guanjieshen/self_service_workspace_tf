@@ -233,8 +233,10 @@ class Portal:
     service principal); tests pass a fake.
     """
 
-    def __init__(self, config, client, cache_seconds=300, run_cache_seconds=3, store=None):
+    def __init__(self, config, client, cache_seconds=300, run_cache_seconds=3, store=None, shown=None):
         self.config = config
+        # config with the approvals app's Settings in it (settings.apply), read when a job runs.
+        self.shown = shown or (lambda: config)
         self.client = client
         # The app's database (store.Store): the only list of requests. None only when config.json
         # has none (a misconfigured or local run): then nothing is sent, and the pages say why.
@@ -599,7 +601,7 @@ class Portal:
                                       "name": name, "owner_group": owner_group, "reason": reason})
             return request_id
         try:
-            run_id = self.hub().jobs.run_now(w.jobs[job_kind]["id"], job_parameters={**params, "request_id": request_id}).run_id
+            run_id = self.hub().jobs.run_now(w.jobs[job_kind]["id"], job_parameters={**params, **self.settings_for(job_kind), "request_id": request_id}).run_id
         except Exception as e:   # recorded as failed, and the person told so (not an error page)
             warn(f"starting the {job_kind} job for {request_id} in {w.name}", e)
             self._quietly(self.store.start_failed, request_id, "The job could not be started.")
@@ -683,13 +685,20 @@ class Portal:
         self.store.event(request_id, "replied", actor=user, role="requester", body=body)
         self._replies.pop(user, None)
 
+    def settings_for(self, job_kind):
+        """What a job is told from the Settings, as they are when it runs: the schema job, the model
+        that writes a new schema's comment (empty: the plain comment)."""
+        if job_kind != "personal_schema":
+            return {}
+        return {"comment_model": (self.shown().get("schema_comment") or {}).get("model") or ""}
+
     def run_recorded(self, row):
         """Run the job of a request in the database, as it was asked, with its request ID: once
         an approver approved it (approvals app). Returns the run's ID."""
         kind = "team_folder" if row["kind"] == "folder" else "personal_schema"
         try:   # the workspace too: one that is gone, or has no job now, also marks the request failed
             w = self.workspace(row["workspace"], kind)
-            run_id = self.hub().jobs.run_now(w.jobs[kind]["id"], job_parameters=record_params(row, w)).run_id
+            run_id = self.hub().jobs.run_now(w.jobs[kind]["id"], job_parameters={**record_params(row, w), **self.settings_for(kind)}).run_id
         except Exception:
             if self.store:
                 self._quietly(self.store.start_failed, row["id"], "The job could not be started.")
