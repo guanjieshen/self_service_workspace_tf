@@ -1,5 +1,5 @@
 # The self-service app's needs in a workspace it serves (terraform/self_service.tf):
-# its service principals assigned and granted on the catalog, the jobs' identity on the usage
+# its service principals granted on the catalog (never assigned: the app calls only the hub), the jobs' identity on the usage
 # policy, and the output the app's deploy reads.
 
 mock_provider "databricks" {
@@ -23,14 +23,6 @@ run "served_workspace" {
   command = plan
   variables { workspace = "basic" }
 
-  assert {
-    condition     = toset(keys(databricks_permission_assignment.self_service_app)) == toset(["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"])
-    error_message = "Both apps' service principals are assigned to a workspace the app serves."
-  }
-  assert {
-    condition     = toset(keys(databricks_entitlements.self_service_app)) == toset(["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]) && alltrue([for e in databricks_entitlements.self_service_app : e.workspace_access])
-    error_message = "Both apps get workspace access (the users group has none), so they can use the Jobs API."
-  }
   assert {
     condition     = local.catalog_grants["11111111-1111-1111-1111-111111111111"] == tolist(["BROWSE", "USE_CATALOG"]) && local.catalog_grants["22222222-2222-2222-2222-222222222222"] == tolist(["BROWSE", "USE_CATALOG"])
     error_message = "The apps may see the catalog (USE CATALOG, BROWSE) and nothing more."
@@ -71,8 +63,8 @@ run "not_served" {
   variables { workspace = "not-served" }
 
   assert {
-    condition     = length(databricks_permission_assignment.self_service_app) == 0 && length(databricks_entitlements.self_service_app) == 0 && !contains(keys(local.catalog_grants), "11111111-1111-1111-1111-111111111111")
-    error_message = "self_service: false: no assignment and no catalog grants for the apps."
+    condition     = !contains(keys(local.catalog_grants), "11111111-1111-1111-1111-111111111111")
+    error_message = "self_service: false: no catalog grants for the apps."
   }
   assert {
     condition     = length(local.serverless_policies.self_service.principals) == 0 && !output.self_service.enabled
@@ -92,8 +84,8 @@ run "before_the_first_deploy" {
   }
 
   assert {
-    condition     = length(databricks_permission_assignment.self_service_app) == 0 && length(local.self_service_app_ids) == 0
-    error_message = "No app_ids yet: nothing is assigned or granted."
+    condition     = length(local.self_service_app_ids) == 0 && !contains(keys(local.catalog_grants), "11111111-1111-1111-1111-111111111111")
+    error_message = "No app_ids yet: nothing is granted."
   }
   assert {
     condition     = length(databricks_workspace_binding.self_service_hub) == 0 && local.self_service_hub_id == null

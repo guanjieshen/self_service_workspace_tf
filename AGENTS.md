@@ -19,7 +19,7 @@ The repository holds two things that share one configuration but are built, test
 
 **Where they meet** (change both sides in one pull request when you touch these):
 
-- **Terraform grants what the app needs on Terraform's objects** (`terraform/self_service.tf`): the apps' catalog privileges, their workspace assignment, the jobs' use of the usage policy. The app never grants on catalogs, warehouses, usage policies or assignments itself (`docs/design.md`, section 9, "Every object has one owner").
+- **Terraform grants what the app needs on Terraform's objects** (`terraform/self_service.tf`): the apps' catalog privileges, the catalog's and usage policy's binding to the hub, the jobs' use of the usage policy. The app never grants on catalogs, warehouses, usage policies or assignments itself (`docs/design.md`, section 9, "Every object has one owner").
 - **The app reads, never repeats,** each served workspace's file and its Terraform output `self_service` (prefix, ID, host, catalog, usage policy, platform admins).
 - **One value flows back:** the apps' service principals, `app_ids` in `config/self-service/hub.yaml`.
 
