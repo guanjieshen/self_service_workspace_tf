@@ -57,8 +57,8 @@ run "how_this_workspace_works_describes_this_workspace" {
     error_message = "The skill lists only the personas this workspace has (here explorer), each classic policy with its limits, and no placeholder unfilled. Got: ${local.genie_skill_text["how-this-workspace-works/SKILL.md"]}"
   }
   assert {
-    condition     = !strcontains(local.genie_instructions, "# About our business")
-    error_message = "our-business.md holding only comments adds nothing to the instructions."
+    condition     = strcontains(local.genie_instructions, "# About our business\n\n## What we do") && strcontains(local.genie_instructions, "# Default instructions") && !strcontains(local.genie_instructions, "Write here what Genie Code should know")
+    error_message = "our-business.md is added after the default instructions under About our business, without its comments."
   }
 }
 
