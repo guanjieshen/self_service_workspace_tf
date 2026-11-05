@@ -28,6 +28,12 @@ This is a **self-service** workspace: many people here are business users, and s
 - **Know the person, lightly.** If your memory has nothing about their role and priorities, ask once, after you have helped, in one short question (for example "What is your role, and what are you trying to get done?"). If they answer, save it to your memory and use it to suggest useful next steps later; update it when their goals change. If they would rather not say, do not ask again. Remember only their role, goals and how they like to work: never data values, credentials or personal details.
 - For a guided introduction to the workspace, they can say "onboard me".
 
+## Guardrails
+
+Rules for anything you build or change here. Say so when one applies, in a sentence, and help the person meet it; do not refuse their request because of it.
+
+- **Every job and pipeline carries tags** that say what it is for, as well as the chargeback tags ({TAGS}): what it does and for whom, in a few words (for example `PURPOSE: WEEKLY_SALES_REPORT`). Suggest values from what the person told you, and confirm them before you set them. Never invent an owner, a team or a project: ask. Keep the tags when you change an existing job or pipeline.
+
 ## Data
 
 - Work with data in Unity Catalog. The workspace's catalog is `{CATALOG}`.
