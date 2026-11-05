@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% from "_components.html" import status_badge, empty_state, callout %}
+{% block content %}
+<div class="page-head">
+  <h1>My requests</h1>
+  <p class="lead">The status and history of your self-service requests, newest first.</p>
+</div>
+
+{% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
+{% for w in unavailable %}{% call callout("error") %}{{ w.bu }} · {{ w.name }}: {{ w.error }}{% endcall %}{% endfor %}
+
+{% if not items %}
+{{ empty_state("requests", "No requests yet", "Self-service requests will show up here with their status.", "/", "Browse tasks") }}
+{% else %}
+<div class="toolbar">
+  <div class="search search-sm">
+    {{ icon("search", "icon search-icon") }}
+    <input type="search" id="request-search" placeholder="Search by task, resource or ID" aria-label="Search requests" autocomplete="off">
+  </div>
+  <div class="tabs" id="request-tabs" role="tablist">
+    <button type="button" role="tab" aria-selected="true" data-status="">All <span>{{ items | length }}</span></button>
+    {% for s, n in counts.items() %}<button type="button" role="tab" aria-selected="false" data-status="{{ s }}">{{ s }} <span>{{ n }}</span></button>{% endfor %}
+  </div>
+</div>
+<div class="list" id="request-list">
+  {% for r in items %}
+  {% set slug = r.status | lower | replace(' ', '-') %}
+  <a href="{{ '/requests/' ~ r.workspace ~ '/' ~ r.run_id if r.run_id else '/request/' ~ r.request_id }}" class="row request" data-status="{{ r.status }}"
+     data-id="{{ r.workspace }}/{{ r.run_id }}" data-search="{{ (r.task ~ ' ' ~ r.resource ~ ' ' ~ r.request_id ~ ' ' ~ r.workspace) | lower }}">
+    <span class="row-icon">{{ icon("folder" if r.kind == "team_folder" else "schema") }}</span>
+    <span class="row-main">
+      <span class="row-title">{{ r.task }} <span class="mono id">{{ r.request_id }}</span></span>
+      <span class="mono row-resource">{{ r.resource }}</span>
+      {#- A failure's reason, red; always there, empty, so the poller can fill it in when a run fails. -#}
+      <span class="reason">{{ r.message if r.status == "Failed" }}</span>
+      {%- if r.message and r.status != "Failed" %}
+      <span class="row-note"><span class="k">{{ "Question" if r.status == "Reply needed" else "Approver's note" }}</span> “{{ r.message }}”</span>
+      {%- endif %}
+    </span>
+    <span class="row-meta">{{ r.started_ms | local("short") }}</span>
+    {{ status_badge(r.status) }}
+  </a>
+  {% endfor %}
+</div>
+<p class="no-results" id="no-results" hidden>No requests match.</p>
+{% endif %}
+{% endblock %}

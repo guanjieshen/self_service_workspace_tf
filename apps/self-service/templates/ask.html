@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% from "_components.html" import back, empty_state %}
+{#- Shown only when Genie One cannot open for this person (/ask redirects there otherwise). -#}
+{% block title %}Ask a question · {{ config.title }}{% endblock %}
+{% block content %}
+{{ back("/", "Catalog") }}
+<div class="page-head">
+  <h1>Ask a question</h1>
+  <p class="lead">Questions are answered by Genie One in your business unit's workspace.</p>
+</div>
+{{ empty_state("ask", "No workspace for you yet",
+   "Genie One opens in your business unit's workspace, and we can't tell which one that is yet. Contact your platform admin. Until then, the FAQ links on the catalog cover the common questions.",
+   "/", "Back to the catalog") }}
+{% endblock %}

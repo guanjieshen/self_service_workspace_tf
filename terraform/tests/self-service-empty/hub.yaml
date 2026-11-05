@@ -1,0 +1,4 @@
+# Test fixture: a hub whose apps do not exist yet (before its first deploy).
+app_ids:
+  self_service: null
+  approvals: null

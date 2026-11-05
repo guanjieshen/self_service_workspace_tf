@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% from "_components.html" import approval_label, callout, empty_state %}
+{% block content %}
+{#- The sections and cards come from cards.py (groups): add a card there, not here. Each section
+    may have an FAQ page: self_service_app.faq.<section key>. -#}
+{% set faq = config.faq or {} %}
+
+<div class="page-head">
+  <h1>Self-service tasks</h1>
+</div>
+
+
+{#- Most people who open the app for the first time can only ask for access. -#}
+{#- Without a lookup function, people say which business unit they are in, once (changeable from the header). -#}
+<p class="new-here">New here? Start with <a href="/persona">Request workspace access</a>{% if faq.getting_started %} · <a href="{{ faq.getting_started }}" target="_blank" rel="noopener">How it works {{ icon("external", "icon icon-xs") }}</a>{% endif %}</p>
+
+{#- A quick filter of the cards below, as you type (app.js); hidden until the script shows it. -#}
+<label class="search catalog-search" id="catalog-search-box" hidden>
+  {{ icon("search", "icon search-icon") }}
+  <input type="search" id="catalog-search" placeholder="Search tasks" aria-label="Search tasks" autocomplete="off">
+</label>
+
+{% for section, title, cards in groups %}
+<section class="task-group" data-group>
+  <div class="group-head">
+    <h2>{{ title }}<span class="count">{{ cards | length }}</span></h2>
+    {% if faq[section] %}<a class="group-faq" href="{{ faq[section] }}" target="_blank" rel="noopener">FAQ {{ icon("external", "icon icon-xs") }}</a>{% endif %}
+  </div>
+  <div class="cards">
+    {% for item in cards %}
+    {% set c, href, external, ready = item.card, item.href, item.external, item.ready %}
+    {% set key, name, text = c.key, c.title, c.text %}
+    {% set have = key == "schema" and personal.exists == True %}
+    {% set asked = key == "schema" and personal.exists == "pending" %}
+    <div class="card task {{ 'is-soon' if not ready }}" data-search="{{ (name ~ ' ' ~ text ~ ' ' ~ title) | lower }}">
+      <div class="task-top">
+        <span class="task-icon">{{ icon(c.icon or key) }}</span>
+        <h3>{% if ready %}<a class="stretched" href="{{ href }}" {% if external %}target="_blank" rel="noopener"{% endif %}>{{ name }}</a>{% else %}{{ name }}{% endif %}</h3>
+        {% if asked %}<span class="quota pending" title="Your request is in progress">Requested</span>
+        {% elif key == "schema" and personal.exists is not none %}<span class="quota {{ 'full' if have }}" title="{{ 'You have your personal schema' if have else 'One personal schema per person' }}">{{ '1/1' if have else '0/1' }}</span>{% endif %}
+        {% if not ready %}<span class="soon">Coming soon</span>{% else %}{{ icon("external" if external else "arrow", "icon task-arrow") }}{% endif %}
+      </div>
+      <p>{{ text }}</p>
+      {#- Every card has a foot, so they all have the same shape: how it is approved, or where it opens. -#}
+      <div class="task-foot">
+        {% if ready and external %}<span class="meta">{{ c.opens }}</span>
+        {% if item.more %}<a class="task-sop" href="{{ item.more[1] }}" target="_blank" rel="noopener">{{ item.more[0] }} {{ icon("external", "icon icon-xs") }}</a>{% endif %}
+        {% elif ready %}
+        {{ approval_label(approval.get(key), approval_labels,
+             "Approved in Entra ID before your access changes" if approval.get(key) == "required" else "Runs straight away; the job checks the request") }}
+        {% if approval.get(key) == "auto" %}<span class="meta">&lt; 1 min</span>{% endif %}
+        {% endif %}
+        {% if ready and links.sop and links.sop[key] %}<a class="task-sop" href="{{ links.sop[key] }}" target="_blank" rel="noopener">SOP {{ icon("external", "icon icon-xs") }}</a>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+<div id="no-results" hidden>{{ empty_state("search", "No tasks match", "Try other words, or clear the search to see every task.") }}</div>
+{% endblock %}
