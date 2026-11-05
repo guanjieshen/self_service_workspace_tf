@@ -97,6 +97,7 @@ The keys a workspace file usually sets. `prefix`, `host`, `genie_code_instructio
 | Add a Genie Code skill | a folder in `defaults/genie-code/skills/` | (every workspace gets the baseline's skills) |
 | Leave Genie Code alone (managed elsewhere) | `settings.genie_code` in `defaults/settings.yaml` | `settings.genie_code: null` in its file |
 | Show a label next to the workspace name | | `label` in its file |
+| Tell Genie Code about your business (what you do, business units, terms, key data) | `defaults/genie-code/our-business.md`: added to the instructions under **About our business** | (the same in every workspace; per workspace, `genie_code_instructions` in its file) |
 
 After an edit: open a pull request. Its plan comments show what changes in each workspace it concerns. Locally: `./scripts/tf.sh <name> plan`, or `./scripts/tf.sh all plan` after changing `defaults/`. More examples: [docs/user-journeys.md](../docs/user-journeys.md).
 
@@ -118,6 +119,7 @@ Put the reason for a difference in a comment next to it: the reviewer sees it in
 | `{PREFIX}` / `{prefix}` | The workspace's `prefix`, upper / lower case. |
 | `{TAGS}`, `{WORKSPACE_TAGS}` (Genie Code text) | Every chargeback tag; the ones set for you, with their values. |
 | `{CATALOG}`, `{WAREHOUSE}` (Genie Code text) | The workspace catalog's name; the default SQL warehouse's name. |
+| `{WAREHOUSE_DETAILS}`, `{PERSONAS}`, `{CLASSIC_POLICIES}` (Genie Code text) | The default warehouse's size and auto-stop; the personas this workspace has and what each can do; each classic cluster policy with its limits. All from this workspace's configuration (its file over the baseline) |
 | `CAN_USE`, `CAN_RESTART`, ... | Databricks permission levels, as shown in the workspace UI. |
 | `ONE-WAY` in a comment | Cannot be undone once applied. |
 | "Decide at onboarding" | Switching it later on a busy workspace is disruptive; decide it before the first apply. |

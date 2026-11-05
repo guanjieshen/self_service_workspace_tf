@@ -22,7 +22,7 @@ class Skills(unittest.TestCase):
     def test_the_admins_tasks_each_have_a_skill(self):
         names = {p.name for p in SKILLS.iterdir() if p.is_dir()}
         self.assertLessEqual({"pull-request-from-databricks", "add-workspace", "change-all-workspaces",
-                              "change-one-workspace", "update-self-service-app", "upgrade-to-a-new-release"}, names)
+                              "change-one-workspace", "update-self-service-app", "upgrade-to-a-new-release", "change-genie-code"}, names)
 
     def test_each_is_a_folder_with_a_well_formed_skill(self):
         for folder in sorted(p for p in SKILLS.iterdir() if p.is_dir()):

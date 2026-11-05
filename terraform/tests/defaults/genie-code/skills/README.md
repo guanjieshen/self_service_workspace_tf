@@ -8,3 +8,7 @@ Every workspace gets the skills in this folder, deployed to `/Workspace/.assista
 - **Every workspace gets these skills**, and only these: a workspace adds instructions (`genie_code_instructions` in its file), not skills.
 
 Terraform manages only the files it deploys: skills that admins add by hand in the workspace are left alone, but edits to a managed skill are replaced on the next apply. This README is not deployed.
+
+## Adding or changing a skill
+
+Follow `agents/skills/change-genie-code/SKILL.md` (or ask Genie Code to, in a Git folder of this repository): where each kind of change goes, the placeholders, the house style, and the pull request. Start a new skill from its template, `agents/skills/change-genie-code/template-SKILL.md`.

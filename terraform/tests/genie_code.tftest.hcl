@@ -38,8 +38,27 @@ run "default_plus_workspace" {
     error_message = "A workspace's genie_code_instructions are appended after the default instructions."
   }
   assert {
-    condition     = tolist(keys(local.genie_skills)) == tolist(["build-tagged-assets/SKILL.md", "onboard-me/SKILL.md"])
+    condition     = tolist(keys(local.genie_skills)) == tolist(["build-tagged-assets/SKILL.md", "how-this-workspace-works/SKILL.md", "onboard-me/SKILL.md"])
     error_message = "Every workspace gets the baseline's skills, and only those."
+  }
+}
+
+run "how_this_workspace_works_describes_this_workspace" {
+  command = plan
+  variables { workspace = "some-groups" }
+
+  assert {
+    condition = alltrue([
+      strcontains(local.genie_skill_text["how-this-workspace-works/SKILL.md"], "- **Explorer**: SQL: Databricks One, plus the SQL editor"),
+      !strcontains(local.genie_skill_text["how-this-workspace-works/SKILL.md"], "**Builder**"),
+      strcontains(local.genie_skill_text["how-this-workspace-works/SKILL.md"], "`TST Classic Interactive`: all-purpose clusters, for notebooks; up to 1 at a time per person, up to 4 workers, stopping after at most 60 idle minutes"),
+      length(regexall("\\{(PREFIX|CATALOG|WAREHOUSE|WAREHOUSE_DETAILS|TAGS|WORKSPACE_TAGS|PERSONAS|CLASSIC_POLICIES)\\}", local.genie_skill_text["how-this-workspace-works/SKILL.md"])) == 0,
+    ])
+    error_message = "The skill lists only the personas this workspace has (here explorer), each classic policy with its limits, and no placeholder unfilled. Got: ${local.genie_skill_text["how-this-workspace-works/SKILL.md"]}"
+  }
+  assert {
+    condition     = !strcontains(local.genie_instructions, "# About our business")
+    error_message = "our-business.md holding only comments adds nothing to the instructions."
   }
 }
 
