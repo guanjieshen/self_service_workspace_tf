@@ -77,7 +77,7 @@ main { max-width: var(--page-w); margin: 0 auto; padding: var(--s8) var(--s6) va
 /* ---- Header ---- */
 .topbar { position: sticky; top: 0; z-index: 10; background: rgba(255, 255, 255, 0.96); border-bottom: 1px solid var(--border); }
 .topbar-inner { max-width: var(--page-w); margin: 0 auto; height: 64px; padding: 0 var(--s6); display: flex; align-items: center; gap: var(--s8); }
-/* The title: its first word in the brand colour, the rest as text (config title "Databricks Self-Service"). */
+/* The title: its first word in the brand colour, the rest as text (config title "Databricks Citizen Development"). */
 .brand { display: flex; align-items: baseline; gap: var(--s2); font-size: var(--text-brand); letter-spacing: -0.02em; white-space: nowrap; }
 .brand-first { color: var(--brand); font-weight: 700; }
 .brand-rest { color: var(--text); font-weight: var(--semibold); }

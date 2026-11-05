@@ -56,7 +56,7 @@ settings.use(w["bu"] for w in CONFIG["workspaces"])   # a section of persona req
 STORE = store.Store.from_config(CONFIG)
 SETTINGS = settings.Cached(STORE.settings if STORE else dict)
 PORTAL = portal.Portal(CONFIG, client, store=STORE, shown=lambda: settings.apply(CONFIG, SETTINGS()))
-app = FastAPI(title=CONFIG.get("title", "Self-Service"), docs_url=None, redoc_url=None)
+app = FastAPI(title=CONFIG.get("title", "Citizen Development"), docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
 def local_time(t, style="full"):

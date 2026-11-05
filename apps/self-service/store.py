@@ -77,7 +77,7 @@ class Store:
             c.execute("INSERT INTO self_service.request_events (request_id, actor, role, type, body) VALUES (%s, %s, 'requester', 'submitted', %s)",
                       (r["id"], r["requested_by"], r.get("reason") or None))
 
-    def event(self, request_id, type_, actor="self-service app", role="system", body=None, data=None):
+    def event(self, request_id, type_, actor="Citizen Development app", role="system", body=None, data=None):
         """Append an event. One that the database allows only once (a run starting or ending, a
         decision) is not an error the second time: it is already recorded."""
         with self._conn() as c:

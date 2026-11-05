@@ -105,7 +105,7 @@ if request_id:
 # never handed to two people. An existing one (checked above: this user's) is a run again.
 if not exists:
     try:
-        spark.sql(f"CREATE SCHEMA {name} COMMENT '{kind.capitalize()} schema of {owner_group or user} (self-service)'")
+        spark.sql(f"CREATE SCHEMA {name} COMMENT '{kind.capitalize()} schema of {owner_group or user} (citizen development)'")
     except Exception as e:
         if "ALREADY_EXISTS" in str(e) or "already exists" in str(e):
             raise ValueError(f"{catalog}.{schema} was just created by another request: choose another name") from e

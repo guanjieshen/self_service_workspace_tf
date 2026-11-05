@@ -18,13 +18,13 @@ def check_request_record(request_id, expected):
     if not requests_catalog:
         return
     if not request_id:
-        raise ValueError("request_id is required: this job runs only for requests made in the self-service app "
+        raise ValueError("request_id is required: this job runs only for requests made in the Citizen Development app "
                          "(require_request_record)")
     table = f"`{requests_catalog}`.`self_service`"
     found = _rows(f"SELECT kind, workspace, requested_by, name, coalesce(owner_group, '') AS owner_group "
                   f"FROM {table}.`requests` WHERE id = '{request_id}'")
     if not found:
-        raise ValueError(f"{request_id} is not a request the self-service app recorded")
+        raise ValueError(f"{request_id} is not a request the Citizen Development app recorded")
     wrong = sorted(k for k, v in expected.items() if found[0].get(k) != v)
     if wrong:
         raise ValueError(f"this run's {', '.join(wrong)} differ from what {request_id} asked for")

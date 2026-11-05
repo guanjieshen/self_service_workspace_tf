@@ -4,14 +4,14 @@
 {% block content %}
 <div class="page-head">
   <h1>My requests</h1>
-  <p class="lead">The status and history of your self-service requests, newest first.</p>
+  <p class="lead">The status and history of your citizen development requests, newest first.</p>
 </div>
 
 {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
 {% for w in unavailable %}{% call callout("error") %}{{ w.bu }} · {{ w.name }}: {{ w.error }}{% endcall %}{% endfor %}
 
 {% if not items %}
-{{ empty_state("requests", "No requests yet", "Self-service requests will show up here with their status.", "/", "Browse tasks") }}
+{{ empty_state("requests", "No requests yet", "Your requests will show up here with their status.", "/", "Browse tasks") }}
 {% else %}
 <div class="toolbar">
   <div class="search search-sm">

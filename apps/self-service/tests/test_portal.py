@@ -19,7 +19,7 @@ from databricks.sdk.errors import NotFound  # noqa: E402
 
 HOST = "https://adb-1.azuredatabricks.net"
 HUB = "https://adb-9.azuredatabricks.net"
-CONFIG = {"title": "Self-Service", "hub_host": HUB, "links": {}, "ai": {"model": "system.ai.claude-sonnet-5-5"}, "workspaces": [
+CONFIG = {"title": "Citizen Development", "hub_host": HUB, "links": {}, "ai": {"model": "system.ai.claude-sonnet-5-5"}, "workspaces": [
     {"name": "fin", "bu": "FIN", "host": HOST}, {"name": "down", "bu": "OPS", "host": "https://down"}]}
 ANA, BO = "ana@contoso.com", "bo@contoso.com"
 WHY = "Monthly reconciliation reports for the team."   # every named schema and folder needs a reason
@@ -149,7 +149,7 @@ class FakeStore:
 
     def events_of(self, request_id):
         at = __import__("datetime").datetime(2026, 10, 21, 12, 0)
-        who = lambda rid, t: self.requests[rid]["requested_by"] if t == "submitted" else "self-service app"
+        who = lambda rid, t: self.requests[rid]["requested_by"] if t == "submitted" else "Citizen Development app"
         return [{"at": at, "actor": d.get("actor", who(rid, t)), "role": "approver" if t in ("needs_info", "approved", "rejected") else "system",
                  "type": t, "body": d.get("body"), "data": d} for rid, t, d in self.events if rid == request_id]
 
@@ -198,7 +198,7 @@ class Discovery(unittest.TestCase):
         self.assertEqual(fin.error, "")
         self.assertEqual((fin.host, down.host), (HOST, "https://down"), "each keeps its own address, for the links people open")
         self.assertEqual(down.jobs, {})
-        self.assertIn("no self-service job found in the hub", down.error)
+        self.assertIn("no Citizen Development job found in the hub", down.error)
 
     def test_a_hub_that_cannot_be_read_is_said_for_every_workspace(self):
         p, fake = make()
