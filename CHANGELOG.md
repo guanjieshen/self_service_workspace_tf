@@ -10,6 +10,8 @@ is left alone.
 
 ## Unreleased
 
+- **Open job run** (the approvals app) opens the run in the hub, where every workspace's schema
+  job runs; it opened the request's own workspace, where the job no longer is.
 - The default Genie Code instructions start with **Who you are helping**: many people here are new
   to Databricks, so answer first, match their level, and ask about their role and priorities at
   most once, saving the answer to Genie Code memory. The `onboard-me` skill keeps its profile in

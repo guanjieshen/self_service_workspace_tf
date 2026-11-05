@@ -807,11 +807,13 @@ class Portal:
         return r if r is not None and requester(r.kind, r.params) == user else None
 
     def run_link(self, ws_name, kind, run_id):
-        """Where an admin sees a request's job run in Databricks (the approvals app), or None.
+        """Where an admin sees a request's job run in Databricks (the approvals app), or None: in
+        the hub, where every workspace's job runs (not the workspace the request is for).
         kind: the database's (folder, or a schema kind)."""
         job_kind = "team_folder" if kind == "folder" else "personal_schema"
         w = next((w for w in self.workspaces() if w.name == ws_name and job_kind in w.jobs), None)
-        return f"{w.host.rstrip('/')}/jobs/{w.jobs[job_kind]['id']}/runs/{int(run_id)}" if w and run_id else None
+        hub = (self.config.get("hub_host") or "").rstrip("/")
+        return f"{hub}/jobs/{w.jobs[job_kind]['id']}/runs/{int(run_id)}" if hub and w and run_id else None
 
     def run_status(self, ws_name, run_id):
         """A run's status (In progress, Completed, Failed), whoever asked: for the approvals app,

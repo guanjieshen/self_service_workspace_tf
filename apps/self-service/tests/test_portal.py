@@ -18,7 +18,8 @@ import portal  # noqa: E402
 from databricks.sdk.errors import NotFound  # noqa: E402
 
 HOST = "https://adb-1.azuredatabricks.net"
-CONFIG = {"title": "Self-Service", "links": {}, "ai": {"model": "system.ai.claude-sonnet-5-5"}, "workspaces": [
+HUB = "https://adb-9.azuredatabricks.net"
+CONFIG = {"title": "Self-Service", "hub_host": HUB, "links": {}, "ai": {"model": "system.ai.claude-sonnet-5-5"}, "workspaces": [
     {"name": "fin", "bu": "FIN", "host": HOST}, {"name": "down", "bu": "OPS", "host": "https://down"}]}
 ANA, BO = "ana@contoso.com", "bo@contoso.com"
 WHY = "Monthly reconciliation reports for the team."   # every named schema and folder needs a reason
@@ -714,12 +715,14 @@ class BusinessUnitRouting(unittest.TestCase):
 
 
 class RunLinks(unittest.TestCase):
-    def test_an_admin_gets_the_runs_page_in_its_workspace(self):
+    def test_an_admin_gets_the_runs_page_in_the_hub_where_the_job_runs(self):
         p, fake = make()
         job = p.workspaces()[0].jobs["team_folder"]["id"]
-        self.assertEqual(p.run_link("fin", "folder", 42), f"{HOST}/jobs/{job}/runs/42")
+        self.assertEqual(p.run_link("fin", "folder", 42), f"{HUB}/jobs/{job}/runs/42", "the hub, not the request's workspace")
         self.assertIsNone(p.run_link("fin", "folder", None), "no run yet")
         self.assertIsNone(p.run_link("nowhere", "folder", 42))
+        p.config = {k: v for k, v in p.config.items() if k != "hub_host"}
+        self.assertIsNone(p.run_link("fin", "folder", 42), "a config.json without the hub: no link rather than a wrong one")
 
 
 class JobTags(unittest.TestCase):
