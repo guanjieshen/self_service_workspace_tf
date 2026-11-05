@@ -12,7 +12,8 @@ resources:
   # (scripts/app_build.py).
   jobs:
     personal_schema:
-      name: ${var.business_unit} personal schema
+      # One job for every schema: personal, project and team (the notebook tells them apart).
+      name: ${var.business_unit} schema requests
       max_concurrent_runs: 20
       queue:
         enabled: true

@@ -10,6 +10,8 @@ is left alone.
 
 ## Unreleased
 
+- **The schema job is named `<BU> schema requests`** (was `<BU> personal schema`): it has always
+  made personal, project and team schemas. Only its name changes; the app finds it by its tag.
 - **Open job run** (the approvals app) opens the run in the hub, where every workspace's schema
   job runs; it opened the request's own workspace, where the job no longer is.
 - The default Genie Code instructions start with **Who you are helping**: many people here are new
