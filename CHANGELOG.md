@@ -10,6 +10,12 @@ is left alone.
 
 ## Unreleased
 
+- **Clearer catalog cards.** Titles start with what happens: **Create a personal schema** (it
+  is never approved by a person), **View data access requests**, **View compute costs**. Each
+  description is one short sentence; the budget policy card now says it tracks serverless usage
+  and costs (a budget policy attributes usage, it does not bill a team). Every card that opens
+  Databricks says "Opens in Databricks · Workspace access required"; the personal schema's quota
+  reads "0 of 1 used"; sections no longer show a count. What each card does is unchanged.
 - **The Open your workspace card is now Open Genie One**, with shorter text ("Explore the data
   you have access to and try suggested questions to get started"), and its link is **Restart
   guided tour**. It works as before.
