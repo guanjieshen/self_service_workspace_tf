@@ -116,6 +116,7 @@ def app_config(s, spokes, mode=None):
     lookup = app.get("bu_lookup") or {}
     config = {
         "title": app["title"],
+        "hub_host": host,   # where the jobs run: an admin's link to a request's run opens there
         "faq": dict(app.get("faq") or {}),
         "ai_check": str(app.get("ai_check") or "off"),
         "human_approval": list(app.get("human_approval") or []),

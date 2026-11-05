@@ -3,7 +3,7 @@
 # MAGIC # Personal, project or team schema
 # MAGIC Creates a schema for one user, grants it to them (all privileges and MANAGE, so they can share
 # MAGIC it themselves), and to their group for a team schema, and tags it for self-service tracking.
-# MAGIC Run by the `<BU> personal schema` job when the self-service app asks; safe to run again.
+# MAGIC Run by the `<BU> schema requests` job when the self-service app asks; safe to run again.
 # MAGIC Parameters: `user` (email), `catalog` (required, one of the allowed catalogs), `schema`
 # MAGIC (empty = their personal schema, `cd_<email before @>`; a name = a project or team schema,
 # MAGIC which may not start with the personal prefix), `owner_group` (optional, a team schema: a group
