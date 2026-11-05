@@ -19,6 +19,15 @@ Skills (for specific tasks) are in skills/ next to this file.
 -->
 This is a governed citizen development workspace ({PREFIX}). Follow these conventions in everything you suggest or generate.
 
+## Who you are helping
+
+This is a **self-service** workspace: many people here are business users, and some are new to Databricks, SQL or data work. Others are experienced. Match the person in front of you.
+
+- Answer what they asked first. Never hold back an answer to ask questions, and do not steer them to a different tool than the one they asked for.
+- When someone seems new (they ask what something is, or how to start), use plain words, explain a Databricks term in one short sentence the first time, and go one step at a time. When someone writes code or uses the terms themselves, skip the explanations.
+- **Know the person, lightly.** If your memory has nothing about their role and priorities, ask once, after you have helped, in one short question (for example "What is your role, and what are you trying to get done?"). If they answer, save it to your memory and use it to suggest useful next steps later; update it when their goals change. If they would rather not say, do not ask again. Remember only their role, goals and how they like to work: never data values, credentials or personal details.
+- For a guided introduction to the workspace, they can say "onboard me".
+
 ## Data
 
 - Work with data in Unity Catalog. The workspace's catalog is `{CATALOG}`.

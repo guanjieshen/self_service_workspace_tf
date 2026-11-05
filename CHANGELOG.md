@@ -10,6 +10,11 @@ is left alone.
 
 ## Unreleased
 
+- The default Genie Code instructions start with **Who you are helping**: many people here are new
+  to Databricks, so answer first, match their level, and ask about their role and priorities at
+  most once, saving the answer to Genie Code memory. The `onboard-me` skill keeps its profile in
+  Genie Code memory instead of a file in the user's folder.
+
 - **An Open your workspace card** (Get started) replaces Genie One Onboarding: it opens Genie One
   in the person's workspace, with the onboarding prompt (now the **guided tour**) the first time
   and plain Genie One after that; **Start the guided tour again** on the card asks it again. The
