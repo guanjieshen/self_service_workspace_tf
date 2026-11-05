@@ -33,7 +33,7 @@ CONFIG = ROOT / "config/self-service"
 WORKSPACES = ROOT / "config/workspaces"
 # Not part of the app's code: its tests, notes, database scripts and local files.
 SKIP = ("__pycache__", ".pyc", ".gitignore", "config.json", "tests", "AGENTS.md", "db")
-KINDS = ("personal_schema", "project_schema", "team_schema", "folder")
+KINDS = ("personal_schema", "project_schema", "team_schema", "temporary_schema", "folder")
 EMAIL = r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]+"
 
 
@@ -72,6 +72,8 @@ def check(s):
     for key, name in (("name", app.get("name")), ("approvals.name", (app.get("approvals") or {}).get("name"))):
         need(re.fullmatch(r"[a-z0-9-]{2,30}", name or ""), f"app.yaml self_service_app.{key}: 2 to 30 lowercase letters, digits and dashes.")
     need(str(app.get("ai_check")) in ("on", "off"), "app.yaml self_service_app.ai_check: on or off.")
+    days = (jobs.get("temporary_schema") or {}).get("days", 30)
+    need(isinstance(days, int) and not isinstance(days, bool) and 1 <= days <= 365, "app.yaml jobs.temporary_schema.days: a whole number of days, 1 to 365.")
     need(re.fullmatch(r"[\w.-]{0,100}", ai_model(app)), "app.yaml self_service_app.ai_model: a model's name (for example system.ai.claude-sonnet-5-5), or null.")
     need(set(app.get("human_approval") or []) <= set(KINDS), f"app.yaml self_service_app.human_approval lists kinds of request: {', '.join(KINDS)}.")
     need(all(u is None or re.match(r"https?://", u) for u in (app.get("faq") or {}).values()),
@@ -117,7 +119,8 @@ def app_config(s, spokes, mode=None):
     config = {
         "title": app["title"],
         "hub_host": host,   # where the jobs run: an admin's link to a request's run opens there
-        "folder_root": s["jobs"].get("folder_root") or "/Workspace",   # where folders go (made by hand for now)
+        "folder_root": s["jobs"].get("folder_root") or "/Workspace",
+        "temporary_days": int((s["jobs"].get("temporary_schema") or {}).get("days") or 30),   # what the temporary schema form says   # where folders go (made by hand for now)
         "faq": dict(app.get("faq") or {}),
         "ai_check": str(app.get("ai_check") or "off"),
         "human_approval": list(app.get("human_approval") or []),
@@ -225,6 +228,7 @@ def build_jobs(s, w, app_ids, root=None):
               "human_approval": list(app.get("human_approval") or [])} if jobs.get("require_request_record") else {}
     (out / "personal_schema.py").write_text(notebook("personal_schema", {
         "prefix": jobs["personal_schema"]["prefix"], "privileges": jobs["personal_schema"]["privileges"],
+        "temporary_days": int((jobs.get("temporary_schema") or {}).get("days") or 30),
         "owner": jobs.get("catalog_owner") or "", "allowed_catalogs": [w["catalog"]], **record}))
     (out / "target.yml").write_text(json.dumps(jobs_target(s, w, app_ids), indent=1))
     return out

@@ -125,4 +125,6 @@ jobs:
   personal_schema:                    # a person's own schema: cd_<email name>
     prefix: cd_
     privileges: [ALL_PRIVILEGES, MANAGE]
+  temporary_schema:                   # a person's short-term schema: <prefix>tmp_<name>, one at a time
+    days: 30                          # its cd_expires tag, this many days ahead (nothing is deleted)
   require_request_record: false       # true: a job runs only for requests the app recorded

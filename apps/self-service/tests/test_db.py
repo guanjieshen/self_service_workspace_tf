@@ -100,7 +100,7 @@ class AgainstPostgres(unittest.TestCase):
 
     def test_migrations_run_once(self):
         self.assertEqual(self.first, [f.name for f in migrate.migrations()], "every migration, in order, on an empty database")
-        self.assertIn("006_guided_tours.sql", self.first)
+        self.assertIn("007_temporary_schemas.sql", self.first)
         self.assertEqual(self.second, [], "running again changes nothing")
 
     def test_the_app_adds_and_reads_but_never_rewrites_history(self):

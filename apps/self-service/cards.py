@@ -57,6 +57,8 @@ CARDS = [
          "Create a schema for your own work, with full control over its contents.", href="/schema"),
     Card("project_schema", "workspace", "Request a project schema",
          "Create a dedicated schema for your project.", href="/schema/project", icon="schema"),
+    Card("temporary_schema", "workspace", "Create a temporary schema",
+         "A short-term schema for experiments, tagged with the date it expires.", href="/schema/temporary", icon="schema"),
     Card("team_schema", "workspace", "Request a team schema",
          "Create a shared schema your team can manage together.", href="/schema/team", icon="schema"),
     # Made by hand while its job is not deployed (portal.BY_HAND): a folder is workspace specific, and the hub does not

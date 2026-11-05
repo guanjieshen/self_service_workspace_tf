@@ -14,13 +14,15 @@ import threading
 import time
 
 # The kinds a request can be, as the database knows them (the portal's job kinds are coarser).
-KINDS = ("personal_schema", "project_schema", "team_schema", "folder")
+KINDS = ("personal_schema", "project_schema", "team_schema", "temporary_schema", "folder")
 
 
 def db_kind(job_kind, params):
     """The request's kind, from the job it runs and its parameters."""
     if job_kind == "team_folder":
         return "folder"
+    if params.get("temporary") == "true":
+        return "temporary_schema"
     if params.get("schema"):
         return "team_schema" if params.get("owner_group") else "project_schema"
     return "personal_schema"

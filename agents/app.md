@@ -33,6 +33,12 @@ browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py
   is recorded, always waits for an approver, and the approvals app says what to create (the
   workspace, `jobs.folder_root`/<name>, who gets Can manage). The approver creates it, then
   approves, which marks it Completed; nothing runs. Deploy the job again and folders run it.
+- **A temporary schema** (`/schema/temporary`) is the requester's alone, named
+  `<prefix>tmp_<name>` (`portal.temporary_prefix`), and runs the same schema job with
+  `temporary=true`. The job tags it `cd_schema_kind=temporary` and `cd_expires` (today plus
+  `jobs.temporary_schema.days`), and refuses a second one while the first has not expired: it
+  reads the catalog's schema tags, so the app does not check. Nothing is deleted at expiry yet;
+  the tag is for a cleanup later. A run again never changes a schema's kind or extends its date.
 - **A team schema's group is typed, and membership is not checked:** the hub cannot see a
   person's groups in their workspace. Any Entra account group can be named; a workspace-local
   one fails at the grant.

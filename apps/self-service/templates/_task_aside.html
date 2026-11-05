@@ -7,6 +7,6 @@
     {%- set needs = approval.get(task_icon) == "required" -%}
     {%- set sop -%}{% if links.sop and links.sop[task_icon] %}<a class="text-link" href="{{ links.sop[task_icon] }}" target="_blank" rel="noopener">Open SOP {{ icon("external", "icon icon-xs") }}</a>{% endif %}{%- endset -%}
     <div class="kv-side">{{ kv([("Approval", approval_label(approval.get(task_icon), approval_labels)), ("Category", task_category),
-                               ("Ready in", "" if needs else "< 1 min"), ("SOP", sop | trim)]) }}</div>
+                               ("Ready in", "" if needs else "Under 1 min"), ("SOP", sop | trim)]) }}</div>
   </section>
 </aside>
