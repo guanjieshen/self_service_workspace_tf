@@ -7,7 +7,7 @@ description: Use when someone wants to change the default (baseline) for every m
 
 The person may not know YAML or Terraform. Ask what they want in their own words, then translate; at most two questions at a time.
 
-**The defaults are `config/defaults/`**: one file per area (access, compute, cost, catalog, settings) and `config/defaults/genie-code/`. A change there reaches **every** workspace in `config/workspaces/`. If they mean only one workspace, use the skill **change-one-workspace** instead.
+**The defaults are `config/defaults/`**: one file per area (access, compute, cost, catalog, settings) and `config/defaults/genie-code/`. A change there reaches **every** workspace in `config/workspaces/`. If they mean only one workspace, use the skill **change-one-workspace** instead. For Genie Code's instructions, skills or business context, use the skill **change-genie-code**.
 
 ## 1. Find the key
 

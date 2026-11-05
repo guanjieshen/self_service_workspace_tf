@@ -10,6 +10,26 @@ is left alone.
 
 ## Unreleased
 
+- The default Genie Code instructions start with **Who you are helping**: many people here are new
+  to Databricks, so answer first, match their level, and ask about their role and priorities at
+  most once, saving the answer to Genie Code memory. The `onboard-me` skill keeps its profile in
+  Genie Code memory instead of a file in the user's folder.
+- A maintainer skill, **`change-genie-code`** (`agents/skills/`), with a template for new skills: where an
+  instruction, a skill or the business context goes, the placeholders, the house style, and the pull request.
+- A new default Genie Code skill, **`how-this-workspace-works`**, written from each workspace's own
+  configuration: the personas it has and what each can do, the shared warehouse, classic cluster
+  policies with their limits, and how to get more. New placeholders `{PERSONAS}`,
+  `{CLASSIC_POLICIES}` and `{WAREHOUSE_DETAILS}` work in the instructions and every skill.
+- **`config/defaults/genie-code/our-business.md`**: your organization's context for Genie Code
+  (what you do, business units, terms), added to the instructions under **About our business**. It
+  ships with only comments, which add nothing.
+- The default instructions and skills say classic compute comes from the workspace's platform team
+  (not the self-service app), and no longer mention app-made project policies or team warehouses.
+- A **Guardrails** section in the default Genie Code instructions: serverless first, with the
+  workspace's usage policy (`{PREFIX}-0-SELF-SERVICE`) or a project's; and every job and pipeline
+  carries the workspace's default tags plus tags that say what it is for, which Genie Code suggests
+  and the person confirms.
+- **The Open your workspace card is now Open Genie One**, with shorter text ("Explore the data
 - **Clearer catalog cards.** Titles start with what happens: **Create a personal schema** (it
   is never approved by a person), **View data access requests**, **View compute costs**. Each
   description is one short sentence; the budget policy card now says it tracks serverless usage

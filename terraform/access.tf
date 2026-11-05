@@ -82,38 +82,76 @@ locals {
   genie_catalog   = coalesce(try(local.catalog.name, null), local.default_catalog, "the workspace's catalog")
   genie_warehouse = replace(replace(try(local.config.sql_warehouse.name, "the default warehouse"), "{PREFIX}", local.prefix_upper), "{prefix}", local.prefix)
 
-  # Instructions: the default followed by this workspace's own, with <!-- comments -->
-  # removed, each under a heading.
+  # Instructions: the default, then the organization's business context (genie-code/
+  # our-business.md, while it holds more than comments), then this workspace's own, each under
+  # a heading, with <!-- comments --> removed.
   genie_default_text   = try(trimspace(replace(file("${local.genie_default_dir}/instructions.md"), "/(?s)<!--.*?-->/", "")), "")
+  genie_business_text  = try(trimspace(replace(file("${local.genie_default_dir}/our-business.md"), "/(?s)<!--.*?-->/", "")), "")
   genie_workspace_text = trimspace(replace(try(tostring(local.ws_all.genie_code_instructions), ""), "/(?s)<!--.*?-->/", ""))
+  genie_parts = compact([
+    local.genie_default_text == "" ? "" : "# Default instructions\n\nShared by every citizen development workspace.\n\n${local.genie_default_text}",
+    local.genie_business_text == "" ? "" : "# About our business\n\n${local.genie_business_text}",
+    local.genie_workspace_text == "" ? "" : "# Workspace instructions\n\nFor this workspace only${local.genie_default_text == "" ? "" : ", in addition to the default instructions"}.\n\n${local.genie_workspace_text}",
+  ])
+
+  # ---- The placeholders, filled in from this workspace's configuration ----
   # {TAGS}: every chargeback tag; {WORKSPACE_TAGS}: the ones set for you, with their values.
   genie_tags           = join(", ", [for t in local.all_tag_keys : "`${t}`"])
   genie_workspace_tags = length(local.chargeback_tags) == 0 ? "none" : join(", ", [for k, v in local.chargeback_tags : "`${k}` = `${v}`"])
-  genie_parts = compact([
-    local.genie_default_text == "" ? "" : "# Default instructions\n\nShared by every citizen development workspace.\n\n${local.genie_default_text}",
-    local.genie_workspace_text == "" ? "" : "# Workspace instructions\n\nFor this workspace only${local.genie_default_text == "" ? "" : ", in addition to the default instructions"}.\n\n${local.genie_workspace_text}",
-  ])
-  genie_instructions = length(local.genie_parts) == 0 ? null : replace(replace(replace(replace(replace(
-    join("\n\n", local.genie_parts),
-    "{PREFIX}", local.prefix_upper),
-    "{CATALOG}", local.genie_catalog),
-    "{WAREHOUSE}", local.genie_warehouse),
-    "{WORKSPACE_TAGS}", local.genie_workspace_tags),
-  "{TAGS}", local.genie_tags)
+  # {PERSONAS}: the personas this workspace has (a group named for them), and what each can do.
+  genie_tier_text = {
+    consumer  = "Databricks One: dashboards, Genie spaces and apps others share",
+    sql       = "SQL: Databricks One, plus the SQL editor, queries, dashboards and Genie spaces",
+    workspace = "the full workspace: notebooks, jobs and pipelines, plus everything SQL can do",
+  }
+  genie_personas = join("\n", concat(
+    local.users_group == null ? [] : ["- **Everyone in the workspace**: ${lookup(local.genie_tier_text, try(local.config.users.access, "consumer"), local.genie_tier_text.consumer)}."],
+    [for p in sort(keys(local.persona_groups)) : "- **${title(p)}**: ${lookup(local.genie_tier_text, try(local.personas[p].access, "consumer"), local.genie_tier_text.consumer)}."],
+    length(local.persona_groups) == 0 && local.users_group == null ? ["- No personas are set up in this workspace yet."] : [],
+  ))
+  # {CLASSIC_POLICIES}: each classic cluster policy this workspace has, with its limits.
+  genie_policy_kinds = { interactive = "all-purpose clusters, for notebooks", jobs = "job clusters", pipelines = "pipeline clusters" }
+  genie_cp           = try(local.config.cluster_policy, null)
+  genie_classic = join("\n", concat([
+    for k in ["interactive", "jobs", "pipelines"] : join("", [
+      "  - `${replace(replace(local.genie_cp[k].name, "{PREFIX}", local.prefix_upper), "{prefix}", local.prefix)}`: ${local.genie_policy_kinds[k]}",
+      "; up to ${try(local.genie_cp[k].max_clusters_per_user, 1)} at a time per person",
+      ", up to ${try(local.genie_cp[k].max_workers, local.genie_cp.max_workers)} workers",
+      try(local.genie_cp[k].max_autotermination_minutes, null) == null ? "" : ", stopping after at most ${local.genie_cp[k].max_autotermination_minutes} idle minutes",
+      length(try(local.genie_cp.node_types, [])) == 0 ? "" : ", on ${join(", ", [for n in local.genie_cp.node_types : "`${n}`"])}",
+      ".",
+    ]) if try(local.genie_cp[k], null) != null
+    ], try(length([for k in ["interactive", "jobs", "pipelines"] : k if try(local.genie_cp[k], null) != null]), 0) == 0 ? ["  - None in this workspace."] : []
+  ))
+  # {WAREHOUSE_DETAILS}: the shared warehouse's size and auto-stop.
+  genie_warehouse_details = join(", ", compact([
+    try(local.config.sql_warehouse.size, null) == null ? "" : "size ${local.config.sql_warehouse.size}",
+    try(local.config.sql_warehouse.auto_stop_minutes, null) == null ? "" : "stops after ${local.config.sql_warehouse.auto_stop_minutes} idle minutes",
+  ]))
 
   # Skills: one folder per skill under genie-code/skills/, each with a SKILL.md.
   genie_skill_files   = [for f in fileset("${local.genie_default_dir}/skills", "*/**") : f if !startswith(basename(f), ".")]
   genie_skill_sources = { for f in local.genie_skill_files : f => "${local.genie_default_dir}/skills/${f}" }
-  # Markdown gets the same treatment as the instructions; other files are deployed as they are.
-  genie_skill_text = {
-    for f, src in local.genie_skill_sources : f => replace(replace(replace(replace(replace(
-      trimspace(replace(file(src), "/(?s)<!--.*?-->/", "")),
+
+  # Every text Genie Code gets (the instructions, and each skill's Markdown), rendered the same way.
+  genie_raw = merge(
+    { "" = join("\n\n", local.genie_parts) },
+    { for f, src in local.genie_skill_sources : f => trimspace(replace(file(src), "/(?s)<!--.*?-->/", "")) if endswith(f, ".md") },
+  )
+  genie_rendered = {
+    for k, t in local.genie_raw : k => replace(replace(replace(replace(replace(replace(replace(replace(t,
       "{PREFIX}", local.prefix_upper),
       "{CATALOG}", local.genie_catalog),
+      "{WAREHOUSE_DETAILS}", local.genie_warehouse_details),
       "{WAREHOUSE}", local.genie_warehouse),
       "{WORKSPACE_TAGS}", local.genie_workspace_tags),
-    "{TAGS}", local.genie_tags) if endswith(f, ".md")
+      "{TAGS}", local.genie_tags),
+      "{PERSONAS}", local.genie_personas),
+    "{CLASSIC_POLICIES}", local.genie_classic)
   }
+  genie_instructions = length(local.genie_parts) == 0 ? null : local.genie_rendered[""]
+  # Markdown gets the same treatment as the instructions; other files are deployed as they are.
+  genie_skill_text = { for f in keys(local.genie_skill_sources) : f => local.genie_rendered[f] if endswith(f, ".md") }
   genie_skills = {
     for f, src in local.genie_skill_sources : f => (
       endswith(f, ".md")
