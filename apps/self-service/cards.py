@@ -3,11 +3,12 @@
 To add a card, add one Card to CARDS: its section, title and text, and where it goes:
 
 - href "/path": a task in this app (it shows how it is approved, from portal.approval_of);
-- link "name": a page in Databricks, from config links.<name> (or "onboarding", the Genie One
-  link); the card is left out while that link is not set;
+- link "name": a page in Databricks, from links.<name> (config links, and the ones main.catalog
+  adds: "workspace", "tour"); the card is left out while that link is not set;
 - neither: Coming soon.
 
 A link card with soon=True shows as Coming soon until its link is set, instead of being left out.
+A link card's more=(text, link name) is a second, smaller link in its foot, shown when that link is set.
 
 A new section goes in SECTIONS; its key is also its FAQ link (self_service_app.faq.<key>, and
 settings.FAQS). Keys stay the same when a title changes: Settings stores the FAQ links by key.
@@ -29,17 +30,21 @@ class Card:
     title: str
     text: str
     href: str = ""  # a page of this app
-    link: str = ""  # a page in Databricks: config links.<link>, or "onboarding"
+    link: str = ""  # a page in Databricks: links.<link>
     icon: str = ""  # _icons.html name; the key when empty
     soon: bool = False  # a link card: Coming soon (not left out) while its link is not set
     opens: str = "Opens in Databricks"   # a link card's foot: where it goes, and what it needs
+    more: tuple = ()  # a link card's second link: (its text, links.<name>)
 
 
 CARDS = [
     Card("persona", "access", "Request workspace access", "Choose the access level you need.", href="/persona"),
-    Card("onboarding", "access", "Genie One Onboarding",
-         "Ask Genie to look at the data you can use and suggest the best questions to start with.", link="onboarding", icon="ask",
-         opens="Opens in Databricks (workspace access is required)"),
+    # /open: Genie One in the person's workspace, with the guided tour (the onboarding prompt) the
+    # first time (portal.open_workspace).
+    Card("open_workspace", "access", "Open your workspace",
+         "Go to Genie One in your workspace. The first time, Genie shows you the data you have access to and the best questions to start with.",
+         link="workspace", icon="ask", opens="Opens in Databricks (workspace access is required)",
+         more=("Start the guided tour again", "tour")),
 
     Card("discover", "data", "Discover data",
          "Browse the data your organization has curated, by business domain, in Databricks.", link="discover", icon="search",
@@ -70,10 +75,11 @@ CARDS = [
 ]
 
 
-def groups(links, onboarding=None):
+def groups(links):
     """[(section key, title, [card, ...])] for the catalog, each card with where it goes:
-    {"card": Card, "href": ..., "external": bool, "ready": bool}. Link cards whose link is not
-    set are left out; sections with no cards are too."""
+    {"card": Card, "href": ..., "external": bool, "ready": bool, "more": (text, href) or None}.
+    Link cards whose link is not set are left out; sections with no cards are too."""
+    links = links or {}
     out = []
     for key, title in SECTIONS:
         shown = []
@@ -81,14 +87,15 @@ def groups(links, onboarding=None):
             if c.section != key:
                 continue
             if c.link:
-                href = onboarding if c.link == "onboarding" else (links or {}).get(c.link)
+                href = links.get(c.link)
                 if not href:
                     if c.soon:
-                        shown.append({"card": c, "href": "", "external": False, "ready": False})
+                        shown.append({"card": c, "href": "", "external": False, "ready": False, "more": None})
                     continue
-                shown.append({"card": c, "href": href, "external": True, "ready": True})
+                more = c.more and links.get(c.more[1]) and (c.more[0], links[c.more[1]])
+                shown.append({"card": c, "href": href, "external": True, "ready": True, "more": more or None})
             else:
-                shown.append({"card": c, "href": c.href, "external": False, "ready": bool(c.href)})
+                shown.append({"card": c, "href": c.href, "external": False, "ready": bool(c.href), "more": None})
         if shown:
             out.append((key, title, shown))
     return out

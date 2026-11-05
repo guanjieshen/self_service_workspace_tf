@@ -61,6 +61,8 @@ class Files(unittest.TestCase):
         statements = [s for s, _ in migrate.grant_statements({"self_service": "a", "approvals": "b"})]
         self.assertIn("GRANT SELECT, INSERT ON self_service.business_unit_choices TO {self_service};", statements)
         self.assertFalse([s for s in statements if "business_unit_choices" in s and "{approvals}" in s], "the approvals app never records one")
+        self.assertIn("GRANT SELECT, INSERT ON self_service.guided_tours TO {self_service};", statements)
+        self.assertFalse([s for s in statements if "guided_tours" in s and "{approvals}" in s], "nor a tour")
 
     def test_unknown_roles_are_refused(self):
         with self.assertRaises(SystemExit):
@@ -98,7 +100,7 @@ class AgainstPostgres(unittest.TestCase):
 
     def test_migrations_run_once(self):
         self.assertEqual(self.first, [f.name for f in migrate.migrations()], "every migration, in order, on an empty database")
-        self.assertIn("005_chosen_business_units.sql", self.first)
+        self.assertIn("006_guided_tours.sql", self.first)
         self.assertEqual(self.second, [], "running again changes nothing")
 
     def test_the_app_adds_and_reads_but_never_rewrites_history(self):
@@ -161,6 +163,9 @@ class AgainstPostgres(unittest.TestCase):
         self.assertEqual((rows["ss-s1"]["state"], rows["ss-s1"]["run_id"], rows["ss-s1"]["owner_group"]), ("run_started", 42, "fin-data-eng"))
         self.assertEqual((rows["ss-s2"]["state"], rows["ss-s2"]["state_body"]), ("start_failed", "The job could not be started."))
         self.assertEqual(db.requests_of("bo@contoso.com"), [], "only the person's own")
+        self.assertFalse(db.toured("Ana@contoso.com"))
+        db.record_tour("Ana@contoso.com")
+        self.assertEqual((db.toured("ana@contoso.com"), db.toured("bo@contoso.com")), (True, False))
         with self.psycopg.connect(DSN) as c:
             types = [r[0] for r in c.execute("SELECT type FROM self_service.request_events WHERE request_id = 'ss-s1' ORDER BY id")]
         self.assertEqual(types, ["submitted", "run_started"])

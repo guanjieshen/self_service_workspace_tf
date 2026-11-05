@@ -1,7 +1,7 @@
 """Settings platform admins change from the approvals app (Settings), without a pull request:
 the links the self-service app shows and a banner across its pages.
 
-Only what the app says or links to (and the Genie One Onboarding prompt). Who can do what (human_approval, approver groups, naming,
+Only what the app says or links to (and the guided tour's prompt). Who can do what (human_approval, approver groups, naming,
 the model, grants) stays in app.yaml, where a change is reviewed. Each setting's default is
 app.yaml's value; a change made here overrides it until someone resets it. Changes are
 appended to the database (setting_events: who and when), never rewritten.
@@ -27,7 +27,7 @@ SECTIONS = [
     ("Announcement banner", "Show a message at the top of every page, such as planned maintenance.", [
         ("banner.text", "Message", "text"),
         ("banner.until", "Show until", "date")]),
-    ("Genie One Onboarding", "The question the Genie One Onboarding card asks Genie in the person's workspace. Empty hides the card.", [
+    ("Guided tour", "The question Genie One is asked the first time someone opens their workspace (the Open your workspace card), and when they start the guided tour again. Empty: Genie One opens with no question.", [
         ("onboarding.prompt", "Prompt", "prompt")]),
     ("Persona request links", "Links to request each access level, such as a ServiceNow catalog item, for every business unit without links of its own.", [
         (f"persona_request.{p}", p.title(), "url") for p in PERSONAS]),
@@ -40,7 +40,7 @@ SECTIONS = [
 # Onboarding section shows; the change history is a tab of its own (approvals.py).
 TABS = [
     ("announcement", "Announcement", ["Announcement banner"]),
-    ("onboarding", "Onboarding", ["Genie One Onboarding", "Persona request links"]),
+    ("onboarding", "Onboarding", ["Guided tour", "Persona request links"]),
     ("help", "Help links", ["FAQ pages", "Standard operating procedures"]),
 ]
 BUSINESS_UNITS = []   # the business units the app serves (use()): each gets its own persona request links

@@ -35,7 +35,7 @@
       {% for key, label, kind in fields %}
       {%- set changed = overrides.get(key) -%}
       {% call field(key, label) %}
-        {% if kind == "prompt" %}<textarea id="{{ key }}" name="{{ key }}" rows="6" maxlength="1000" placeholder="No Genie One Onboarding card">{{ values[key] }}</textarea>
+        {% if kind == "prompt" %}<textarea id="{{ key }}" name="{{ key }}" rows="6" maxlength="1000" placeholder="No guided tour">{{ values[key] }}</textarea>
         {% else %}<input id="{{ key }}" name="{{ key }}" value="{{ values[key] }}"
                {% if kind == "url" %}type="url" placeholder="https://" class="mono"{% elif kind == "date" %}type="date"{% else %}maxlength="200" placeholder="No banner"{% endif %}>{% endif %}
         {% if changed %}<p class="hint settings-hint">Last updated {{ changed.at | local }} by {{ changed.by }}

@@ -206,8 +206,10 @@ def catalog(request: Request):
         return RedirectResponse("/approvals", status_code=303)
     user = user_of(request)
     shown = settings.apply(CONFIG, SETTINGS())   # the links and the onboarding prompt, as admins set them
-    return page(request, "catalog.html", nav="catalog", personal=personal_schema(user),
-                groups=cards.groups(PORTAL.links_for(user, shown.get("links")), PORTAL.onboarding_link(user, shown["onboarding"]["prompt"])))
+    mine = PORTAL.my_workspace(user) is not None
+    links = {**PORTAL.links_for(user, shown.get("links")), "workspace": "/open" if mine else None,
+             "tour": "/open?tour=1" if mine and shown["onboarding"]["prompt"] else None}
+    return page(request, "catalog.html", nav="catalog", personal=personal_schema(user), groups=cards.groups(links))
 
 
 @app.get("/schema", response_class=HTMLResponse)
@@ -340,6 +342,14 @@ def ask(request: Request):
     """Ask a question: Genie One in the person's own workspace. Without one for them (the BU
     lookup does not know them), the page says where to go instead."""
     link = PORTAL.genie_one(user_of(request))
+    return RedirectResponse(link, status_code=303) if link else page(request, "ask.html", nav="catalog")
+
+
+@app.get("/open", response_class=HTMLResponse)
+def open_workspace(request: Request, tour: bool = False):
+    """Open your workspace: Genie One in the person's own workspace, with the guided tour the first
+    time or when they ask for it again (portal.open_workspace). Without one for them, as /ask."""
+    link = PORTAL.open_workspace(user_of(request), settings.apply(CONFIG, SETTINGS())["onboarding"]["prompt"], tour)
     return RedirectResponse(link, status_code=303) if link else page(request, "ask.html", nav="catalog")
 
 

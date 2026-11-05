@@ -169,6 +169,17 @@ class Store:
         with self._conn() as c:
             c.execute("INSERT INTO self_service.business_unit_choices (email, bu) VALUES (%s, %s)", (email.lower(), bu.upper()))
 
+    # ---- The guided tour (the Open your workspace card) ----
+
+    def toured(self, email):
+        """Whether this person has had the guided tour."""
+        with self._conn() as c:
+            return c.execute("SELECT 1 FROM self_service.guided_tours WHERE email = %s LIMIT 1", (email.lower(),)).fetchone() is not None
+
+    def record_tour(self, email):
+        with self._conn() as c:
+            c.execute("INSERT INTO self_service.guided_tours (email) VALUES (%s)", (email.lower(),))
+
     # ---- Settings (settings.py): app.yaml's values, overridden from the approvals app ----
 
     def settings(self):

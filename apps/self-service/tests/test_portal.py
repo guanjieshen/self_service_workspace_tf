@@ -165,6 +165,12 @@ class FakeStore:
     def choose_business_unit(self, email, bu):
         self.chosen = {**getattr(self, "chosen", {}), email.lower(): bu.upper()}
 
+    def toured(self, email):
+        return email.lower() in getattr(self, "tours", [])
+
+    def record_tour(self, email):
+        self.tours = [*getattr(self, "tours", []), email.lower()]
+
     def requests_of(self, user, limit=200):
         if self.fail == "read":
             raise ConnectionError("database unreachable")
@@ -580,12 +586,33 @@ class BusinessUnitRouting(unittest.TestCase):
         p.config = {**p.config, "bu_lookup": {"function": "dir.people.business_unit_of", "warehouse_id": "wh1", "host": HOST}}
         return p, fake
 
-    def test_ai_onboarding_opens_genie_in_the_persons_own_workspace(self):
+    def test_opening_the_workspace_gives_the_guided_tour_the_first_time(self):
         p, _ = self.make()
-        self.assertEqual(p.onboarding_link(ANA, "Onboard me & show my data?"),
-                         "https://adb-1.azuredatabricks.net/one/chat?o=1&q=Onboard%20me%20%26%20show%20my%20data%3F")
-        self.assertIsNone(p.onboarding_link(BO, "Onboard me"), "the lookup does not know them: no card")
-        self.assertIsNone(p.onboarding_link(ANA, ""), "no prompt: no card")
+        tour = "https://adb-1.azuredatabricks.net/one/chat?o=1&q=Onboard%20me%20%26%20show%20my%20data%3F"
+        self.assertEqual(p.open_workspace(ANA, "Onboard me & show my data?"), tour, "the first time: the tour")
+        self.assertEqual(p.store.tours, [ANA])
+        self.assertEqual(p.open_workspace(ANA, "Onboard me & show my data?"), "https://adb-1.azuredatabricks.net/one/chat?o=1", "then plain Genie One")
+        self.assertEqual(p.open_workspace(ANA, "Onboard me & show my data?", tour=True), tour, "the tour again, when asked")
+        self.assertEqual(p.store.tours, [ANA, ANA], "each tour is a row")
+        self.assertIsNone(p.open_workspace(BO, "Onboard me"), "the lookup does not know them: no workspace")
+
+    def test_without_a_prompt_genie_one_opens_plain_and_no_tour_is_recorded(self):
+        p, _ = make()
+        self.assertEqual(p.open_workspace(ANA, ""), "https://adb-1.azuredatabricks.net/one/chat?o=1")
+        self.assertFalse(p.toured(ANA))
+
+    def test_the_tour_is_given_again_rather_than_never_when_the_database_fails(self):
+        p, _ = make()
+        with mock.patch.object(p.store, "toured", side_effect=ConnectionError("down")):
+            self.assertIn("q=Onboard", p.open_workspace(ANA, "Onboard me"), "cannot read it: the tour")
+        with mock.patch.object(p.store, "record_tour", side_effect=ConnectionError("down")):
+            self.assertIn("q=Onboard", p.open_workspace(BO, "Onboard me"), "cannot record it: still the tour")
+        self.assertIn("q=Onboard", p.open_workspace(BO, "Onboard me"), "and again next time")
+        with mock.patch.object(p.store, "toured", side_effect=AssertionError("read again")):
+            self.assertNotIn("q=", p.open_workspace(BO, "Onboard me"), "kept once recorded: not read again")
+        p.store, p._toured = None, {}
+        self.assertIn("q=Onboard", p.open_workspace(ANA, "Onboard me"), "no database: always the tour")
+        self.assertIn("q=Onboard", p.open_workspace(ANA, "Onboard me"))
 
     def test_links_open_in_the_persons_own_workspace(self):
         p, _ = self.make()
@@ -594,7 +621,7 @@ class BusinessUnitRouting(unittest.TestCase):
         self.assertEqual(links, {"discover": "https://acme.azuredatabricks.net/discover?o=42", "wiki": "https://wiki", "sop": {"schema": None}},
                          "a custom URL: o= is Terraform's workspace ID")
         self.assertIsNone(p.links_for(BO, {"discover": "{host}/discover"})["discover"], "no workspace for them: no card")
-        self.assertEqual(p.onboarding_link(ANA, "Start with {catalog}"), "https://acme.azuredatabricks.net/one/chat?o=42&q=Start%20with%20fin_citizen_dev")
+        self.assertEqual(p.open_workspace(ANA, "Start with {catalog}"), "https://acme.azuredatabricks.net/one/chat?o=42&q=Start%20with%20fin_citizen_dev")
 
     def test_genie_one_needs_a_workspace_id_only_on_azure(self):
         self.assertEqual(portal.genie_one_link("https://dbc-123.cloud.databricks.com/", "Onboard me"),
@@ -773,10 +800,14 @@ class Cards(unittest.TestCase):
         shown = lambda groups: [c["card"].key for _, _, cs in groups for c in cs]
         bare = shown(cards.groups({}))
         self.assertNotIn("discover", bare)
-        self.assertNotIn("onboarding", bare)
-        full = cards.groups({"discover": "https://d", "review_requests": "https://r"}, onboarding="https://g")
+        self.assertNotIn("open_workspace", bare)
+        full = cards.groups({"discover": "https://d", "review_requests": "https://r", "workspace": "/open"})
         self.assertIn("discover", shown(full))
-        self.assertEqual([c["href"] for _, _, cs in full for c in cs if c["card"].key == "onboarding"], ["https://g"])
+        opened = [c for _, _, cs in full for c in cs if c["card"].key == "open_workspace"]
+        self.assertEqual([(c["href"], c["more"]) for c in opened], [("/open", None)], "no tour link without its link")
+        toured = cards.groups({"workspace": "/open", "tour": "/open?tour=1"})
+        self.assertEqual([c["more"] for _, _, cs in toured for c in cs if c["card"].key == "open_workspace"],
+                         [("Start the guided tour again", "/open?tour=1")])
         only_data = [(k, t, [c for c in cs if c["card"].section == "data"]) for k, t, cs in cards.groups({})]
         self.assertEqual([k for k, _, cs in cards.groups({}) if k == "data"], [], "Data has only link cards: hidden without links")
 
@@ -790,7 +821,7 @@ class Cards(unittest.TestCase):
         self.assertEqual(set_["card"].opens, "Opens your organization's request form", "not Databricks")
         opens = {c.key: c.opens for c in cards.CARDS}
         self.assertEqual(opens["discover"], "Opens in Databricks (workspace access is required)")
-        self.assertEqual(opens["onboarding"], "Opens in Databricks (workspace access is required)")
+        self.assertEqual(opens["open_workspace"], "Opens in Databricks (workspace access is required)")
         self.assertNotIn("group_request", settings.KINDS, "set in app.yaml (links.group_request), not in Settings, for now")
 
     def test_every_section_has_an_faq_setting(self):
@@ -1148,14 +1179,29 @@ class Pages(unittest.TestCase):
         data = page[page.index("<h2>Data<"):]
         self.assertIn('href="https://adb-1.azuredatabricks.net/discover?o=1" target="_blank" rel="noopener">Discover data</a>', data, "in the Data section")
 
-    def test_the_genie_one_onboarding_card_asks_genie_the_prompt(self):
-        self.assertNotIn("Genie One Onboarding", self.http.get("/", headers=self.as_ana).text, "no prompt: no card")
+    def test_open_your_workspace_gives_the_tour_once_and_again_on_request(self):
+        page = self.http.get("/", headers=self.as_ana).text
+        self.assertIn('href="/open" target="_blank" rel="noopener">Open your workspace</a>', page)
+        self.assertNotIn("Start the guided tour again", page, "no prompt: no tour")
+        r = self.http.get("/open", headers=self.as_ana, follow_redirects=False)
+        self.assertEqual((r.status_code, r.headers["location"]), (303, "https://adb-1.azuredatabricks.net/one/chat?o=1"))
         self.main.CONFIG["onboarding"] = {"prompt": "Onboard me"}
         try:
             page = self.http.get("/", headers=self.as_ana).text
+            first = self.http.get("/open", headers=self.as_ana, follow_redirects=False).headers["location"]
+            then = self.http.get("/open", headers=self.as_ana, follow_redirects=False).headers["location"]
+            again = self.http.get("/open?tour=1", headers=self.as_ana, follow_redirects=False).headers["location"]
         finally:
             self.main.CONFIG.pop("onboarding")
-        self.assertIn('href="https://adb-1.azuredatabricks.net/one/chat?o=1&amp;q=Onboard%20me" target="_blank" rel="noopener">Genie One Onboarding</a>', page)
+        self.assertIn('href="/open?tour=1" target="_blank" rel="noopener">Start the guided tour again', page)
+        self.assertEqual((first, then, again), ("https://adb-1.azuredatabricks.net/one/chat?o=1&q=Onboard%20me",
+                                                "https://adb-1.azuredatabricks.net/one/chat?o=1",
+                                                "https://adb-1.azuredatabricks.net/one/chat?o=1&q=Onboard%20me"))
+        with mock.patch.object(self.main.PORTAL, "my_workspace", return_value=None):
+            self.assertNotIn("Open your workspace", self.http.get("/", headers=self.as_ana).text, "no workspace for them: no card")
+            page = self.http.get("/open", headers=self.as_ana)
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("Contact your platform admin", page.text, "where to go instead")
 
     def test_each_section_links_its_faq_and_new_people_are_pointed_to_access(self):
         self.main.CONFIG["links"]["discover"] = "https://adb-1.azuredatabricks.net/discover?o=1"   # Data has only link cards
@@ -1166,7 +1212,7 @@ class Pages(unittest.TestCase):
         self.assertEqual([h for h in ("<h2>Get started<", "<h2>Data<", "<h2>Build<", "<h2>Compute &amp; cost<") if h in page],
                          ["<h2>Get started<", "<h2>Data<", "<h2>Build<", "<h2>Compute &amp; cost<"])
         self.assertNotIn('class="group-faq"', page, "no FAQ pages set, no FAQ links")
-        self.assertIn('New here? Start with <a href="/persona">Request workspace access</a> · <a href="/ask" target="_blank" rel="noopener">Ask a question', page)
+        self.assertIn('New here? Start with <a href="/persona">Request workspace access</a></p>', page, "no Ask a question: Open your workspace is the card")
         self.main.CONFIG["faq"] = {"getting_started": "https://wiki.contoso.com/start", "access": "https://wiki.contoso.com/access",
                                    "data": None, "workspace": "https://wiki.contoso.com/workspace"}
         try:
