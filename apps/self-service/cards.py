@@ -41,37 +41,37 @@ CARDS = [
     Card("persona", "access", "Request workspace access", "Choose the access level you need.", href="/persona"),
     # /open: Genie One in the person's workspace, with the guided tour (the onboarding prompt) the
     # first time (portal.open_workspace).
-    Card("open_workspace", "access", "Open Genie One",
+    Card("open_workspace", "access", "Open Databricks Genie One",
          "Explore the data you have access to and try suggested questions to get started.",
          link="workspace", icon="launch", opens="Opens in Databricks · Workspace access required",
          more=("Restart guided tour", "tour")),
 
     Card("discover", "data", "Discover data",
-         "Browse the data your organization has curated, by business domain, in Databricks.", link="discover", icon="search",
-         opens="Opens in Databricks (workspace access is required)"),
-    Card("review_requests", "data", "Review data access requests",
-         "See the data access requests you made in Databricks, and the ones others made for your data.", link="review_requests", icon="requests",
-         opens="Opens in Databricks (workspace access is required)"),
+         "Explore curated datasets organized by business area.", link="discover", icon="search",
+         opens="Opens in Databricks · Workspace access required"),
+    Card("review_requests", "data", "View data access requests",
+         "See the requests you made and the ones made for data you manage.", link="review_requests", icon="requests",
+         opens="Opens in Databricks · Workspace access required"),
 
-    Card("schema", "workspace", "Request a personal schema",
-         "Create your own schema in the workspace catalog, with full permissions to manage it.", href="/schema"),
+    Card("schema", "workspace", "Create a personal schema",
+         "Create a schema for your own work, with full control over its contents.", href="/schema"),
     Card("project_schema", "workspace", "Request a project schema",
-         "Create a schema with a name you choose, for a project of yours.", href="/schema/project", icon="schema"),
+         "Create a dedicated schema for your project.", href="/schema/project", icon="schema"),
     Card("team_schema", "workspace", "Request a team schema",
-         "Create a schema your team manages together, so it stays when people move on.", href="/schema/team", icon="schema"),
+         "Create a shared schema your team can manage together.", href="/schema/team", icon="schema"),
     # Coming soon for now: a folder is workspace specific, and the hub does not call other
     # workspaces (its job is not deployed). Set href="/folder" again to bring it back.
     Card("folder", "workspace", "Request a workspace folder",
          "Create a shared workspace folder and control who can access it."),
     Card("group_request", "workspace", "Add a group to your workspace",
-         "Ask for an Entra group to be added to your workspace with a persona, so you can share your work with it.",
+         "Add an Entra ID group and assign its workspace access level.",
          link="group_request", icon="group", soon=True, opens="Opens your organization's request form"),
 
-    Card("warehouses", "compute", "Manage SQL warehouses", "Create and manage SQL warehouses sized to your workload."),
+    Card("warehouses", "compute", "Manage SQL warehouses", "Create and manage SQL warehouses for your workloads."),
     Card("budget_policy", "compute", "Request a budget policy",
-         "Get a serverless budget policy, so your team's serverless usage is charged to your team.", icon="budget"),
-    Card("cost_dashboard", "compute", "View cost dashboard",
-         "See what your team spends on compute in this workspace, and where it goes.", icon="chart"),
+         "Track your team's serverless usage and costs.", icon="budget"),
+    Card("cost_dashboard", "compute", "View compute costs",
+         "See how much your team spends on compute in this workspace.", icon="chart"),
 ]
 
 

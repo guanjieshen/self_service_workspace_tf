@@ -29,7 +29,7 @@
       {% set check_kind = "team_schema" if team else "project_schema" %}{% include "_reason.html" %}
       {% if team %}
       {#- Typed, not chosen: the hub cannot list a person's groups in their workspace. -#}
-      {% call field("owner_group", "Team's Entra group", required=True,
+      {% call field("owner_group", "Team's Entra ID group", required=True,
                     hint="Its exact name, for example sales-analysts. Everyone in it gets the same access as you.") %}
         <input id="owner_group" name="owner_group" class="mono" required maxlength="200" pattern="[A-Za-z0-9 _.\-]+"
                value="{{ owner_group }}" placeholder="sales-analysts" autocomplete="off">

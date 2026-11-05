@@ -296,7 +296,7 @@ class Schemas(unittest.TestCase):
         run_id = p.request_schema("fin", ANA, schema="fin_reporting", owner_group="fin-finance", reason=WHY)
         self.assertEqual(fake.started[0][1]["owner_group"], "fin-finance", "a group they may not be in")
         self.assertEqual(p.run("fin", run_id, ANA).task, "Request a team schema")
-        with self.assertRaisesRegex(portal.RequestError, "must be an Entra group's name"):
+        with self.assertRaisesRegex(portal.RequestError, "must be an Entra ID group's name"):
             p.request_schema("fin", ANA, schema="fin_other", owner_group="fin`; DROP", reason=WHY)
         with self.assertRaisesRegex(portal.RequestError, "needs a name"):
             p.request_schema("fin", ANA, owner_group="fin-data-eng")
@@ -797,7 +797,7 @@ class History(unittest.TestCase):
         p.request_folder("fin", ANA, "fin-docs", reason=WHY)
         fake.runs_[999] = run_of(999, 1, {"user": BO, "catalog": "fin_citizen_dev"})
         items = p.requests(ANA)
-        self.assertEqual([r.task for r in items], ["Request a workspace folder", "Request a personal schema"])
+        self.assertEqual([r.task for r in items], ["Request a workspace folder", "Create a personal schema"])
         self.assertTrue(all(r.run_id != 999 for r in items))
         self.assertEqual(items[1].run_id, a)
 
@@ -849,7 +849,7 @@ class Cards(unittest.TestCase):
         self.assertEqual((set_["ready"], set_["external"], set_["href"]), (True, True, "https://servicenow.example.com/add-group"))
         self.assertEqual(set_["card"].opens, "Opens your organization's request form", "not Databricks")
         opens = {c.key: c.opens for c in cards.CARDS}
-        self.assertEqual(opens["discover"], "Opens in Databricks (workspace access is required)")
+        self.assertEqual(opens["discover"], "Opens in Databricks · Workspace access required")
         self.assertEqual(opens["open_workspace"], "Opens in Databricks · Workspace access required")
         self.assertNotIn("group_request", settings.KINDS, "set in app.yaml (links.group_request), not in Settings, for now")
 
@@ -946,11 +946,11 @@ class Pages(unittest.TestCase):
         self.assertEqual(self.http.get("/api/requests/fin/100", headers={"X-Forwarded-Email": BO}).status_code, 404)
 
     def test_the_catalog_shows_the_personal_schema_quota(self):
-        self.assertIn(">0/1<", self.http.get("/", headers=self.as_ana).text)
+        self.assertIn(">0 of 1 used<", self.http.get("/", headers=self.as_ana).text)
         self.fake.schemas_.add("fin_citizen_dev.cd_ana")
         self.main.PORTAL._personal.clear()
         page = self.http.get("/", headers=self.as_ana).text
-        self.assertIn(">1/1<", page)
+        self.assertIn(">1 of 1 used<", page)
         self.assertIn("Open schema", self.http.get("/schema", headers=self.as_ana).text, "the form, not the card, links to the schema")
 
     def test_a_running_request_shows_as_requested(self):
@@ -977,7 +977,7 @@ class Pages(unittest.TestCase):
         page = self.http.get("/schema/team", headers=self.as_ana).text
         self.assertIn('<input id="owner_group" name="owner_group"', page, "typed: the hub cannot list a person's groups")
         r = self.http.post("/schema/team", data={"reason": WHY, "workspace": "fin", "name": "fin_reporting"}, headers=self.as_ana)
-        self.assertIn("Give the Entra group", r.text)
+        self.assertIn("Give the Entra ID group", r.text)
         r = self.http.post("/schema/team", data={"reason": WHY, "workspace": "fin", "name": "fin_reporting", "owner_group": "users"}, headers=self.as_ana)
         self.assertIn("users is every user of a workspace", r.text, "not a workspace's own group: Unity Catalog cannot grant to it")
         r = self.http.post("/schema/team", data={"reason": WHY, "workspace": "fin", "name": "fin_reporting", "owner_group": "fin-finance"},
@@ -1103,14 +1103,14 @@ class Pages(unittest.TestCase):
         self.assertEqual((r.status_code, r.headers["location"]), (301, "/schema/project?name=sales_bookings"))
 
     def test_the_review_requests_tile_opens_catalog_explorer(self):
-        self.assertNotIn("Review data access requests", self.http.get("/", headers=self.as_ana).text)
+        self.assertNotIn("View data access requests", self.http.get("/", headers=self.as_ana).text)
         link = "https://adb-1.azuredatabricks.net/explore/data?o=1&requestsView=audit"
         self.main.CONFIG["links"]["review_requests"] = link
         try:
             page = self.http.get("/", headers=self.as_ana).text
         finally:
             self.main.CONFIG["links"].pop("review_requests")
-        self.assertIn(f'href="{link.replace("&", "&amp;")}" target="_blank" rel="noopener">Review data access requests</a>', page)
+        self.assertIn(f'href="{link.replace("&", "&amp;")}" target="_blank" rel="noopener">View data access requests</a>', page)
 
     def test_ask_a_question_opens_genie_one_in_the_persons_workspace(self):
         r = self.http.get("/ask", headers=self.as_ana, follow_redirects=False)
@@ -1191,7 +1191,7 @@ class Pages(unittest.TestCase):
     def test_request_a_budget_policy_and_the_cost_dashboard_are_coming_soon(self):
         page = self.http.get("/", headers=self.as_ana).text
         compute = page[page.index("<h2>Compute &amp; cost"):]
-        for name in ("Request a budget policy", "View cost dashboard"):
+        for name in ("Request a budget policy", "View compute costs"):
             with self.subTest(card=name):
                 card = compute[compute.rindex('<div class="card task', 0, compute.index(name)):][:1200]
                 self.assertIn("is-soon", card)
@@ -1210,7 +1210,7 @@ class Pages(unittest.TestCase):
 
     def test_open_your_workspace_gives_the_tour_once_and_again_on_request(self):
         page = self.http.get("/", headers=self.as_ana).text
-        self.assertIn('href="/open" target="_blank" rel="noopener">Open Genie One</a>', page)
+        self.assertIn('href="/open" target="_blank" rel="noopener">Open Databricks Genie One</a>', page)
         self.assertNotIn("Restart guided tour", page, "no prompt: no tour")
         r = self.http.get("/open", headers=self.as_ana, follow_redirects=False)
         self.assertEqual((r.status_code, r.headers["location"]), (303, "https://adb-1.azuredatabricks.net/one/chat?o=1"))
@@ -1227,7 +1227,7 @@ class Pages(unittest.TestCase):
                                                 "https://adb-1.azuredatabricks.net/one/chat?o=1",
                                                 "https://adb-1.azuredatabricks.net/one/chat?o=1&q=Onboard%20me"))
         with mock.patch.object(self.main.PORTAL, "my_workspace", return_value=None):
-            self.assertNotIn("Open Genie One", self.http.get("/", headers=self.as_ana).text, "no workspace for them: no card")
+            self.assertNotIn("Open Databricks Genie One", self.http.get("/", headers=self.as_ana).text, "no workspace for them: no card")
             page = self.http.get("/open", headers=self.as_ana)
         self.assertEqual(page.status_code, 200)
         self.assertIn("Contact your platform admin", page.text, "where to go instead")
@@ -1241,7 +1241,7 @@ class Pages(unittest.TestCase):
         self.assertEqual([h for h in ("<h2>Get started<", "<h2>Data<", "<h2>Build<", "<h2>Compute &amp; cost<") if h in page],
                          ["<h2>Get started<", "<h2>Data<", "<h2>Build<", "<h2>Compute &amp; cost<"])
         self.assertNotIn('class="group-faq"', page, "no FAQ pages set, no FAQ links")
-        self.assertIn('New here? Start with <a href="/persona">Request workspace access</a></p>', page, "no Ask a question: Open Genie One is the card")
+        self.assertIn('New here? Start with <a href="/persona">Request workspace access</a></p>', page, "no Ask a question: Open Databricks Genie One is the card")
         self.main.CONFIG["faq"] = {"getting_started": "https://wiki.contoso.com/start", "access": "https://wiki.contoso.com/access",
                                    "data": None, "workspace": "https://wiki.contoso.com/workspace"}
         try:
