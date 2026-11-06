@@ -10,6 +10,11 @@ is left alone.
 
 ## Unreleased
 
+- **The approver's summary of an extension says what the schema holds.** For Extend temporary
+  schema, the AI summary also reads the schema from Unity Catalog's metadata (its deletion date,
+  the days asked, and each table or view with its comment and columns; never the data), so it says
+  what is there, how much, and whether any table or column suggests data about people, customers,
+  pay or health. An empty schema is called out.
 - **Temporary schemas replace personal schemas.** The personal schema card and form go (old links
   open the temporary schema form). Each person's own schema is a temporary one, with:
   - **Extend temporary schema:** 7 days at a time, as often as an approver approves; the schema

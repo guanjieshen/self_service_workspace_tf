@@ -801,13 +801,47 @@ class Portal:
         if not model:
             return None
         try:
-            result = summary_module.summarize(self.hub(), model, row)
+            result = summary_module.summarize(self.hub(), model, row, schema_now=self.schema_now(row))
         except Exception as e:
             warn(f"writing the AI summary of {row['id']}", e)
             return None
         if self.store:
             self._quietly(self.store.summarized, row["id"], result)
         return result
+
+    SCHEMA_NOW_TABLES, SCHEMA_NOW_COLUMNS = 40, 30   # what the summary reads of a schema, at most
+
+    def schema_now(self, row):
+        """For more time on a temporary schema: what the approver's summary reads of it today, from
+        Unity Catalog's metadata in the hub (the app may BROWSE the catalog): its deletion date, the
+        days asked, and each table or view with its type, comment and columns (names, types,
+        comments; never the data). None for any other request; {"could_not_read": why} when Unity
+        Catalog cannot answer: the summary then says so."""
+        if row.get("kind") != "temporary_extension":
+            return None
+        try:
+            w = self.workspace(row["workspace"], "personal_schema")
+            catalog = w.jobs["personal_schema"]["tags"].get("cd_catalog", "")
+            c = self.hub()
+            tags = c.api_client.do("GET", f"/api/2.1/unity-catalog/entity-tag-assignments/schemas/{catalog}.{row['name']}/tags")
+            t = {a["tag_key"]: a.get("tag_value", "") for a in tags.get("tag_assignments") or []}
+            tables = []
+            for i, table in enumerate(c.tables.list(catalog_name=catalog, schema_name=row["name"])):
+                if i == self.SCHEMA_NOW_TABLES:
+                    tables.append({"more": "and more tables, not listed"})
+                    break
+                cols = list(getattr(table, "columns", None) or [])
+                tables.append({"name": table.name, "type": str(getattr(getattr(table, "table_type", None), "value", "") or ""),
+                               "comment": (getattr(table, "comment", None) or "")[:300],
+                               "columns": [{"name": col.name, "type": getattr(col, "type_text", "") or "",
+                                            **({"comment": col.comment[:200]} if getattr(col, "comment", None) else {})}
+                                           for col in cols[:self.SCHEMA_NOW_COLUMNS]]
+                                          + ([{"more": f"{len(cols) - self.SCHEMA_NOW_COLUMNS} more columns"}] if len(cols) > self.SCHEMA_NOW_COLUMNS else [])})
+            return {"deleted_on": t.get("cd_expires", ""), "created": t.get("cd_created", ""), "days_asked": row.get("days"),
+                    "tables": tables}
+        except Exception as e:   # the summary says it could not tell: never a reason to drop the summary
+            warn(f"reading what {row.get('name')} holds, for its summary", e)
+            return {"could_not_read": type(e).__name__}
 
     def _summarize_later(self, r):
         """The approver's summary (summary.py), written in the background so sending is not
@@ -817,7 +851,7 @@ class Portal:
             return
         def run():
             try:
-                self.store.summarized(r["id"], summary_module.summarize(self.hub(), model, r))
+                self.store.summarized(r["id"], summary_module.summarize(self.hub(), model, r, schema_now=self.schema_now(r)))
             except Exception as e:
                 warn(f"writing the AI summary of {r['id']}", e)
         threading.Thread(target=run, daemon=True).start()
