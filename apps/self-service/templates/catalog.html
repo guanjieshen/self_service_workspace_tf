@@ -31,14 +31,16 @@
     {% for item in cards %}
     {% set c, href, external, ready = item.card, item.href, item.external, item.ready %}
     {% set key, name, text = c.key, c.title, c.text %}
-    {% set have = key == "schema" and personal.exists == True %}
-    {% set asked = key == "schema" and personal.exists == "pending" %}
+    {#- One per person (the personal and the temporary schema): the quota, from quotas[key]. -#}
+    {% set q = quotas.get(key) or {} %}
+    {% set have = q.exists == True %}
+    {% set asked = q.exists == "pending" %}
     <div class="card task {{ 'is-soon' if not ready }}" data-search="{{ (name ~ ' ' ~ text ~ ' ' ~ title) | lower }}">
       <div class="task-top">
         <span class="task-icon">{{ icon(c.icon or key) }}</span>
         <h3>{% if ready %}<a class="stretched" href="{{ href }}" {% if external %}target="_blank" rel="noopener"{% endif %}>{{ name }}</a>{% else %}{{ name }}{% endif %}</h3>
         {% if asked %}<span class="quota pending" title="Your request is in progress">Requested</span>
-        {% elif key == "schema" and personal.exists is not none %}<span class="quota {{ 'full' if have }}" title="{{ 'You have your personal schema' if have else 'One personal schema per person' }}">{{ '1 of 1 used' if have else '0 of 1 used' }}</span>{% endif %}
+        {% elif key in quotas and q.exists is not none %}<span class="quota {{ 'full' if have }}" title="{{ ('You have your personal schema' if have else 'One personal schema per person') if key == 'schema' else (('You have ' ~ q.name ~ ' until ' ~ q.expires) if have else 'One temporary schema at a time') }}">{{ '1 of 1 used' if have else '0 of 1 used' }}</span>{% endif %}
         {% if not ready %}<span class="soon">Coming soon</span>{% else %}{{ icon("external" if external else "arrow", "icon task-arrow") }}{% endif %}
       </div>
       <p>{{ text }}</p>

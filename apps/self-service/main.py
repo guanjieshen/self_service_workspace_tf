@@ -173,6 +173,12 @@ def personal_schema(user):
     return PORTAL.personal_schema(workspaces[0].name, user) if workspaces else {"exists": None}
 
 
+def temporary_schema(user):
+    """The user's temporary schema, as personal_schema says theirs (one at a time)."""
+    workspaces, _ = offered(user, "personal_schema")
+    return PORTAL.temporary_schema(workspaces[0].name, user) if workspaces else {"exists": None}
+
+
 @app.get("/healthz", include_in_schema=False)
 def healthz():
     """Whether this app works, checked as its own identity: its database answers, and it finds
@@ -211,7 +217,8 @@ def catalog(request: Request):
     mine = PORTAL.my_workspace(user) is not None
     links = {**PORTAL.links_for(user, shown.get("links")), "workspace": "/open" if mine else None,
              "tour": "/open?tour=1" if mine and shown["onboarding"]["prompt"] else None}
-    return page(request, "catalog.html", nav="catalog", personal=personal_schema(user), groups=cards.groups(links))
+    return page(request, "catalog.html", nav="catalog", groups=cards.groups(links),
+                quotas={"schema": personal_schema(user), "temporary_schema": temporary_schema(user)})
 
 
 @app.get("/schema", response_class=HTMLResponse)
@@ -281,6 +288,7 @@ def named_schema_form(request: Request, kind: str, workspace: str = "", name: st
     chosen = workspace if workspace in {w.name for w in workspaces} else (workspaces[0].name if workspaces else "")
     error = error or why
     return page(request, "schema_named.html", nav="catalog", team=kind == "team", temporary=kind == "temporary",
+                have=temporary_schema(user_of(request)) if kind == "temporary" else None,
                 workspaces=workspaces, chosen=chosen,
                 name=name, owner_group=owner_group,
                 reason=reason, error=error)

@@ -10,6 +10,21 @@ is left alone.
 
 ## Unreleased
 
+- **One temporary schema per person, shown like the personal one:** the card says "0 of 1 used"
+  or "1 of 1 used" (from the person's requests of the last 30 days, and whether the schema still
+  exists). The app refuses a second one before anything runs, and the form says which one they
+  have and until when. Its warning is clearer: "Your temporary schema will be deleted after 30
+  days." in red. **Nothing deletes it yet**: an admin does, from its `cd_expires` tag.
+- **The guided tour names the person's business unit:** `{business_unit}` (the prefix, upper
+  case) is filled in like `{catalog}`, and the default prompt uses both.
+- **A Coming soon card, Request classic compute access** (Compute & cost).
+
+  **Baseline edits:**
+
+  | File | Change |
+  | --- | --- |
+  | `config/self-service/app.yaml` | Optional: the new default `onboarding.prompt` (it names `{business_unit}` and `{catalog}`). A prompt changed in Settings overrides it: change it there too |
+
 - **Temporary schemas.** A new card, **Create a temporary schema** (Build), for short-term work:
   the person names it (`cd_tmp_<name>`) and says what it is for; it is created straight away,
   theirs alone, and tagged `cd_schema_kind=temporary` and `cd_expires=<date>` (30 days ahead,

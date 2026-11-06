@@ -653,6 +653,8 @@ class BusinessUnitRouting(unittest.TestCase):
                          "a custom URL: o= is Terraform's workspace ID")
         self.assertIsNone(p.links_for(BO, {"discover": "{host}/discover"})["discover"], "no workspace for them: no card")
         self.assertEqual(p.open_workspace(ANA, "Start with {catalog}"), "https://acme.azuredatabricks.net/one/chat?o=42&q=Start%20with%20fin_citizen_dev")
+        self.assertEqual(portal.fill("I'm in {business_unit}; {catalog}", p.config["workspaces"][0]), "I'm in FIN; fin_citizen_dev",
+                         "the guided tour names the person's business unit (its prefix)")
 
     def test_genie_one_needs_a_workspace_id_only_on_azure(self):
         self.assertEqual(portal.genie_one_link("https://dbc-123.cloud.databricks.com/", "Onboard me"),
@@ -1195,7 +1197,7 @@ class Pages(unittest.TestCase):
     def test_request_a_budget_policy_and_the_cost_dashboard_are_coming_soon(self):
         page = self.http.get("/", headers=self.as_ana).text
         compute = page[page.index("<h2>Compute &amp; cost"):]
-        for name in ("Request a budget policy", "View compute costs"):
+        for name in ("Request a budget policy", "View compute costs", "Request classic compute access"):
             with self.subTest(card=name):
                 card = compute[compute.rindex('<div class="card task', 0, compute.index(name)):][:1200]
                 self.assertIn("is-soon", card)
@@ -1308,9 +1310,45 @@ class TemporarySchemas(unittest.TestCase):
         self.assertIn(">Create a temporary schema</a>", page)
         form = self.http.get("/schema/temporary", headers=self.as_ana).text
         self.assertIn("fin_citizen_dev.cd_tmp_</span>", form, "they type what follows cd_tmp_")
-        self.assertIn("It's yours for 14 days", form, "app.yaml jobs.temporary_schema.days")
-        self.assertIn("one temporary schema at a time", form)
+        self.assertIn('<span class="danger-text">Your temporary schema will be deleted after 14 days.</span>', form, "in red; app.yaml jobs.temporary_schema.days")
+        self.assertIn("copy it to another schema before it expires. You can only have one temporary schema at a time.", form)
         self.assertIn('data-ai-check="temporary_schema"', form)
+
+    def quota(self):
+        self.main.PORTAL._personal.clear()
+        page = self.http.get("/", headers=self.as_ana).text
+        card = page[page.index("Create a temporary schema</a>") - 600:page.index("Create a temporary schema</a>") + 600]
+        return next((q for q in ("0 of 1 used", "1 of 1 used", "Requested") if q in card), None)
+
+    def test_one_temporary_schema_per_person_like_the_personal_one(self):
+        import datetime as dt
+        self.assertEqual(self.quota(), "0 of 1 used")
+        self.http.post("/schema/temporary", data={"workspace": "fin", "name": "try_join", "reason": WHY}, headers=self.as_ana)
+        (rid, row), = self.db.requests.items()
+        row["created_at"] = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=1)   # asked just now
+        run_id = max(self.fake.runs_)
+        self.assertEqual(self.quota(), "Requested", "its run is still going")
+        self.fake.runs_[run_id].state = state("TERMINATED", "SUCCESS")
+        self.fake.schemas_.add("fin_citizen_dev.cd_tmp_try_join")
+        self.assertEqual(self.quota(), "1 of 1 used")
+        have = self.main.PORTAL.temporary_schema("fin", ANA)
+        self.assertEqual((have["name"], have["expires"]), ("fin_citizen_dev.cd_tmp_try_join", (row["created_at"] + dt.timedelta(days=14)).date().isoformat()))
+        r = self.http.post("/schema/temporary", data={"workspace": "fin", "name": "another", "reason": WHY}, headers=self.as_ana)
+        self.assertIn("You already have a temporary schema, fin_citizen_dev.cd_tmp_try_join, until", r.text)
+        self.assertEqual(len(self.fake.started), 1, "refused before any run")
+        form = self.http.get("/schema/temporary", headers=self.as_ana).text
+        self.assertIn("You already have a temporary schema", form)
+        self.assertIn('class="primary" disabled', form, "nothing to send until it expires")
+        self.fake.schemas_.discard("fin_citizen_dev.cd_tmp_try_join")
+        self.assertEqual(self.quota(), "0 of 1 used", "an admin dropped it: free again")
+        self.fake.schemas_.add("fin_citizen_dev.cd_tmp_try_join")
+        row["created_at"] -= dt.timedelta(days=15)
+        self.assertEqual(self.quota(), "0 of 1 used", "expired: free again")
+
+    def test_when_the_database_cannot_answer_the_quota_is_unknown_and_the_job_decides(self):
+        self.db.fail = "read"
+        self.main.PORTAL._personal.clear()
+        self.assertEqual(self.main.PORTAL.temporary_schema("fin", ANA)["exists"], None)
 
     def test_a_temporary_schema_runs_the_schema_job_with_its_full_name(self):
         r = self.http.post("/schema/temporary", data={"workspace": "fin", "name": "try_join", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
