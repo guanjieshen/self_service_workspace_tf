@@ -44,12 +44,11 @@ browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py
   and named `<prefix>tmp_<name>`, and it reports every one in its run. A run again never changes
   a schema's kind or extends its date.
 - **Temporary schemas replace personal ones** (the card and `/schema` are gone; `/schema`
-  redirects). On their temporary schema a person may **request more time** (7 days,
-  `portal.EXTENSION_DAYS`) or **keep it as a project schema**: kinds `temporary_extension` and
-  `temporary_conversion` (migration 008, with the request's `days`), always for an approver
-  (`portal.ALWAYS_APPROVED`). Approved, the schema job runs with `action=extend` (adds the days to
-  `cd_expires`) or `action=convert` (relabels it in place: no `cd_expires`, `cd_schema_kind=project`,
-  project rights). The app reads the schema's tags from Unity Catalog (`Portal.temporary_schema`,
+  redirects). On their temporary schema a person may **extend it** (7 days,
+  `portal.EXTENSION_DAYS`): kind `temporary_extension` (migration 008, with the request's `days`),
+  always for an approver (`portal.ALWAYS_APPROVED`). Approved, the schema job runs with
+  `action=extend` (adds the days to `cd_expires`). **Keeping one as a project schema is not offered
+  for now** (it may need a rename): migration 008's `temporary_conversion` kind stays, unused. The app reads the schema's tags from Unity Catalog (`Portal.temporary_schema`,
   the entity tag assignments API), so the card, the form and the reminder (every page, 3 days or
   fewer: `main.expiring`) follow an extension. **A request waiting for an approver holds its
   schema:** sent, the job tags it `cd_pending_request` (`action=hold`); the cleanup never deletes a

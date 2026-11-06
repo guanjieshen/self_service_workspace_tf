@@ -1,15 +1,11 @@
-{#- About the person's temporary schema: more time (action extend: portal.EXTENSION_DAYS) or keeping it as a
-    project schema (action keep). Both wait for an approver. -#}
+{#- More time for one of the person's temporary schemas (portal.EXTENSION_DAYS), which waits for an
+    approver. (Keeping one as a project schema is not offered for now.) -#}
 {% extends "base.html" %}
 
 {% from "_components.html" import callout, field %}
 {% block content %}
-{% set extend = action == "extend" %}
-{% if extend %}
-{% set task_icon, task_name, task_text, task_category = "temporary_extension", "Request more time", "Ask for 7 more days before your temporary schema is deleted.", "Data" %}
-{% else %}
-{% set task_icon, task_name, task_text, task_category = "temporary_conversion", "Keep as a project schema", "Keep your temporary schema, and everything in it, as a permanent project schema.", "Data" %}
-{% endif %}
+{% set extend = True %}
+{% set task_icon, task_name, task_text, task_category = "temporary_extension", "Extend temporary schema", "Ask for 7 more days before your temporary schema is deleted.", "Data" %}
 {% set task_aside = True %}{% include "_task_header.html" %}
 
 <div class="page-grid form-grid">
@@ -31,8 +27,7 @@
       {% else %}<input type="hidden" name="schema" value="{{ mine[0].name }}">{% endif %}
       {% call callout() %}
         {% if this %}<span class="mono">{{ this.name }}</span> is deleted on {{ this.expires }}. {% endif %}It is kept until an approver decides.
-        {% if extend %}You're asking for {{ choices | join(" or ") }} more days; once approved, they are added to its date.
-        {% else %}Once approved, it is no longer deleted and you can share it, like any project schema. It keeps its name.{% endif %}
+        You're asking for {{ choices | join(" or ") }} more days; once approved, they are added to its date.
         If the request is rejected, it is deleted as before.
       {% endcall %}
       {% if extend and choices | length == 1 %}<input type="hidden" name="days" value="{{ choices[0] }}">
@@ -43,9 +38,9 @@
         </div>
       {% endcall %}
       {% endif %}
-      {% call field("reason", "Why do you need " ~ ("more time" if extend else "to keep it") ~ "?", required=True) %}
+      {% call field("reason", "Why do you need more time?", required=True) %}
         <textarea id="reason" name="reason" rows="3" required minlength="10" maxlength="1000"
-                  placeholder="{{ 'What you are still working on, and when you expect to finish.' if extend else 'What it holds, who will use it, and why it should be permanent.' }}">{{ reason or '' }}</textarea>
+                  placeholder="What you are still working on, and when you expect to finish.">{{ reason or '' }}</textarea>
       {% endcall %}
     {% endif %}
   </div>

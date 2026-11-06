@@ -12,7 +12,7 @@
 # MAGIC temporary). Personal schemas are not offered any more: each one left is made temporary first
 # MAGIC (its owner's rights narrowed to `temporary_privileges`, `cd_expires` `temporary_days` ahead,
 # MAGIC `cd_converted_from=personal`), so it expires like the others. One with a request waiting for an
-# MAGIC approver (more time, or to keep it: tag `cd_pending_request`) is never deleted until it is decided.
+# MAGIC approver (more time: tag `cd_pending_request`) is never deleted until it is decided.
 # MAGIC Parameter: `dry_run` ("true": report
 # MAGIC what it would drop, drop nothing). Edit this notebook in the repository
 # MAGIC (bundle/jobs/notebooks/temporary_cleanup.py): the next deploy replaces it.

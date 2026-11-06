@@ -279,9 +279,9 @@ def schema_submit(request: Request):
 
 @app.get("/schema/temporary/{action}", response_class=HTMLResponse)
 def temporary_action_form(request: Request, action: str, schema: str = "", days: str = "", reason: str = "", error: str = ""):
-    """More time for one of the person's temporary schemas (portal.EXTENSION_DAYS), or keeping it as a project schema:
-    requests an approver always decides."""
-    if action not in ("extend", "keep"):
+    """More time for one of the person's temporary schemas (portal.EXTENSION_DAYS): a request an
+    approver always decides."""
+    if action != "extend":   # keeping one as a project schema: not offered for now
         raise HTTPException(404)
     workspaces, why = offered(user_of(request), "personal_schema")
     have = temporary_schema(user_of(request))
@@ -294,14 +294,11 @@ def temporary_action_form(request: Request, action: str, schema: str = "", days:
 @app.post("/schema/temporary/{action}")
 def temporary_action_submit(request: Request, action: str, workspace: str = Form(""), schema: str = Form(""), days: str = Form(""),
                             reason: str = Form("")):
-    if action not in ("extend", "keep"):
+    if action != "extend":   # keeping one as a project schema: not offered for now
         raise HTTPException(404)
     reason = reason.strip()
     try:
-        if action == "extend":
-            started = PORTAL.request_more_time(workspace, user_of(request), int(days) if days.isdigit() else 0, reason, schema)
-        else:
-            started = PORTAL.request_keep(workspace, user_of(request), reason, schema)
+        started = PORTAL.request_more_time(workspace, user_of(request), int(days) if days.isdigit() else 0, reason, schema)
     except portal.RequestError as e:
         return temporary_action_form(request, action, schema=schema, days=days, reason=reason, error=str(e))
     return sent(workspace, started)
@@ -459,9 +456,8 @@ def retry_link(r):
     if r.kind == "team_folder":
         return "/folder?" + urlencode({"workspace": r.workspace, "folder": r.params.get("folder", ""),
                                        "reason": r.params.get("reason", "")})
-    if r.params.get("action") in ("extend", "convert"):
-        return "/schema/temporary/" + ("extend" if r.params["action"] == "extend" else "keep") + "?" + urlencode(
-            {"days": r.params.get("days", ""), "reason": r.params.get("reason", "")})
+    if r.params.get("action") in ("extend", "convert"):   # convert: not offered for now, so more time instead
+        return "/schema/temporary/extend?" + urlencode({"days": r.params.get("days", ""), "reason": r.params.get("reason", "")})
     if r.params.get("temporary") == "true":   # the form asks for what follows <prefix>tmp_
         name = r.params.get("schema", "").split("tmp_", 1)[-1]
         return "/schema/temporary?" + urlencode({"workspace": r.workspace, "name": name, "reason": r.params.get("reason", "")})

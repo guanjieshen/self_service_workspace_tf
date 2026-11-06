@@ -137,7 +137,7 @@ class Tags(unittest.TestCase):
     def test_the_jobs_set_the_tags_the_app_reads(self):
         read = set(re.findall(r'"(cd_\w+)"', (APP / "portal.py").read_text()))
         set_by_jobs = set().union(*(job_tags(kind) for kind in DEPLOYED)) | {"cd_root"}   # cd_root: the folder job's, not deployed
-        on_schemas = set(re.findall(r"'(cd_\w+)'", notebook("personal_schema")))   # what the schema job tags a schema with
+        on_schemas = set(re.findall(r"'(cd_\w+)'", notebook("personal_schema") + notebook("temporary_cleanup")))   # what the jobs tag schemas with
         self.assertEqual(read - set_by_jobs - on_schemas, set(), "tags the app reads but no job sets")
 
     def test_the_app_finds_every_job_by_its_kind(self):

@@ -35,8 +35,7 @@
         <p class="mono">{{ t.name }}</p>
         <p class="meta">Deleted on {{ t.expires }}.</p>
         <p class="done-actions"><a class="button primary" href="{{ t.link }}" target="_blank" rel="noopener">Open schema {{ icon("external", "icon icon-xs") }}</a>
-          <a class="button" href="/schema/temporary/extend?schema={{ t.name | urlencode }}">Request more time</a>
-          <a class="button" href="/schema/temporary/keep?schema={{ t.name | urlencode }}">Keep as a project schema</a></p></div></div>
+          <a class="button" href="/schema/temporary/extend?schema={{ t.name | urlencode }}">Extend temporary schema</a></p></div></div>
       {% endfor %}
       {% if have.exists == True %}<p class="meta">That is the most you may have: ask for another once one expires.</p>{% endif %}
     {% endif %}

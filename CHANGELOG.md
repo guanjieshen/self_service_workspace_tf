@@ -12,17 +12,18 @@ is left alone.
 
 - **Temporary schemas replace personal schemas.** The personal schema card and form go (old links
   open the temporary schema form). Each person's own schema is a temporary one, with:
-  - **Request more time:** 7 days at a time, as often as an approver approves; the schema
+  - **Extend temporary schema:** 7 days at a time, as often as an approver approves; the schema
     job adds the days to its `cd_expires`.
-  - **While either request waits for an approver, its schema is held:** the job tags it
+  - **While it waits for an approver, the schema is held:** the job tags it
     `cd_pending_request=<request ID>` when it is sent, and the daily cleanup never deletes a held
-    schema. Approved, the tag goes with the change; rejected, the tag goes and the next cleanup
-    deletes it if its date has passed.
+    schema. Approved, the tag goes and the days are added; rejected, the tag goes and the next
+    cleanup deletes it if its date has passed.
   - **How many temporary schemas each person may have** is a setting: the approvals app's
     Settings > Schemas (1 to 10; `jobs.temporary_schema.limit` in `app.yaml` is the default, 1).
     With more than one, the form lists them, each with its own buttons.
-  - **Keep as a project schema:** an approver decides; the schema job relabels it in place (no
-    `cd_expires`, `cd_schema_kind=project`, the project rights). It keeps its `cd_tmp_` name.
+  - **The card shows how much time is left:** a bar for each temporary schema, from its
+    `cd_created` to its `cd_expires`, green, then amber in its last week and red in its last 3 days.
+  - Keeping a temporary schema as a project schema is not offered for now (it may need a rename).
   - **A reminder** on every page of the app when it is deleted in 3 days or fewer.
   - The app now reads the schema's own `cd_expires` from Unity Catalog, so the card and the
     reminder follow an approved extension.
@@ -30,7 +31,7 @@ is left alone.
   the upgrade: each one gets `cd_schema_kind=temporary`, `cd_expires` 30 days ahead and
   `cd_converted_from=personal`, and its owner's rights narrow to the temporary schema's (their new
   rights are granted before the old ones are revoked). **30 days later they are deleted**, unless
-  their owner asks for more time or to keep them. The cleanup's summary lists each one made
+  their owner extends them. The cleanup's summary lists each one made
   temporary, by email. Run it with `dry_run=true` first to see which.
 - Deploy the app runs migration `008_temporary_extensions_and_conversions.sql` (the two new kinds
   of request and their days).

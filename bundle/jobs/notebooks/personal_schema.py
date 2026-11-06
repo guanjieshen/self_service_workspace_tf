@@ -12,8 +12,7 @@
 # MAGIC the user belongs to, which gets the same rights), `reason` (why they need it; kept with the run) and
 # MAGIC `request_id` (optional), `temporary_limit` (how many temporary schemas a person may have, from the
 # MAGIC app's Settings; 1 when empty), `action` (empty: make the schema; "extend": add `days` (7) to an existing
-# MAGIC temporary schema's `cd_expires`; "convert": keep an existing temporary schema as a project schema,
-# MAGIC in place: no expiry, the project rights; both once an approver approved them; "hold": while either waits
+# MAGIC temporary schema's `cd_expires`, once an approver approved it; "hold": while it waits
 # MAGIC for an approver, tag it `cd_pending_request=<request_id>`, which the daily cleanup never deletes;
 # MAGIC "release": the approver rejected it, so the tag goes and it expires as before), `temporary` ("true": a temporary schema, named `<prefix>tmp_<name>`, tagged
 # MAGIC `cd_expires` a set number of days ahead; one per person until it expires), and `comment_model` (optional: the model, from the app's Settings, that writes
@@ -82,8 +81,8 @@ if kind in ("project", "team") and schema.startswith(prefix):
     raise ValueError(f"a project or team schema may not start with {prefix} (personal schemas are named {prefix}<name>)")
 if temporary and owner_group:
     raise ValueError("a temporary schema is the user's alone: owner_group is for a team schema")
-if action not in ("", "extend", "convert", "hold", "release"):
-    raise ValueError(f"action is extend, convert, hold, release or empty, not {action!r}")
+if action not in ("", "extend", "hold", "release"):   # keeping one as a project schema: not offered for now
+    raise ValueError(f"action is extend, hold, release or empty, not {action!r}")
 if action in ("hold", "release") and not request_id:
     raise ValueError("a hold names the request it is for: request_id")
 if action and not temporary:
@@ -116,9 +115,8 @@ if {"MANAGE", "ALL_PRIVILEGES"} & set(temporary_privileges):
 # is not an account group fails at the grant below, before the schema is handed over.
 
 # Only a request the app recorded, for these parameters (off unless jobs.require_request_record).
-# A hold, and its release, are for a request for more time (it has days) or to keep it.
-asked_for = {"extend": "temporary_extension", "convert": "temporary_conversion"}.get(action) or (
-    ("temporary_extension" if days else "temporary_conversion") if action in ("hold", "release") else f"{kind}_schema")
+# A hold, and its release, are for a request for more time.
+asked_for = "temporary_extension" if action else f"{kind}_schema"
 check_request_record(request_id, {"kind": asked_for,
                                   "workspace": workspace_name, "requested_by": user,
                                   "name": schema, "owner_group": owner_group})
@@ -135,7 +133,7 @@ was = spark.sql(f"SELECT tag_value FROM `{catalog}`.information_schema.schema_ta
 if exists and was and was[0].tag_value != kind:
     raise ValueError(f"{catalog}.{schema} is already a {was[0].tag_value} schema, not a {kind} one")
 
-# More time, or keep it: only for a temporary schema of theirs that still exists. Then nothing else runs.
+# More time (and its hold): only for a temporary schema of theirs that still exists. Then nothing else runs.
 if action:
     if not exists or [r.tag_value for r in was] != ["temporary"]:
         raise ValueError(f"{catalog}.{schema} is not a temporary schema of {user}'s (it may have expired and been deleted)")
@@ -157,11 +155,6 @@ if action:
         spark.sql(f"ALTER SCHEMA {name} SET TAGS ('cd_expires' = '{until}')")
         dbutils.notebook.exit(json.dumps({"catalog": catalog, "schema": schema, "kind": "temporary", "user": user,
                                           "action": "extend", "days": int(days), "expires": until}))
-    # Kept as a project schema, in place: no expiry, so the cleanup leaves it; the project rights.
-    spark.sql(f"ALTER SCHEMA {name} UNSET TAGS ('cd_expires')")
-    spark.sql(f"ALTER SCHEMA {name} SET TAGS ('cd_schema_kind' = 'project', 'cd_kept_from' = 'temporary')")
-    spark.sql(f"GRANT {', '.join(p.replace('_', ' ') for p in privileges)} ON SCHEMA {name} TO `{user}`")
-    dbutils.notebook.exit(json.dumps({"catalog": catalog, "schema": schema, "kind": "project", "user": user, "action": "convert"}))
 
 # At most temporary_limit temporary schemas per person: as many of theirs not expired yet refuses another.
 if kind == "temporary":
