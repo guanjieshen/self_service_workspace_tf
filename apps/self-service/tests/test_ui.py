@@ -459,6 +459,14 @@ class LakebaseDecisions(unittest.TestCase):
     def test_a_human_approval_kind_waits_even_when_the_ai_review_passed_it(self):
         self.assertEqual([r["id"] for r in self.s.queue("dana@contoso.com")], ["ss-1"])
 
+    def test_approving_a_folder_made_by_hand_marks_it_completed(self):
+        self.row.update(kind="folder", name="fin-close", owner_group=None)
+        self.s.manual = lambda: {"folder"}
+        self.assertEqual([r["id"] for r in self.s.queue("dana@contoso.com")], ["ss-1"], "always for a person")
+        done = self.s.decide("dana@contoso.com", "ss-1", "approved")
+        self.assertEqual(self.decided[-1][2], "approved")
+        self.assertTrue(done["manual"], "the approvals page then says Completed, and the app's redirect says so")
+
     def test_approving_records_the_decision_then_runs_the_job(self):
         self.s.decide("dana@contoso.com", "ss-1", "approved")
         self.assertEqual(self.decided, [("ss-1", "dana@contoso.com", "approved", "")])

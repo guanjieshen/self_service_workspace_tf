@@ -82,6 +82,10 @@ class SentParameters(unittest.TestCase):
     def test_team_folder(self):
         self.assertEqual(self.sent("team_folder"), job_parameters("team_folder"))
 
+    def test_the_schema_job_is_named_for_every_kind_it_makes(self):
+        self.assertEqual(BUNDLE["jobs"]["personal_schema"]["name"], "${var.business_unit} schema requests",
+                         "personal, project, team and temporary: not 'personal schema'")
+
     def test_the_temporary_schema_cleanup_runs_every_day_on_its_own(self):
         job = yaml.safe_load((ROOT / "bundle/hub/resources/cleanup.yml").read_text())["resources"]["jobs"]["temporary_cleanup"]
         self.assertEqual([t["task_key"] for t in job["tasks"]], ["cleanup"], "one task: it summarizes too")
