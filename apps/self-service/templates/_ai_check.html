@@ -1,0 +1,11 @@
+{#- Validate: the app's rules, then the AI check of the name and the description. Advice only:
+    the request can be submitted either way. Shown only with JavaScript. -#}
+{% if ai_mode != "off" %}
+<div class="ai-check validate" data-ai-check="{{ check_kind }}" hidden>
+  <div class="ai-check-head">
+    <p class="meta">Check for any issues before submitting.</p>
+    <button type="button" class="button" data-ai-check-run>Validate</button>
+  </div>
+  <ul class="ai-check-rows" aria-live="polite"></ul>
+</div>
+{% endif %}

@@ -1,0 +1,38 @@
+{#- Small pieces the approvals pages share. -#}
+{#- How long ago: "3h ago", or with short=True "3h" (a column headed Waiting). -#}
+{%- macro age(now, t, short=False) -%}
+{%- set h = ((now - t).total_seconds() / 3600) | int -%}
+{%- if h < 1 %}{{ "<1h" if short else "just now" }}{% elif h < 48 %}{{ h }}h{{ "" if short else " ago" }}{% else %}{{ (h / 24) | int }}d{{ "" if short else " ago" }}{% endif -%}
+{%- endmacro -%}
+{%- macro sla(now, t) -%}{%- set h = ((now - t).total_seconds() / 3600) | int -%}{{ 'late' if h >= 48 else 'due' if h >= 24 else '' }}{%- endmacro -%}
+{%- from "_components.html" import status_badge, chip -%}
+{#- An approval's status, shown with the shared status badge (the self-service app's colours). -#}
+{%- macro status(s, pill=False) -%}
+{%- set labels = {"waiting": "Pending approval", "needs_info": "Waiting on requester", "approved": "Approved", "rejected": "Rejected",
+                   "running": "In progress", "completed": "Completed", "failed": "Failed", "finished": "Finished", "unknown": "Unknown"} -%}
+{{ status_badge(labels[s], pill=pill) }}
+{%- endmacro -%}
+{#- What an approver should look at: the AI summary's concerns, two at most, then "+N". -#}
+{%- macro notes(r) -%}
+{%- set items = r.summary.concerns | map(attribute="label") | list if r.summary else [] -%}
+{%- if items %}<span class="flags">{% for x in items[:2] %}{{ chip(x, "note") }}{% endfor %}{% if items | length > 2 %}<span class="more">+{{ items | length - 2 }}</span>{% endif %}</span>{% endif -%}
+{%- endmacro -%}
+
+{#- One settings change, as the history lists it: the setting, what it was and what it is now
+    (a first change was app.yaml's value before; none is a reset to it), who and when. -#}
+{%- macro setting_value(v) -%}
+{%- if v is none %}<span class="change-default">Default</span>{% elif v == "" %}<span class="change-default">Not set</span>{% else %}{{ v }}{% endif -%}
+{%- endmacro -%}
+{% macro setting_change(h, labels, defaults) %}
+{%- set before = defaults.get(h.key, "") if h.first else h.previous -%}
+<div class="row change-row">
+  <span class="row-main">
+    <span class="row-title">{{ labels.get(h.key, h.key) }}</span>
+    <span class="change" title="{{ before if before is not none else 'Default' }} → {{ h.value if h.value is not none else 'Default' }}">
+      <span class="change-old">{{ setting_value(before) }}</span><span class="change-arrow" aria-label="changed to">→</span><span class="change-new">{{ setting_value(h.value) }}</span>
+    </span>
+  </span>
+  <span class="col meta change-by">{{ h.by }}</span>
+  <span class="col meta change-at">{{ h.at | local }}</span>
+</div>
+{% endmacro %}
