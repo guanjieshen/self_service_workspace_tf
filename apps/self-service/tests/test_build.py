@@ -81,6 +81,12 @@ class Builds(unittest.TestCase):
         for skipped in ("tests", "db", "AGENTS.md", "__pycache__"):
             self.assertFalse((out / "self-service" / skipped).exists(), skipped)
 
+    def test_one_cleanup_for_every_served_catalog_in_the_hub(self):
+        out = app_build.build_hub(self.s, self.spokes, root=self.tmp)
+        self.assertIn('catalogs = ["fin_citizen_dev", "ops_citizen_dev"]', (out / "temporary_cleanup.py").read_text(),
+                      "every served workspace's catalog, from its Terraform output")
+        self.assertNotIn("temporary_cleanup", json.dumps(app_build.hub_target(self.s)), "no target settings: admins only, no usage policy")
+
     def test_an_app_yaml_from_1_0_keeps_its_summary_model_as_the_ai_model(self):
         self.assertEqual(app_build.ai_model({"ai_summary": {"model": "system.ai.old"}}), "system.ai.old")
         self.assertEqual(app_build.ai_model({"ai_model": "system.ai.new", "ai_summary": {"model": "system.ai.old"}}), "system.ai.new")
@@ -105,12 +111,8 @@ class Builds(unittest.TestCase):
                          "in the hub, each workspace's job with its own state")
         self.assertEqual(t["variables"], {"business_unit": "FIN"})
         jobs = t["resources"]["jobs"]
-        self.assertEqual(set(jobs), {"personal_schema", "temporary_cleanup"}, "the folder job is not deployed for now: folders are made by hand")
-        cleanup = jobs["temporary_cleanup"]
-        self.assertEqual(cleanup["tags"], {"cd_catalog": "fin_citizen_dev", "cd_workspace": "fin-citizen-dev"})
-        self.assertNotIn("permissions", cleanup, "the apps may not run the cleanup: only workspace admins")
-        self.assertEqual(cleanup["usage_policy_id"], "policy-fin")
-        self.assertIn('catalogs = ["fin_citizen_dev"]', (out / "temporary_cleanup.py").read_text(), "only this workspace's catalog")
+        self.assertEqual(set(jobs), {"personal_schema"}, "the folder job is not deployed for now: folders are made by hand; "
+                                                          "the cleanup is the hub's, one for every catalog")
         self.assertFalse((out / "team_folder.py").exists())
         self.assertEqual(jobs["personal_schema"]["tags"], {"cd_catalog": "fin_citizen_dev", "cd_prefix": "cd_", "cd_workspace": "fin-citizen-dev"})
         self.assertEqual(jobs["personal_schema"]["permissions"], [{"level": "CAN_MANAGE_RUN", "service_principal_name": "11111111-1111-1111-1111-111111111111"}])
