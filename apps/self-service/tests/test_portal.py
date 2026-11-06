@@ -1357,7 +1357,10 @@ class TemporarySchemas(unittest.TestCase):
         self.assertEqual(len(self.fake.started), 1, "refused before any run")
         form = self.http.get("/schema/temporary", headers=self.as_ana).text
         self.assertIn("You already have a temporary schema", form)
-        self.assertIn('class="primary" disabled', form, "nothing to send until it expires")
+        self.assertIn('<p class="mono">fin_citizen_dev.cd_tmp_try_join</p>', form)
+        self.assertIn('href="https://adb-1.azuredatabricks.net/explore/data/fin_citizen_dev/cd_tmp_try_join" target="_blank" rel="noopener">Open schema',
+                      form, "opens it in their own workspace, like the personal schema")
+        self.assertNotIn('type="submit"', form, "nothing to send until it expires: Open schema instead")
         self.fake.schemas_.discard("fin_citizen_dev.cd_tmp_try_join")
         self.assertEqual(self.quota(), "0 of 1 used", "an admin dropped it: free again")
         self.fake.schemas_.add("fin_citizen_dev.cd_tmp_try_join")

@@ -16,7 +16,7 @@
       <div class="done-box pending-box">{{ icon("requests") }}<div><p class="strong">Your request is in progress <span class="quota pending">Requested</span></p>
         <p class="mono">{{ personal.name }}</p></div></div>
     {% elif personal.exists %}
-      <div class="done-box">{{ icon("check") }}<div><p class="strong">You already have your personal schema <span class="quota full">1/1</span></p>
+      <div class="done-box">{{ icon("check") }}<div><p class="strong">You already have your personal schema <span class="quota full">1 of 1 used</span></p>
         <p class="mono">{{ personal.name }}</p></div></div>
     {% else %}
       {% set chosen, by = workspaces[0].name, "catalog" %}{% include "_workspace_select.html" %}

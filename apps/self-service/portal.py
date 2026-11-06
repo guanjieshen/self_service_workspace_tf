@@ -539,7 +539,8 @@ class Portal:
             except Exception as e:
                 warn(f"looking up {name}", e)
                 return {"exists": None, "name": "", "expires": ""}
-            found = {"exists": True, "name": name, "expires": expires}
+            found = {"exists": True, "name": name, "expires": expires,   # opens in their own workspace, as the personal one
+                     "link": f"{w.host}/explore/data/{catalog}/{r['name']}"}
             break
         keep(self._personal, key, found)
         return found
