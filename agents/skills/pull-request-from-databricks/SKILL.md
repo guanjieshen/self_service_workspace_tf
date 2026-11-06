@@ -17,7 +17,7 @@ The person may never have used git. Explain each step in one plain sentence, do 
 ## Steps
 
 1. **A branch first.** In the Git folder (the folder's name at the top of the file browser), click the branch name, then **Create branch**. Name it after the change, lowercase with dashes, for example `add-finance-workspace`. If they already have changes on `main`, that is fine: creating the branch carries them over.
-2. **Look at the change together.** In the Git folder dialog, the **Changes** list shows each file. Read the diff with them in plain words ("this sets the warehouse to Medium in the hr workspace"). Remove anything they did not mean to change.
+2. **Look at the change together.** In the Git folder dialog, the **Changes** list shows each file. Read the diff with them in plain words ("this sets the warehouse to Medium in the hr workspace"). Remove anything they did not mean to change. **If it changes framework code** (anything outside `config/` and `.github/CODEOWNERS`), it must also have its `CHANGELOG.md` entry under **Unreleased** and the guides in `agents/` it makes out of date (the skill **change-the-app-code**, step 4): add them now, or the **Changelog for framework changes** check fails.
 3. **Commit and push.** In the same dialog: a short message saying what and why (for example `Add the finance workspace`), then **Commit & push**.
 4. **Open the pull request.** On GitHub, open the repository; a yellow bar offers **Compare & pull request** for the new branch. Otherwise: **Pull requests > New pull request**, base `main`, compare the branch. Title: what changes. Description: why. **Create pull request.**
 5. **Wait for the checks** (a few minutes). On the pull request:

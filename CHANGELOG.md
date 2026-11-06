@@ -10,6 +10,17 @@ is left alone.
 
 ## Unreleased
 
+- **Genie Code skills for support**, written for someone new to software, git and Databricks:
+  `start-here` (any request in your own words: said back precisely, then the right skill),
+  `investigate-a-problem` (read only), `fix-a-failed-check-or-deploy`, `read-a-plan`,
+  `support-a-temporary-schema`, `change-the-database` and `change-the-app-code`.
+- **The guides and the changelog stay true:** `AGENTS.md` asks every change to update what
+  describes it, the skills do it before every pull request, and a new step of the **Format and
+  validate** check, **Changelog for framework changes** (`scripts/changelog_check.py`), fails a pull
+  request that changes framework code without a `CHANGELOG.md` entry, and names the guides to
+  check. An organization's own `config/` changes need none.
+- **`agents/database.md`:** the apps' Lakebase database for someone new to it: making a change,
+  trying it on a branch, getting data back.
 - **A bigger announcement banner and header:** the banner leads with a bold "Announcement", in
   16px text with more room; the temporary schema reminder uses the same bar. The name in both apps'
   header is 22px (was 20px).
