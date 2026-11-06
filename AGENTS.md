@@ -13,7 +13,7 @@ The repository holds two things that share one configuration but are built, test
 | What it is | Every workspace's settings, personas, compute, usage policy and catalog | The self-service app and the approvals app, their database, and a schema job per workspace they serve, all in the hub |
 | Built with | Terraform | Databricks Asset Bundles |
 | Folders | `terraform/`, `config/defaults/`, `config/workspaces/` | `apps/self-service/`, `bundle/`, `config/self-service/`, `scripts/app_build.py`, `scripts/app_deploy.py` |
-| Guides | [agents/terraform.md](agents/terraform.md), [agents/config.md](agents/config.md) | [agents/app.md](agents/app.md), [agents/design.md](agents/design.md) (look, typography, copy) |
+| Guides | [agents/terraform.md](agents/terraform.md), [agents/config.md](agents/config.md) | [agents/app.md](agents/app.md), [agents/design.md](agents/design.md) (look, typography, copy), [agents/database.md](agents/database.md) (Lakebase: changes, branches, recovery) |
 | Tests | `./scripts/test.sh terraform`, `python`, `scaffold` | `./scripts/test.sh app` (and the notebooks' tests in `python`) |
 | Deployed by | `scripts/tf.sh`, per workspace, in the deploy workflow | `scripts/app_deploy.py`: the hub, then each workspace's jobs |
 
@@ -30,6 +30,7 @@ The repository holds two things that share one configuration but are built, test
 | `apps/self-service/`, `bundle/`, `config/self-service/`, `scripts/app_build.py`, `scripts/app_deploy.py` | [agents/app.md](agents/app.md) |
 | `agents/skills/` (the Genie Code skills an organization's admins use) | This file: they are written for someone with no git, YAML or Terraform, and end in a pull request |
 | Any template, `app.css`, or text people read in the apps | [agents/design.md](agents/design.md) |
+| `apps/self-service/db/`, `store.py`, or what the apps keep about a request (the Lakebase database) | [agents/database.md](agents/database.md): no database background needed |
 | `scripts/`, `.github/`, `install/`, docs | This file |
 
 ## What this repository is
