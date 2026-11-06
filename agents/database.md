@@ -58,7 +58,7 @@ stops the bundle from ever deleting it. Never remove that line.
 
 | # | Do | Why |
 | --- | --- | --- |
-| 1 | **Write a new migration**, the next number: `apps/self-service/db/migrations/009_what_it_does.sql`. Start it with a comment saying what and why. | Each runs once, in number order |
+| 1 | **Write a new migration**, the next number: a file in `apps/self-service/db/migrations/` named with the next number, for example `009_what_it_does.sql`. Start it with a comment saying what and why. | Each runs once, in number order |
 | 2 | **Never edit a migration that has run** (any that is on `main`). To change it, add another. | Production has run the old text; an edit never reaches it, and a fresh install would differ |
 | 3 | **Add, then use; never rename or drop in one step.** Add a column (`ADD COLUMN ... ` nullable, or with a default) in one release; start using it in the code; only later, in another release, remove what is no longer used. | The running app must still work with the new tables during the deploy |
 | 4 | A view that lists columns with `*`: recreate it with the columns **named**, new ones **last** (`CREATE OR REPLACE VIEW`; see `008`). | Postgres refuses a replaced view whose columns move |
@@ -115,6 +115,6 @@ lost for good. Act **within the 7 days**.
 | The project (size, scale to zero, protection) | `bundle/hub/resources/apps.yml` (`postgres_projects`), sizes in `config/self-service/app.yaml` (`database:`) |
 | Who may read the data | `config/self-service/hub.yaml`, `database.readers` (emails) |
 | Creating the database and the readers' roles, running the migrations | `scripts/app_deploy.py` (`ensure_database`), `apps/self-service/db/migrate.py` |
-| The migrations, the rights | `apps/self-service/db/migrations/NNN_*.sql`, `apps/self-service/db/grants.sql` |
+| The migrations, the rights | the numbered files in `apps/self-service/db/migrations/`, `apps/self-service/db/grants.sql` |
 | Every query | `apps/self-service/store.py` (the self-service app), `apps/self-service/approvals_store.py` (the admin app, through `store.py`) |
 | The tests | `apps/self-service/tests/test_db.py` (rules always; a real Postgres with `PG_TEST_DSN`, as CI's **Database tests** job), `apps/self-service/tests/dev_branch.py` (a Lakebase branch, by hand) |
