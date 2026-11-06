@@ -44,6 +44,13 @@
         {% if not ready %}<span class="soon">Coming soon</span>{% else %}{{ icon("external" if external else "arrow", "icon task-arrow") }}{% endif %}
       </div>
       <p>{{ text }}</p>
+      {#- Each temporary schema they have: how much of its time is left, and when it is deleted. -#}
+      {% if key == "temporary_schema" and q.schemas %}{% for t in q.schemas %}
+      {%- set tone = "life-calm" if t.days_left > 7 else "life-soon" if t.days_left > 3 else "life-urgent" -%}
+      <div class="lifebar {{ tone }}"><div class="lifebar-top"><span class="mono">{{ t.name.split(".", 1)[1] }}</span><span>{{ t.days_left }} of {{ t.days_total }} days left</span></div>
+        <div class="lifebar-track" role="progressbar" aria-label="Days left" aria-valuemin="0" aria-valuemax="{{ t.days_total }}" aria-valuenow="{{ t.days_left }}"><div class="lifebar-fill" style="width: {{ [100, [0, (100 * (t.days_total - t.days_left) / t.days_total) | round | int] | max] | min }}%"></div></div>
+        <div class="meta">Deleted on {{ t.expires }}</div></div>
+      {% endfor %}{% endif %}
       {#- Every card has a foot, so they all have the same shape: how it is approved, or where it opens. -#}
       <div class="task-foot">
         {% if ready and external %}<span class="meta">{{ c.opens }}</span>

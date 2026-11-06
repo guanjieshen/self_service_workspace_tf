@@ -691,3 +691,11 @@ aside .kv dd { text-align: right; }
 /* A temporary schema they have: what they can do about it */
 .done-box .grow { flex: 1; }
 .done-actions { display: flex; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s3); }
+/* The catalog's temporary schema card: how much of each one's time is left (green, then amber in its
+   last week, red in its last 3 days) */
+.lifebar { margin: var(--s3) 0 0 44px; font-size: var(--text-sm); }
+.lifebar-top { display: flex; justify-content: space-between; gap: var(--s3); }
+.lifebar-track { height: 6px; border-radius: 3px; background: var(--border); margin: 6px 0 4px; overflow: hidden; }
+.lifebar-fill { height: 100%; background: #16a34a; }
+.life-soon .lifebar-fill { background: #d97706; } .life-soon .lifebar-top span:last-child { color: #92400e; }
+.life-urgent .lifebar-fill { background: #dc2626; } .life-urgent .lifebar-top span:last-child { color: var(--bad); }

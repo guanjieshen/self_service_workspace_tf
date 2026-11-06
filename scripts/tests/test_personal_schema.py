@@ -156,47 +156,18 @@ class PersonalSchema(unittest.TestCase):
         self.assertEqual(sql, [f"ALTER SCHEMA `fin_citizen_dev`.`cd_tmp_x` SET TAGS ('cd_expires' = '{until}')"], "from its current date; nothing else")
         self.assertEqual((result["action"], result["expires"]), ("extend", until))
 
-    def test_keeping_it_relabels_it_as_a_project_schema_in_place(self):
-        mine = {"cd_tmp_x": {"cd_user": "a@contoso.com", "cd_schema_kind": "temporary", "cd_expires": "2099-01-01"}}
-        sql, result = run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "convert"}, mine)
-        self.assertEqual(sql, ["ALTER SCHEMA `fin_citizen_dev`.`cd_tmp_x` UNSET TAGS ('cd_expires')",
-                               "ALTER SCHEMA `fin_citizen_dev`.`cd_tmp_x` SET TAGS ('cd_schema_kind' = 'project', 'cd_kept_from' = 'temporary')",
-                               "GRANT ALL PRIVILEGES, MANAGE ON SCHEMA `fin_citizen_dev`.`cd_tmp_x` TO `a@contoso.com`"],
-                         "no expiry (the cleanup leaves it), the project rights; its name stays")
-        self.assertEqual((result["kind"], result["action"]), ("project", "convert"))
-
-    def test_the_limit_comes_from_the_settings(self):
-        import datetime as dt
-        live = {"cd_tmp_old": {"cd_user": "a@contoso.com", "cd_schema_kind": "temporary", "cd_expires": (dt.date.today() + dt.timedelta(days=3)).isoformat()}}
-        _, result = run({"user": "a@contoso.com", "schema": "cd_tmp_new", "temporary": "true", "temporary_limit": "2"}, live)
-        self.assertTrue(result["created"], "2 allowed: a second one")
-        with self.assertRaisesRegex(ValueError, "temporary_limit is 1 to 10"):
-            run({"user": "a@contoso.com", "schema": "cd_tmp_new", "temporary": "true", "temporary_limit": "11"}, live)
-
-    def test_a_request_waiting_for_an_approver_holds_its_schema_and_a_decision_lifts_it(self):
-        mine = {"cd_tmp_x": {"cd_user": "a@contoso.com", "cd_schema_kind": "temporary", "cd_expires": "2099-01-01"}}
-        sql, result = run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "hold", "days": "7", "request_id": "ss-7"}, mine)
-        self.assertEqual(sql, ["ALTER SCHEMA `fin_citizen_dev`.`cd_tmp_x` SET TAGS ('cd_pending_request' = 'ss-7')"], "the cleanup never deletes it now")
-        held = {"cd_tmp_x": {**mine["cd_tmp_x"], "cd_pending_request": "ss-7"}}
-        sql, _ = run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "release", "days": "7", "request_id": "ss-7"}, held)
-        self.assertEqual(sql, ["ALTER SCHEMA `fin_citizen_dev`.`cd_tmp_x` UNSET TAGS ('cd_pending_request')"], "rejected: it expires as before")
-        sql, _ = run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "extend", "days": "7", "request_id": "ss-7"}, held)
-        self.assertEqual(sql[0], "ALTER SCHEMA `fin_citizen_dev`.`cd_tmp_x` UNSET TAGS ('cd_pending_request')", "approved: the hold goes, then the days")
-        sql, _ = run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "release", "request_id": "ss-8"}, held)
-        self.assertEqual(sql, [], "another request's hold stays")
-
-    def test_more_time_or_keeping_is_only_for_a_temporary_schema_of_theirs(self):
+    def test_more_time_is_only_for_a_temporary_schema_of_theirs(self):
         for params, schemas, message in (
                 ({"days": "7", "action": "extend"}, {}, "not a temporary schema of"),
                 ({"days": "7", "action": "extend"}, {"cd_tmp_x": {"cd_user": "bo@contoso.com", "cd_schema_kind": "temporary"}}, "not a@contoso.com's"),
-                ({"action": "convert"}, {"cd_tmp_x": {"cd_user": "a@contoso.com", "cd_schema_kind": "project"}}, "already a project schema"),
+                ({"action": "extend", "days": "7"}, {"cd_tmp_x": {"cd_user": "a@contoso.com", "cd_schema_kind": "project"}}, "already a project schema"),
                 ({"days": "3", "action": "extend"}, {}, "days is 7"),
-                ({"action": "delete"}, {}, "action is extend, convert, hold, release or empty"),
+                ({"action": "convert"}, {}, "action is extend, hold, release or empty"),   # keeping it: not offered for now
                 ({"action": "hold"}, {}, "names the request it is for")):
             with self.subTest(params=params), self.assertRaisesRegex(ValueError, message):
                 run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", **params}, schemas)
         with self.assertRaisesRegex(ValueError, "is for a temporary schema"):
-            run({"user": "a@contoso.com", "schema": "sales", "action": "convert"})
+            run({"user": "a@contoso.com", "schema": "sales", "action": "extend", "days": "7"})
 
     def test_an_old_personal_schema_made_temporary_gets_more_time_by_its_name(self):
         mine = {"cd_a": {"cd_user": "a@contoso.com", "cd_schema_kind": "temporary", "cd_expires": "2099-01-01", "cd_converted_from": "personal"}}

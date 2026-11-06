@@ -71,7 +71,7 @@ One job in the hub, **Temporary schema cleanup**, drops every temporary schema w
 | --- | --- |
 | See what it deleted, whose and how many tables | In the hub, Jobs > **Temporary schema cleanup** > its latest run: the summary is at the top |
 | See what it would delete, without deleting | **Run now with different parameters**, `dry_run` = `true` (a workspace admin) |
-| Keep a temporary schema longer | In the app, on their temporary schema: **Request more time** (7 days) or **Keep as a project schema**; both wait in the approvals app, and the schema is not deleted while they wait. Rejected, it is deleted at the next cleanup if its date has passed. The reminder shows on every page 3 days before |
+| Keep a temporary schema longer | In the app, on their temporary schema: **Extend temporary schema** (7 days). It waits in the approvals app, and the schema is not deleted while it waits; rejected, it is deleted at the next cleanup if its date has passed. The reminder shows on every page 3 days before. Keeping one as a project schema is not offered for now: copy what they need into a project schema |
 | Why their old personal schema is now temporary | Personal schemas are not offered any more: the cleanup made each one temporary (deleted 30 days later unless more time is approved or it is kept) |
 
 ## 6. Edit, read back, deploy

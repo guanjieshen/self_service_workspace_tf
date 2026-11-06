@@ -1327,6 +1327,10 @@ class TemporarySchemas(unittest.TestCase):
         self.fake.schemas_.add("fin_citizen_dev.cd_tmp_try_join")   # as the job made it, tagged
         self.fake.tags_["fin_citizen_dev.cd_tmp_try_join"] = {"cd_schema_kind": "temporary", "cd_user": ANA, "cd_expires": until}
         self.assertEqual(self.quota(), "1 of 1 used")
+        page = self.http.get("/", headers=self.as_ana).text
+        self.assertIn('<span class="mono">cd_tmp_try_join</span><span>14 of 14 days left</span>', page, "the card's bar: no cd_created, so app.yaml's days")
+        self.assertIn(f"Deleted on {until}", page)
+        self.assertIn('class="lifebar life-calm"', page)
         have = self.main.PORTAL.temporary_schema("fin", ANA)
         self.assertEqual((have["name"], have["expires"], have["days_left"]), ("fin_citizen_dev.cd_tmp_try_join", until, 14), "its own cd_expires tag")
         r = self.http.post("/schema/temporary", data={"workspace": "fin", "name": "another", "reason": WHY}, headers=self.as_ana)
@@ -1338,8 +1342,8 @@ class TemporarySchemas(unittest.TestCase):
         self.assertIn('<p class="mono">fin_citizen_dev.cd_tmp_try_join</p>', form)
         self.assertIn('href="https://adb-1.azuredatabricks.net/explore/data/fin_citizen_dev/cd_tmp_try_join" target="_blank" rel="noopener">Open schema',
                       form, "opens it in their own workspace")
-        self.assertIn('href="/schema/temporary/extend?schema=fin_citizen_dev.cd_tmp_try_join">Request more time</a>', form)
-        self.assertIn('href="/schema/temporary/keep?schema=fin_citizen_dev.cd_tmp_try_join">Keep as a project schema</a>', form)
+        self.assertIn('href="/schema/temporary/extend?schema=fin_citizen_dev.cd_tmp_try_join">Extend temporary schema</a>', form)
+        self.assertNotIn("Keep as a project schema", form, "not offered for now")
         self.assertIn("That is the most you may have", form)
         self.assertNotIn('type="submit"', form, "nothing to send until one expires")
         self.fake.tags_["fin_citizen_dev.cd_tmp_try_join"]["cd_expires"] = (dt.date.today() + dt.timedelta(days=30)).isoformat()
@@ -1352,6 +1356,25 @@ class TemporarySchemas(unittest.TestCase):
         self.assertEqual(self.quota(), "0 of 1 used", "expired: free again")
         self.fake.tags_["fin_citizen_dev.cd_tmp_try_join"].update(cd_schema_kind="project", cd_expires="")
         self.assertEqual(self.quota(), "0 of 1 used", "kept as a project schema: no longer their temporary one")
+
+    def test_the_bar_counts_from_created_to_expires_and_turns_red_at_the_end(self):
+        import datetime as dt
+        today = dt.date.today()
+        self.assertEqual(portal.lifetime({"cd_created": (today - dt.timedelta(days=30)).isoformat()}, today + dt.timedelta(days=7), 30), 37,
+                         "an approved extension makes it longer")
+        self.assertEqual(portal.lifetime({"cd_created": "2020-01-01", "cd_converted_from": "personal"}, today, 30), 30,
+                         "an old personal schema: its 30 days, not since 2020")
+        self.assertEqual(portal.lifetime({}, today, 30), 30)
+        self.http.post("/schema/temporary", data={"workspace": "fin", "name": "late", "reason": WHY}, headers=self.as_ana)
+        self.fake.runs_[max(self.fake.runs_)].state = state("TERMINATED", "SUCCESS")
+        self.fake.schemas_.add("fin_citizen_dev.cd_tmp_late")
+        self.fake.tags_["fin_citizen_dev.cd_tmp_late"] = {"cd_schema_kind": "temporary", "cd_user": ANA, "cd_created": (today - dt.timedelta(days=28)).isoformat(),
+                                                          "cd_expires": (today + dt.timedelta(days=2)).isoformat()}
+        self.main.PORTAL._personal.clear()
+        page = self.http.get("/", headers=self.as_ana).text
+        self.assertIn('class="lifebar life-urgent"', page)
+        self.assertIn("<span>2 of 30 days left</span>", page)
+        self.assertIn('style="width: 93%"', page, "28 of its 30 days gone")
 
     def test_the_limit_per_person_comes_from_the_settings(self):
         import datetime as dt
@@ -1399,12 +1422,12 @@ class TemporarySchemas(unittest.TestCase):
         self.assertEqual(self.quota(), "1 of 1 used")
         page = self.http.get("/", headers=self.as_ana).text
         self.assertIn('Your temporary schema <span class="mono">fin_citizen_dev.cd_ana</span> will be deleted on', page, "the reminder: 3 days or fewer")
-        self.assertIn('href="/schema/temporary/extend">request more time</a>', page)
+        self.assertIn('href="/schema/temporary/extend">extend it</a>', page)
         self.fake.tags_["fin_citizen_dev.cd_ana"]["cd_expires"] = (dt.date.today() + dt.timedelta(days=4)).isoformat()
         self.main.PORTAL._personal.clear()
         self.assertNotIn("will be deleted on", self.http.get("/", headers=self.as_ana).text, "not yet")
 
-    def test_more_time_and_keeping_it_wait_for_an_approver_then_run_the_schema_job(self):
+    def test_more_time_waits_for_an_approver_then_runs_the_schema_job(self):
         import datetime as dt
         self.http.post("/schema/temporary", data={"workspace": "fin", "name": "x", "reason": WHY}, headers=self.as_ana)
         self.fake.runs_[max(self.fake.runs_)].state = state("TERMINATED", "SUCCESS")
@@ -1427,13 +1450,8 @@ class TemporarySchemas(unittest.TestCase):
         self.main.PORTAL.run_recorded({**row, "id": rid})
         params = self.fake.started[-1][1]
         self.assertEqual((params["schema"], params["temporary"], params["action"], params["days"]), ("cd_tmp_x", "true", "extend", "7"))
-        r = self.http.post("/schema/temporary/keep", data={"workspace": "fin", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
-        kept = next(x for x in self.db.requests.values() if x["kind"] == "temporary_conversion")
-        self.assertEqual(kept["name"], "cd_tmp_x")
-        self.main.PORTAL.run_recorded({**kept, "id": next(i for i, x in self.db.requests.items() if x is kept)})
-        self.assertEqual(self.fake.started[-1][1]["action"], "convert")
         page = self.http.get(f"/request/{rid}", headers=self.as_ana).text   # its run, once the approver approved it
-        self.assertIn("Request more time", page)
+        self.assertIn("Extend temporary schema", page)
         r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "7", "reason": WHY + " Again."}, headers=self.as_ana, follow_redirects=False)
         waiting = r.headers["location"].rsplit("/", 1)[1]
         self.db.event(waiting, "approved", actor="dana@contoso.com")   # approved, its run not started yet
@@ -1441,11 +1459,12 @@ class TemporarySchemas(unittest.TestCase):
         bad = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "3", "reason": WHY}, headers=self.as_ana)
         self.assertIn("More time is 7 days", bad.text)
         self.assertEqual(self.http.get("/schema/temporary/other", headers=self.as_ana).status_code, 404)
+        self.assertEqual(self.http.get("/schema/temporary/keep", headers=self.as_ana).status_code, 404, "keeping it: not offered for now")
 
-    def test_without_a_temporary_schema_there_is_nothing_to_extend_or_keep(self):
-        form = self.http.get("/schema/temporary/keep", headers=self.as_ana).text
+    def test_without_a_temporary_schema_there_is_nothing_to_extend(self):
+        form = self.http.get("/schema/temporary/extend", headers=self.as_ana).text
         self.assertIn("You have no temporary schema to ask about", form)
-        r = self.http.post("/schema/temporary/keep", data={"workspace": "fin", "reason": WHY}, headers=self.as_ana)
+        r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "7", "reason": WHY}, headers=self.as_ana)
         self.assertIn("You have no temporary schema to ask about", r.text)
         self.assertEqual(self.db.requests, {})
 

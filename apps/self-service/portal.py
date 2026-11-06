@@ -45,9 +45,10 @@ TASKS = {"personal_schema": "Create a personal schema", "team_folder": "Request 
 # team schema (the requester's and one of their groups').
 PROJECT_SCHEMA, TEAM_SCHEMA = "Request a project schema", "Request a team schema"
 # ... and a temporary schema: the requester's alone, <prefix>tmp_<name>, tagged to expire (one at a time),
-# with more time for it, or kept as a project schema: requests an approver always decides.
+# with more time for it: a request an approver always decides. (Keeping one as a project schema,
+# temporary_conversion, is not offered for now: it may need a rename. Its label stays, for any sent.)
 TEMPORARY_SCHEMA = "Create a temporary schema"
-TEMPORARY_EXTENSION, TEMPORARY_CONVERSION = "Request more time", "Keep as a project schema"
+TEMPORARY_EXTENSION, TEMPORARY_CONVERSION = "Extend temporary schema", "Keep as a project schema"
 ALWAYS_APPROVED = {"temporary_extension", "temporary_conversion"}   # whatever app.yaml human_approval says
 EXTENSION_DAYS = (7,)   # the more time someone may ask for at once (one choice for now)
 # How each task is approved, as the catalog and task pages label it. The app's own tasks run
@@ -185,6 +186,17 @@ def new_request_id():
 def schema_name(email, prefix="cd_"):
     """The personal schema's name: cd_ plus the email before the @ (as the job names it)."""
     return prefix + re.sub(r"[^a-z0-9]+", "_", email.split("@")[0].lower()).strip("_")
+
+
+def lifetime(tags, expires, days):
+    """How many days a temporary schema has in all, for the card's bar: from its cd_created to its
+    cd_expires (an approved extension makes it longer); days for an old personal schema made
+    temporary (its cd_created is when it was first made), or without a date."""
+    try:
+        created = datetime.date.fromisoformat(tags.get("cd_created", ""))
+    except ValueError:
+        return days
+    return days if tags.get("cd_converted_from") else max((expires - created).days, 1)
 
 
 def temporary_prefix(prefix):
@@ -556,8 +568,10 @@ class Portal:
                 continue   # never made, dropped by the cleanup, or by an admin
             t = {a["tag_key"]: a.get("tag_value", "") for a in out.get("tag_assignments") or []}
             if t.get("cd_schema_kind") == "temporary" and t.get("cd_user") == user and t.get("cd_expires", "") >= today:
-                live.append({"name": f"{catalog}.{schema}", "expires": t["cd_expires"],
-                             "days_left": (datetime.date.fromisoformat(t["cd_expires"]) - datetime.date.today()).days,
+                expires = datetime.date.fromisoformat(t["cd_expires"])
+                left = (expires - datetime.date.today()).days
+                live.append({"name": f"{catalog}.{schema}", "expires": t["cd_expires"], "days_left": left,
+                             "days_total": max(lifetime(t, expires, int(self.config.get("temporary_days") or 30)), left),
                              "link": f"{w.host}/explore/data/{catalog}/{schema}"})   # opens in their own workspace
         live.sort(key=lambda x: x["expires"])
         soonest = live[0] if live else {"name": pending or "", "expires": "", "days_left": None, "link": None}
@@ -683,12 +697,6 @@ class Portal:
         if days not in EXTENSION_DAYS:
             raise RequestError(f"More time is {' or '.join(map(str, EXTENSION_DAYS))} days.")
         return self._about_temporary(ws_name, user, "extend", reason, schema, days)
-
-    def request_keep(self, ws_name, user, reason="", schema=""):
-        """Keep one of the user's temporary schemas as a project schema: recorded, and run once an
-        approver approves it; the job relabels it in place (no expiry, project rights). Returns the
-        request's ID."""
-        return self._about_temporary(ws_name, user, "convert", reason, schema)
 
     def _about_temporary(self, ws_name, user, action, reason, schema="", days=None):
         check_reason(reason)
