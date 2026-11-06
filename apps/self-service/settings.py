@@ -28,7 +28,7 @@ SECTIONS = [
     ("Announcement banner", "Show a message at the top of every page, such as planned maintenance.", [
         ("banner.text", "Message", "text"),
         ("banner.until", "Show until", "date")]),
-    ("Guided tour", "The question Genie One is asked the first time someone opens their workspace (the Open Databricks Genie One card), and when they restart the guided tour. Empty: Genie One opens with no question.", [
+    ("Guided tour", "The question Genie One is asked the first time someone opens their workspace (the Open Databricks Genie One card), and when they restart the guided tour. {business_unit} and {catalog} are their business unit and its catalog. Empty: Genie One opens with no question.", [
         ("onboarding.prompt", "Prompt", "prompt")]),
     ("Persona request links", "Links to request each access level, such as a ServiceNow catalog item, for every business unit without links of its own.", [
         (f"persona_request.{p}", p.title(), "url") for p in PERSONAS]),

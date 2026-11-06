@@ -70,6 +70,8 @@ CARDS = [
          link="group_request", icon="group", soon=True, opens="Opens your organization's request form"),
 
     Card("warehouses", "compute", "Manage SQL warehouses", "Create and manage SQL warehouses for your workloads."),
+    Card("classic_compute", "compute", "Request classic compute access",
+         "Get access to classic clusters for workloads that serverless can't run.", icon="cluster"),
     Card("budget_policy", "compute", "Request a budget policy",
          "Track your team's serverless usage and costs.", icon="budget"),
     Card("cost_dashboard", "compute", "View compute costs",

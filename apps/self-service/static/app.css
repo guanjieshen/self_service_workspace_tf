@@ -677,3 +677,5 @@ aside .kv dd { text-align: right; }
 
 /* The steps for a request made by hand (approvals detail) */
 .manual-steps { margin: var(--s2) 0 0; padding-left: var(--s5); display: grid; gap: var(--s1); }
+/* A sentence a person must not miss, inside a callout (the temporary schema's deletion) */
+.danger-text { color: var(--bad); font-weight: var(--medium); }

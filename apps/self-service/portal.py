@@ -164,10 +164,11 @@ def genie_one_link(host, prompt="", workspace_id=""):
 
 
 def fill(text, w):
-    """{host}, {workspace_id} and {catalog} in a link or a prompt, from a workspace in config.json."""
+    """{host}, {workspace_id}, {catalog} and {business_unit} (its business unit: the prefix, upper case) in a
+    link or a prompt, from a workspace in config.json."""
     host = w["host"].rstrip("/")
     return (text.replace("{host}", host).replace("{workspace_id}", workspace_id_of(host, w.get("id")))
-                .replace("{catalog}", w.get("catalog") or ""))
+                .replace("{catalog}", w.get("catalog") or "").replace("{business_unit}", (w.get("bu") or "").upper()))
 
 
 def new_request_id():
@@ -503,6 +504,46 @@ class Portal:
         keep(self._personal, key, found)
         return found
 
+    def temporary_schema(self, ws_name, user):
+        """The user's temporary schema in a workspace, for the card's 1 of 1 and the form:
+        {"exists": True / False / "pending" (asked for, still running) / None (unknown), "name",
+        "expires"}. Their temporary schema requests of the last days (jobs.temporary_schema.days)
+        come from the database; Unity Catalog says whether one still exists. Where either cannot
+        answer, unknown: the job checks again either way."""
+        w = next((w for w in self.workspaces() if w.name == ws_name and "personal_schema" in w.jobs), None)
+        if w is None or not self.store or not hasattr(self.store, "requests_of"):
+            return {"exists": None, "name": "", "expires": ""}
+        key = (ws_name, user, "temporary")
+        cached = self._personal.get(key)
+        if cached and time.time() - cached[0] < 60:
+            return cached[1]
+        days = int(self.config.get("temporary_days") or 30)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        utc = lambda t: t if t.tzinfo else t.replace(tzinfo=datetime.timezone.utc)   # the database's times are UTC
+        catalog = w.jobs["personal_schema"]["tags"].get("cd_catalog", "")
+        try:
+            recent = [r for r in self.store.requests_of(user) if r["kind"] == "temporary_schema" and r["workspace"] == ws_name
+                      and r["state"] not in ("rejected", "start_failed") and utc(r["created_at"]) + datetime.timedelta(days=days) > now]
+        except Exception as e:
+            warn(f"reading {user}'s temporary schemas", e)
+            return {"exists": None, "name": "", "expires": ""}
+        found = {"exists": False, "name": "", "expires": ""}
+        for r in recent:   # newest first
+            name, expires = f"{catalog}.{r['name']}", (r["created_at"] + datetime.timedelta(days=days)).date().isoformat()
+            if self.active_request(ws_name, user, "personal_schema", name):   # not cached: the card follows the run
+                return {"exists": "pending", "name": name, "expires": expires}
+            try:
+                self.hub().schemas.get(name)
+            except NotFound:
+                continue   # its run failed, or an admin dropped it
+            except Exception as e:
+                warn(f"looking up {name}", e)
+                return {"exists": None, "name": "", "expires": ""}
+            found = {"exists": True, "name": name, "expires": expires}
+            break
+        keep(self._personal, key, found)
+        return found
+
     def hub(self):
         """The app's own workspace (the hub), where the AI calls run: the Validate check,
         the AI gateway for the summaries. Not the workspace a request goes to."""
@@ -588,6 +629,11 @@ class Portal:
                 raise RequestError("A temporary schema needs a name, and is yours alone.")
             check_schema(schema, prefix)
             schema = temporary_prefix(prefix) + schema
+            have = self.temporary_schema(ws_name, user)
+            if have["exists"] is True or (have["exists"] == "pending" and have["name"].split(".", 1)[-1] != schema):
+                raise RequestError(f"You already have a temporary schema, {have['name']}, until {have['expires']}. "
+                                   "You can have one at a time: ask for another once it expires.")
+            self._personal.pop((ws_name, user, "temporary"), None)
         elif schema:
             check_schema(schema, prefix)
         if schema:
