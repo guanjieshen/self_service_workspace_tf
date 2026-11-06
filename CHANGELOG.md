@@ -10,6 +10,11 @@ is left alone.
 
 ## Unreleased
 
+- **Nine Genie Code skills' front matter was not valid YAML** (a ": " inside the description), so
+  GitHub showed an error and Genie Code may not have loaded them: `change-all-workspaces`,
+  `change-one-workspace`, `change-the-app-code`, `change-the-database`, `investigate-a-problem`,
+  `pull-request-from-databricks`, `read-a-plan`, `support-a-temporary-schema`,
+  `update-self-service-app`. Reworded; a test now refuses a description that would break it.
 - **Genie Code skills for support**, written for someone new to software, git and Databricks:
   `start-here` (any request in your own words: said back precisely, then the right skill),
   `investigate-a-problem` (read only), `fix-a-failed-check-or-deploy`, `read-a-plan`,

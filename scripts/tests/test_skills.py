@@ -32,6 +32,10 @@ class Skills(unittest.TestCase):
                 self.assertRegex(folder.name, r"^[a-z0-9]+(-[a-z0-9]+)*$", "lowercase words and dashes")
                 description = meta.get("description", "")
                 self.assertTrue(description.startswith("Use when"), "say when to use it: Genie Code matches on it")
+                # The front matter is YAML (Genie Code and GitHub read it): an unquoted value with ": " or " #"
+                # in it is not valid YAML, and the skill may not load.
+                for key, value in meta.items():
+                    self.assertNotRegex(value, r": | #", f"{key}: no ': ' or ' #' in it (YAML); use a comma or a full stop")
                 self.assertLessEqual(len(description), 1024, "the Agent Skills limit")
 
     def test_a_skill_it_hands_over_to_exists(self):

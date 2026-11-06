@@ -1,6 +1,6 @@
 ---
 name: change-one-workspace
-description: Use when someone wants to change the custom configuration of one managed workspace only: its groups (which Entra group holds an access level), its warehouse size, its tags or APPID, a label, groups people may share folders with, an admin setting for that workspace, Genie Code instructions for it, leaving the self-service app out, or to stop managing (retire) it. Edits config/workspaces/<name>.yaml and hands over to pull-request-from-databricks.
+description: Use when someone wants to change the custom configuration of one managed workspace only, such as its groups (which Entra group holds an access level), its warehouse size, its tags or APPID, a label, groups people may share folders with, an admin setting for that workspace, Genie Code instructions for it, leaving the self-service app out, or to stop managing (retire) it. Edits config/workspaces/<name>.yaml and hands over to pull-request-from-databricks.
 ---
 
 # Change one workspace's configuration

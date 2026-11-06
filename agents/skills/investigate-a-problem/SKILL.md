@@ -1,6 +1,6 @@
 ---
 name: investigate-a-problem
-description: Use when someone reports that something does not work or did not happen as expected: a request that failed or is stuck, a schema that is missing or was deleted, a person who cannot open the app or see their schema, the admin app or the self-service app down, a job that failed. Looks, never changes: finds the request, its job run, the schema's tags, the cleanup's report and the apps' health, explains the cause in plain words, and proposes the fix (handing over to the right skill to make it).
+description: Use when someone reports that something does not work or did not happen as expected, such as a request that failed or is stuck, a schema that is missing or was deleted, a person who cannot open the app or see their schema, the admin app or the self-service app down, a job that failed. Looks, never changes; finds the request, its job run, the schema's tags, the cleanup's report and the apps' health, explains the cause in plain words, and proposes the fix (handing over to the right skill to make it).
 ---
 
 # Investigate a problem (read only)

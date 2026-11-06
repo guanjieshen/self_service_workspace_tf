@@ -1,6 +1,6 @@
 ---
 name: support-a-temporary-schema
-description: Use when someone asks about a temporary schema (cd_tmp_...): whose it is and when it is deleted, why it was deleted, extending it, a request to extend it that waits, why they cannot create another, how many each person may have or how long they last, or what the daily cleanup did. Reads the schema's tags and the cleanup's report; changes happen only in the app (extend), the admin app (approve, Settings) or a pull request.
+description: Use when someone asks about a temporary schema (cd_tmp_...), such as whose it is and when it is deleted, why it was deleted, extending it, a request to extend it that waits, why they cannot create another, how many each person may have or how long they last, or what the daily cleanup did. Reads the schema's tags and the cleanup's report; changes happen only in the app (extend), the admin app (approve, Settings) or a pull request.
 ---
 
 # Support a temporary schema

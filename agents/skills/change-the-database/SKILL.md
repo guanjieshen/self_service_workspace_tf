@@ -1,6 +1,6 @@
 ---
 name: change-the-database
-description: Use when a change needs the apps to store something new or differently in their database (a new field on a request, a new table, a new kind of request, a new allowed value): writing a database migration, its grants, the code in store.py and its tests, trying it on a Lakebase branch, then the pull request. Also when someone asks how the database is changed safely or how to get data back. Follows agents/database.md; refuses anything that could lose data.
+description: Use when a change needs the apps to store something new or differently in their database (a new field on a request, a new table, a new kind of request, a new allowed value). Writes a database migration, its grants, the code in store.py and its tests, tries it on a Lakebase branch, then opens the pull request. Also when someone asks how the database is changed safely or how to get data back. Follows agents/database.md; refuses anything that could lose data.
 ---
 
 # Change the database
