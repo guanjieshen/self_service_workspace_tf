@@ -10,6 +10,14 @@ is left alone.
 
 ## Unreleased
 
+## 1.1.1
+
+- **Fix: an old personal schema's owner kept their access when it was made temporary.** 1.1.0's
+  cleanup granted the temporary schema's rights, then revoked ALL PRIVILEGES and MANAGE; in Unity
+  Catalog that revoke removes every privilege, including the ones just granted, so the owner was
+  left with none. It now revokes first, then grants. Found in a real run before anyone upgraded.
+  **Upgrade from 1.0.x straight to 1.1.1**, not 1.1.0 (the upgrade notes of 1.1.0 apply).
+
 ## 1.1.0
 
 Upgrade from 1.0.x with `install/copy_to_your_repo` (README, Releases and upgrades; or the skill
@@ -98,8 +106,7 @@ with its 1.0.1 configuration unchanged.
     reminder follow an approved extension.
 - **Existing personal schemas are made temporary** by the daily cleanup, on its first run after
   the upgrade: each one gets `cd_schema_kind=temporary`, `cd_expires` 30 days ahead and
-  `cd_converted_from=personal`, and its owner's rights narrow to the temporary schema's (their new
-  rights are granted before the old ones are revoked). **30 days later they are deleted**, unless
+  `cd_converted_from=personal`, and its owner's rights narrow to the temporary schema's. **30 days later they are deleted**, unless
   their owner extends them. The cleanup's summary lists each one made
   temporary, by email. Run it with `dry_run=true` first to see which.
 - Deploy the app runs migration `008_temporary_extensions_and_conversions.sql` (the two new kinds

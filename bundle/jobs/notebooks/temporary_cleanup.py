@@ -63,9 +63,10 @@ for catalog in catalogs:
             row["why"] = "would be made temporary (dry run)"
             continue
         name = f"`{catalog}`.`{schema}`"
-        try:   # their new rights first, then the old ones go: they never lose access in between
-            spark.sql(f"GRANT {', '.join(p.replace('_', ' ') for p in temporary_privileges)} ON SCHEMA {name} TO `{row['user']}`")
+        try:   # the old rights go, then the new ones: in Unity Catalog, revoking ALL PRIVILEGES revokes
+            # every privilege, including any just granted, so granting first would leave them none
             spark.sql(f"REVOKE ALL PRIVILEGES, MANAGE ON SCHEMA {name} FROM `{row['user']}`")
+            spark.sql(f"GRANT {', '.join(p.replace('_', ' ') for p in temporary_privileges)} ON SCHEMA {name} TO `{row['user']}`")
             spark.sql(f"ALTER SCHEMA {name} SET TAGS ('cd_schema_kind' = 'temporary', 'cd_expires' = '{until}', "
                       "'cd_converted_from' = 'personal')")
             row["why"] = f"made temporary: deleted on {until} unless more time is approved, or it is kept"
