@@ -51,6 +51,22 @@ class ReleaseZip(unittest.TestCase):
         identifiers = rel.own_identifiers(self.files)
         self.assertEqual(rel.leaks(rel.release_files(self.files), identifiers), [])
 
+    def test_a_workspace_file_started_from_the_example_is_not_a_leak(self):
+        """An organization's workspace files begin as copies of _example.yaml: its commented lines and
+        <placeholders> are nobody's environment, so _example.yaml itself never counts as a leak."""
+        files = dict(self.files)
+        example = files["config/workspaces/_example.yaml"].decode()
+        files["config/workspaces/hr.yaml"] = (example + "\n# storage_root: abfss://data@realaccount.dfs.core.windows.net/hr\n").encode()
+        identifiers = rel.own_identifiers(files)
+        self.assertFalse([i for i in identifiers if "<" in i], "no placeholder is an identifier")
+        self.assertNotIn("abfss://data@realaccount.dfs.core.windows.net/hr", identifiers, "a commented line is not a value")
+        files["config/workspaces/hr.yaml"] = (example.replace("host: https://adb-0000000000000000.0.azuredatabricks.net",
+                                                              "host: https://adb-1234500000000001.1.azuredatabricks.net")
+                                              + "\nstorage_root: abfss://data@realaccount.dfs.core.windows.net/hr\n").encode()
+        identifiers = rel.own_identifiers(files)
+        self.assertIn("abfss://data@realaccount.dfs.core.windows.net/hr", identifiers, "its real values still are")
+        self.assertIn("https://adb-1234500000000001.1.azuredatabricks.net", identifiers)
+
     def test_a_leak_stops_the_build(self):
         files = dict(self.files)
         files["config/setup.yaml"] = b"tenant_id: 11111111-2222-3333-4444-555555555555\n"

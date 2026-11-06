@@ -10,6 +10,12 @@ is left alone.
 
 ## Unreleased
 
+- **Upgrading from 1.0.x no longer turns the Tests check red:** the release-leak test counted a
+  workspace file's commented example lines (`# storage_root: abfss://<container>@...`, the
+  example's `adb-0000...` host) as this repository's environment, so `_example.yaml` looked like a
+  leak in any repository whose workspace files began as copies of it. Only real values count now.
+  A build test, and the skill coverage test, also accept an `app.yaml` from 1.0.x (its
+  `ai_summary` key).
 - **Nine Genie Code skills' front matter was not valid YAML** (a ": " inside the description), so
   GitHub showed an error and Genie Code may not have loaded them: `change-all-workspaces`,
   `change-one-workspace`, `change-the-app-code`, `change-the-database`, `investigate-a-problem`,

@@ -72,9 +72,11 @@ def own_identifiers(files):
         found.add(account.group(1))
     for path, data in files.items():
         if re.match(r"^(config|dev)/workspaces/(?!_example)[^/]+\.yaml$", path):
-            text = data.decode()
-            found.update(re.findall(r"https://adb-[0-9]+\.[0-9]+\.azuredatabricks\.net", text))
-            found.update(re.findall(r"abfss://[^\s\"']+", text))
+            # Its values, not its comments: a file started from _example.yaml keeps the example's
+            # commented lines and <placeholders>, which are nobody's environment.
+            text = "\n".join(line.split("#", 1)[0] for line in data.decode().splitlines())
+            found.update(v for v in re.findall(r"https://adb-[0-9]+\.[0-9]+\.azuredatabricks\.net", text) if not v.startswith("https://adb-0000"))
+            found.update(v for v in re.findall(r"abfss://[^\s\"']+", text) if "<" not in v)
     # The self-service hub: its URL, its database's endpoint, the readers, the apps' identities.
     hub = files.get(HUB_FILE, b"").decode()
     found.update(re.findall(r"https://adb-[0-9]+\.[0-9]+\.azuredatabricks\.net", hub))
