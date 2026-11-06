@@ -76,10 +76,17 @@ In your repository's Databricks Git folder, Genie Code walks an admin through ea
 
 | Ask Genie Code to... | Skill |
 | --- | --- |
+| **Anything, in your own words** ("the app is broken", "extend ana's schema"): it says the task back precisely, asks at most two questions, and hands over to the right skill | `start-here` |
+| Find out why something did not work (a request, a schema, the apps), without changing anything | `investigate-a-problem` |
+| Fix a red check or a failed deploy | `fix-a-failed-check-or-deploy` |
+| Explain what a pull request will do, and whether it is safe to merge | `read-a-plan` |
+| Answer or act on a temporary schema (when it is deleted, extending it, the limit, the cleanup) | `support-a-temporary-schema` |
 | Add a new workspace | `add-workspace` |
 | Change a default for every workspace | `change-all-workspaces` |
 | Change one workspace's configuration, or stop managing it | `change-one-workspace` |
 | Change the self-service app (its settings, its hub, a new business unit) | `update-self-service-app` |
+| Change what the apps store (the database), safely | `change-the-database` |
+| Change the framework's own code (a card, a form, a job), with its tests, guides and changelog | `change-the-app-code` |
 | Upgrade to a new release of this framework | `upgrade-to-a-new-release` |
 | Get any change reviewed and deployed | `pull-request-from-databricks` (the others end here) |
 

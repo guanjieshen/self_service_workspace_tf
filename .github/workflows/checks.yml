@@ -26,9 +26,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0   # the base branch too, for the changelog check
       - uses: ./.github/actions/setup
         with:
           sign-in: "false"
+      # A change to framework code says what it changes (AGENTS.md, "Keep the guides and the
+      # changelog true"): fails without a CHANGELOG.md entry, and names the guides to keep true.
+      - name: Changelog for framework changes
+        env:
+          BASE: ${{ github.base_ref }}
+        run: python3 scripts/changelog_check.py "origin/$BASE"
       - run: terraform fmt -check -recursive terraform
       # Across workspaces: unique hosts, ids and catalog names, budget policy names that do
       # not collide on an account, and file names safe for workflow commands.

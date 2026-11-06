@@ -101,6 +101,29 @@ Each topic has one home. Update that file; link to it from elsewhere instead of 
 | A new workspace key (in a workspace file, not the baseline) | `workspace_keys` in `terraform/config.tf`; `config/workspaces/_example.yaml`; the workspace keys table in `config/README.md` | A fixture and an assertion |
 | Something removed or renamed | Every doc that mentions it (search the repository), and its tests and fixtures; add the old name to `RETIRED` in `scripts/tests/test_docs.py` | The suite still passes with nothing skipped; `test_docs.py` fails on a path that no longer exists, or a retired name that comes back |
 
+### Keep the guides and the changelog true
+
+**Every change updates what describes it, in the same pull request.** The next person (or AI
+assistant) knows only what is written here, so a guide that is out of date is a bug.
+
+| You changed | Also update |
+| --- | --- |
+| Anything people or admins see or do (a card, a form, a setting, a job, a rule) | `CHANGELOG.md` under **Unreleased**: what changed for them, and what the first plan or deploy after it shows |
+| How a part works (a new file, a new rule, a new step, a gotcha you found) | The guide for that part: `agents/app.md`, `agents/database.md`, `agents/design.md`, `agents/terraform.md`, `agents/config.md` |
+| Something an admin does or asks for | The skill that guides it in `agents/skills/` (and `config/README.md` if it is a key) |
+| A new skill | The skills table in `README.md` and `docs/SETUP.md` (step 2), and this file if it changes how work is done |
+
+**The check enforces the changelog:** the pull request check **Format and validate** runs
+`scripts/changelog_check.py`, which fails when framework code (`apps/`, `bundle/`, `scripts/`,
+`terraform/`, `install/`, `.github/`, not only their tests) changes without `CHANGELOG.md`, and
+names the guides that describe what changed. The guides themselves are on you: read the ones it
+names and fix what is no longer true.
+
+**Changes are made with Genie Code** (the organization's admins and support use only Genie Code):
+its skills (`agents/skills/`, registered in step 2 of `docs/SETUP.md`) carry these rules, so it
+follows them even when it does not read this file. The skill **start-here** is the front door for
+any request; **change-the-app-code** is how the framework's own code is changed.
+
 ### Keep it simple
 
 Simplicity and ease of use come first. Before adding an option, ask whether a fixed,

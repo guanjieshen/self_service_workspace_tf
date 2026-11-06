@@ -104,14 +104,21 @@ Your repository's Git folder comes with **Genie Code skills** (`agents/skills/`)
 
 | Skill | When |
 | --- | --- |
+| `start-here` | **Anything, in your own words**: it turns the request into a precise task and hands over to the right skill |
+| `investigate-a-problem` | Something did not work: find out why, changing nothing |
+| `fix-a-failed-check-or-deploy` | A red check on a pull request, or a failed deploy |
+| `read-a-plan` | What a pull request will do, and whether it is safe to merge |
+| `support-a-temporary-schema` | A temporary schema: when it is deleted, extending it, the limit, the cleanup |
 | `add-workspace` | Onboard a workspace |
 | `change-all-workspaces` | Change a default for every workspace |
 | `change-one-workspace` | Change one workspace's own configuration, or retire it |
 | `update-self-service-app` | The self-service app: its settings, the hub, a new business unit |
+| `change-the-database` | What the apps store (the database), changed safely |
+| `change-the-app-code` | The framework's own code, with its tests, guides and changelog |
 | `upgrade-to-a-new-release` | Update your repository to a newer release of this framework |
 | `pull-request-from-databricks` | Get any change reviewed and deployed (the others end here) |
 
-**Turn them on once, per admin:** in your repository's Git folder, open the Genie Code pane > **Settings** (skills) > add the folder `<your Git folder>/agents/skills` (for example `/Workspace/Users/<you>/<repo>/agents/skills`) > **Add folder**. Then ask Genie Code, for example, "I want to add a new workspace", or @ mention a skill. Genie Code also reads `AGENTS.md` in the folder.
+**Turn them on once, per admin:** in your repository's Git folder, open the Genie Code pane > **Settings** (skills) > add the folder `<your Git folder>/agents/skills` (for example `/Workspace/Users/<you>/<repo>/agents/skills`) > **Add folder**. Then ask Genie Code anything in your own words, for example "the schema request failed for ana", or @ mention a skill (`start-here` when unsure). Genie Code also reads `AGENTS.md` in the folder.
 
 ### Before step 5
 
