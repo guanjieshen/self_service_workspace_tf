@@ -10,6 +10,13 @@ is left alone.
 
 ## Unreleased
 
+- **A temporary schema cannot be shared.** Its requester gets what they need to use it (create,
+  read and change tables, views, volumes and functions: `jobs.temporary_schema.privileges`), never
+  `MANAGE` or `ALL PRIVILEGES`, so they cannot grant it to anyone; the build and the job refuse
+  either. The job's identity (or `catalog_owner`) owns it, as every schema. Other kinds keep
+  `personal_schema.privileges`. Temporary schemas made before keep the rights they were given.
+  Tables a requester creates in it are theirs, and an owner can grant on its own table to anyone
+  who can already use the schema.
 - **Expired temporary schemas are dropped every day.** One job in the hub, **Temporary schema
   cleanup**, deployed with the apps, runs at 06:00 UTC over every served workspace's catalog and
   drops each temporary schema whose `cd_expires` date has passed (`DROP SCHEMA ... CASCADE`). It

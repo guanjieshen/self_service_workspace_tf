@@ -12,7 +12,8 @@ from notebook_helpers import ROOT, RecordsSpark, render_notebook
 
 NOTEBOOK = (ROOT / "bundle/jobs/notebooks/personal_schema.py").read_text()
 GROUPS = {"a@contoso.com": ["fin-data-eng", "fin-local"], "sam.lee@contoso.com": []}   # each user's groups
-CONFIG = {"prefix": "cd_", "privileges": ["ALL_PRIVILEGES", "MANAGE"], "owner": "fin_platform_admins", "allowed_catalogs": ["fin_citizen_dev"], "temporary_days": 30}
+CONFIG = {"prefix": "cd_", "privileges": ["ALL_PRIVILEGES", "MANAGE"], "owner": "fin_platform_admins", "allowed_catalogs": ["fin_citizen_dev"], "temporary_days": 30,
+          "temporary_privileges": ["USE_SCHEMA", "SELECT", "MODIFY", "CREATE_TABLE"]}
 MODEL = {"comment_model": "system.ai.claude-sonnet-5-5"}   # a run parameter, from the app's Settings
 
 
@@ -120,8 +121,9 @@ class PersonalSchema(unittest.TestCase):
         self.assertEqual(sql[0], f"CREATE SCHEMA `fin_citizen_dev`.`cd_tmp_try_this` COMMENT 'Temporary schema of a@contoso.com, until {expires} (citizen development)'")
         self.assertIn("'cd_schema_kind' = 'temporary'", sql[1])
         self.assertIn(f"'cd_expires' = '{expires}'", sql[1])
-        self.assertEqual([s for s in sql if s.startswith("GRANT")], ["GRANT ALL PRIVILEGES, MANAGE ON SCHEMA `fin_citizen_dev`.`cd_tmp_try_this` TO `a@contoso.com`"],
-                         "the user's alone")
+        self.assertEqual([s for s in sql if s.startswith("GRANT")], ["GRANT USE SCHEMA, SELECT, MODIFY, CREATE TABLE ON SCHEMA `fin_citizen_dev`.`cd_tmp_try_this` TO `a@contoso.com`"],
+                         "the user's alone, to use and never to share: no MANAGE, no ALL PRIVILEGES")
+        self.assertEqual(sql[-1], "ALTER SCHEMA `fin_citizen_dev`.`cd_tmp_try_this` OWNER TO `fin_platform_admins`", "owned by catalog_owner, never the user")
         _, result = run({"user": "a@contoso.com", "schema": "cd_tmp_try_this", "temporary": "true"}, config={"temporary_days": 7})
         self.assertEqual(result["expires"], (dt.date.today() + dt.timedelta(days=7)).isoformat(), "app.yaml jobs.temporary_schema.days")
 
@@ -145,6 +147,13 @@ class PersonalSchema(unittest.TestCase):
                 self.assertTrue(result["created"])
         _, result = run({"user": "a@contoso.com"}, live)
         self.assertEqual(result["kind"], "personal", "other kinds are not counted")
+
+    def test_a_temporary_schema_can_never_be_given_sharing_rights(self):
+        for rights in (["SELECT", "MANAGE"], ["ALL_PRIVILEGES"]):
+            with self.subTest(rights=rights), self.assertRaisesRegex(ValueError, "never shared"):
+                run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true"}, config={"temporary_privileges": rights})
+        sql, _ = run({"user": "a@contoso.com", "schema": "sales_forecast", "reason": "Forecasts."})
+        self.assertIn("GRANT ALL PRIVILEGES, MANAGE ON SCHEMA `fin_citizen_dev`.`sales_forecast`", " ".join(sql), "other kinds keep theirs")
 
     def test_a_temporary_schema_is_named_and_alone(self):
         for params, message in (({"schema": "try_this"}, "named cd_tmp_<name>"),
