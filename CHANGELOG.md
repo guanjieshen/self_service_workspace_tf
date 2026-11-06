@@ -10,6 +10,14 @@ is left alone.
 
 ## Unreleased
 
+- **Expired temporary schemas are dropped every day.** A new job per business unit in the hub,
+  **`<BU> temporary schema cleanup`**, deployed with the schema job, runs at 06:00 UTC and drops
+  each temporary schema whose `cd_expires` date has passed (`DROP SCHEMA ... CASCADE`). It touches
+  only schemas the schema job made as temporary ones (tagged `cd_managed_by=self_service` and
+  `cd_schema_kind=temporary`, named `<prefix>tmp_<name>`), and its run reports every one: dropped,
+  kept or failed, for whom, created, expires and how many tables. `dry_run=true` reports only. The
+  first run after the upgrade drops any already expired. An optional Genie Code summary is added
+  by hand (Genie Code tasks are UI only): `docs/SETUP.md`, "The temporary schema cleanup".
 - **Branding, in the approvals app's Settings:** the word at the start of both apps' header
   ("Databricks" by default, the title's first word) and its colour (`#RRGGBB`, Databricks red by
   default). Both apps show a change within 15 seconds; Reset goes back to the default. The
@@ -18,7 +26,7 @@ is left alone.
   or "1 of 1 used" (from the person's requests of the last 30 days, and whether the schema still
   exists). The app refuses a second one before anything runs, and the form says which one they
   have and until when. Its warning is clearer: "Your temporary schema will be deleted after 30
-  days." in red. **Nothing deletes it yet**: an admin does, from its `cd_expires` tag.
+  days." in red (the daily cleanup job, below, does).
 - **The guided tour names the person's business unit:** `{business_unit}` (the prefix, upper
   case) is filled in like `{catalog}`, and the default prompt uses both.
 - **A Coming soon card, Request classic compute access** (Compute & cost).
@@ -33,7 +41,7 @@ is left alone.
   the person names it (`cd_tmp_<name>`) and says what it is for; it is created straight away,
   theirs alone, and tagged `cd_schema_kind=temporary` and `cd_expires=<date>` (30 days ahead,
   `jobs.temporary_schema.days`). One at a time: the job refuses another while theirs has not
-  expired. **Nothing is deleted when it expires**: the tag is for admins (or a cleanup job later).
+  expired. The daily cleanup job (above) drops it once it has expired.
   Deploy the app runs migration `007_temporary_schemas.sql` (a new kind of request). The schema
   job also now refuses a run again that would change a schema's kind.
 

@@ -35,7 +35,7 @@ What people may do, and how the app behaves. Read the key's comment in the file 
 | The **Add a group to your workspace** card (otherwise Coming soon) | `links.group_request`: their request form's URL |
 | The default FAQ links and prompt (Settings overrides them) | `faq.<section>`, `onboarding.prompt` |
 | Personal schemas' name prefix or rights | `personal_schema.prefix`, `personal_schema.privileges` (under `jobs:`) |
-| How long a temporary schema lasts (its `cd_expires` tag; nothing is deleted) | `temporary_schema.days` (under `jobs:`, 1 to 365) |
+| How long a temporary schema lasts (its `cd_expires` tag; the daily cleanup job drops it after) | `temporary_schema.days` (under `jobs:`, 1 to 365) |
 | Who owns new schemas | `catalog_owner` (under `jobs:`). Workspace folders are made by hand for now: `folder_root` is where the approvals app tells admins to create them |
 
 Never change `name`, `approvals.name` or `database.project_id` (they name the apps and the database: changing them makes new ones). Stop and say a maintainer should plan it.

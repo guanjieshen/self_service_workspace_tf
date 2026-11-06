@@ -37,8 +37,11 @@ browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py
   `<prefix>tmp_<name>` (`portal.temporary_prefix`), and runs the same schema job with
   `temporary=true`. The job tags it `cd_schema_kind=temporary` and `cd_expires` (today plus
   `jobs.temporary_schema.days`), and refuses a second one while the first has not expired: it
-  reads the catalog's schema tags, so the app does not check. Nothing is deleted at expiry yet;
-  the tag is for a cleanup later. A run again never changes a schema's kind or extends its date.
+  reads the catalog's schema tags (the app checks first too, from its requests). The daily
+  `<BU> temporary schema cleanup` job (`notebooks/temporary_cleanup.py`) drops it once `cd_expires`
+  has passed: only schemas tagged `cd_managed_by=self_service` and `cd_schema_kind=temporary`
+  and named `<prefix>tmp_<name>`, and it reports every one in its run. A run again never changes
+  a schema's kind or extends its date.
 - **A team schema's group is typed, and membership is not checked:** the hub cannot see a
   person's groups in their workspace. Any Entra account group can be named; a workspace-local
   one fails at the grant.
