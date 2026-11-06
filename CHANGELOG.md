@@ -10,6 +10,10 @@ is left alone.
 
 ## Unreleased
 
+- **The approvals app is called Admin where people read it:** its header reads "<brand> Admin",
+  its pages' titles end in "Admin", and its description in Databricks' Apps list is "Citizen
+  Development admin: approvals, settings and monitoring". The app itself keeps its name
+  (`cd-approvals`) and URL: renaming a Databricks app makes a new one.
 - **The approver's summary of an extension says what the schema holds.** For Extend temporary
   schema, the AI summary also reads the schema from Unity Catalog's metadata (its deletion date,
   the days asked, and each table or view with its comment and columns; never the data), so it says

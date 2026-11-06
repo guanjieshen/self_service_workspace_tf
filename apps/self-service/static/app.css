@@ -628,8 +628,6 @@ aside .kv dd { text-align: right; }
 .topbar-admin { background: var(--admin-bar); border-bottom-color: var(--admin-bar); }
 .topbar-admin .brand-rest { color: #fff; }
 .topbar-admin .brand:hover .brand-rest { color: var(--border); }
-.brand-tag { align-self: center; padding: 1px var(--s2); border-radius: var(--r-full); background: var(--accent); color: var(--text);
-  font-size: var(--text-xs); font-weight: var(--semibold); letter-spacing: 0.02em; }
 .topbar-admin nav a { color: var(--text-3); }
 .topbar-admin nav a:hover { color: #fff; }
 .topbar-admin nav a[aria-current="page"] { color: #fff; border-bottom-color: var(--accent); }
