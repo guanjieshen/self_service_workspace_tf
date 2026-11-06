@@ -76,7 +76,7 @@ class Builds(unittest.TestCase):
             {"name": "ops-citizen-dev", "bu": "OPS", "host": "https://adb-3000000000000003.3.azuredatabricks.net", "id": "3000000000000003", "catalog": "ops_citizen_dev"}])
         self.assertEqual(config["database"]["host"], "ep-example-1.database.canadacentral.azuredatabricks.net")
         self.assertTrue(config["links"]["discover"].startswith("{host}/"), "the app fills in each person's own workspace, not the hub's")
-        self.assertEqual(config["ai"], {"model": self.s["app"]["ai_model"]}, "one model for every AI feature")
+        self.assertEqual(config["ai"], {"model": app_build.ai_model(self.s["app"])}, "one model for every AI feature (an older app.yaml: ai_summary)")
         self.assertEqual(config["hub_host"], "https://adb-1000000000000001.1.azuredatabricks.net", "admins' links to job runs open in the hub")
         for skipped in ("tests", "db", "AGENTS.md", "__pycache__"):
             self.assertFalse((out / "self-service" / skipped).exists(), skipped)

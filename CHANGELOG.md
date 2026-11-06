@@ -10,6 +10,47 @@ is left alone.
 
 ## Unreleased
 
+## 1.1.0
+
+Upgrade from 1.0.x with `install/copy_to_your_repo` (README, Releases and upgrades; or the skill
+`upgrade-to-a-new-release`): it replaces the framework's files and keeps your `config/` and
+`.github/CODEOWNERS`. Tried end to end on a repository installed from 1.0.1: every check passes
+with its 1.0.1 configuration unchanged.
+
+### Before you upgrade: read this
+
+| | |
+| --- | --- |
+| **Personal schemas become temporary, then are deleted** | Personal schemas are not offered any more. The first daily cleanup after the deploy (06:00 UTC) makes **every existing personal schema temporary**: its owner keeps read and write but loses MANAGE and ALL PRIVILEGES, and it is **deleted 30 days later** unless its owner extends it (7 days at a time, each approved). **Before merging the upgrade**, or right after it deploys, run the hub's **Temporary schema cleanup** job with `dry_run` = `true`: its summary lists every personal schema it would make temporary, by owner. Tell those owners. |
+| **The admin app** | The approvals app is called **Admin** in its header and pages (its Databricks name and URL stay `cd-approvals`). |
+| **Nothing else needs doing first.** | Your `app.yaml` from 1.0.x keeps working as it is (the new settings default). |
+
+### What the first plan and the deploy show
+
+- **Plans:** each workspace's Genie Code instructions change if you copy the new baseline files
+  (below); nothing else.
+- **Deploy the app:** runs migrations `006_guided_tours`, `007_temporary_schemas` and
+  `008_temporary_extensions_and_conversions` (new tables and columns; nothing is deleted), deploys
+  the hub's new **Temporary schema cleanup** job (daily), and gives each served workspace's schema
+  job its new parameters.
+
+### Baseline edits (all optional: an upgrade never changes your configuration)
+
+| File | Change |
+| --- | --- |
+| `config/self-service/app.yaml` | `title: Databricks Citizen Development` (the header's name; its first word is also Settings > Branding) |
+| `config/self-service/app.yaml` | `ai_model: system.ai.claude-sonnet-5-5` in place of `ai_summary:` and its `model:` (the old key still works) |
+| `config/self-service/app.yaml` | Under `jobs:`, `temporary_schema:` with `days: 30`, `limit: 1` and `privileges: [...]` (the defaults when missing; the limit is also Settings > Schemas) |
+| `config/self-service/app.yaml` | `links.sop.temporary_schema` in place of `links.sop.schema` |
+| `config/defaults/genie-code/` | Copy the framework's new files if you want them: `our-business.md` (what your business is, for Genie Code: edit it to describe yours) and `skills/how-this-workspace-works/`; and its updated `instructions.md`, `skills/onboard-me/` and `skills/build-tagged-assets/` |
+
+### What changed
+- **Upgrading from 1.0.x no longer turns the Tests check red:** the release-leak test counted a
+  workspace file's commented example lines (`# storage_root: abfss://<container>@...`, the
+  example's `adb-0000...` host) as this repository's environment, so `_example.yaml` looked like a
+  leak in any repository whose workspace files began as copies of it. Only real values count now.
+  A build test, and the skill coverage test, also accept an `app.yaml` from 1.0.x (its
+  `ai_summary` key).
 - **Nine Genie Code skills' front matter was not valid YAML** (a ": " inside the description), so
   GitHub showed an error and Genie Code may not have loaded them: `change-all-workspaces`,
   `change-one-workspace`, `change-the-app-code`, `change-the-database`, `investigate-a-problem`,
