@@ -10,6 +10,9 @@ is left alone.
 
 ## Unreleased
 
+- **A bigger announcement banner and header:** the banner leads with a bold "Announcement", in
+  16px text with more room; the temporary schema reminder uses the same bar. The name in both apps'
+  header is 22px (was 20px).
 - **The approvals app is called Admin where people read it:** its header reads "<brand> Admin",
   its pages' titles end in "Admin", and its description in Databricks' Apps list is "Citizen
   Development admin: approvals, settings and monitoring". The app itself keeps its name
