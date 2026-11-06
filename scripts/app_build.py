@@ -62,6 +62,15 @@ def ai_model(app):
     return str(app.get("ai_model") or (app.get("ai_summary") or {}).get("model") or "")
 
 
+# A temporary schema's rights when app.yaml names none: use it fully, never share it.
+TEMPORARY_PRIVILEGES = ['USE_SCHEMA', 'SELECT', 'MODIFY', 'CREATE_TABLE', 'CREATE_VOLUME', 'READ_VOLUME', 'WRITE_VOLUME', 'CREATE_FUNCTION', 'EXECUTE', 'CREATE_MATERIALIZED_VIEW']
+
+
+def temporary_privileges(jobs):
+    """What a temporary schema's requester is granted (app.yaml jobs.temporary_schema.privileges)."""
+    return list((jobs.get("temporary_schema") or {}).get("privileges") or TEMPORARY_PRIVILEGES)
+
+
 def check(s):
     """Settings that would fail later (in a deploy, or in the app), refused now, naming the setting."""
     app, hub, db, jobs = s["app"], s["hub"], s["database"], s["jobs"]
@@ -74,6 +83,9 @@ def check(s):
     need(str(app.get("ai_check")) in ("on", "off"), "app.yaml self_service_app.ai_check: on or off.")
     days = (jobs.get("temporary_schema") or {}).get("days", 30)
     need(isinstance(days, int) and not isinstance(days, bool) and 1 <= days <= 365, "app.yaml jobs.temporary_schema.days: a whole number of days, 1 to 365.")
+    rights = temporary_privileges(jobs)
+    need(all(isinstance(p, str) and re.fullmatch(r"[A-Z_]+", p) for p in rights) and not {"MANAGE", "ALL_PRIVILEGES"} & set(rights),
+         "app.yaml jobs.temporary_schema.privileges: privileges such as SELECT or CREATE_TABLE; never MANAGE or ALL_PRIVILEGES, which let the requester share it.")
     need(re.fullmatch(r"[\w.-]{0,100}", ai_model(app)), "app.yaml self_service_app.ai_model: a model's name (for example system.ai.claude-sonnet-5-5), or null.")
     need(set(app.get("human_approval") or []) <= set(KINDS), f"app.yaml self_service_app.human_approval lists kinds of request: {', '.join(KINDS)}.")
     need(all(u is None or re.match(r"https?://", u) for u in (app.get("faq") or {}).values()),
@@ -232,6 +244,7 @@ def build_jobs(s, w, app_ids, root=None):
     (out / "personal_schema.py").write_text(notebook("personal_schema", {
         "prefix": jobs["personal_schema"]["prefix"], "privileges": jobs["personal_schema"]["privileges"],
         "temporary_days": int((jobs.get("temporary_schema") or {}).get("days") or 30),
+        "temporary_privileges": temporary_privileges(jobs),
         "owner": jobs.get("catalog_owner") or "", "allowed_catalogs": [w["catalog"]], **record}))
     (out / "target.yml").write_text(json.dumps(jobs_target(s, w, app_ids), indent=1))
     return out

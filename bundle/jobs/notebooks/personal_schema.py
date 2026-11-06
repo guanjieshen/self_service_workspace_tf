@@ -2,7 +2,9 @@
 # MAGIC %md
 # MAGIC # Personal, project, team or temporary schema
 # MAGIC Creates a schema for one user, grants it to them (all privileges and MANAGE, so they can share
-# MAGIC it themselves), and to their group for a team schema, and tags it for self-service tracking.
+# MAGIC it themselves; a temporary schema only what they need to use it, so it is never shared), and
+# MAGIC to their group for a team schema, and tags it for self-service tracking. The job's identity
+# MAGIC (or catalog_owner) owns it, never the requester.
 # MAGIC Run by the `<BU> schema requests` job when the self-service app asks; safe to run again.
 # MAGIC Parameters: `user` (email), `catalog` (required, one of the allowed catalogs), `schema`
 # MAGIC (empty = their personal schema, `cd_<email before @>`; a name = a project or team schema,
@@ -27,6 +29,8 @@ privileges = ${jsonencode(privileges)}
 owner = ${jsonencode(owner)}
 allowed_catalogs = ${jsonencode(allowed_catalogs)}
 temporary_days = ${jsonencode(temporary_days)}   # how long a temporary schema lasts: its cd_expires tag
+# What a temporary schema's requester may do: use it, never share it (no MANAGE, no ALL_PRIVILEGES).
+temporary_privileges = ${jsonencode(temporary_privileges)}
 # The request record check (below): the app's records, this workspace's name in them, and
 # the kinds that always need an approver. requests_catalog empty = off.
 requests_catalog = ${jsonencode(requests_catalog)}
@@ -82,8 +86,10 @@ if not re.fullmatch(r"[A-Za-z0-9._:/-]{0,100}", request_id):
     raise ValueError(f"request_id may only contain letters, digits and . _ : / -, not {request_id!r}")
 if not re.fullmatch(r"[\w.-]{0,100}", comment_model):
     raise ValueError(f"comment_model must be a model's name, not {comment_model!r}")
-if not all(re.fullmatch(r"[A-Z_]+", p) for p in privileges):
-    raise ValueError(f"not privileges: {privileges}")
+if not all(re.fullmatch(r"[A-Z_]+", p) for p in privileges + temporary_privileges):
+    raise ValueError(f"not privileges: {privileges}, {temporary_privileges}")
+if {"MANAGE", "ALL_PRIVILEGES"} & set(temporary_privileges):
+    raise ValueError("a temporary schema is never shared: its privileges may not include MANAGE or ALL_PRIVILEGES")
 
 # A team schema's group is any Entra account group the requester names: membership is not checked
 # (the job runs in the hub, which does not see a person's groups in their workspace). A name that
@@ -142,7 +148,7 @@ if not exists:
             raise ValueError(f"{catalog}.{schema} was just created by another request: choose another name") from e
         raise
 spark.sql(f"ALTER SCHEMA {name} SET TAGS ({', '.join(f'{k!r} = {v!r}' for k, v in tags.items())})")
-grant = ', '.join(p.replace('_', ' ') for p in privileges)
+grant = ', '.join(p.replace('_', ' ') for p in (temporary_privileges if kind == "temporary" else privileges))
 spark.sql(f"GRANT {grant} ON SCHEMA {name} TO `{user}`")
 if owner_group:
     try:

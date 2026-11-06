@@ -1330,6 +1330,7 @@ class TemporarySchemas(unittest.TestCase):
         form = self.http.get("/schema/temporary", headers=self.as_ana).text
         self.assertIn("fin_citizen_dev.cd_tmp_</span>", form, "they type what follows cd_tmp_")
         self.assertIn('<span class="danger-text">Your temporary schema will be deleted after 14 days.</span>', form, "in red; app.yaml jobs.temporary_schema.days")
+        self.assertIn("but you can't share it with others", form)
         self.assertIn("copy it to another schema before it expires. You can only have one temporary schema at a time.", form)
         self.assertIn('data-ai-check="temporary_schema"', form)
 

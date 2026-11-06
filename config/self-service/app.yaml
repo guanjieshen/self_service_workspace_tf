@@ -129,4 +129,8 @@ jobs:
     privileges: [ALL_PRIVILEGES, MANAGE]
   temporary_schema:                   # a person's short-term schema: <prefix>tmp_<name>, one at a time
     days: 30                          # its cd_expires tag, this many days ahead; the daily cleanup job drops it after
+    # What the requester may do in it: use it fully, but not share it (never MANAGE or
+    # ALL_PRIVILEGES, which let them grant it to others; the build refuses them).
+    privileges: [USE_SCHEMA, SELECT, MODIFY, CREATE_TABLE, CREATE_VOLUME, READ_VOLUME, WRITE_VOLUME,
+                 CREATE_FUNCTION, EXECUTE, CREATE_MATERIALIZED_VIEW]
   require_request_record: false       # true: a job runs only for requests the app recorded
