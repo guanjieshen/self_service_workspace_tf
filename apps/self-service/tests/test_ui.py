@@ -421,6 +421,20 @@ class ReviewFixes(unittest.TestCase):
             self.assertIn("unavailable", checks.check(bad, "system.ai.m", "folder", "x", "y")["error"])
 
 
+class SummaryOfMoreTime(unittest.TestCase):
+    def test_what_the_schema_holds_goes_to_the_model_as_data(self):
+        import summary
+        sent = []
+        client = type("C", (), {"api_client": type("A", (), {"do": lambda self, method, path, body=None: sent.append(body) or
+                    {"choices": [{"message": {"content": '{"headline": "h", "summary": "s", "concerns": [], "questions": []}'}}]}})()})()
+        summary.summarize(client, "system.ai.m", {"kind": "temporary_extension", "name": "cd_tmp_x", "reason": "x", "days": 7},
+                          schema_now={"deleted_on": "2026-12-06", "tables": [{"name": "payroll_join"}]})
+        facts = json.loads(sent[0]["messages"][1]["content"])
+        self.assertEqual(facts["schema_now"]["tables"], [{"name": "payroll_join"}])
+        self.assertEqual(facts["kind"], "more time for a temporary schema")
+        self.assertIn("schema_now", sent[0]["messages"][0]["content"], "the instructions say what it is, and that it is data")
+
+
 class SummaryLevels(unittest.TestCase):
     def test_concerns_are_ranked_by_level_whatever_the_model_sent(self):
         import json as j

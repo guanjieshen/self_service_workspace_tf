@@ -60,6 +60,8 @@ class FakeClient:
         self.groups = ns(list=lambda filter, attributes, count=None: [ns(display_name="fin-data-eng")])
         self.schemas_ = set()          # schemas the app can see (BROWSE); None = it cannot see any
         self.tags_ = {}                # schema -> its tags (cd_schema_kind, cd_user, cd_expires...)
+        self.tables_ = {}              # schema -> its tables (Unity Catalog's metadata: names, types, comments, columns)
+        self.tables = ns(list=lambda catalog_name, schema_name: iter(self.tables_.get(f"{catalog_name}.{schema_name}", [])))
         self.schemas = ns(get=self.get_schema)
         self.folders_ = {}             # path -> "mine" or "theirs" (the app sees theirs as permission denied)
         self.workspace = ns(get_status=self.get_status)
@@ -658,6 +660,28 @@ class BusinessUnitRouting(unittest.TestCase):
             self.assertEqual(p.summarize(row)["headline"], "h")
         self.assertEqual(write.call_args.args[1], "system.ai.from-settings")
         self.assertEqual(p.store.events[-1][:2], ("ss-1", "reviewed"), "kept with the request")
+
+    def test_the_summary_of_more_time_reads_what_the_schema_holds(self):
+        p, fake = make()
+        fake.schemas_.add("fin_citizen_dev.cd_tmp_x")
+        fake.tags_["fin_citizen_dev.cd_tmp_x"] = {"cd_expires": "2026-12-06", "cd_created": "2026-11-06"}
+        col = lambda name, kind, comment=None: ns(name=name, type_text=kind, comment=comment)
+        fake.tables_["fin_citizen_dev.cd_tmp_x"] = [
+            ns(name="payroll_join", table_type=ns(value="MANAGED"), comment="Test of pay bands by region",
+               columns=[col("employee_id", "bigint"), col("salary", "decimal(10,2)", "annual, CAD")]),
+            ns(name="regions_v", table_type=ns(value="VIEW"), comment=None, columns=[col(f"c{i}", "string") for i in range(35)])]
+        row = {"id": "ss-1", "kind": "temporary_extension", "workspace": "fin", "requested_by": ANA, "name": "cd_tmp_x", "reason": WHY, "days": 7}
+        now = p.schema_now(row)
+        self.assertEqual((now["deleted_on"], now["created"], now["days_asked"]), ("2026-12-06", "2026-11-06", 7))
+        self.assertEqual(now["tables"][0], {"name": "payroll_join", "type": "MANAGED", "comment": "Test of pay bands by region",
+                                            "columns": [{"name": "employee_id", "type": "bigint"}, {"name": "salary", "type": "decimal(10,2)", "comment": "annual, CAD"}]})
+        self.assertEqual(len(now["tables"][1]["columns"]), 31, "at most 30 columns, then how many more")
+        self.assertIsNone(p.schema_now({**row, "kind": "project_schema"}), "only for more time")
+        with mock.patch.object(portal.summary_module, "summarize", return_value={"headline": "h"}) as write:
+            p.summarize(row)
+        self.assertEqual(write.call_args.kwargs["schema_now"]["tables"][0]["name"], "payroll_join", "the summary is written from it")
+        fake.schemas_.discard("fin_citizen_dev.cd_tmp_x")
+        self.assertEqual(p.schema_now(row), {"could_not_read": "NotFound"}, "it says so, rather than nothing")
 
     def test_the_tour_is_given_again_rather_than_never_when_the_database_fails(self):
         p, _ = make()
