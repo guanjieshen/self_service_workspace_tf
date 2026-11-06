@@ -37,7 +37,8 @@
       {% call field(key, label) %}
         {% if kind == "prompt" %}<textarea id="{{ key }}" name="{{ key }}" rows="6" maxlength="1000" placeholder="No guided tour">{{ values[key] }}</textarea>
         {% else %}<input id="{{ key }}" name="{{ key }}" value="{{ values[key] }}"
-               {% if kind == "url" %}type="url" placeholder="https://" class="mono"{% elif kind == "date" %}type="date"{% elif kind == "model" %}class="mono" maxlength="100" placeholder="No AI"{% else %}maxlength="200" placeholder="No banner"{% endif %}>{% endif %}
+               {% if kind == "url" %}type="url" placeholder="https://" class="mono"{% elif kind == "date" %}type="date"{% elif kind == "model" %}class="mono" maxlength="100" placeholder="No AI"{% elif kind == "color" %}class="mono" maxlength="7" pattern="#[0-9A-Fa-f]{6}" placeholder="#FF3621 (the default)"{% elif key == "brand.name" %}maxlength="40" placeholder="The title's first word"{% else %}maxlength="200" placeholder="No banner"{% endif %}>{% endif %}
+        {% if kind == "color" %}<span class="color-swatch" style="background: {{ values[key] or '#ff3621' }}" aria-hidden="true"></span>{% endif %}
         {% if changed %}<p class="hint settings-hint">Last updated {{ changed.at | local }} by {{ changed.by }}
           <button type="submit" class="link-button" form="settings-reset" name="reset" value="{{ key }}">Reset</button></p>
         {% elif kind == "date" %}<p class="hint">Optional. The banner will automatically disappear after this date.</p>

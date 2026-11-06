@@ -140,7 +140,8 @@ def page(request, template, **context):
             return unavailable(request, e)
     config = settings.apply(CONFIG, SETTINGS() if MODE != "approvals" else {})
     return templates.TemplateResponse(request, template, {
-        "config": config, "links": config.get("links", {}), "user": user_of(request), "tasks": portal.TASKS,
+        # brand: both apps' header, as admins set it (the approvals app's pages show app.yaml's config otherwise)
+        "config": config, "brand": settings.apply(CONFIG, SETTINGS())["brand"], "links": config.get("links", {}), "user": user_of(request), "tasks": portal.TASKS,
         "approval": portal.approval_of(CONFIG, PORTAL.manual()), "approval_labels": portal.APPROVAL_LABELS, "mode": MODE, "ai_mode": ai_mode(),
         "replies_needed": PORTAL.replies_needed(user_of(request)) if MODE != "approvals" else 0,
         **(business_unit(user_of(request)) if MODE != "approvals" else {}), **context})

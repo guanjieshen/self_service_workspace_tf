@@ -23,8 +23,11 @@ SOPS = {"schema": "Personal schema", "project_schema": "Project schema", "team_s
 # How it works (the "New here?" line), then one FAQ per catalog section, named as it is.
 FAQS = {"getting_started": "How it works", **dict(cards.SECTIONS)}
 
-# Every setting, by section: (key, label, kind). kind: url, text, prompt, date or model.
+# Every setting, by section: (key, label, kind). kind: url, text, prompt, date, model or color.
 SECTIONS = [
+    ("Header", "The word at the start of both apps' header, and its colour. Empty: the first word of the title in app.yaml, in the default colour.", [
+        ("brand.name", "Name", "text"),
+        ("brand.color", "Colour", "color")]),
     ("Announcement banner", "Show a message at the top of every page, such as planned maintenance.", [
         ("banner.text", "Message", "text"),
         ("banner.until", "Show until", "date")]),
@@ -43,6 +46,7 @@ SECTIONS = [
 # Onboarding section shows; the change history is a tab of its own (approvals.py).
 TABS = [
     ("announcement", "Announcement", ["Announcement banner"]),
+    ("branding", "Branding", ["Header"]),
     ("onboarding", "Onboarding", ["Guided tour", "Persona request links"]),
     ("help", "Help links", ["FAQ pages", "Standard operating procedures"]),
     ("ai", "AI", ["AI model"]),
@@ -82,7 +86,8 @@ def defaults(config):
     """Each setting's value from app.yaml ("" when it has none)."""
     links = config.get("links") or {}
     persona = links.get("persona_request")
-    out = {"banner.text": "", "banner.until": "", "onboarding.prompt": (config.get("onboarding") or {}).get("prompt") or "",
+    out = {"brand.name": (config.get("title") or "").split(" ", 1)[0], "brand.color": "",
+           "banner.text": "", "banner.until": "", "onboarding.prompt": (config.get("onboarding") or {}).get("prompt") or "",
            "ai.model": (config.get("ai") or {}).get("model") or ""}
     for p in PERSONAS:
         out[f"persona_request.{p}"] = (persona.get(p) if isinstance(persona, dict) else persona) or ""
@@ -110,7 +115,8 @@ def apply(config, overrides, today=None):
     faq and banner (None when there is none, or it has ended)."""
     if not overrides:
         d = defaults(config)
-        return {**config, "banner": None, "onboarding": {"prompt": d["onboarding.prompt"]}, "ai": {"model": d["ai.model"]}}
+        return {**config, "banner": None, "onboarding": {"prompt": d["onboarding.prompt"]}, "ai": {"model": d["ai.model"]},
+                "brand": {"name": d["brand.name"], "color": ""}}
     v = values(config, overrides)
     links = {**(config.get("links") or {}),
              "persona_request": {p: v[f"persona_request.{p}"] or None for p in PERSONAS},
@@ -122,6 +128,7 @@ def apply(config, overrides, today=None):
     return {**config, "links": links, "faq": {k: v[f"faq.{k}"] or None for k in FAQS},
             "onboarding": {"prompt": v["onboarding.prompt"]},
             "ai": {"model": v["ai.model"]},
+            "brand": {"name": v["brand.name"] or defaults(config)["brand.name"], "color": v["brand.color"]},
             "banner": {"text": v["banner.text"], "until": until} if shown else None}
 
 
@@ -137,6 +144,10 @@ def check(key, value):
         raise ValueError(f"{LABELS[key]}: keep it under 200 characters.")
     if kind == "prompt" and len(value) > 1000:
         raise ValueError(f"{LABELS[key]}: keep it under 1,000 characters.")
+    if kind == "color" and value and not re.fullmatch(r"#[0-9A-Fa-f]{6}", value):
+        raise ValueError(f"{LABELS[key]}: a colour as #RRGGBB, for example #FF3621.")
+    if key == "brand.name" and len(value) > 40:
+        raise ValueError(f"{LABELS[key]}: keep it under 40 characters.")
     if kind == "model" and not re.fullmatch(r"[\w.-]{0,100}", value):
         raise ValueError(f"{LABELS[key]}: a model's name, for example system.ai.claude-sonnet-5-5.")
     if kind == "date" and value:

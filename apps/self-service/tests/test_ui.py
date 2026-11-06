@@ -574,6 +574,16 @@ class Settings(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaisesRegex(ValueError, "a model's name"):
                 self.s.check("ai.model", bad)
 
+    def test_the_header_brand_comes_from_the_title_until_an_admin_changes_it(self):
+        config = {**self.CONFIG, "title": "Databricks Citizen Development"}
+        self.assertEqual(self.s.apply(config, {})["brand"], {"name": "Databricks", "color": ""})
+        self.assertEqual(self.s.apply(config, self.over(brand__name="Contoso", brand__color="#0055AA"))["brand"], {"name": "Contoso", "color": "#0055AA"})
+        self.assertEqual(self.s.apply(config, self.over(brand__name=""))["brand"]["name"], "Databricks", "empty: the title's first word")
+        self.assertEqual(self.s.check("brand.color", "#0055aa"), "#0055aa")
+        for key, bad in (("brand.color", "red"), ("brand.color", "#05a"), ("brand.color", "#0055AA; x"), ("brand.name", "x" * 41)):
+            with self.subTest(key=key, bad=bad), self.assertRaises(ValueError):
+                self.s.check(key, bad)
+
     def test_the_last_values_are_used_when_the_database_fails(self):
         calls = []
         def read():
@@ -721,6 +731,21 @@ class SettingsPages(unittest.TestCase):
         self.assertIn("<h2>AI model</h2>", page)
         self.assertIn('<input id="ai.model" name="ai.model" value="system.ai.claude-sonnet-5-5"', page)
         self.assertIn('placeholder="No AI"', page)
+
+    def test_the_brand_shows_in_both_apps_headers(self):
+        import settings
+        over = {"brand.name": {"value": "Contoso", "by": "dana", "at": None}, "brand.color": {"value": "#0055AA", "by": "dana", "at": None}}
+        for mode, path in (("approvals", "/approvals"), (None, "/business-unit")):
+            with self.subTest(mode=mode):
+                main = self.load(mode, {"title": "Databricks Citizen Development", "links": {}, "faq": {}})
+                main.SETTINGS = lambda: over
+                page = TestClient(main.app).get(path).text
+                self.assertIn('<span class="brand-first" style="color: #0055AA">Contoso</span>', page)
+        main = self.load("approvals", {"title": "Databricks Citizen Development", "links": {}, "faq": {}})
+        page = TestClient(main.app).get("/approvals/settings?tab=branding").text
+        self.assertIn("<h2>Header</h2>", page)
+        self.assertIn('placeholder="#FF3621 (the default)"', page)
+        self.assertIn('<span class="brand-first">Databricks</span>', page, "no change yet: the title's first word, the default colour")
 
     def test_the_onboarding_prompt_is_a_text_area(self):
         http = TestClient(self.load("approvals", {"links": {}, "faq": {}, "onboarding": {"prompt": "Onboard me"}}).app)

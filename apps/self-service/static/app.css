@@ -679,3 +679,5 @@ aside .kv dd { text-align: right; }
 .manual-steps { margin: var(--s2) 0 0; padding-left: var(--s5); display: grid; gap: var(--s1); }
 /* A sentence a person must not miss, inside a callout (the temporary schema's deletion) */
 .danger-text { color: var(--bad); font-weight: var(--medium); }
+/* Settings: the colour a colour field holds */
+.color-swatch { display: inline-block; width: 20px; height: 20px; margin-top: var(--s2); border-radius: 4px; border: 1px solid var(--border); vertical-align: middle; }
