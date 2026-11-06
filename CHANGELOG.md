@@ -10,14 +10,14 @@ is left alone.
 
 ## Unreleased
 
-- **Expired temporary schemas are dropped every day.** A new job per business unit in the hub,
-  **`<BU> temporary schema cleanup`**, deployed with the schema job, runs at 06:00 UTC and drops
-  each temporary schema whose `cd_expires` date has passed (`DROP SCHEMA ... CASCADE`). It touches
-  only schemas the schema job made as temporary ones (tagged `cd_managed_by=self_service` and
-  `cd_schema_kind=temporary`, named `<prefix>tmp_<name>`), and its run reports every one: dropped,
-  kept or failed, for whom, created, expires and how many tables. `dry_run=true` reports only. The
-  first run after the upgrade drops any already expired. An optional Genie Code summary is added
-  by hand (Genie Code tasks are UI only): `docs/SETUP.md`, "The temporary schema cleanup".
+- **Expired temporary schemas are dropped every day.** One job in the hub, **Temporary schema
+  cleanup**, deployed with the apps, runs at 06:00 UTC over every served workspace's catalog and
+  drops each temporary schema whose `cd_expires` date has passed (`DROP SCHEMA ... CASCADE`). It
+  touches only schemas the schema job made as temporary ones (tagged `cd_managed_by=self_service`
+  and `cd_schema_kind=temporary`, named `<prefix>tmp_<name>`). Its run's summary says how many it
+  deleted, whose (by email) and how many tables each held, then lists every temporary schema:
+  dropped, kept or failed, created and expires. `dry_run=true` reports only. The first run after
+  the upgrade drops any already expired.
 - **Branding, in the approvals app's Settings:** the word at the start of both apps' header
   ("Databricks" by default, the title's first word) and its colour (`#RRGGBB`, Databricks red by
   default). Both apps show a change within 15 seconds; Reset goes back to the default. The

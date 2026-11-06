@@ -181,13 +181,11 @@ def hub_target(s, database=True):
 
 
 def jobs_target(s, w, app_ids):
-    """A served workspace's target in the jobs bundle: its schema job and its daily temporary
-    schema cleanup, deployed to the hub (Unity
+    """A served workspace's target in the jobs bundle: its schema job, deployed to the hub (Unity
     Catalog is the metastore's, and its catalog is bound to the hub too: terraform/self_service.tf),
     so the apps never call another workspace. Each business unit has its own state path in the hub,
-    and its jobs say which workspace they serve (cd_workspace). Only workspace admins and the two
-    apps (app_ids: their service principals' application IDs) may run the schema job; only
-    workspace admins the cleanup."""
+    and its job says which workspace it serves (cd_workspace). Only workspace admins and the two
+    apps (app_ids: their service principals' application IDs) may run it."""
     jobs = s["jobs"]
     runners = [{"level": "CAN_MANAGE_RUN", "service_principal_name": i} for i in app_ids]
     policy = {"usage_policy_id": w["usage_policy_id"]} if w.get("usage_policy_id") else {}
@@ -199,15 +197,14 @@ def jobs_target(s, w, app_ids):
             "personal_schema": {"tags": {"cd_catalog": w["catalog"], "cd_prefix": jobs["personal_schema"]["prefix"],
                                          "cd_workspace": w["name"]},
                                 "permissions": runners, **policy},
-            # The daily cleanup: the apps may not run it (no permissions for them), only workspace admins.
-            "temporary_cleanup": {"tags": {"cd_catalog": w["catalog"], "cd_workspace": w["name"]}, **policy},
         }},
     }}}
 
 
 def build_hub(s, spokes, database_host=None, database=True, root=None):
-    """bundle/hub/build/: each app's code and config.json, and target.yml. database_host: the
-    database's endpoint, which app_deploy.py looks up (it is never stored)."""
+    """bundle/hub/build/: each app's code and config.json, the daily cleanup's notebook (with
+    every served workspace's catalog), and target.yml. database_host: the database's endpoint, which
+    app_deploy.py looks up (it is never stored)."""
     if database_host:
         s = {**s, "database": {**s["database"], "host": database_host}}
     out = (root or ROOT) / "bundle/hub/build"
@@ -215,14 +212,15 @@ def build_hub(s, spokes, database_host=None, database=True, root=None):
     for app_dir, mode in (("self-service", None), ("approvals", "approvals")):
         shutil.copytree(APP, out / app_dir, ignore=lambda d, names: [n for n in names if any(n == k or n.endswith(k) for k in SKIP)])
         (out / app_dir / "config.json").write_text(json.dumps(app_config(s, spokes, mode), indent=1))
+    (out / "temporary_cleanup.py").write_text(notebook("temporary_cleanup", {
+        "prefix": s["jobs"]["personal_schema"]["prefix"], "allowed_catalogs": sorted({w["catalog"] for w in spokes})}))
     # JSON is YAML: the bundle reads it as an included file.
     (out / "target.yml").write_text(json.dumps(hub_target(s, database=database), indent=1))
     return out
 
 
 def build_jobs(s, w, app_ids, root=None):
-    """bundle/jobs/build/<workspace>/: the schema job's and the daily temporary schema cleanup's
-    notebooks, with their settings, and target.yml.
+    """bundle/jobs/build/<workspace>/: the schema job's notebook, with its settings, and target.yml.
     (The folder job, bundle/jobs/notebooks/team_folder.py, is not deployed for now: a folder is
     workspace specific, and the hub does not call other workspaces.)"""
     jobs, app = s["jobs"], s["app"]
@@ -235,8 +233,6 @@ def build_jobs(s, w, app_ids, root=None):
         "prefix": jobs["personal_schema"]["prefix"], "privileges": jobs["personal_schema"]["privileges"],
         "temporary_days": int((jobs.get("temporary_schema") or {}).get("days") or 30),
         "owner": jobs.get("catalog_owner") or "", "allowed_catalogs": [w["catalog"]], **record}))
-    (out / "temporary_cleanup.py").write_text(notebook("temporary_cleanup", {
-        "prefix": jobs["personal_schema"]["prefix"], "allowed_catalogs": [w["catalog"]]}))
     (out / "target.yml").write_text(json.dumps(jobs_target(s, w, app_ids), indent=1))
     return out
 

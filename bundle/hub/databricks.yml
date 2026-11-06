@@ -1,5 +1,6 @@
 # The self-service hub, as a Databricks Asset Bundle: both apps (the self-service app and the
-# approvals app) and their Lakebase project, in the central workspace (config/self-service/hub.yaml).
+# approvals app), their Lakebase project, and the daily temporary schema cleanup (one job for
+# every served catalog), in the central workspace (config/self-service/hub.yaml).
 # Deploy with scripts/app_deploy.py (GitHub Actions does, on merge). It first runs
 # scripts/app_build.py, which writes build/ (each app's code and config.json) and
 # build/target.yml (the target "hub", from config/self-service/).

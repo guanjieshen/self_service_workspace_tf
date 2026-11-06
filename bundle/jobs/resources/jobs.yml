@@ -1,5 +1,4 @@
-# The self-service jobs: a schema job and a daily temporary schema cleanup per workspace the app
-# serves, deployed to the hub. What differs by
+# The self-service jobs: one per workspace the app serves, deployed to the hub. What differs by
 # workspace (the catalog and workspace tags, who may run it, the usage policy) is in
 # build/<workspace>/target.yml. The folder job (notebooks/team_folder.py) is not deployed for now:
 # a folder is workspace specific, and the hub does not call other workspaces. To bring it back,
@@ -36,23 +35,3 @@ resources:
           timeout_seconds: 600
           notebook_task:
             notebook_path: ../build/${bundle.target}/personal_schema.py
-    # Once a day: drops the temporary schemas whose cd_expires date has passed, and reports every
-    # temporary schema it looked at (notebooks/temporary_cleanup.py). Only workspace admins may run
-    # it by hand (the apps may not: target.yml gives them nothing on it). dry_run=true reports only.
-    temporary_cleanup:
-      name: ${var.business_unit} temporary schema cleanup
-      max_concurrent_runs: 1
-      tags:
-        cd_self_service: temporary_cleanup
-      schedule:
-        quartz_cron_expression: "0 0 6 * * ?"   # 06:00 UTC, every day
-        timezone_id: UTC
-        pause_status: UNPAUSED
-      parameters:
-        - {name: dry_run, default: ""}
-      tasks:
-        - task_key: cleanup
-          max_retries: 0
-          timeout_seconds: 3600
-          notebook_task:
-            notebook_path: ../build/${bundle.target}/temporary_cleanup.py

@@ -67,7 +67,7 @@ def run(schemas, dry_run="", **kw):
     error = None
     try:
         exec(compile(notebook, "temporary_cleanup.py", "exec"),
-             {"dbutils": dbutils, "spark": spark, "display": lambda df: None, "print": lambda *a: None})
+             {"dbutils": dbutils, "spark": spark, "display": lambda df: None, "print": lambda *a, **k: None})
     except Exit:
         pass
     except RuntimeError as e:
@@ -117,6 +117,33 @@ class Cleanup(unittest.TestCase):
         _, report, error = run({})
         self.assertIsNone(error)
         self.assertEqual(report["schemas"], [])
+
+
+class Summary(unittest.TestCase):
+    def test_it_says_how_many_were_deleted_whose_and_how_many_tables(self):
+        spark, report, _ = run({"cd_tmp_old": temporary(), "cd_tmp_bo": temporary(user="bo@contoso.com"),
+                                "cd_tmp_live": temporary(expires=DAY(3))}, tables={"cd_tmp_old": 4, "cd_tmp_bo": 1})
+        self.assertEqual(report["summary"], "\n".join([
+            f"Temporary schema cleanup on {TODAY.isoformat()}: deleted 2 schemas, with 5 tables.",
+            "  bo@contoso.com: fin_citizen_dev.cd_tmp_bo (1 table)",
+            "  ana@contoso.com: fin_citizen_dev.cd_tmp_old (4 tables)",
+            "Kept 1 temporary schema that has not expired."]))
+        self.assertFalse([s for s in spark.sql_run if "ai_" in s], "exact numbers and emails: written from the report, no model")
+
+    def test_a_dry_run_says_what_it_would_delete(self):
+        _, report, _ = run({"cd_tmp_old": temporary()}, dry_run="true")
+        self.assertTrue(report["summary"].startswith(f"Temporary schema cleanup on {TODAY.isoformat()} (dry run): would delete 1 schema, with 0 tables."))
+
+    def test_a_failure_is_in_the_summary_with_its_reason(self):
+        _, report, error = run({"cd_tmp_a": temporary()}, fail={"cd_tmp_a"})
+        self.assertIsNotNone(error)
+        self.assertIn("deleted 0 schemas, with 0 tables.", report["summary"])
+        self.assertIn("Could not delete 1 schema:\n  ana@contoso.com: fin_citizen_dev.cd_tmp_a: [PERMISSION_DENIED]", report["summary"])
+
+    def test_nothing_to_do(self):
+        _, report, _ = run({})
+        self.assertEqual(report["summary"], f"Temporary schema cleanup on {TODAY.isoformat()}: deleted 0 schemas, with 0 tables.\n"
+                                            "Kept 0 temporary schemas that have not expired.")
 
 
 if __name__ == "__main__":
