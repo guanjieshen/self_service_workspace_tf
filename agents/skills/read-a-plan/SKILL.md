@@ -1,6 +1,6 @@
 ---
 name: read-a-plan
-description: Use when someone asks what a pull request will do, whether it is safe to merge, or what a plan comment means ("is this safe?", "what does this change?", "what is Before merging?"). Explains the plan comment of each workspace and the App plan in plain words, especially what the plan guard lists under Before merging, and ends with a clear recommendation: safe to merge, or ask someone first. Never merges.
+description: Use when someone asks what a pull request will do, whether it is safe to merge, or what a plan comment means ("is this safe?", "what does this change?", "what is Before merging?"). Explains the plan comment of each workspace and the App plan in plain words, especially what the plan guard lists under Before merging, and ends with a clear recommendation, safe to merge or ask someone first. Never merges.
 ---
 
 # Read a plan

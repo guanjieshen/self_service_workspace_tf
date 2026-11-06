@@ -1,6 +1,6 @@
 ---
 name: pull-request-from-databricks
-description: Use when someone has changed files in this repository's Databricks Git folder (or another skill finished an edit) and needs to get the change reviewed and deployed: make a branch, commit and push, open a pull request on GitHub, read the plan comment, and merge. Also use when they ask how to "save", "publish", "deploy" or "submit" a change, or why a check failed.
+description: Use when someone has changed files in this repository's Databricks Git folder (or another skill finished an edit) and needs to get the change reviewed and deployed. Makes a branch, commits and pushes, opens a pull request on GitHub, reads the plan comment, and merges. Also use when they ask how to "save", "publish", "deploy" or "submit" a change, or why a check failed.
 ---
 
 # Get a change reviewed and deployed

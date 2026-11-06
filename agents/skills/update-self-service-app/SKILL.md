@@ -1,6 +1,6 @@
 ---
 name: update-self-service-app
-description: Use when someone wants to change the self-service (Citizen Development) app or the approvals app: their links (FAQ, SOPs, persona requests, Discover), the guided tour's prompt, a banner, the header's name or colour, the title, which requests need an approver, the AI model (Validate, the approvers' summary, schema comments), who may open each app, the jobs' settings (schema prefix and rights, temporary schemas' days, where folders go), the daily temporary schema cleanup, set the app up for the first time (the hub), or add a business unit to it. Says whether it is a Settings change (no pull request) or a file change, makes the edit, and hands over to pull-request-from-databricks.
+description: Use when someone wants to change the self-service (Citizen Development) app or the approvals app, such as their links (FAQ, SOPs, persona requests, Discover), the guided tour's prompt, a banner, the header's name or colour, the title, which requests need an approver, the AI model (Validate, the approvers' summary, schema comments), who may open each app, the jobs' settings (schema prefix and rights, temporary schemas' days, where folders go), the daily temporary schema cleanup, set the app up for the first time (the hub), or add a business unit to it. Says whether it is a Settings change (no pull request) or a file change, makes the edit, and hands over to pull-request-from-databricks.
 ---
 
 # Update the self-service app

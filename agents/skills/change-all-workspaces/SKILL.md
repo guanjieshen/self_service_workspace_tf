@@ -1,6 +1,6 @@
 ---
 name: change-all-workspaces
-description: Use when someone wants to change the default (baseline) for every managed workspace at once: the default warehouse size, chargeback tags, the usage policy, what an access level (persona) can do, who may create tokens, admin and security settings, cluster policy limits, or Genie Code's instructions and skills. Edits config/defaults/, warns which workspaces override the value, and hands over to pull-request-from-databricks.
+description: Use when someone wants to change the default (baseline) for every managed workspace at once, such as the default warehouse size, chargeback tags, the usage policy, what an access level (persona) can do, who may create tokens, admin and security settings, cluster policy limits, or Genie Code's instructions and skills. Edits config/defaults/, warns which workspaces override the value, and hands over to pull-request-from-databricks.
 ---
 
 # Change the defaults for every workspace

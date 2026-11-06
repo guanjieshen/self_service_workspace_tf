@@ -1,6 +1,6 @@
 ---
 name: change-the-app-code
-description: Use when the change is to the framework's own code rather than a setting: a new or changed card, form, page or wording in the Citizen Development app or the admin app, a job's behaviour, the build or deploy scripts, the Terraform, a test. Reads AGENTS.md and the guide for that part first, makes the change with its tests, updates the guides in agents/ and CHANGELOG.md so the next person (or Genie Code) knows, then the pull request. Not for an organization's own settings (those are other skills).
+description: Use when the change is to the framework's own code rather than a setting, such as a new or changed card, form, page or wording in the Citizen Development app or the admin app, a job's behaviour, the build or deploy scripts, the Terraform, a test. Reads AGENTS.md and the guide for that part first, makes the change with its tests, updates the guides in agents/ and CHANGELOG.md so the next person (or Genie Code) knows, then the pull request. Not for an organization's own settings (those are other skills).
 ---
 
 # Change the framework's code
