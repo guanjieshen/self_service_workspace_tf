@@ -148,6 +148,9 @@ changing a template, `static/app.css` or any text people read.
 
 ## The database (Lakebase)
 
+> **New to Lakebase or databases?** Read [database.md](database.md) first: what it is, how to change it
+> step by step, how to try a change on a branch, and how to get data back.
+
 - **Code first:** the hub's bundle creates the project, `scripts/app_deploy.py` the database;
   `db/migrations/NNN_name.sql` run once each, in order (`db/migrate.py`, after the bundle
   deploys); `db/grants.sql` runs on every deploy. Never edit a migration that has run: add the next.
