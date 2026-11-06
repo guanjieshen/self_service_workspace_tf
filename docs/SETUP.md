@@ -337,8 +337,30 @@ Before you start: the workspace exists and the runners can reach it (its private
 | Retry a failed apply | Fix the cause, then re-run the latest Apply run (it refuses if `main` has moved on) |
 | Plan locally | `./scripts/tf.sh <name> plan`, signed in with `az login`. You need **Storage Blob Data Contributor** on the state container (a local plan takes the state lock, which writes), and Databricks access to the workspace. CI's plan is the one to trust |
 | Upgrade to a new release | Below: the pull request's plan shows what the new version changes in each workspace |
+| See what the temporary schema cleanup dropped | In the hub, Jobs > **`<BU> temporary schema cleanup`** > its latest run: what it dropped, kept and why (below) |
 
 More: [config/README.md](../config/README.md) (configuration tasks) and [github-actions.md](github-actions.md) (the workflows).
+
+### The temporary schema cleanup
+
+Every business unit has a **`<BU> temporary schema cleanup`** job in the hub, deployed with its schema job (`bundle/jobs/`). Every day at 06:00 UTC it **drops each temporary schema whose `cd_expires` date has passed** (`DROP SCHEMA ... CASCADE`: everything in it), and only those: tagged `cd_managed_by=self_service` and `cd_schema_kind=temporary`, and named `cd_tmp_<name>`. A schema is still kept on its expiry date.
+
+| You want to... | How |
+| --- | --- |
+| See what it did today | Its run's output: one line per temporary schema (dropped, kept, failed; for whom, created, expires, tables), and the same as JSON in the run's result (task value `report`) |
+| See what it would drop, without dropping | **Run now with different parameters**: `dry_run` = `true` |
+| Know when one could not be dropped | The run fails, after it has tried every schema; the report says which and why. Turn on the job's failure notifications to hear of it |
+| Get an AI summary | Below: a Genie Code task, added by hand |
+
+**A Genie Code summary (optional, by hand).** Genie Code tasks can be added only in the Jobs UI (not in a bundle or through the API), so the cleanup job cannot hold one: a deploy would remove it. Add it as its own job instead, once, in the hub:
+
+| # | What to do |
+| --- | --- |
+| 1 | Jobs > **Create job** > a **Genie Code** task, named `summary`. Your workspace needs Genie Code's agentic capabilities |
+| 2 | **Prompt:** *Read the latest run of the job "&lt;BU&gt; temporary schema cleanup" in this workspace. Its result is a JSON report: the date, counts, and one row per temporary schema (catalog, schema, user, created, expires, tables, action, why). Write a short summary for the platform team: how many were dropped, kept and failed; a table of the dropped schemas (schema, owner, created, tables); those expiring in the next 7 days; and any failure with its reason. Use only what the report says, and change nothing.* |
+| 3 | **Schedule:** daily at 07:00 UTC (after the cleanup). Add a notification to send the summary where your team reads it |
+
+It runs as its owner, with auto-approve always on (Genie Code jobs cannot turn it off): keep the prompt to reading and summarizing.
 
 ### Changes the plan guard points out
 

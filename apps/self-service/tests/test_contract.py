@@ -82,6 +82,13 @@ class SentParameters(unittest.TestCase):
     def test_team_folder(self):
         self.assertEqual(self.sent("team_folder"), job_parameters("team_folder"))
 
+    def test_the_temporary_schema_cleanup_runs_every_day_on_its_own(self):
+        job = BUNDLE["jobs"]["temporary_cleanup"]
+        self.assertEqual((job["schedule"]["quartz_cron_expression"], job["schedule"]["pause_status"]), ("0 0 6 * * ?", "UNPAUSED"))
+        self.assertEqual(job["max_concurrent_runs"], 1)
+        self.assertEqual(job_parameters("temporary_cleanup"), {"dry_run"}, "dry_run, and nothing else")
+        self.assertIn('dbutils.widgets.text("dry_run", "")', notebook("temporary_cleanup"), "the notebook reads it")
+
     def test_the_notebooks_read_the_same_parameters(self):
         for kind in DEPLOYED:
             with self.subTest(kind=kind):
