@@ -36,6 +36,8 @@
       </div>
     </div>
   </header>
+  {#- The reminder: someone's temporary schema is deleted in 3 days or fewer (main.expiring). -#}
+  {% if expiring %}<div class="banner expiry-notice" role="status"><div class="banner-inner">{{ icon("alert", "icon icon-xs") }}<span>Your temporary schema <span class="mono">{{ expiring.name }}</span> will be deleted on {{ expiring.expires }}{{ " (tomorrow)" if expiring.days_left == 1 else " (today)" if expiring.days_left == 0 else "" }}. Copy anything you want to keep, or <a class="text-link" href="/schema/temporary/extend">request more time</a> or <a class="text-link" href="/schema/temporary/keep">keep it as a project schema</a>.</span></div></div>{% endif %}
   {% if config.banner %}<div class="banner" role="status"><div class="banner-inner">{{ icon("info", "icon icon-xs") }}<span>{{ config.banner.text }}</span></div></div>{% endif %}
   <main>
     {% block content %}{% endblock %}

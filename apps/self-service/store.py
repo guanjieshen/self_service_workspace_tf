@@ -14,13 +14,18 @@ import threading
 import time
 
 # The kinds a request can be, as the database knows them (the portal's job kinds are coarser).
-KINDS = ("personal_schema", "project_schema", "team_schema", "temporary_schema", "folder")
+KINDS = ("personal_schema", "project_schema", "team_schema", "temporary_schema", "temporary_extension",
+         "temporary_conversion", "folder")
 
 
 def db_kind(job_kind, params):
     """The request's kind, from the job it runs and its parameters."""
     if job_kind == "team_folder":
         return "folder"
+    if params.get("action") == "extend":
+        return "temporary_extension"
+    if params.get("action") == "convert":
+        return "temporary_conversion"
     if params.get("temporary") == "true":
         return "temporary_schema"
     if params.get("schema"):
@@ -73,9 +78,10 @@ class Store:
         """A new request and its first event (submitted), in one transaction: before its job
         runs, so every request that runs is recorded."""
         with self._conn() as c:
-            c.execute("INSERT INTO self_service.requests (id, kind, workspace, bu, requested_by, name, owner_group, reason) "
-                      "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-                      (r["id"], r["kind"], r["workspace"], r["bu"], r["requested_by"], r["name"], r.get("owner_group") or None, r.get("reason") or None))
+            c.execute("INSERT INTO self_service.requests (id, kind, workspace, bu, requested_by, name, owner_group, reason, days) "
+                      "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                      (r["id"], r["kind"], r["workspace"], r["bu"], r["requested_by"], r["name"], r.get("owner_group") or None,
+                       r.get("reason") or None, r.get("days") or None))
             c.execute("INSERT INTO self_service.request_events (request_id, actor, role, type, body) VALUES (%s, %s, 'requester', 'submitted', %s)",
                       (r["id"], r["requested_by"], r.get("reason") or None))
 
@@ -115,18 +121,18 @@ class Store:
         with self._conn() as c:
             rows = c.execute(
                 "SELECT s.id, s.kind, s.workspace, s.bu, s.name, s.owner_group, s.reason, s.created_at, "
-                "       s.state, s.state_data, run.data, "
+                "       s.state, s.state_data, run.data, s.days, "
                 "       (SELECT body FROM self_service.request_events b WHERE b.request_id = s.id AND b.type = s.state ORDER BY b.id DESC LIMIT 1) "
                 "FROM self_service.request_status s "
                 "LEFT JOIN self_service.request_events run ON run.request_id = s.id AND run.type = 'run_started' "
                 "WHERE s.requested_by = %s ORDER BY s.created_at DESC LIMIT %s", (user, limit)).fetchall()
         out = []
-        for rid, kind, ws, bu, name, group, reason, created, state, state_data, run, state_body in rows:
+        for rid, kind, ws, bu, name, group, reason, created, state, state_data, run, days, state_body in rows:
             run = run if isinstance(run, dict) else json.loads(run or "{}")
             state_data = state_data if isinstance(state_data, dict) else json.loads(state_data or "{}")
             out.append({"id": rid, "kind": kind, "workspace": ws, "bu": bu, "name": name, "owner_group": group,
                         "reason": reason, "created_at": created, "state": state, "state_data": state_data,
-                        "state_body": state_body, "run_id": run.get("run_id"), "requested_by": user})
+                        "state_body": state_body, "run_id": run.get("run_id"), "requested_by": user, "days": days})
         return out
 
     # ---- Reading, for the approvals app (its role may read every request) ----
@@ -137,7 +143,7 @@ class Store:
         with self._conn() as c:
             rows = c.execute(
                 "SELECT s.id, s.kind, s.workspace, s.bu, s.requested_by, s.name, s.owner_group, s.reason, s.created_at, "
-                "       s.state, s.state_at, run.data, d.type, d.actor, d.at, d.body, summary.data "
+                "       s.state, s.state_at, run.data, d.type, d.actor, d.at, d.body, summary.data, s.days "
                 "FROM self_service.request_status s "
                 "LEFT JOIN self_service.request_events run ON run.request_id = s.id AND run.type = 'run_started' "
                 "LEFT JOIN LATERAL (SELECT data FROM self_service.request_events WHERE request_id = s.id AND type = 'reviewed' "
@@ -149,7 +155,7 @@ class Store:
                  "owner_group": r[6], "reason": r[7], "created_at": r[8], "state": r[9], "state_at": r[10],
                  "run": load(r[11]),
                  "decision": r[12] and {"outcome": r[12], "by": r[13], "at": r[14], "comment": r[15] or ""},
-                 "summary": load(r[16]).get("summary")} for r in rows]
+                 "summary": load(r[16]).get("summary"), "days": r[17]} for r in rows]
 
     def events_of(self, request_id):
         """Everything that happened to one request, in order."""

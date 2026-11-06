@@ -467,6 +467,23 @@ class LakebaseDecisions(unittest.TestCase):
         self.assertEqual(self.decided[-1][2], "approved")
         self.assertTrue(done["manual"], "the approvals page then says Completed, and the app's redirect says so")
 
+    def test_more_time_or_keeping_it_always_waits_for_a_person(self):
+        self.row.update(kind="temporary_extension", name="cd_tmp_x", owner_group=None, days=7)
+        self.s.human_approval = {"project_schema", "team_schema", "temporary_extension", "temporary_conversion"}   # as main.py gives it
+        self.assertEqual([r["id"] for r in self.s.queue("dana@contoso.com")], ["ss-1"])
+        self.assertEqual(self.s.all("dana@contoso.com")[0]["days"], 7)
+        self.s.decide("dana@contoso.com", "ss-1", "approved")
+        self.assertEqual([r["id"] for r in self.started], ["ss-1"], "approved: the job adds the days")
+
+    def test_rejecting_more_time_releases_the_hold(self):
+        released = []
+        self.s.release = released.append
+        self.row.update(kind="temporary_extension", name="cd_tmp_x", owner_group=None, days=7)
+        self.s.human_approval = {"temporary_extension"}
+        self.s.decide("dana@contoso.com", "ss-1", "rejected", "Finish it this week, or keep it as a project schema.")
+        self.assertEqual([r["id"] for r in released], ["ss-1"], "the next cleanup deletes it if its date has passed")
+        self.assertEqual(self.started, [])
+
     def test_approving_records_the_decision_then_runs_the_job(self):
         self.s.decide("dana@contoso.com", "ss-1", "approved")
         self.assertEqual(self.decided, [("ss-1", "dana@contoso.com", "approved", "")])
@@ -591,6 +608,15 @@ class Settings(unittest.TestCase):
         for key, bad in (("brand.color", "red"), ("brand.color", "#05a"), ("brand.color", "#0055AA; x"), ("brand.name", "x" * 41)):
             with self.subTest(key=key, bad=bad), self.assertRaises(ValueError):
                 self.s.check(key, bad)
+
+    def test_the_temporary_schema_limit_comes_from_app_yaml_until_an_admin_changes_it(self):
+        self.assertEqual(self.s.apply(self.CONFIG, {})["temporary"], {"limit": 1}, "1 by default")
+        self.assertEqual(self.s.apply({**self.CONFIG, "temporary_limit": 2}, {})["temporary"], {"limit": 2}, "app.yaml's")
+        self.assertEqual(self.s.apply(self.CONFIG, self.over(temporary__limit="3"))["temporary"], {"limit": 3}, "Settings > Schemas")
+        self.assertEqual(self.s.check("temporary.limit", "10"), "10")
+        for bad in ("0", "11", "two", "1.5"):
+            with self.subTest(bad=bad), self.assertRaisesRegex(ValueError, "1 to 10"):
+                self.s.check("temporary.limit", bad)
 
     def test_the_last_values_are_used_when_the_database_fails(self):
         calls = []

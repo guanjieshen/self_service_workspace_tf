@@ -100,7 +100,7 @@ class AgainstPostgres(unittest.TestCase):
 
     def test_migrations_run_once(self):
         self.assertEqual(self.first, [f.name for f in migrate.migrations()], "every migration, in order, on an empty database")
-        self.assertIn("007_temporary_schemas.sql", self.first)
+        self.assertIn("008_temporary_extensions_and_conversions.sql", self.first)
         self.assertEqual(self.second, [], "running again changes nothing")
 
     def test_the_app_adds_and_reads_but_never_rewrites_history(self):
@@ -163,6 +163,9 @@ class AgainstPostgres(unittest.TestCase):
         self.assertEqual((rows["ss-s1"]["state"], rows["ss-s1"]["run_id"], rows["ss-s1"]["owner_group"]), ("run_started", 42, "fin-data-eng"))
         self.assertEqual((rows["ss-s2"]["state"], rows["ss-s2"]["state_body"]), ("start_failed", "The job could not be started."))
         self.assertEqual(db.requests_of("bo@contoso.com"), [], "only the person's own")
+        db.record_request({"id": "ss-s3", "kind": "temporary_extension", "workspace": "fin", "bu": "FIN", "requested_by": "ana@contoso.com",
+                           "name": "cd_tmp_x", "reason": "Still testing the join for the team.", "days": 7})
+        self.assertEqual(next(r for r in db.requests_of("ana@contoso.com") if r["id"] == "ss-s3")["days"], 7, "more time: its days")
         self.assertFalse(db.toured("Ana@contoso.com"))
         db.record_tour("Ana@contoso.com")
         self.assertEqual((db.toured("ana@contoso.com"), db.toured("bo@contoso.com")), (True, False))

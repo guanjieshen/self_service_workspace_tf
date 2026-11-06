@@ -5,7 +5,9 @@ import datetime as dt
 from concurrent.futures import ThreadPoolExecutor
 
 # Every kind of request, as approvers read it (the database's kinds).
-TYPES = {"personal_schema": "Personal schema", "project_schema": "Project schema", "team_schema": "Team schema", "temporary_schema": "Temporary schema", "folder": "Workspace folder"}
+TYPES = {"personal_schema": "Personal schema", "project_schema": "Project schema", "team_schema": "Team schema", "temporary_schema": "Temporary schema",
+         "temporary_extension": "More time for a temporary schema", "temporary_conversion": "Temporary schema to keep as a project schema",
+         "folder": "Workspace folder"}
 WAITING = ("submitted", "replied", "needs_info")   # states in which a request that needs a person waits
 
 
@@ -13,7 +15,8 @@ class LakebaseStore:
     """The approvals app's data, from the requests database (store.Store). A request's run
     status comes from its job run (run_status: the Jobs API), never from a copy."""
 
-    def __init__(self, db, bus, run_status=None, start=None, human_approval=(), summarize=None, run_link=None, manual=()):
+    def __init__(self, db, bus, run_status=None, start=None, human_approval=(), summarize=None, run_link=None, manual=(),
+                 release=None):
         """start(row): runs an approved request's job (portal.Portal.run_recorded). human_approval:
         the kinds a person must always approve (app.yaml); they wait here instead of running.
         summarize(row): writes the AI summary of a request that has none (portal.Portal.summarize)."""
@@ -22,6 +25,7 @@ class LakebaseStore:
         self.run_link = run_link or (lambda workspace, kind, run_id: None)   # the run in Databricks (portal.Portal.run_link)
         self.start = start
         self.human_approval = set(human_approval)
+        self.release = release   # release(row): a rejected request's hold on its schema goes (portal.Portal.release_hold)
         self.manual = manual if callable(manual) else (lambda: set(manual))   # kinds made by hand (Portal.manual): approving marks them done
         self.summarize = summarize
 
@@ -40,7 +44,8 @@ class LakebaseStore:
         d = row.get("decision")
         return {"id": row["id"], "kind": "folder" if row["kind"] == "folder" else "schema", "type": TYPES[row["kind"]],
                 "name": row["name"], "workspace": row["workspace"], "bu": row["bu"], "requested_by": row["requested_by"],
-                "owner_group": row["owner_group"], "reason": row["reason"] or "", "submitted": row["created_at"].replace(tzinfo=None),
+                "owner_group": row["owner_group"], "reason": row["reason"] or "", "days": row.get("days"),
+                "submitted": row["created_at"].replace(tzinfo=None),
                 "status": status,
                 "run": row["run"], "run_url": self.run_link(row["workspace"], row["kind"], (row["run"] or {}).get("run_id")),
                 "decision": d and {**d, "at": d["at"].replace(tzinfo=None)},
@@ -119,6 +124,8 @@ class LakebaseStore:
             raise ValueError("Say why, so the requester knows what to change.")
         if not self.db.decide(request_id, approver, outcome, comment.strip()):
             raise ValueError("Another approver decided first. Reload to see their decision.")
+        if outcome == "rejected" and self.release:
+            self.release(row)
         if outcome == "approved":
             try:
                 self.start(row)

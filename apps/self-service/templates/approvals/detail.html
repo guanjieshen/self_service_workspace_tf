@@ -98,7 +98,10 @@
             <button type="submit" name="action" value="ask" class="button">Ask a question</button>
             <button type="submit" name="action" value="reject" class="button danger">Reject</button>
           </div>
-          <p class="meta">{% if r.manual %}Approve once you have created it: the requester sees it as created.{% else %}Approve creates the {{ "folder" if r.kind == "folder" else "schema" }} in under a minute.{% endif %}</p>
+          <p class="meta">{% if r.manual %}Approve once you have created it: the requester sees it as created.
+            {% elif r.type == "More time for a temporary schema" %}Approve adds {{ r.days }} days to its expiry date, in under a minute.
+            {% elif r.type == "Temporary schema to keep as a project schema" %}Approve keeps it as a project schema, in place: it is no longer deleted, and its requester gets the project rights.
+            {% else %}Approve creates the {{ "folder" if r.kind == "folder" else "schema" }} in under a minute.{% endif %}</p>
         </form>
         {% if r.summary and r.summary.questions %}
         <div class="suggested">

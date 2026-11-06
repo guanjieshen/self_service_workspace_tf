@@ -2,7 +2,7 @@
 
 Read the repository's [AGENTS.md](../AGENTS.md) first. This guide is for **maintaining the
 self-service web app** (the workspace baseline has its own: [terraform.md](terraform.md)). This is the self-service app:
-a Databricks App where people ask for a personal, project or team schema or a workspace
+a Databricks App where people ask for a temporary, project or team schema or a workspace
 folder, and follow their requests, plus the approvals app (the same code) and the jobs they
 run. `docs/design.md` ("The self-service app") is the design; this is how to work on it.
 
@@ -43,6 +43,20 @@ browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py
   has passed: only schemas tagged `cd_managed_by=self_service` and `cd_schema_kind=temporary`
   and named `<prefix>tmp_<name>`, and it reports every one in its run. A run again never changes
   a schema's kind or extends its date.
+- **Temporary schemas replace personal ones** (the card and `/schema` are gone; `/schema`
+  redirects). On their temporary schema a person may **request more time** (7 days,
+  `portal.EXTENSION_DAYS`) or **keep it as a project schema**: kinds `temporary_extension` and
+  `temporary_conversion` (migration 008, with the request's `days`), always for an approver
+  (`portal.ALWAYS_APPROVED`). Approved, the schema job runs with `action=extend` (adds the days to
+  `cd_expires`) or `action=convert` (relabels it in place: no `cd_expires`, `cd_schema_kind=project`,
+  project rights). The app reads the schema's tags from Unity Catalog (`Portal.temporary_schema`,
+  the entity tag assignments API), so the card, the form and the reminder (every page, 3 days or
+  fewer: `main.expiring`) follow an extension. **A request waiting for an approver holds its
+  schema:** sent, the job tags it `cd_pending_request` (`action=hold`); the cleanup never deletes a
+  held schema; approved, the tag goes with the change; rejected, `Portal.release_hold` runs the job
+  with `action=release`. How many temporary schemas a person may have is Settings > Schemas
+  (`Portal.temporary_limit`, sent to the job as `temporary_limit`, which checks it again). The daily cleanup made every old personal schema
+  temporary (`cd_converted_from=personal`), so it counts as its owner's temporary schema.
 - **A team schema's group is typed, and membership is not checked:** the hub cannot see a
   person's groups in their workspace. Any Entra account group can be named; a workspace-local
   one fails at the grant.

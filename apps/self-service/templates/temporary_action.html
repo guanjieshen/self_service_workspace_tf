@@ -1,0 +1,62 @@
+{#- About the person's temporary schema: more time (action extend: portal.EXTENSION_DAYS) or keeping it as a
+    project schema (action keep). Both wait for an approver. -#}
+{% extends "base.html" %}
+
+{% from "_components.html" import callout, field %}
+{% block content %}
+{% set extend = action == "extend" %}
+{% if extend %}
+{% set task_icon, task_name, task_text, task_category = "temporary_extension", "Request more time", "Ask for 7 more days before your temporary schema is deleted.", "Data" %}
+{% else %}
+{% set task_icon, task_name, task_text, task_category = "temporary_conversion", "Keep as a project schema", "Keep your temporary schema, and everything in it, as a permanent project schema.", "Data" %}
+{% endif %}
+{% set task_aside = True %}{% include "_task_header.html" %}
+
+<div class="page-grid form-grid">
+<form class="panel" method="post" action="/schema/temporary/{{ action }}" data-submit>
+  <div class="panel-body">
+    {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
+    {% set mine = (have.schemas if have else []) or [] %}
+    {% set this = (mine | selectattr("name", "equalto", chosen) | first) if chosen else none %}
+    {% if not mine %}
+      {% if not error %}{% call callout("error") %}You have no temporary schema to ask about. <a class="text-link" href="/schema/temporary">Create one</a> first.{% endcall %}{% endif %}
+    {% else %}
+      <input type="hidden" name="workspace" value="{{ workspaces[0].name if workspaces else '' }}">
+      {% if mine | length > 1 %}
+      {% call field("schema", "Which temporary schema?", required=True) %}
+        <div class="choices">
+          {% for t in mine %}<label class="choice"><input type="radio" name="schema" value="{{ t.name }}" required {{ 'checked' if t.name == chosen }}> <span class="mono">{{ t.name }}</span> (deleted on {{ t.expires }})</label>{% endfor %}
+        </div>
+      {% endcall %}
+      {% else %}<input type="hidden" name="schema" value="{{ mine[0].name }}">{% endif %}
+      {% call callout() %}
+        {% if this %}<span class="mono">{{ this.name }}</span> is deleted on {{ this.expires }}. {% endif %}It is kept until an approver decides.
+        {% if extend %}You're asking for {{ choices | join(" or ") }} more days; once approved, they are added to its date.
+        {% else %}Once approved, it is no longer deleted and you can share it, like any project schema. It keeps its name.{% endif %}
+        If the request is rejected, it is deleted as before.
+      {% endcall %}
+      {% if extend and choices | length == 1 %}<input type="hidden" name="days" value="{{ choices[0] }}">
+      {% elif extend %}
+      {% call field("days", "How much more time?", required=True) %}
+        <div class="choices">
+          {% for d in choices %}<label class="choice"><input type="radio" name="days" value="{{ d }}" required {{ 'checked' if days == d | string }}> {{ d }} days</label>{% endfor %}
+        </div>
+      {% endcall %}
+      {% endif %}
+      {% call field("reason", "Why do you need " ~ ("more time" if extend else "to keep it") ~ "?", required=True) %}
+        <textarea id="reason" name="reason" rows="3" required minlength="10" maxlength="1000"
+                  placeholder="{{ 'What you are still working on, and when you expect to finish.' if extend else 'What it holds, who will use it, and why it should be permanent.' }}">{{ reason or '' }}</textarea>
+      {% endcall %}
+    {% endif %}
+  </div>
+  <div class="panel-foot form-foot">
+    <div class="form-actions">
+      <button type="submit" class="primary" {{ 'disabled' if not mine }}>Submit request</button>
+      <a class="button" href="/schema/temporary">Cancel</a>
+    </div>
+    <p class="meta">An approver decides; you can follow it under My requests.</p>
+  </div>
+</form>
+{% include "_task_aside.html" %}
+</div>
+{% endblock %}

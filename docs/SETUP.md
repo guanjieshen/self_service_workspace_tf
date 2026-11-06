@@ -343,7 +343,7 @@ More: [config/README.md](../config/README.md) (configuration tasks) and [github-
 
 ### The temporary schema cleanup
 
-One job in the hub, **Temporary schema cleanup**, deployed with the apps (`bundle/hub/`), looks at every served workspace's catalog (Unity Catalog is the metastore's, and each is bound to the hub). Every day at 06:00 UTC it **drops each temporary schema whose `cd_expires` date has passed** (`DROP SCHEMA ... CASCADE`: everything in it), and only those: tagged `cd_managed_by=self_service` and `cd_schema_kind=temporary`, and named `cd_tmp_<name>`. A schema is still kept on its expiry date.
+One job in the hub, **Temporary schema cleanup**, deployed with the apps (`bundle/hub/`), looks at every served workspace's catalog (Unity Catalog is the metastore's, and each is bound to the hub). Every day at 06:00 UTC it **drops each temporary schema whose `cd_expires` date has passed** (`DROP SCHEMA ... CASCADE`: everything in it), and only those: tagged `cd_managed_by=self_service` and `cd_schema_kind=temporary`, and named `cd_tmp_<name>` (or an old personal schema it made temporary). A schema is still kept on its expiry date, and **never deleted while a request for more time, or to keep it, waits for an approver** (tag `cd_pending_request`).
 
 | You want to... | How |
 | --- | --- |
@@ -445,7 +445,7 @@ For when CI cannot run (GitHub is down, the runner is broken) and a workspace ne
 
 **Who:** the platform team. **Optional:** the baseline works without it.
 
-The app lets people ask for what they need (a personal, project or team schema, or a workspace folder, which a platform admin creates by hand for now) in a web page, and an approvals app lets platform admins approve, change settings and answer questions. Both apps, their database **and each served workspace's schema job** run in one **hub** workspace: Unity Catalog is shared across the metastore, and each served workspace's catalog is bound to the hub too, so **the app never calls another workspace**. The Deploy workflow deploys all of it (**Deploy the app**), from `config/self-service/`, after Terraform: nothing is deployed by hand.
+The app lets people ask for what they need (a temporary, project or team schema, or a workspace folder, which a platform admin creates by hand for now) in a web page, and an approvals app lets platform admins approve, change settings and answer questions. Both apps, their database **and each served workspace's schema job** run in one **hub** workspace: Unity Catalog is shared across the metastore, and each served workspace's catalog is bound to the hub too, so **the app never calls another workspace**. The Deploy workflow deploys all of it (**Deploy the app**), from `config/self-service/`, after Terraform: nothing is deployed by hand.
 
 ### Before you start
 
@@ -464,7 +464,7 @@ The app lets people ask for what they need (a personal, project or team schema, 
 
 The first pull request cannot do both: Terraform needs the apps' identities for the catalog grant, and they exist only once the apps do. Every later change is one pull request.
 
-**Then check:** open the self-service app (Compute > Apps > the app's URL). It asks which **business unit** you are in (one per served workspace, named by its prefix), then shows the catalog of tasks. Ask for your personal schema: it is ready in under a minute.
+**Then check:** open the self-service app (Compute > Apps > the app's URL). It asks which **business unit** you are in (one per served workspace, named by its prefix), then shows the catalog of tasks. Create a temporary schema: it is ready in under a minute.
 
 ### After that
 

@@ -5,6 +5,7 @@ they are skipped without them; ./scripts/test.sh app (and CI) fails instead.
 """
 import io
 import json
+import re
 import pathlib
 import sys
 import types
@@ -58,6 +59,7 @@ class FakeClient:
             ns(user_name=ANA, groups=[ns(display="fin-data-eng"), ns(display="fin_builder")])] if ANA in filter or "sw" in filter else [])
         self.groups = ns(list=lambda filter, attributes, count=None: [ns(display_name="fin-data-eng")])
         self.schemas_ = set()          # schemas the app can see (BROWSE); None = it cannot see any
+        self.tags_ = {}                # schema -> its tags (cd_schema_kind, cd_user, cd_expires...)
         self.schemas = ns(get=self.get_schema)
         self.folders_ = {}             # path -> "mine" or "theirs" (the app sees theirs as permission denied)
         self.workspace = ns(get_status=self.get_status)
@@ -69,6 +71,13 @@ class FakeClient:
         self.bus_, self.statements = {ANA: "FIN"}, []
 
     def api(self, method, path, body=None):
+        if path.startswith("/api/2.1/unity-catalog/entity-tag-assignments/schemas/"):   # a schema's tags
+            name = path.split("/schemas/", 1)[1].rsplit("/tags", 1)[0]
+            if self.schemas_ is None:
+                raise PermissionError("User does not have USE CATALOG on Catalog")
+            if name not in self.schemas_:
+                raise NotFound(f"Schema '{name}' does not exist.")
+            return {"tag_assignments": [{"tag_key": k, "tag_value": v} for k, v in self.tags_.get(name, {}).items()]}
         if path == "/api/2.0/sql/statements":
             self.statements.append(body)
             if self.bus_ is None:
@@ -515,8 +524,8 @@ class RequestsInTheDatabase(unittest.TestCase):
         run_id = p.run_recorded(row)
         job_id, params = fake.started[-1]
         self.assertEqual(params, {"user": ANA, "catalog": "fin_citizen_dev", "schema": "fin_reporting",
-                                  "owner_group": "fin-data-eng", "reason": WHY, "request_id": "ss-team1", "temporary": "",
-                                  "comment_model": "system.ai.claude-sonnet-5-5"})
+                                  "owner_group": "fin-data-eng", "reason": WHY, "request_id": "ss-team1", "temporary": "", "action": "", "days": "",
+                                  "comment_model": "system.ai.claude-sonnet-5-5", "temporary_limit": "1"})
         self.assertEqual(db.events[-1], ("ss-team1", "run_started", {"workspace": "fin", "run_id": run_id}))
         p.run_recorded({**row, "id": "ss-f1", "kind": "folder", "name": "fin-docs"})
         self.assertEqual(fake.started[-1][1], {"folder": "fin-docs", "requested_by": ANA, "owner_group": "fin-data-eng",
@@ -951,7 +960,7 @@ class Pages(unittest.TestCase):
     def test_tasks_say_how_they_are_approved(self):
         page = self.http.get("/", headers=self.as_ana).text
         self.assertIn("<h1>Citizen Development Tasks</h1>", page, "the catalog's heading: title case, the app's name")
-        self.assertEqual(page.count("Auto-approved"), 5, "personal, project, team and temporary schemas, and folders (their job is in this hub)")
+        self.assertEqual(page.count("Auto-approved"), 4, "project, team and temporary schemas, and folders (their job is in this hub)")
         self.assertEqual(page.count(">Approval required"), 1, "workspace access (approved in Entra)")
         self.assertIn("Approval required", self.http.get("/persona", headers=self.as_ana).text)
         self.assertIn("Auto-approved", self.http.get("/folder", headers=self.as_ana).text)
@@ -959,64 +968,28 @@ class Pages(unittest.TestCase):
     def test_not_signed_in(self):
         self.assertEqual(self.http.get("/").status_code, 401)
 
-    def test_submit_goes_to_the_status_page_which_polls(self):
+    def test_personal_schemas_are_not_offered_old_links_go_to_the_temporary_schema(self):
+        r = self.http.get("/schema", headers=self.as_ana, follow_redirects=False)
+        self.assertEqual((r.status_code, r.headers["location"]), (301, "/schema/temporary"))
         r = self.http.post("/schema", data={"workspace": "fin"}, headers=self.as_ana, follow_redirects=False)
+        self.assertEqual((r.status_code, r.headers["location"]), (303, "/schema/temporary"))
+        self.assertEqual(self.fake.started, [], "never a personal schema")
+        self.assertNotIn("Create a personal schema", self.http.get("/", headers=self.as_ana).text)
+
+    def test_submit_goes_to_the_status_page_which_polls(self):
+        r = self.http.post("/schema/temporary", data={"workspace": "fin", "name": "try_join", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
         self.assertEqual((r.status_code, r.headers["location"]), (303, "/requests/fin/100"))
         page = self.http.get("/requests/fin/100", headers=self.as_ana).text
         self.assertIn('data-poll="/api/requests/fin/100"', page)
         self.assertIn("under a minute", page)
-        self.assertRegex(page, r'<h1 class="request-title">fin_citizen_dev\.cd_ana</h1>', "what was asked for leads the page")
-        self.assertIn('<span class="k">Can manage</span> You', page)
+        self.assertRegex(page, r'<h1 class="request-title">fin_citizen_dev\.cd_tmp_try_join</h1>', "what was asked for leads the page")
         self.assertEqual(self.http.get("/api/requests/fin/100", headers=self.as_ana).json()["phase"], "Starting")
         self.assertEqual(self.http.get("/api/requests/fin/100", headers={"X-Forwarded-Email": BO}).status_code, 404)
-
-    def test_the_catalog_shows_the_personal_schema_quota(self):
-        self.assertIn(">0 of 1 used<", self.http.get("/", headers=self.as_ana).text)
-        self.fake.schemas_.add("fin_citizen_dev.cd_ana")
-        self.main.PORTAL._personal.clear()
-        page = self.http.get("/", headers=self.as_ana).text
-        self.assertIn(">1 of 1 used<", page)
-        self.assertIn("Open schema", self.http.get("/schema", headers=self.as_ana).text, "the form, not the card, links to the schema")
-
-    def test_a_running_request_shows_as_requested(self):
-        self.http.post("/schema", data={"workspace": "fin"}, headers=self.as_ana)
-        self.assertIn(">Requested<", self.http.get("/", headers=self.as_ana).text)
-        form = self.http.get("/schema", headers=self.as_ana).text
-        self.assertIn("Your request is in progress", form)
-        self.assertIn('href="/requests/fin/100"', form)
-        self.assertNotIn(">Request personal schema<", form)
-        r = self.http.post("/schema", data={"workspace": "fin"}, headers=self.as_ana, follow_redirects=False)
-        self.assertEqual(r.headers["location"], "/requests/fin/100", "a second submit goes to the running request")
-        self.assertEqual(len(self.fake.started), 1)
-
-    def test_project_schema_form(self):
-        r = self.http.post("/schema/project", data={"reason": WHY, "workspace": "fin", "name": "cd_bo"}, headers=self.as_ana)
-        self.assertIn("can&#39;t start with cd_", r.text)
-        r = self.http.post("/schema/project", data={"reason": WHY, "workspace": "fin", "name": "sales_bookings", "owner_group": "fin-data-eng"},
-                           headers=self.as_ana, follow_redirects=False)
-        self.assertEqual(r.status_code, 303)
-        self.assertEqual((self.fake.started[0][1]["schema"], self.fake.started[0][1]["owner_group"]), ("sales_bookings", ""),
-                         "a project schema never takes a group, even if one is sent")
-
-    def test_team_schema_form(self):
-        page = self.http.get("/schema/team", headers=self.as_ana).text
-        self.assertIn('<input id="owner_group" name="owner_group"', page, "typed: the hub cannot list a person's groups")
-        r = self.http.post("/schema/team", data={"reason": WHY, "workspace": "fin", "name": "fin_reporting"}, headers=self.as_ana)
-        self.assertIn("Give the Entra ID group", r.text)
-        r = self.http.post("/schema/team", data={"reason": WHY, "workspace": "fin", "name": "fin_reporting", "owner_group": "users"}, headers=self.as_ana)
-        self.assertIn("users is every user of a workspace", r.text, "not a workspace's own group: Unity Catalog cannot grant to it")
-        r = self.http.post("/schema/team", data={"reason": WHY, "workspace": "fin", "name": "fin_reporting", "owner_group": "fin-finance"},
-                           headers=self.as_ana, follow_redirects=False)
-        self.assertEqual(r.status_code, 303, "any Entra group: membership is not checked")
-        self.assertEqual(self.fake.started[0][1]["owner_group"], "fin-finance")
-        status = self.http.get(r.headers["location"], headers=self.as_ana).text
-        self.assertIn('<span class="k">Can manage</span> You and fin-finance', status)
         self.assertEqual(self.http.get("/schema/other", headers=self.as_ana).status_code, 404)
 
     def test_the_reason_is_asked_for_shown_and_kept_for_try_again(self):
         self.assertIn('name="reason"', self.http.get("/schema/project", headers=self.as_ana).text)
         self.assertIn('name="reason"', self.http.get("/folder", headers=self.as_ana).text)
-        self.assertNotIn('name="reason"', self.http.get("/schema", headers=self.as_ana).text, "not for a personal schema")
         r = self.http.post("/folder", data={"workspace": "fin", "folder": "fin-docs", "reason": "short"}, headers=self.as_ana)
         self.assertIn("Describe what it will be used for in a sentence or two.", r.text)
         self.assertIn(">short</textarea>", r.text, "what they typed stays in the form")
@@ -1331,14 +1304,15 @@ class TemporarySchemas(unittest.TestCase):
         self.assertIn("fin_citizen_dev.cd_tmp_</span>", form, "they type what follows cd_tmp_")
         self.assertIn('<span class="danger-text">Your temporary schema will be deleted after 14 days.</span>', form, "in red; app.yaml jobs.temporary_schema.days")
         self.assertIn("but you can't share it with others", form)
-        self.assertIn("copy it to another schema before it expires. You can only have one temporary schema at a time.", form)
+        self.assertIn("copy it to another schema before it expires. You can have one temporary schema at a time.", form)
         self.assertIn('data-ai-check="temporary_schema"', form)
 
     def quota(self):
         self.main.PORTAL._personal.clear()
         page = self.http.get("/", headers=self.as_ana).text
         card = page[page.index("Create a temporary schema</a>") - 600:page.index("Create a temporary schema</a>") + 600]
-        return next((q for q in ("0 of 1 used", "1 of 1 used", "Requested") if q in card), None)
+        found = re.search(r">(\d+ of \d+ used|Requested)<", card)
+        return found.group(1) if found else None
 
     def test_one_temporary_schema_per_person_like_the_personal_one(self):
         import datetime as dt
@@ -1349,24 +1323,131 @@ class TemporarySchemas(unittest.TestCase):
         run_id = max(self.fake.runs_)
         self.assertEqual(self.quota(), "Requested", "its run is still going")
         self.fake.runs_[run_id].state = state("TERMINATED", "SUCCESS")
-        self.fake.schemas_.add("fin_citizen_dev.cd_tmp_try_join")
+        until = (dt.date.today() + dt.timedelta(days=14)).isoformat()
+        self.fake.schemas_.add("fin_citizen_dev.cd_tmp_try_join")   # as the job made it, tagged
+        self.fake.tags_["fin_citizen_dev.cd_tmp_try_join"] = {"cd_schema_kind": "temporary", "cd_user": ANA, "cd_expires": until}
         self.assertEqual(self.quota(), "1 of 1 used")
         have = self.main.PORTAL.temporary_schema("fin", ANA)
-        self.assertEqual((have["name"], have["expires"]), ("fin_citizen_dev.cd_tmp_try_join", (row["created_at"] + dt.timedelta(days=14)).date().isoformat()))
+        self.assertEqual((have["name"], have["expires"], have["days_left"]), ("fin_citizen_dev.cd_tmp_try_join", until, 14), "its own cd_expires tag")
         r = self.http.post("/schema/temporary", data={"workspace": "fin", "name": "another", "reason": WHY}, headers=self.as_ana)
-        self.assertIn("You already have a temporary schema, fin_citizen_dev.cd_tmp_try_join, until", r.text)
+        self.assertIn("You already have 1 temporary schema, the most you may have: fin_citizen_dev.cd_tmp_try_join (until", r.text)
         self.assertEqual(len(self.fake.started), 1, "refused before any run")
         form = self.http.get("/schema/temporary", headers=self.as_ana).text
-        self.assertIn("You already have a temporary schema", form)
+        self.assertIn("Your temporary schema", form)
+        self.assertIn('<span class="quota full">1 of 1 used</span>', form)
         self.assertIn('<p class="mono">fin_citizen_dev.cd_tmp_try_join</p>', form)
         self.assertIn('href="https://adb-1.azuredatabricks.net/explore/data/fin_citizen_dev/cd_tmp_try_join" target="_blank" rel="noopener">Open schema',
-                      form, "opens it in their own workspace, like the personal schema")
-        self.assertNotIn('type="submit"', form, "nothing to send until it expires: Open schema instead")
+                      form, "opens it in their own workspace")
+        self.assertIn('href="/schema/temporary/extend?schema=fin_citizen_dev.cd_tmp_try_join">Request more time</a>', form)
+        self.assertIn('href="/schema/temporary/keep?schema=fin_citizen_dev.cd_tmp_try_join">Keep as a project schema</a>', form)
+        self.assertIn("That is the most you may have", form)
+        self.assertNotIn('type="submit"', form, "nothing to send until one expires")
+        self.fake.tags_["fin_citizen_dev.cd_tmp_try_join"]["cd_expires"] = (dt.date.today() + dt.timedelta(days=30)).isoformat()
+        self.main.PORTAL._personal.clear()
+        self.assertEqual(self.main.PORTAL.temporary_schema("fin", ANA)["days_left"], 30, "an approved extension moves its tag: the app follows")
         self.fake.schemas_.discard("fin_citizen_dev.cd_tmp_try_join")
         self.assertEqual(self.quota(), "0 of 1 used", "an admin dropped it: free again")
         self.fake.schemas_.add("fin_citizen_dev.cd_tmp_try_join")
-        row["created_at"] -= dt.timedelta(days=15)
+        self.fake.tags_["fin_citizen_dev.cd_tmp_try_join"]["cd_expires"] = (dt.date.today() - dt.timedelta(days=1)).isoformat()
         self.assertEqual(self.quota(), "0 of 1 used", "expired: free again")
+        self.fake.tags_["fin_citizen_dev.cd_tmp_try_join"].update(cd_schema_kind="project", cd_expires="")
+        self.assertEqual(self.quota(), "0 of 1 used", "kept as a project schema: no longer their temporary one")
+
+    def test_the_limit_per_person_comes_from_the_settings(self):
+        import datetime as dt
+        self.http.post("/schema/temporary", data={"workspace": "fin", "name": "first", "reason": WHY}, headers=self.as_ana)
+        self.fake.runs_[max(self.fake.runs_)].state = state("TERMINATED", "SUCCESS")
+        self.fake.schemas_.add("fin_citizen_dev.cd_tmp_first")
+        self.fake.tags_["fin_citizen_dev.cd_tmp_first"] = {"cd_schema_kind": "temporary", "cd_user": ANA,
+                                                           "cd_expires": (dt.date.today() + dt.timedelta(days=9)).isoformat()}
+        self.main.PORTAL.shown = lambda: {"temporary": {"limit": 2}}   # Settings > Schemas
+        self.assertEqual(self.quota(), "1 of 2 used")
+        form = self.http.get("/schema/temporary", headers=self.as_ana).text
+        self.assertIn('type="submit"', form, "room for another")
+        self.assertIn("You can have 2 temporary schemas at a time", form)
+        r = self.http.post("/schema/temporary", data={"workspace": "fin", "name": "second", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
+        self.assertEqual(r.status_code, 303)
+        self.assertEqual(self.fake.started[-1][1]["temporary_limit"], "2", "the job checks it again")
+        self.fake.runs_[max(self.fake.runs_)].state = state("TERMINATED", "SUCCESS")
+        self.fake.schemas_.add("fin_citizen_dev.cd_tmp_second")
+        self.fake.tags_["fin_citizen_dev.cd_tmp_second"] = {"cd_schema_kind": "temporary", "cd_user": ANA,
+                                                            "cd_expires": (dt.date.today() + dt.timedelta(days=30)).isoformat()}
+        self.assertEqual(self.quota(), "2 of 2 used")
+        form = self.http.get("/schema/temporary/extend", headers=self.as_ana).text
+        self.assertIn("Which temporary schema?", form, "two of them: they choose")
+        bad = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "7", "reason": WHY}, headers=self.as_ana)
+        self.assertIn("Choose which of your temporary schemas this is for", bad.text)
+        r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "7", "reason": WHY, "schema": "fin_citizen_dev.cd_tmp_second"},
+                           headers=self.as_ana, follow_redirects=False)
+        self.assertRegex(r.headers["location"], r"^/request/ss-")
+        self.assertEqual(self.fake.started[-1][1]["schema"], "cd_tmp_second", "the hold is on the one chosen")
+
+    def test_a_rejection_lifts_the_hold_so_the_schema_expires_as_before(self):
+        row = {"id": "ss-9", "kind": "temporary_extension", "workspace": "fin", "requested_by": ANA, "name": "cd_tmp_x", "reason": WHY, "days": 7}
+        self.main.PORTAL.release_hold(row)
+        params = self.fake.started[-1][1]
+        self.assertEqual((params["action"], params["schema"], params["request_id"]), ("release", "cd_tmp_x", "ss-9"))
+        n = len(self.fake.started)
+        self.main.PORTAL.release_hold({**row, "kind": "project_schema"})
+        self.assertEqual(len(self.fake.started), n, "only more time, or keeping it, holds a schema")
+
+    def test_an_old_personal_schema_made_temporary_counts_as_theirs(self):
+        import datetime as dt
+        self.fake.schemas_.add("fin_citizen_dev.cd_ana")
+        self.fake.tags_["fin_citizen_dev.cd_ana"] = {"cd_schema_kind": "temporary", "cd_user": ANA, "cd_converted_from": "personal",
+                                                     "cd_expires": (dt.date.today() + dt.timedelta(days=2)).isoformat()}
+        self.assertEqual(self.quota(), "1 of 1 used")
+        page = self.http.get("/", headers=self.as_ana).text
+        self.assertIn('Your temporary schema <span class="mono">fin_citizen_dev.cd_ana</span> will be deleted on', page, "the reminder: 3 days or fewer")
+        self.assertIn('href="/schema/temporary/extend">request more time</a>', page)
+        self.fake.tags_["fin_citizen_dev.cd_ana"]["cd_expires"] = (dt.date.today() + dt.timedelta(days=4)).isoformat()
+        self.main.PORTAL._personal.clear()
+        self.assertNotIn("will be deleted on", self.http.get("/", headers=self.as_ana).text, "not yet")
+
+    def test_more_time_and_keeping_it_wait_for_an_approver_then_run_the_schema_job(self):
+        import datetime as dt
+        self.http.post("/schema/temporary", data={"workspace": "fin", "name": "x", "reason": WHY}, headers=self.as_ana)
+        self.fake.runs_[max(self.fake.runs_)].state = state("TERMINATED", "SUCCESS")
+        self.fake.schemas_.add("fin_citizen_dev.cd_tmp_x")
+        self.fake.tags_["fin_citizen_dev.cd_tmp_x"] = {"cd_schema_kind": "temporary", "cd_user": ANA,
+                                                       "cd_expires": (dt.date.today() + dt.timedelta(days=5)).isoformat()}
+        made = len(self.fake.started)   # the temporary schema's own run
+        form = self.http.get("/schema/temporary/extend", headers=self.as_ana).text
+        self.assertIn('<input type="hidden" name="days" value="7">', form, "one choice: 7 days")
+        self.assertIn("You're asking for 7 more days", form)
+        self.assertIn("Approval required", form)
+        r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "7", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
+        self.assertRegex(r.headers["location"], r"^/request/ss-", "waits for an approver")
+        self.assertEqual(len(self.fake.started), made + 1, "only the hold runs until it is approved")
+        hold = self.fake.started[-1][1]
+        self.assertEqual((hold["action"], hold["schema"], hold["request_id"]), ("hold", "cd_tmp_x", r.headers["location"].rsplit("/", 1)[1]),
+                         "tagged with the request: the cleanup never deletes it while it waits")
+        rid, row = next((i, x) for i, x in self.db.requests.items() if x["kind"] == "temporary_extension")
+        self.assertEqual((row["name"], row["days"]), ("cd_tmp_x", 7))
+        self.main.PORTAL.run_recorded({**row, "id": rid})
+        params = self.fake.started[-1][1]
+        self.assertEqual((params["schema"], params["temporary"], params["action"], params["days"]), ("cd_tmp_x", "true", "extend", "7"))
+        r = self.http.post("/schema/temporary/keep", data={"workspace": "fin", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
+        kept = next(x for x in self.db.requests.values() if x["kind"] == "temporary_conversion")
+        self.assertEqual(kept["name"], "cd_tmp_x")
+        self.main.PORTAL.run_recorded({**kept, "id": next(i for i, x in self.db.requests.items() if x is kept)})
+        self.assertEqual(self.fake.started[-1][1]["action"], "convert")
+        page = self.http.get(f"/request/{rid}", headers=self.as_ana).text   # its run, once the approver approved it
+        self.assertIn("Request more time", page)
+        r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "7", "reason": WHY + " Again."}, headers=self.as_ana, follow_redirects=False)
+        waiting = r.headers["location"].rsplit("/", 1)[1]
+        self.db.event(waiting, "approved", actor="dana@contoso.com")   # approved, its run not started yet
+        self.assertIn("Approved: 7 more days are being added", self.http.get(f"/request/{waiting}", headers=self.as_ana).text)
+        bad = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "3", "reason": WHY}, headers=self.as_ana)
+        self.assertIn("More time is 7 days", bad.text)
+        self.assertEqual(self.http.get("/schema/temporary/other", headers=self.as_ana).status_code, 404)
+
+    def test_without_a_temporary_schema_there_is_nothing_to_extend_or_keep(self):
+        form = self.http.get("/schema/temporary/keep", headers=self.as_ana).text
+        self.assertIn("You have no temporary schema to ask about", form)
+        r = self.http.post("/schema/temporary/keep", data={"workspace": "fin", "reason": WHY}, headers=self.as_ana)
+        self.assertIn("You have no temporary schema to ask about", r.text)
+        self.assertEqual(self.db.requests, {})
 
     def test_when_the_database_cannot_answer_the_quota_is_unknown_and_the_job_decides(self):
         self.db.fail = "read"

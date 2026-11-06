@@ -18,12 +18,12 @@ import cards
 log = logging.getLogger(__name__)
 
 PERSONAS = ("explorer", "builder", "publisher")
-SOPS = {"schema": "Personal schema", "project_schema": "Project schema", "team_schema": "Team schema", "temporary_schema": "Temporary schema",
+SOPS = {"project_schema": "Project schema", "team_schema": "Team schema", "temporary_schema": "Temporary schema",
         "persona": "Workspace access", "folder": "Workspace folder", "warehouses": "SQL warehouses"}
 # How it works (the "New here?" line), then one FAQ per catalog section, named as it is.
 FAQS = {"getting_started": "How it works", **dict(cards.SECTIONS)}
 
-# Every setting, by section: (key, label, kind). kind: url, text, prompt, date, model or color.
+# Every setting, by section: (key, label, kind). kind: url, text, prompt, date, model, color or count.
 SECTIONS = [
     ("Header", "The word at the start of both apps' header, and its colour. Empty: the first word of the title in app.yaml, in the default colour.", [
         ("brand.name", "Name", "text"),
@@ -39,6 +39,8 @@ SECTIONS = [
         (f"faq.{k}", label, "url") for k, label in FAQS.items()]),
     ("Standard operating procedures", "SOP links shown on each catalog item.", [
         (f"sop.{k}", label, "url") for k, label in SOPS.items()]),
+    ("Temporary schemas", "How many temporary schemas each person may have at a time, 1 to 10. Empty: app.yaml's (1 by default).", [
+        ("temporary.limit", "Per person", "count")]),
     ("AI model", "The model every AI feature uses, through the hub's AI gateway: the Validate check on forms, the approvers' summary, and new project and team schemas' comments. Empty: no AI (Validate checks the rules only, no summaries, plain comments).", [
         ("ai.model", "Model", "model")]),
 ]
@@ -49,6 +51,7 @@ TABS = [
     ("branding", "Branding", ["Header"]),
     ("onboarding", "Onboarding", ["Guided tour", "Persona request links"]),
     ("help", "Help links", ["FAQ pages", "Standard operating procedures"]),
+    ("schemas", "Schemas", ["Temporary schemas"]),
     ("ai", "AI", ["AI model"]),
 ]
 BUSINESS_UNITS = []   # the business units the app serves (use()): each gets its own persona request links
@@ -88,7 +91,8 @@ def defaults(config):
     persona = links.get("persona_request")
     out = {"brand.name": (config.get("title") or "").split(" ", 1)[0], "brand.color": "",
            "banner.text": "", "banner.until": "", "onboarding.prompt": (config.get("onboarding") or {}).get("prompt") or "",
-           "ai.model": (config.get("ai") or {}).get("model") or ""}
+           "ai.model": (config.get("ai") or {}).get("model") or "",
+           "temporary.limit": str(config.get("temporary_limit") or 1)}
     for p in PERSONAS:
         out[f"persona_request.{p}"] = (persona.get(p) if isinstance(persona, dict) else persona) or ""
         for bu in BUSINESS_UNITS:
@@ -116,7 +120,7 @@ def apply(config, overrides, today=None):
     if not overrides:
         d = defaults(config)
         return {**config, "banner": None, "onboarding": {"prompt": d["onboarding.prompt"]}, "ai": {"model": d["ai.model"]},
-                "brand": {"name": d["brand.name"], "color": ""}}
+                "brand": {"name": d["brand.name"], "color": ""}, "temporary": {"limit": int(d["temporary.limit"])}}
     v = values(config, overrides)
     links = {**(config.get("links") or {}),
              "persona_request": {p: v[f"persona_request.{p}"] or None for p in PERSONAS},
@@ -128,6 +132,7 @@ def apply(config, overrides, today=None):
     return {**config, "links": links, "faq": {k: v[f"faq.{k}"] or None for k in FAQS},
             "onboarding": {"prompt": v["onboarding.prompt"]},
             "ai": {"model": v["ai.model"]},
+            "temporary": {"limit": int(v["temporary.limit"] or defaults(config)["temporary.limit"])},
             "brand": {"name": v["brand.name"] or defaults(config)["brand.name"], "color": v["brand.color"]},
             "banner": {"text": v["banner.text"], "until": until} if shown else None}
 
@@ -144,6 +149,8 @@ def check(key, value):
         raise ValueError(f"{LABELS[key]}: keep it under 200 characters.")
     if kind == "prompt" and len(value) > 1000:
         raise ValueError(f"{LABELS[key]}: keep it under 1,000 characters.")
+    if kind == "count" and value and not re.fullmatch(r"[1-9]|10", value):
+        raise ValueError(f"{LABELS[key]}: a whole number from 1 to 10.")
     if kind == "color" and value and not re.fullmatch(r"#[0-9A-Fa-f]{6}", value):
         raise ValueError(f"{LABELS[key]}: a colour as #RRGGBB, for example #FF3621.")
     if key == "brand.name" and len(value) > 40:
