@@ -10,6 +10,10 @@ is left alone.
 
 ## Unreleased
 
+- **Branding, in the approvals app's Settings:** the word at the start of both apps' header
+  ("Databricks" by default, the title's first word) and its colour (`#RRGGBB`, Databricks red by
+  default). Both apps show a change within 15 seconds; Reset goes back to the default. The
+  approvals app's header is dark: pick a colour that reads on both.
 - **One temporary schema per person, shown like the personal one:** the card says "0 of 1 used"
   or "1 of 1 used" (from the person's requests of the last 30 days, and whether the schema still
   exists). The app refuses a second one before anything runs, and the form says which one they
