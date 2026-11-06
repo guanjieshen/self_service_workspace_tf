@@ -50,5 +50,32 @@ class Skills(unittest.TestCase):
                 self.assertNotRegex(text, r"tf\.sh \S+ apply|bundle deploy|ALLOW_LOCAL_APPLY=1", "never deploy by hand")
 
 
+
+class AppSkillCoversTheApp(unittest.TestCase):
+    """update-self-service-app is how an admin finds a setting: every Settings tab and every key of
+    config/self-service/app.yaml that an admin may change is in it, so a new one cannot be missed."""
+    SKILL = (SKILLS / "update-self-service-app/SKILL.md").read_text()
+    # Keys an admin is never sent to: they name the apps and the database (the skill says never to
+    # change them), or are details of a setting the skill already names.
+    NOT_FOR_ADMINS = {"name", "approvals", "database", "admin_path", "require_request_record", "personal_schema", "temporary_schema"}
+
+    def test_every_settings_tab_is_in_it(self):
+        settings = (ROOT / "apps/self-service/settings.py").read_text()
+        tabs = re.search(r"TABS = \[(.*?)\n\]", settings, re.S).group(1)
+        for label in re.findall(r'\("[a-z_]+", "([^"]+)"', tabs):
+            with self.subTest(tab=label):
+                self.assertTrue(f"**{label}**" in self.SKILL, f"Settings tab {label}: say in the skill what it holds")
+
+    def test_every_app_yaml_key_an_admin_changes_is_in_it(self):
+        text = (ROOT / "config/self-service/app.yaml").read_text()
+        for block in ("self_service_app", "jobs"):
+            body = re.search(rf"(?ms)^{block}:\n(.*?)(?=^\S|\Z)", text).group(1)
+            for key in re.findall(r"(?m)^  ([a-z_]+):", body):
+                if key in self.NOT_FOR_ADMINS:
+                    continue
+                with self.subTest(block=block, key=key):
+                    self.assertTrue(f"`{key}" in self.SKILL, f"app.yaml {block}.{key}: say in the skill when an admin changes it")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -632,6 +632,24 @@ class BusinessUnitRouting(unittest.TestCase):
         self.assertEqual(p.open_workspace(ANA, ""), "https://adb-1.azuredatabricks.net/one/chat?o=1")
         self.assertFalse(p.toured(ANA))
 
+    def test_a_tour_had_before_a_restart_is_remembered_from_the_database(self):
+        p, _ = make()
+        p.store.tours = [ANA]                                   # recorded by the app before it restarted
+        self.assertEqual(p.open_workspace(ANA, "Onboard me"), "https://adb-1.azuredatabricks.net/one/chat?o=1", "plain Genie One")
+        with mock.patch.object(p.store, "toured", side_effect=AssertionError("read again")):
+            self.assertTrue(p.toured(ANA), "kept once read")
+
+    def test_the_approvers_summary_uses_the_ai_model_from_settings(self):
+        p, _ = make()
+        row = {"id": "ss-1", "kind": "project_schema", "workspace": "fin", "requested_by": ANA, "name": "fin_forecast", "reason": WHY}
+        p.shown = lambda: {"ai": {"model": ""}}
+        self.assertIsNone(p.summarize(row), "no AI model: no summary")
+        p.shown = lambda: {"ai": {"model": "system.ai.from-settings"}}
+        with mock.patch.object(portal.summary_module, "summarize", return_value={"headline": "h", "model": "system.ai.from-settings"}) as write:
+            self.assertEqual(p.summarize(row)["headline"], "h")
+        self.assertEqual(write.call_args.args[1], "system.ai.from-settings")
+        self.assertEqual(p.store.events[-1][:2], ("ss-1", "reviewed"), "kept with the request")
+
     def test_the_tour_is_given_again_rather_than_never_when_the_database_fails(self):
         p, _ = make()
         with mock.patch.object(p.store, "toured", side_effect=ConnectionError("down")):
@@ -932,6 +950,7 @@ class Pages(unittest.TestCase):
 
     def test_tasks_say_how_they_are_approved(self):
         page = self.http.get("/", headers=self.as_ana).text
+        self.assertIn("<h1>Citizen Development Tasks</h1>", page, "the catalog's heading: title case, the app's name")
         self.assertEqual(page.count("Auto-approved"), 5, "personal, project, team and temporary schemas, and folders (their job is in this hub)")
         self.assertEqual(page.count(">Approval required"), 1, "workspace access (approved in Entra)")
         self.assertIn("Approval required", self.http.get("/persona", headers=self.as_ana).text)
@@ -1373,6 +1392,22 @@ class TemporarySchemas(unittest.TestCase):
         self.assertEqual(rows[0], (False, "The schema name is already taken (fine only if it is yours)"))
         asked = json.loads(self.fake.decided[-1]["messages"][1]["content"])
         self.assertEqual((asked["request_type"], asked["name"]), ("temporary schema", "cd_tmp_taken"), "the model reads it as a temporary schema")
+
+    def test_a_temporary_schema_is_the_requesters_alone(self):
+        with self.assertRaisesRegex(portal.RequestError, "yours alone"):
+            self.main.PORTAL.request_schema("fin", ANA, schema="x", owner_group="fin-data-eng", reason=WHY, temporary=True)
+        with self.assertRaisesRegex(portal.RequestError, "needs a name"):
+            self.main.PORTAL.request_schema("fin", ANA, reason=WHY, temporary=True)
+
+    def test_when_unity_catalog_cannot_answer_the_quota_is_unknown(self):
+        import datetime as dt
+        self.http.post("/schema/temporary", data={"workspace": "fin", "name": "try_join", "reason": WHY}, headers=self.as_ana)
+        (rid, row), = self.db.requests.items()
+        row["created_at"] = dt.datetime.now(dt.timezone.utc)
+        self.fake.runs_[max(self.fake.runs_)].state = state("TERMINATED", "SUCCESS")
+        self.fake.schemas_ = None   # the app cannot see the catalog
+        self.main.PORTAL._personal.clear()
+        self.assertIsNone(self.main.PORTAL.temporary_schema("fin", ANA)["exists"], "unknown: the job decides")
 
     def test_a_failed_one_is_asked_again_on_its_form(self):
         r = portal.Request("Create a temporary schema", "fin", "fin_citizen_dev.cd_tmp_try", "ss-1", "", "Failed", "", kind="personal_schema",

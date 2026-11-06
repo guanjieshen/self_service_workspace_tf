@@ -1,6 +1,6 @@
 ---
 name: update-self-service-app
-description: Use when someone wants to change the self-service app or the approvals app: their links (FAQ, SOPs, persona requests, Discover), the onboarding prompt, a banner, the title, which requests need an approver, the AI check or summary, who may open each app, the jobs' settings (schema prefix and rights, folder location), set the app up for the first time (the hub), or add a business unit to it. Says whether it is a Settings change (no pull request) or a file change, makes the edit, and hands over to pull-request-from-databricks.
+description: Use when someone wants to change the self-service (Citizen Development) app or the approvals app: their links (FAQ, SOPs, persona requests, Discover), the guided tour's prompt, a banner, the header's name or colour, the title, which requests need an approver, the AI model (Validate, the approvers' summary, schema comments), who may open each app, the jobs' settings (schema prefix and rights, temporary schemas' days, where folders go), the daily temporary schema cleanup, set the app up for the first time (the hub), or add a business unit to it. Says whether it is a Settings change (no pull request) or a file change, makes the edit, and hands over to pull-request-from-databricks.
 ---
 
 # Update the self-service app
@@ -15,7 +15,7 @@ These are changed by a platform admin in the **approvals app > Settings** and sh
 | --- | --- |
 | A banner across every page (planned maintenance, ...) | **Announcement** |
 | The word at the start of both apps' header (Databricks by default), or its colour | **Branding** > Header |
-| The guided tour's prompt (what Genie One is asked the first time someone opens their workspace) | **Onboarding** > Guided tour |
+| The guided tour's prompt (what Genie One is asked the first time someone opens their workspace; `{business_unit}` and `{catalog}` are filled in with theirs) | **Onboarding** > Guided tour |
 | The links to request Explorer, Builder or Publisher access (for example ServiceNow items), for all business units or one | **Onboarding** > Persona request links, with its **Business unit** selector |
 | FAQ links next to each section, or the standard operating procedure behind each task | **Help links** |
 | The AI model every AI feature uses (Validate, the approvers' summary, new schemas' comments), or turn AI off (empty) | **AI** > AI model |
@@ -27,9 +27,10 @@ What people may do, and how the app behaves. Read the key's comment in the file 
 
 | They want to... | Key (under `self_service_app:` unless said) |
 | --- | --- |
-| The app's title in the header | `title` |
-| Which requests wait for an approver | `human_approval` (from `project_schema`, `team_schema`; the others are created straight away) |
+| The app's title in the header (its first word can be changed in Settings > Branding instead) | `title` |
+| Which requests wait for an approver | `human_approval` (from `project_schema`, `team_schema`, `temporary_schema`; the others are created straight away). Workspace folders always wait: an admin makes them by hand for now |
 | The Validate check on forms (AI advice on the name and reason) | `ai_check`: `"on"` or `"off"` |
+| Route people to their own business unit from a directory, instead of them choosing it once | `bu_lookup.function`: a SQL function, email in, business unit out (`catalog.schema.function`), run on `hub.warehouse_id` in `hub.yaml`. Its owner grants the self-service app EXECUTE, outside this repository. `null` = they choose |
 | The default AI model, for every AI feature (Validate, the approvers' summary, new schemas' comments) | `ai_model` (`null` = no AI; admins change it in Settings > AI) |
 | A wiki link in the header, a short link to the app | `links.wiki`, `links.go_link` |
 | The **Add a group to your workspace** card (otherwise Coming soon) | `links.group_request`: their request form's URL |
@@ -58,9 +59,19 @@ Check step 12's **Before you start** with them first (serverless, Apps and Lakeb
 
 ## 4. A new business unit
 
-A business unit is a managed workspace (its `prefix`, upper case). To add one, add its workspace: the skill **add-workspace**. Its merge deploys its jobs, and the app offers it on the next deploy. To leave a workspace out of the app: `self_service: false` in its file (the skill change-one-workspace).
+A business unit is a managed workspace (its `prefix`, upper case). To add one, add its workspace: the skill **add-workspace**. Its merge deploys its schema job, the daily cleanup covers its catalog too, and the app offers it on the next deploy. To leave a workspace out of the app: `self_service: false` in its file (the skill change-one-workspace).
 
-## 5. Edit, read back, deploy
+## 5. The temporary schema cleanup (nothing to edit)
+
+One job in the hub, **Temporary schema cleanup**, drops every temporary schema whose `cd_expires` date has passed, once a day at 06:00 UTC, in every business unit's catalog. It is deployed with the apps; there is no setting to change but `temporary_schema.days` (above).
+
+| They want to... | Tell them |
+| --- | --- |
+| See what it deleted, whose and how many tables | In the hub, Jobs > **Temporary schema cleanup** > its latest run: the summary is at the top |
+| See what it would delete, without deleting | **Run now with different parameters**, `dry_run` = `true` (a workspace admin) |
+| Keep a temporary schema longer | Not possible: copy what they need to a project schema before it expires |
+
+## 6. Edit, read back, deploy
 
 1. Change only what was asked, keeping the comments; two spaces per level, no tabs.
 2. Read it back in plain words ("project schemas will no longer wait for an approver").
