@@ -18,6 +18,7 @@ These are changed by a platform admin in the **approvals app > Settings** and sh
 | The guided tour's prompt (what Genie One is asked the first time someone opens their workspace; `{business_unit}` and `{catalog}` are filled in with theirs) | **Onboarding** > Guided tour |
 | The links to request Explorer, Builder or Publisher access (for example ServiceNow items), for all business units or one | **Onboarding** > Persona request links, with its **Business unit** selector |
 | FAQ links next to each section, or the standard operating procedure behind each task | **Help links** |
+| How many temporary schemas each person may have at a time (1 by default, up to 10) | **Schemas** > Temporary schemas |
 | The AI model every AI feature uses (Validate, the approvers' summary, new schemas' comments), or turn AI off (empty) | **AI** > AI model |
 | See who changed what, and when | **Change history** |
 
@@ -35,7 +36,7 @@ What people may do, and how the app behaves. Read the key's comment in the file 
 | A wiki link in the header, a short link to the app | `links.wiki`, `links.go_link` |
 | The **Add a group to your workspace** card (otherwise Coming soon) | `links.group_request`: their request form's URL |
 | The default FAQ links and prompt (Settings overrides them) | `faq.<section>`, `onboarding.prompt` |
-| Personal schemas' name prefix or rights | `personal_schema.prefix`, `personal_schema.privileges` (under `jobs:`) |
+| The name prefix of every schema the app makes (`cd_`), or the rights of project and team schemas (and of a temporary schema kept as one) | `personal_schema.prefix`, `personal_schema.privileges` (under `jobs:`) |
 | How long a temporary schema lasts (its `cd_expires` tag; the daily cleanup job drops it after) | `temporary_schema.days` (under `jobs:`, 1 to 365) |
 | What a temporary schema's requester may do in it (they can never share it) | `temporary_schema.privileges` (under `jobs:`): never `MANAGE` or `ALL_PRIVILEGES`, the build refuses them |
 | Who owns new schemas | `catalog_owner` (under `jobs:`). Workspace folders are made by hand for now: `folder_root` is where the approvals app tells admins to create them |
@@ -70,7 +71,8 @@ One job in the hub, **Temporary schema cleanup**, drops every temporary schema w
 | --- | --- |
 | See what it deleted, whose and how many tables | In the hub, Jobs > **Temporary schema cleanup** > its latest run: the summary is at the top |
 | See what it would delete, without deleting | **Run now with different parameters**, `dry_run` = `true` (a workspace admin) |
-| Keep a temporary schema longer | Not possible: copy what they need to a project schema before it expires |
+| Keep a temporary schema longer | In the app, on their temporary schema: **Request more time** (7 days) or **Keep as a project schema**; both wait in the approvals app, and the schema is not deleted while they wait. Rejected, it is deleted at the next cleanup if its date has passed. The reminder shows on every page 3 days before |
+| Why their old personal schema is now temporary | Personal schemas are not offered any more: the cleanup made each one temporary (deleted 30 days later unless more time is approved or it is kept) |
 
 ## 6. Edit, read back, deploy
 

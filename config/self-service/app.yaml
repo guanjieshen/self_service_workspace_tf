@@ -32,7 +32,7 @@ self_service_app:
     # {workspace_id} as above; null = no Discover data card.
     discover: "{host}/discover?o={workspace_id}"
     sop:                                 # the standard operating procedure behind each task
-      schema: null                       # personal schemas
+      temporary_schema: null             # temporary schemas (each person's own now)
       project_schema: null
       team_schema: null
       persona: null
@@ -129,6 +129,7 @@ jobs:
     privileges: [ALL_PRIVILEGES, MANAGE]
   temporary_schema:                   # a person's short-term schema: <prefix>tmp_<name>, one at a time
     days: 30                          # its cd_expires tag, this many days ahead; the daily cleanup job drops it after
+    limit: 1                          # how many a person may have at a time (1 to 10); admins change it in Settings > Schemas
     # What the requester may do in it: use it fully, but not share it (never MANAGE or
     # ALL_PRIVILEGES, which let them grant it to others; the build refuses them).
     privileges: [USE_SCHEMA, SELECT, MODIFY, CREATE_TABLE, CREATE_VOLUME, READ_VOLUME, WRITE_VOLUME,

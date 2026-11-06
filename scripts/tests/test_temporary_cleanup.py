@@ -63,7 +63,8 @@ def run(schemas, dry_run="", **kw):
         widgets=types.SimpleNamespace(text=lambda name, default: None, get=lambda name: dry_run),
         jobs=types.SimpleNamespace(taskValues=types.SimpleNamespace(set=lambda key, value: out.__setitem__(key, value))),
         notebook=types.SimpleNamespace(exit=exit_))
-    notebook = render_notebook(NOTEBOOK, {"prefix": "cd_", "allowed_catalogs": ["fin_citizen_dev"]})
+    notebook = render_notebook(NOTEBOOK, {"prefix": "cd_", "allowed_catalogs": ["fin_citizen_dev"], "temporary_days": 30,
+                                          "temporary_privileges": ["USE_SCHEMA", "SELECT", "MODIFY", "CREATE_TABLE"]})
     error = None
     try:
         exec(compile(notebook, "temporary_cleanup.py", "exec"),
@@ -87,6 +88,12 @@ class Cleanup(unittest.TestCase):
         self.assertEqual((rows["cd_tmp_live"]["action"], rows["cd_tmp_live"]["why"]), ("kept", f"expires on {DAY(3)}"))
         self.assertEqual(rows["cd_tmp_today"]["action"], "kept", "it is still theirs on its expiry date (as the app counts it)")
         self.assertEqual((report["date"], report["counts"]), (TODAY.isoformat(), {"dropped": 1, "would drop": 0, "kept": 2, "failed": 0}))
+
+    def test_a_schema_waiting_for_an_approver_is_never_deleted(self):
+        spark, report, _ = run({"cd_tmp_held": temporary(cd_pending_request="ss-7"), "cd_tmp_old": temporary()})
+        self.assertEqual([s for s in spark.sql_run if s.startswith("DROP")], ["DROP SCHEMA `fin_citizen_dev`.`cd_tmp_old` CASCADE"])
+        held = next(r for r in report["schemas"] if r["schema"] == "cd_tmp_held")
+        self.assertEqual((held["action"], held["why"]), ("kept", f"expired on {DAY(-1)}, but ss-7 waits for an approver"))
 
     def test_never_touches_a_schema_it_did_not_make_as_temporary(self):
         spark, report, _ = run({"cd_ana": {"cd_managed_by": "self_service", "cd_schema_kind": "personal", "cd_expires": DAY(-9)},
@@ -117,6 +124,35 @@ class Cleanup(unittest.TestCase):
         _, report, error = run({})
         self.assertIsNone(error)
         self.assertEqual(report["schemas"], [])
+
+
+class PersonalSchemasMadeTemporary(unittest.TestCase):
+    def test_each_old_personal_schema_is_made_temporary_with_narrower_rights(self):
+        personal = {"cd_managed_by": "self_service", "cd_schema_kind": "personal", "cd_user": "ana@contoso.com", "cd_created": DAY(-200)}
+        spark, report, error = run({"cd_ana": dict(personal)})
+        self.assertIsNone(error)
+        self.assertEqual([s for s in spark.sql_run if not s.startswith("SELECT")], [
+            "GRANT USE SCHEMA, SELECT, MODIFY, CREATE TABLE ON SCHEMA `fin_citizen_dev`.`cd_ana` TO `ana@contoso.com`",
+            "REVOKE ALL PRIVILEGES, MANAGE ON SCHEMA `fin_citizen_dev`.`cd_ana` FROM `ana@contoso.com`",
+            f"ALTER SCHEMA `fin_citizen_dev`.`cd_ana` SET TAGS ('cd_schema_kind' = 'temporary', 'cd_expires' = '{DAY(30)}', 'cd_converted_from' = 'personal')"],
+            "the new rights first, so they never lose access; then it expires like any temporary schema")
+        self.assertIn(f"Made 1 personal schema temporary, to be deleted on {DAY(30)}", report["summary"])
+        self.assertIn("  ana@contoso.com: fin_citizen_dev.cd_ana", report["summary"])
+        self.assertEqual([r["schema"] for r in report["schemas"]], ["cd_ana"], "and is then counted as a temporary schema, kept")
+
+    def test_a_dry_run_only_says_which_it_would_make_temporary(self):
+        spark, report, _ = run({"cd_ana": {"cd_managed_by": "self_service", "cd_schema_kind": "personal", "cd_user": "ana@contoso.com"}}, dry_run="true")
+        self.assertEqual([s for s in spark.sql_run if not s.startswith("SELECT")], [])
+        self.assertIn("Would make 1 personal schema temporary", report["summary"])
+
+    def test_one_made_temporary_is_deleted_once_expired_whatever_its_name(self):
+        spark, report, _ = run({"cd_ana": temporary(cd_converted_from="personal")})
+        self.assertEqual([s for s in spark.sql_run if s.startswith("DROP")], ["DROP SCHEMA `fin_citizen_dev`.`cd_ana` CASCADE"])
+
+    def test_a_personal_schema_with_an_unexpected_owner_is_left_alone(self):
+        spark, report, _ = run({"cd_x": {"cd_managed_by": "self_service", "cd_schema_kind": "personal", "cd_user": "x`; DROP"}})
+        self.assertEqual([s for s in spark.sql_run if not s.startswith("SELECT")], [])
+        self.assertEqual(report["converted"][0]["why"], "kept as it is: an unexpected name or owner")
 
 
 class Summary(unittest.TestCase):

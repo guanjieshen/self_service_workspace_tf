@@ -36,7 +36,7 @@ def checks(kind):
 def notebook_parameters(kind):
     """The parameters the notebook reads (its dbutils.widgets.text loop)."""
     found = re.search(r"for name in \(([^)]*)\):\s*\n\s*dbutils\.widgets\.text", notebook(kind)).group(1)
-    return set(found.replace('"', "").replace(" ", "").split(","))
+    return set(re.findall(r'"(\w+)"', found))
 
 
 def job_parameters(kind):
@@ -137,7 +137,8 @@ class Tags(unittest.TestCase):
     def test_the_jobs_set_the_tags_the_app_reads(self):
         read = set(re.findall(r'"(cd_\w+)"', (APP / "portal.py").read_text()))
         set_by_jobs = set().union(*(job_tags(kind) for kind in DEPLOYED)) | {"cd_root"}   # cd_root: the folder job's, not deployed
-        self.assertEqual(read - set_by_jobs, set(), "tags the app reads but no job sets")
+        on_schemas = set(re.findall(r"'(cd_\w+)'", notebook("personal_schema")))   # what the schema job tags a schema with
+        self.assertEqual(read - set_by_jobs - on_schemas, set(), "tags the app reads but no job sets")
 
     def test_the_app_finds_every_job_by_its_kind(self):
         for kind in DEPLOYED:

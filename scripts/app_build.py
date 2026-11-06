@@ -33,7 +33,7 @@ CONFIG = ROOT / "config/self-service"
 WORKSPACES = ROOT / "config/workspaces"
 # Not part of the app's code: its tests, notes, database scripts and local files.
 SKIP = ("__pycache__", ".pyc", ".gitignore", "config.json", "tests", "AGENTS.md", "db")
-KINDS = ("personal_schema", "project_schema", "team_schema", "temporary_schema", "folder")
+KINDS = ("personal_schema", "project_schema", "team_schema", "temporary_schema", "temporary_extension", "temporary_conversion", "folder")
 EMAIL = r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]+"
 
 
@@ -83,6 +83,8 @@ def check(s):
     need(str(app.get("ai_check")) in ("on", "off"), "app.yaml self_service_app.ai_check: on or off.")
     days = (jobs.get("temporary_schema") or {}).get("days", 30)
     need(isinstance(days, int) and not isinstance(days, bool) and 1 <= days <= 365, "app.yaml jobs.temporary_schema.days: a whole number of days, 1 to 365.")
+    limit = (jobs.get("temporary_schema") or {}).get("limit", 1)
+    need(isinstance(limit, int) and not isinstance(limit, bool) and 1 <= limit <= 10, "app.yaml jobs.temporary_schema.limit: how many temporary schemas a person may have, 1 to 10.")
     rights = temporary_privileges(jobs)
     need(all(isinstance(p, str) and re.fullmatch(r"[A-Z_]+", p) for p in rights) and not {"MANAGE", "ALL_PRIVILEGES"} & set(rights),
          "app.yaml jobs.temporary_schema.privileges: privileges such as SELECT or CREATE_TABLE; never MANAGE or ALL_PRIVILEGES, which let the requester share it.")
@@ -132,7 +134,8 @@ def app_config(s, spokes, mode=None):
         "title": app["title"],
         "hub_host": host,   # where the jobs run: an admin's link to a request's run opens there
         "folder_root": s["jobs"].get("folder_root") or "/Workspace",
-        "temporary_days": int((s["jobs"].get("temporary_schema") or {}).get("days") or 30),   # what the temporary schema form says   # where folders go (made by hand for now)
+        "temporary_days": int((s["jobs"].get("temporary_schema") or {}).get("days") or 30),   # what the temporary schema form says
+        "temporary_limit": int((s["jobs"].get("temporary_schema") or {}).get("limit") or 1),   # the default: Settings > Schemas changes it   # where folders go (made by hand for now)
         "faq": dict(app.get("faq") or {}),
         "ai_check": str(app.get("ai_check") or "off"),
         "human_approval": list(app.get("human_approval") or []),
@@ -225,7 +228,9 @@ def build_hub(s, spokes, database_host=None, database=True, root=None):
         shutil.copytree(APP, out / app_dir, ignore=lambda d, names: [n for n in names if any(n == k or n.endswith(k) for k in SKIP)])
         (out / app_dir / "config.json").write_text(json.dumps(app_config(s, spokes, mode), indent=1))
     (out / "temporary_cleanup.py").write_text(notebook("temporary_cleanup", {
-        "prefix": s["jobs"]["personal_schema"]["prefix"], "allowed_catalogs": sorted({w["catalog"] for w in spokes})}))
+        "prefix": s["jobs"]["personal_schema"]["prefix"], "allowed_catalogs": sorted({w["catalog"] for w in spokes}),
+        "temporary_days": int((s["jobs"].get("temporary_schema") or {}).get("days") or 30),
+        "temporary_privileges": temporary_privileges(s["jobs"])}))
     # JSON is YAML: the bundle reads it as an included file.
     (out / "target.yml").write_text(json.dumps(hub_target(s, database=database), indent=1))
     return out

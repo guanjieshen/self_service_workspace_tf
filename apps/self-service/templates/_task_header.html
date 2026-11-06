@@ -6,7 +6,7 @@
 {{ back("/", "Catalog") }}
 <div class="request-head">
   <div class="request-name">
-    <span class="request-icon">{{ icon("schema" if task_icon.endswith("schema") else task_icon, "icon icon-sm") }}</span>
+    <span class="request-icon">{{ icon("schema" if task_icon.endswith("schema") or task_icon.startswith("temporary_") else task_icon, "icon icon-sm") }}</span>
     <h1>{{ task_name }}</h1>
   </div>
   {% if approval.get(task_icon) %}{{ status_badge(approval_labels[approval.get(task_icon)], "approval-" ~ approval.get(task_icon), pill=True) }}{% endif %}

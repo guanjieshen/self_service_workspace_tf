@@ -44,12 +44,16 @@ TASKS = {"personal_schema": "Create a personal schema", "team_folder": "Request 
 # The personal schema job also makes named schemas: a project schema (the requester's) and a
 # team schema (the requester's and one of their groups').
 PROJECT_SCHEMA, TEAM_SCHEMA = "Request a project schema", "Request a team schema"
-# ... and a temporary schema: the requester's alone, <prefix>tmp_<name>, tagged to expire (one at a time).
+# ... and a temporary schema: the requester's alone, <prefix>tmp_<name>, tagged to expire (one at a time),
+# with more time for it, or kept as a project schema: requests an approver always decides.
 TEMPORARY_SCHEMA = "Create a temporary schema"
+TEMPORARY_EXTENSION, TEMPORARY_CONVERSION = "Request more time", "Keep as a project schema"
+ALWAYS_APPROVED = {"temporary_extension", "temporary_conversion"}   # whatever app.yaml human_approval says
+EXTENSION_DAYS = (7,)   # the more time someone may ask for at once (one choice for now)
 # How each task is approved, as the catalog and task pages label it. The app's own tasks run
 # straight away (the jobs check every request); a persona is approved in Entra ID.
 APPROVAL = {"schema": "auto", "project_schema": "auto", "team_schema": "auto", "temporary_schema": "auto", "folder": "auto",
-            "persona": "required"}
+            "persona": "required", "temporary_extension": "required", "temporary_conversion": "required"}
 # A request whose job is not deployed in the hub is made by hand (Portal.manual): recorded and
 # tracked like the others, always for an approver, who makes it (the approvals app says what) and
 # then approves it, which marks it done. The database's kind -> its job. Today the folder job is
@@ -62,7 +66,7 @@ APPROVAL_LABELS = {"auto": "Auto-approved", "required": "Approval required"}
 def approval_of(config, manual=()):
     """Each catalog task's approval, with the kinds an approver decides (app.yaml human_approval,
     and those made by hand: manual)."""
-    people = set(config.get("human_approval", ())) | set(manual)
+    people = set(config.get("human_approval", ())) | set(manual) | ALWAYS_APPROVED
     task_kind = {"schema": "personal_schema", "project_schema": "project_schema", "team_schema": "team_schema",
                  "temporary_schema": "temporary_schema", "folder": "folder"}
     return {**APPROVAL, **{task: "required" for task, kind in task_kind.items() if kind in people}}
@@ -130,7 +134,8 @@ def load_config(path):
 
 # Each kind of request, as the requester reads it.
 APPROVAL_TYPES = {"personal_schema": "Personal schema", "project_schema": "Project schema", "team_schema": "Team schema",
-                  "temporary_schema": "Temporary schema", "folder": "Workspace folder"}
+                  "temporary_schema": "Temporary schema", "temporary_extension": "More time for a temporary schema",
+                  "temporary_conversion": "Temporary schema to keep as a project schema", "folder": "Workspace folder"}
 # The states in which a request waits for a person (the database's request_status).
 WAITING = ("submitted", "replied", "needs_info")
 
@@ -144,7 +149,9 @@ def record_params(row, w):
         catalog = w.jobs["personal_schema"]["tags"].get("cd_catalog", "") if w and "personal_schema" in w.jobs else ""
         params = {"user": row["requested_by"], "catalog": catalog,
                   "schema": "" if row["kind"] == "personal_schema" else row["name"],
-                  "temporary": "true" if row["kind"] == "temporary_schema" else ""}
+                  "temporary": "true" if row["kind"] in ("temporary_schema", "temporary_extension", "temporary_conversion") else "",
+                  "action": {"temporary_extension": "extend", "temporary_conversion": "convert"}.get(row["kind"], ""),
+                  "days": str(row.get("days") or "")}
     return {**params, "owner_group": row.get("owner_group") or "", "reason": row.get("reason") or "", "request_id": row["id"]}
 
 
@@ -504,45 +511,60 @@ class Portal:
         keep(self._personal, key, found)
         return found
 
+    def temporary_limit(self):
+        """How many temporary schemas each person may have at a time (Settings > Schemas; app.yaml
+        jobs.temporary_schema.limit until an admin changes it)."""
+        return int((self.shown().get("temporary") or {}).get("limit") or 1)
+
     def temporary_schema(self, ws_name, user):
-        """The user's temporary schema in a workspace, for the card's 1 of 1 and the form:
-        {"exists": True / False / "pending" (asked for, still running) / None (unknown), "name",
-        "expires"}. Their temporary schema requests of the last days (jobs.temporary_schema.days)
-        come from the database; Unity Catalog says whether one still exists. Where either cannot
-        answer, unknown: the job checks again either way."""
+        """The user's temporary schemas in a workspace, for the card's "1 of 1 used", the form and
+        the reminder: {"exists": True (at the limit) / False (room for another) / "pending" (one is
+        being made) / None (unknown), "used", "limit", "schemas": [{"name", "expires",
+        "days_left", "link"}] (soonest deleted first), and the soonest one's name, expires,
+        days_left and link}. The candidates are their temporary schema requests (the database)
+        and their old personal schema (the cleanup made those temporary); each schema's own tags
+        in Unity Catalog say whether it is a temporary one of theirs and until when (an approved
+        extension moves it). Where either cannot answer, unknown: the job checks again either way."""
+        limit = self.temporary_limit()
+        none = {"exists": None, "used": None, "limit": limit, "schemas": [], "name": "", "expires": "", "days_left": None, "link": None}
         w = next((w for w in self.workspaces() if w.name == ws_name and "personal_schema" in w.jobs), None)
         if w is None or not self.store or not hasattr(self.store, "requests_of"):
-            return {"exists": None, "name": "", "expires": ""}
+            return none
         key = (ws_name, user, "temporary")
         cached = self._personal.get(key)
         if cached and time.time() - cached[0] < 60:
             return cached[1]
-        days = int(self.config.get("temporary_days") or 30)
-        now = datetime.datetime.now(datetime.timezone.utc)
-        utc = lambda t: t if t.tzinfo else t.replace(tzinfo=datetime.timezone.utc)   # the database's times are UTC
-        catalog = w.jobs["personal_schema"]["tags"].get("cd_catalog", "")
+        tags = w.jobs["personal_schema"]["tags"]
+        catalog, prefix = tags.get("cd_catalog", ""), tags.get("cd_prefix", "cd_")
         try:
-            recent = [r for r in self.store.requests_of(user) if r["kind"] == "temporary_schema" and r["workspace"] == ws_name
-                      and r["state"] not in ("rejected", "start_failed") and utc(r["created_at"]) + datetime.timedelta(days=days) > now]
+            asked = [r for r in self.store.requests_of(user) if r["kind"] == "temporary_schema" and r["workspace"] == ws_name
+                     and r["state"] not in ("rejected", "start_failed")]
         except Exception as e:
             warn(f"reading {user}'s temporary schemas", e)
-            return {"exists": None, "name": "", "expires": ""}
-        found = {"exists": False, "name": "", "expires": ""}
-        for r in recent:   # newest first
-            name, expires = f"{catalog}.{r['name']}", (r["created_at"] + datetime.timedelta(days=days)).date().isoformat()
-            if self.active_request(ws_name, user, "personal_schema", name):   # not cached: the card follows the run
-                return {"exists": "pending", "name": name, "expires": expires}
+            return none
+        today = datetime.date.today().isoformat()
+        live, pending = [], None
+        for schema in dict.fromkeys([r["name"] for r in asked] + [schema_name(user, prefix)]):   # newest first, no repeats
             try:
-                self.hub().schemas.get(name)
-            except NotFound:
-                continue   # its run failed, or an admin dropped it
+                out = self.hub().api_client.do("GET", f"/api/2.1/unity-catalog/entity-tag-assignments/schemas/{catalog}.{schema}/tags")
             except Exception as e:
-                warn(f"looking up {name}", e)
-                return {"exists": None, "name": "", "expires": ""}
-            found = {"exists": True, "name": name, "expires": expires,   # opens in their own workspace, as the personal one
-                     "link": f"{w.host}/explore/data/{catalog}/{r['name']}"}
-            break
-        keep(self._personal, key, found)
+                if not isinstance(e, NotFound) and "does not exist" not in str(e).lower() and "not found" not in str(e).lower():
+                    warn(f"reading the tags of {catalog}.{schema}", e)
+                    return none
+                if asked and schema == asked[0]["name"] and self.active_request(ws_name, user, "personal_schema", f"{catalog}.{schema}"):
+                    pending = f"{catalog}.{schema}"   # being made
+                continue   # never made, dropped by the cleanup, or by an admin
+            t = {a["tag_key"]: a.get("tag_value", "") for a in out.get("tag_assignments") or []}
+            if t.get("cd_schema_kind") == "temporary" and t.get("cd_user") == user and t.get("cd_expires", "") >= today:
+                live.append({"name": f"{catalog}.{schema}", "expires": t["cd_expires"],
+                             "days_left": (datetime.date.fromisoformat(t["cd_expires"]) - datetime.date.today()).days,
+                             "link": f"{w.host}/explore/data/{catalog}/{schema}"})   # opens in their own workspace
+        live.sort(key=lambda x: x["expires"])
+        soonest = live[0] if live else {"name": pending or "", "expires": "", "days_left": None, "link": None}
+        found = {**soonest, "used": len(live) + (1 if pending else 0), "limit": limit, "schemas": live,
+                 "exists": "pending" if pending and len(live) + 1 >= limit else len(live) >= limit}
+        if not pending:   # one being made is not cached: the card follows its run
+            keep(self._personal, key, found)
         return found
 
     def hub(self):
@@ -632,8 +654,9 @@ class Portal:
             schema = temporary_prefix(prefix) + schema
             have = self.temporary_schema(ws_name, user)
             if have["exists"] is True or (have["exists"] == "pending" and have["name"].split(".", 1)[-1] != schema):
-                raise RequestError(f"You already have a temporary schema, {have['name']}, until {have['expires']}. "
-                                   "You can have one at a time: ask for another once it expires.")
+                mine = ", ".join(f"{x['name']} (until {x['expires']})" for x in have["schemas"]) or have["name"]
+                raise RequestError(f"You already have {have['used']} temporary schema{'' if have['used'] == 1 else 's'}, the most you "
+                                   f"may have: {mine}. Ask for another once one expires.")
             self._personal.pop((ws_name, user, "temporary"), None)
         elif schema:
             check_schema(schema, prefix)
@@ -651,7 +674,62 @@ class Portal:
         self._personal.pop((ws_name, user), None)
         return self._start(w, "personal_schema", user, schema or resource.split(".", 1)[1], owner_group, reason, {
             "user": user, "catalog": catalog, "schema": schema, "owner_group": owner_group, "reason": reason,
-            "temporary": "true" if temporary else ""})
+            "temporary": "true" if temporary else "", "action": "", "days": ""})
+
+    def request_more_time(self, ws_name, user, days, reason="", schema=""):
+        """More time for one of the user's temporary schemas (EXTENSION_DAYS; schema: its name, or
+        their only one): recorded, and run once an approver approves it; the job adds the days to
+        its cd_expires. Returns the request's ID."""
+        if days not in EXTENSION_DAYS:
+            raise RequestError(f"More time is {' or '.join(map(str, EXTENSION_DAYS))} days.")
+        return self._about_temporary(ws_name, user, "extend", reason, schema, days)
+
+    def request_keep(self, ws_name, user, reason="", schema=""):
+        """Keep one of the user's temporary schemas as a project schema: recorded, and run once an
+        approver approves it; the job relabels it in place (no expiry, project rights). Returns the
+        request's ID."""
+        return self._about_temporary(ws_name, user, "convert", reason, schema)
+
+    def _about_temporary(self, ws_name, user, action, reason, schema="", days=None):
+        check_reason(reason)
+        w = self.workspace(ws_name, "personal_schema")
+        self._check_bu(user, w, "personal_schema")
+        have = self.temporary_schema(ws_name, user)
+        mine = [x["name"] for x in have["schemas"]]
+        chosen = next((n for n in mine if n == schema or n.split(".", 1)[1] == schema), None) if schema else (mine[0] if len(mine) == 1 else None)
+        if not mine:
+            raise RequestError("You have no temporary schema to ask about. Create one first.")
+        if chosen is None:
+            raise RequestError("Choose which of your temporary schemas this is for.")
+        catalog, schema = chosen.split(".", 1)
+        self._personal.pop((ws_name, user, "temporary"), None)
+        params = {"user": user, "catalog": catalog, "schema": schema, "owner_group": "", "reason": reason,
+                  "temporary": "true", "action": action, "days": str(days or "")}
+        request_id = self._start(w, "personal_schema", user, schema, "", reason, params)
+        # While it waits for an approver, the schema is held: tagged with this request, which the
+        # daily cleanup never deletes (the job writes the tag: the app writes nothing in a catalog).
+        try:
+            self.hub().jobs.run_now(w.jobs["personal_schema"]["id"], job_parameters={
+                **params, **self.settings_for("personal_schema"), "action": "hold", "request_id": request_id})
+        except Exception as e:
+            warn(f"holding {catalog}.{schema} for {request_id}", e)
+            self._quietly(self.store.start_failed, request_id, "Your schema could not be held while this request waits.")
+            raise RequestError(f"Your request could not be sent: {catalog}.{schema} could not be kept from deletion while "
+                               "it waits for an approver. Try again in a minute.") from e
+        return request_id
+
+    def release_hold(self, row):
+        """An approver rejected more time, or keeping it: the hold goes (the job), so the schema
+        expires as before, and the next daily cleanup deletes it if its date has passed. Never
+        stops the rejection: if it cannot run, the hold stays and the schema is kept (say so)."""
+        if row["kind"] not in ALWAYS_APPROVED:
+            return
+        try:
+            w = self.workspace(row["workspace"], "personal_schema")
+            self.hub().jobs.run_now(w.jobs["personal_schema"]["id"], job_parameters={
+                **record_params(row, w), **self.settings_for("personal_schema"), "action": "release"})
+        except Exception as e:
+            warn(f"releasing the hold of {row['id']} on {row['name']} (it is kept until someone does)", e)
 
     def request_folder(self, ws_name, user, folder, reason=""):
         """Run the team folder job for the user's folder: they and the workspace's platform admins
@@ -671,7 +749,7 @@ class Portal:
     def needs_approval(self, kind):
         """Whether this kind of request (the database's kinds) waits for an approver before its
         job runs (app.yaml human_approval), or before an admin makes it by hand (manual)."""
-        return kind in self.config.get("human_approval", ()) or kind in self.manual()
+        return kind in self.config.get("human_approval", ()) or kind in self.manual() or kind in ALWAYS_APPROVED
 
     def _start(self, w, job_kind, user, name, owner_group, reason, params):
         """Record the request, then run its job, then link the run to it. Recording comes first,
@@ -690,7 +768,7 @@ class Portal:
         try:
             self.store.record_request({"id": request_id, "kind": kind, "workspace": w.name,
                                        "bu": w.bu, "requested_by": user, "name": name, "owner_group": owner_group,
-                                       "reason": reason})
+                                       "reason": reason, "days": int(params["days"]) if params.get("days") else None})
         except Exception as e:
             warn(f"recording request {request_id}", e)
             raise RequestError("Your request could not be recorded just now, so it was not sent. Try again in a minute.") from e
@@ -792,8 +870,9 @@ class Portal:
 
     def settings_for(self, job_kind):
         """What a job is told from the Settings, as they are when it runs: the schema job, the model
-        that writes a new schema's comment (empty: the plain comment)."""
-        return {"comment_model": self.ai_model()} if job_kind == "personal_schema" else {}
+        that writes a new schema's comment (empty: the plain comment), and how many temporary
+        schemas each person may have."""
+        return {"comment_model": self.ai_model(), "temporary_limit": str(self.temporary_limit())} if job_kind == "personal_schema" else {}
 
     def run_recorded(self, row):
         """Run the job of a request in the database, as it was asked, with its request ID: once
@@ -873,7 +952,9 @@ class Portal:
                 message = failure_reason(getattr(run.state, "state_message", "")) if status == "Failed" else ""
         life = getattr(getattr(run.state, "life_cycle_state", None), "value", "") or ""
         task = TASKS[kind]
-        if kind == "personal_schema" and params.get("temporary") == "true":
+        if kind == "personal_schema" and params.get("action") in ("extend", "convert"):
+            task = TEMPORARY_EXTENSION if params["action"] == "extend" else TEMPORARY_CONVERSION
+        elif kind == "personal_schema" and params.get("temporary") == "true":
             task = TEMPORARY_SCHEMA
         elif kind == "personal_schema" and params.get("schema"):
             task = TEAM_SCHEMA if params.get("owner_group") else PROJECT_SCHEMA
@@ -994,7 +1075,8 @@ class Portal:
     def _request_from_row(self, row, w, status, message):
         kind = "team_folder" if row["kind"] == "folder" else "personal_schema"
         task = {"personal_schema": TASKS["personal_schema"], "project_schema": PROJECT_SCHEMA,
-                "team_schema": TEAM_SCHEMA, "temporary_schema": TEMPORARY_SCHEMA, "folder": TASKS["team_folder"]}[row["kind"]]
+                "team_schema": TEAM_SCHEMA, "temporary_schema": TEMPORARY_SCHEMA, "temporary_extension": TEMPORARY_EXTENSION,
+                "temporary_conversion": TEMPORARY_CONVERSION, "folder": TASKS["team_folder"]}[row["kind"]]
         params = record_params(row, w)
         if kind == "team_folder":
             resource = self.folder_path(w, row["name"]) if w else row["name"]

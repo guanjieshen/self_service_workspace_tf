@@ -210,7 +210,7 @@ Catalogs shared between workspaces, storage credentials and external locations s
 
 ## 9. The self-service app
 
-What people request (personal, project and team schemas; workspace folders, made by hand for now) comes
+What people request (temporary, project and team schemas; workspace folders, made by hand for now) comes
 from the self-service app, an approvals app for the requests that need a person, and a schema job
 for each workspace the app serves, all in the hub: Unity Catalog is shared across the metastore,
 so **the app never calls another workspace** and needs no cross-workspace access. They live in this repository (`apps/self-service/`, `bundle/`,

@@ -53,6 +53,12 @@
           {% elif decision and r.manual %}
             <div><p class="strong">Your {{ noun }} is ready</p>
             <p>A platform admin created it{% if r.path %} at <span class="mono">{{ r.path }}</span>{% endif %} in <span class="mono">{{ r.workspace }}</span>. You can manage it and share it with others in Databricks.</p></div>
+          {% elif decision and r.kind == "temporary_extension" %}
+            <div><p class="strong">Approved: {{ r.days }} more days are being added</p>
+            <p>Your temporary schema's new date shows under <a href="/schema/temporary">Create a temporary schema</a> in under a minute.</p></div>
+          {% elif decision and r.kind == "temporary_conversion" %}
+            <div><p class="strong">Approved: your temporary schema is being kept as a project schema</p>
+            <p>In under a minute it is no longer deleted, and you can share it like any project schema. It keeps its name.</p></div>
           {% elif decision %}
             <div><p class="strong">Approved: your {{ noun }} is being created</p>
             <p>Its status shows under <a href="/requests">My requests</a> in under a minute.</p></div>

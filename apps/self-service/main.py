@@ -144,7 +144,23 @@ def page(request, template, **context):
         "config": config, "brand": settings.apply(CONFIG, SETTINGS())["brand"], "links": config.get("links", {}), "user": user_of(request), "tasks": portal.TASKS,
         "approval": portal.approval_of(CONFIG, PORTAL.manual()), "approval_labels": portal.APPROVAL_LABELS, "mode": MODE, "ai_mode": ai_mode(),
         "replies_needed": PORTAL.replies_needed(user_of(request)) if MODE != "approvals" else 0,
-        **(business_unit(user_of(request)) if MODE != "approvals" else {}), **context})
+        **(business_unit(user_of(request)) if MODE != "approvals" else {}), "expiring": expiring(request, template), **context})
+
+
+REMIND_DAYS = 3   # the reminder shows when a temporary schema is deleted in this many days or fewer
+
+
+def expiring(request, template):
+    """The person's temporary schema when it is deleted soon (the reminder on every page), or None.
+    Never on the pages about the database being down, and never an error: a reminder is a nicety."""
+    if MODE == "approvals" or template in ("business_unit.html", "unavailable.html"):
+        return None
+    try:
+        have = temporary_schema(user_of(request))
+    except Exception:
+        return None
+    left = have.get("days_left")
+    return have if have.get("exists") is True and left is not None and left <= REMIND_DAYS else None
 
 
 def business_unit(user):
@@ -167,15 +183,9 @@ def offered(user, kind):
         return [], str(e)
 
 
-def personal_schema(user):
-    """The user's personal schema in the first workspace that offers them (one per workspace):
-    exists True, False, "pending" (asked for, still running) or None (unknown)."""
-    workspaces, _ = offered(user, "personal_schema")
-    return PORTAL.personal_schema(workspaces[0].name, user) if workspaces else {"exists": None}
-
-
 def temporary_schema(user):
-    """The user's temporary schema, as personal_schema says theirs (one at a time)."""
+    """The user's temporary schema in the first workspace that offers them (one at a time):
+    exists True, False, "pending" (asked for, still running) or None (unknown)."""
     workspaces, _ = offered(user, "personal_schema")
     return PORTAL.temporary_schema(workspaces[0].name, user) if workspaces else {"exists": None}
 
@@ -219,15 +229,14 @@ def catalog(request: Request):
     links = {**PORTAL.links_for(user, shown.get("links")), "workspace": "/open" if mine else None,
              "tour": "/open?tour=1" if mine and shown["onboarding"]["prompt"] else None}
     return page(request, "catalog.html", nav="catalog", groups=cards.groups(links),
-                quotas={"schema": personal_schema(user), "temporary_schema": temporary_schema(user)})
+                quotas={"temporary_schema": temporary_schema(user)})
 
 
-@app.get("/schema", response_class=HTMLResponse)
-def schema_form(request: Request, error: str = ""):
-    user = user_of(request)
-    workspaces, why = offered(user, "personal_schema")
-    return page(request, "schema.html", nav="catalog", workspaces=workspaces,
-                schema=portal.schema_name(user), personal=personal_schema(user), error=error or why)
+@app.get("/schema", include_in_schema=False)
+def schema_form(request: Request):
+    """Personal schemas are not offered any more: a temporary schema is each person's own now
+    (old links and bookmarks go there)."""
+    return RedirectResponse("/schema/temporary", status_code=301)
 
 
 def local_path(path):
@@ -263,12 +272,38 @@ def business_unit_submit(request: Request, bu: str = Form(""), next: str = Form(
     return RedirectResponse(local_path(next), status_code=303)
 
 
-@app.post("/schema")
-def schema_submit(request: Request, workspace: str = Form("")):
+@app.post("/schema", include_in_schema=False)
+def schema_submit(request: Request):
+    return RedirectResponse("/schema/temporary", status_code=303)   # never a personal schema now
+
+
+@app.get("/schema/temporary/{action}", response_class=HTMLResponse)
+def temporary_action_form(request: Request, action: str, schema: str = "", days: str = "", reason: str = "", error: str = ""):
+    """More time for one of the person's temporary schemas (portal.EXTENSION_DAYS), or keeping it as a project schema:
+    requests an approver always decides."""
+    if action not in ("extend", "keep"):
+        raise HTTPException(404)
+    workspaces, why = offered(user_of(request), "personal_schema")
+    have = temporary_schema(user_of(request))
+    names = [t["name"] for t in have.get("schemas") or []]
+    chosen = schema if schema in names else (names[0] if len(names) == 1 else "")
+    return page(request, "temporary_action.html", nav="catalog", action=action, have=have, chosen=chosen,
+                workspaces=workspaces, days=days, reason=reason, choices=portal.EXTENSION_DAYS, error=error or why)
+
+
+@app.post("/schema/temporary/{action}")
+def temporary_action_submit(request: Request, action: str, workspace: str = Form(""), schema: str = Form(""), days: str = Form(""),
+                            reason: str = Form("")):
+    if action not in ("extend", "keep"):
+        raise HTTPException(404)
+    reason = reason.strip()
     try:
-        started = PORTAL.request_schema(workspace, user_of(request))
+        if action == "extend":
+            started = PORTAL.request_more_time(workspace, user_of(request), int(days) if days.isdigit() else 0, reason, schema)
+        else:
+            started = PORTAL.request_keep(workspace, user_of(request), reason, schema)
     except portal.RequestError as e:
-        return schema_form(request, error=str(e))
+        return temporary_action_form(request, action, schema=schema, days=days, reason=reason, error=str(e))
     return sent(workspace, started)
 
 
@@ -389,6 +424,8 @@ def check_kind(r):
     """Which form a request came from: None for a personal schema."""
     if r.kind == "team_folder":
         return "folder"
+    if r.params.get("action") in ("extend", "convert"):
+        return None   # no name to check: it is their temporary schema
     if r.params.get("temporary") == "true":
         return "temporary_schema"
     if r.params.get("schema"):
@@ -422,6 +459,9 @@ def retry_link(r):
     if r.kind == "team_folder":
         return "/folder?" + urlencode({"workspace": r.workspace, "folder": r.params.get("folder", ""),
                                        "reason": r.params.get("reason", "")})
+    if r.params.get("action") in ("extend", "convert"):
+        return "/schema/temporary/" + ("extend" if r.params["action"] == "extend" else "keep") + "?" + urlencode(
+            {"days": r.params.get("days", ""), "reason": r.params.get("reason", "")})
     if r.params.get("temporary") == "true":   # the form asks for what follows <prefix>tmp_
         name = r.params.get("schema", "").split("tmp_", 1)[-1]
         return "/schema/temporary?" + urlencode({"workspace": r.workspace, "name": name, "reason": r.params.get("reason", "")})
@@ -498,7 +538,7 @@ if MODE == "approvals":
     import approvals_store
     APPROVALS = approvals.register(app, page, user_of, store=approvals_store.LakebaseStore(
         PORTAL.store, {w["bu"] for w in CONFIG.get("workspaces", [])}, PORTAL.run_status, start=PORTAL.run_recorded,
-        human_approval=CONFIG.get("human_approval", ()), summarize=PORTAL.summarize, run_link=PORTAL.run_link, manual=PORTAL.manual), config=CONFIG)
+        human_approval=[*CONFIG.get("human_approval", ()), *portal.ALWAYS_APPROVED], summarize=PORTAL.summarize, run_link=PORTAL.run_link, manual=PORTAL.manual, release=PORTAL.release_hold), config=CONFIG)
 
 if __name__ == "__main__":
     import uvicorn
