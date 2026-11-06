@@ -45,7 +45,7 @@
 
   /* Type scale: use these, not pixel sizes. 2xs is for glyphs, initials and key hints only. */
   --text-2xs: 11px; --text-xs: 12px; --text-sm: 13px; --text-base: 14px; --text-md: 15px;
-  --text-lg: 16px; --text-brand: 20px; --text-xl: 24px; --text-2xl: 28px;
+  --text-lg: 16px; --text-brand: 22px; --text-xl: 24px; --text-2xl: 28px;
   --regular: 400; --medium: 500; --semibold: 600;
 
   --font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -535,8 +535,10 @@ a.inbox-row:focus-visible { box-shadow: inset var(--ring); border-radius: 0; }
 .form-actions { display: flex; gap: var(--s2); }
 
 /* ---- Banner (self-service app): one line under the header, set in the approvals app's Settings ---- */
-.banner { background: var(--accent-soft); border-bottom: 1px solid var(--accent-border); color: var(--text); font-size: var(--text-base); }
-.banner-inner { max-width: var(--page-w); margin: 0 auto; padding: var(--s2) var(--s6); display: flex; align-items: center; gap: var(--s2); }
+.banner { background: var(--accent-soft); border-bottom: 1px solid var(--accent-border); color: var(--text); font-size: var(--text-lg); }
+.banner-inner { max-width: var(--page-w); margin: 0 auto; padding: 14px var(--s6); display: flex; align-items: center; gap: 10px; }
+.banner-inner > .icon { width: 20px; height: 20px; flex: none; }
+.banner-title { font-weight: var(--semibold, 600); }
 .banner .icon { color: var(--accent-ink); }
 
 /* ---- Settings (approvals app): one section per group, its fields to the right ---- */
