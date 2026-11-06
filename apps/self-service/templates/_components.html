@@ -1,0 +1,106 @@
+{#- Components both apps use (the self-service app, and the approvals app: the same code with
+    APP_MODE=approvals). One look, one place to change it: use these instead of copying markup,
+    and style them in static/app.css under "Shared components". -#}
+{%- from "_icons.html" import icon -%}
+
+{#- A link back to the page before. -#}
+{%- macro back(href, label) -%}
+<a class="back" href="{{ href }}">{{ icon("back", "icon icon-xs") }}{{ label }}</a>
+{%- endmacro -%}
+
+{#- A status: a dot and a word. Its class is the label, slugged (In progress -> in-progress);
+    app.css gives each class one of five tones. quiet: secondary text, for labels beside a title. -#}
+{%- macro status_badge(label, cls=None, id=None, quiet=False, pill=False) -%}
+<span class="status {{ cls or label | lower | replace(' ', '-') }}{{ ' quiet' if quiet }}{{ ' pill' if pill }}"{% if id %} id="{{ id }}"{% endif %}><span class="dot"></span><span class="status-text">{{ label }}</span></span>
+{%- endmacro -%}
+
+{#- Whether a task needs an approver (portal.APPROVAL: auto or required), as a quiet status. -#}
+{%- macro approval_label(kind, labels, title="") -%}
+{%- if kind -%}<span title="{{ title }}">{{ status_badge(labels[kind], "approval-" ~ kind, quiet=True) }}</span>{%- endif -%}
+{%- endmacro -%}
+
+{#- A message in a box. kind: info (a note), error, success or warning. The body is the caller's;
+    action: optional markup at the right (a link). Errors the person must act on get role="alert". -#}
+{%- macro callout(kind="info", role=None, action=None) -%}
+<div class="callout {{ kind }}"{% if role %} role="{{ role }}"{% endif %}>{{ icon({"info": "info", "error": "alert", "success": "check", "warning": "alert"}[kind], "icon callout-icon") }}<div class="callout-body">{{ caller() }}</div>{% if action %}<div class="callout-action">{{ action }}</div>{% endif %}</div>
+{%- endmacro -%}
+
+{#- A form field: its label, the control (the caller's), and helper text. A hint that changes
+    with the control can be part of the caller instead. -#}
+{%- macro field(id, label, required=False, hint=None) -%}
+<div class="field">
+  <label for="{{ id }}">{{ label }}{% if required %} <span class="req" aria-hidden="true">*</span>{% endif %}</label>
+  {{ caller() }}
+  {%- if hint %}
+  <p class="hint">{{ hint }}</p>{% endif %}
+</div>
+{%- endmacro -%}
+
+{#- Label and value rows in a card: (label, value) or (label, value, class); empty values are left out. -#}
+{%- macro kv(items) -%}
+<dl class="kv">{% for item in items if item[1] %}<div><dt>{{ item[0] }}</dt><dd{% if item | length > 2 and item[2] %} class="{{ item[2] }}"{% endif %}>{{ item[1] }}</dd></div>{% endfor %}</dl>
+{%- endmacro -%}
+
+{#- A small button that copies text (app.js), and says so. -#}
+{%- macro copy_button(text, label="Copy") -%}
+<button type="button" class="copy-button" data-copy="{{ text }}" title="{{ label }}" aria-label="{{ label }}">{{ icon("copy", "icon icon-xs") }}</button>
+{%- endmacro -%}
+
+{#- Facts at the foot of a panel: (label, value) or (label, value, class). -#}
+{%- macro details_list(items) -%}
+<dl class="panel-foot details">{% for item in items %}<div><dt>{{ item[0] }}</dt><dd{% if item | length > 2 and item[2] %} class="{{ item[2] }}"{% endif %}>{{ item[1] }}</dd></div>{% endfor %}</dl>
+{%- endmacro -%}
+
+{#- A select whose choice applies at once (filters): the form is sent on change (app.js). -#}
+{%- macro filter_select(name, options, selected, label) -%}
+<select name="{{ name }}" aria-label="{{ label }}" data-autosubmit>
+  {% for value, text in options %}<option value="{{ value }}" {{ 'selected' if selected == value }}>{{ text }}</option>{% endfor %}
+</select>
+{%- endmacro -%}
+
+{#- Facts about a request, as chips: (label, value) or (label, value, class); empty values are left out. -#}
+{%- macro facts(items) -%}
+<ul class="request-facts">{% for item in items if item[1] %}<li{% if item | length > 2 and item[2] %} class="{{ item[2] }}"{% endif %}><span class="k">{{ item[0] }}</span> {{ item[1] }}</li>{% endfor %}</ul>
+{%- endmacro -%}
+
+{#- Checks with a green tick or a red mark: (ok, text) or (ok, label, text). -#}
+{%- macro check_rows(rows, extra="") -%}
+<ul class="ai-check-rows {{ extra }}">{% for row in rows %}<li class="{{ 'ok' if row[0] else 'warn' }}">{% if row | length > 2 %}<span class="q">{{ row[1] }}</span> {% endif %}{{ row[-1] }}</li>{% endfor %}</ul>
+{%- endmacro -%}
+
+{#- A page or list with nothing in it yet. -#}
+{%- macro empty_state(icon_name, title, text, href=None, label=None) -%}
+<div class="empty">
+  {{ icon(icon_name, "icon empty-icon") }}
+  <h3>{{ title }}</h3>
+  <p>{{ text }}</p>
+  {% if href %}<a class="button" href="{{ href }}">{{ label }}</a>{% endif %}
+</div>
+{%- endmacro -%}
+
+{#- A small label: neutral, or "bad" for something that needs attention. -#}
+{%- macro chip(text, kind="") -%}<span class="chip {{ kind }}">{{ text }}</span>{%- endmacro -%}
+
+{#- A request's conversation, oldest first: who did what, and what they wrote (both apps). -#}
+{%- macro conversation(events, you="") -%}
+{%- set verbs = {"submitted": "asked", "reviewed": "reviewed it", "needs_info": "asked a question", "replied": "replied",
+                 "commented": "commented", "approved": "approved it", "rejected": "rejected it", "run_started": "started its job",
+                 "start_failed": "could not start its job", "withdrawn": "withdrew it"} -%}
+{%- set pills = {"approved": "Approved", "rejected": "Rejected", "commented": "Comment"} -%}
+<ol class="timeline">
+  {% for e in events %}
+  {%- set who = "You" if you and e.actor == you else (e.actor.split("@")[0] if "@" in e.actor else e.actor) -%}
+  <li class="event {{ e.role }} {{ e.type }}">
+    <span class="event-dot" aria-hidden="true"></span>
+    <div class="event-body">
+      <p class="event-head"><span class="event-who" title="{{ e.actor }}">{{ who }}</span>
+        {#- Decisions and comments are a pill; a question or a reply speaks for itself; an event with no message says what happened. -#}
+        {% if e.type in pills %}<span class="event-pill {{ e.type }}">{{ pills[e.type] }}</span>
+        {% elif not e.body %}<span class="event-what">{{ verbs.get(e.type, e.type) }}</span>{% endif %}
+        <span class="event-time">{{ e.at | local("short") }}</span></p>
+      {% if e.body %}<p class="event-message">{{ e.body }}</p>{% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ol>
+{%- endmacro -%}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% from "_components.html" import callout, field %}
+{% block content %}
+{% set task_icon, task_name, task_text, task_category = "folder", "Request a workspace folder", "Create a shared folder for your work.", "Build" %}
+{% set task_aside = True %}{% include "_task_header.html" %}
+
+<div class="page-grid form-grid">
+<form class="panel" method="post" action="/folder" data-submit>
+  <div class="panel-body">
+    {% call callout() %}A platform admin creates this folder for you once they approve it. You can manage it, and share it with others in Databricks once it's created. Your workspace's platform admins can manage it too.{% endcall %}
+    {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
+    {% if not workspaces %}
+      {% if not error %}{% call callout("error") %}No workspace offers folders yet.{% endcall %}{% endif %}
+    {% else %}
+      {% set on_change = True %}{% include "_workspace_select.html" %}
+
+      {% call field("folder", "Folder name", required=True, hint="Use lowercase letters, numbers, and dashes.") %}
+        <div class="prefixed"><span class="prefix mono">/Workspace/</span>
+          <input id="folder" name="folder" class="mono" required pattern="[a-z0-9][a-z0-9\-]*" value="{{ form.folder or '' }}" placeholder="my-project"></div>
+      {% endcall %}
+
+      {% set check_kind = "folder" %}{% set reason = form.reason %}{% include "_reason.html" %}
+
+      {% include "_ai_check.html" %}
+    {% endif %}
+  </div>
+  <div class="panel-foot form-foot">
+    <div class="form-actions">
+      <button type="submit" class="primary" {{ 'disabled' if not workspaces }}>{{ "Submit request" if approval["folder"] == "required" else "Create folder" }}</button>
+      <a class="button" href="/">Cancel</a>
+    </div>
+    <p class="meta">{{ "Your folder will be created once approved." if approval["folder"] == "required" else "Your folder will be ready in under a minute." }}</p>
+  </div>
+</form>
+{% include "_task_aside.html" %}
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+.terraform/
+.state/
+.plans/
+*.tfstate
+*.tfstate.*
+*.tfplan
+terraform/backend_override.tf
+dist/
+__pycache__/
+.ai-eval/
+.DS_Store
+.coverage
