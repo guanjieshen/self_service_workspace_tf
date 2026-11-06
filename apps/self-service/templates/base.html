@@ -13,8 +13,8 @@
   <header class="topbar{{ ' topbar-admin' if mode == 'approvals' }}">
     <div class="topbar-inner">
       {% if mode == "approvals" %}
-      {#- The approvals app says so: its own name and an Admin tag, on a dark bar. -#}
-      <a class="brand" href="/approvals"><span class="brand-first"{% if brand.color %} style="color: {{ brand.color }}"{% endif %}>{{ brand.name }}</span><span class="brand-rest">Approvals</span><span class="brand-tag">Admin</span></a>
+      {#- The admin app (deployed as the approvals app) says so: "<brand> Admin", on a dark bar. -#}
+      <a class="brand" href="/approvals"><span class="brand-first"{% if brand.color %} style="color: {{ brand.color }}"{% endif %}>{{ brand.name }}</span><span class="brand-rest">Admin</span></a>
       <nav aria-label="Main">
         <a href="/approvals" {% if nav == 'queue' %}aria-current="page"{% endif %}>Approvals{% if waiting_count %} <span class="nav-count">{{ waiting_count }}</span>{% endif %}</a>
         <a href="/approvals/overview" {% if nav == 'overview' %}aria-current="page"{% endif %}>Overview</a>

@@ -2,7 +2,7 @@
 {% from "_icons.html" import icon %}
 {% from "_components.html" import empty_state, callout, filter_select %}
 {% from "approvals/_macros.html" import age, sla, notes, status %}
-{% block title %}{{ views[view][0] }} · Approvals · {{ config.title }}{% endblock %}
+{% block title %}{{ views[view][0] }} · Admin · {{ config.title }}{% endblock %}
 {% block content %}
 {%- set waiting_col = view in ("review", "info") -%}
 <div class="page-head">

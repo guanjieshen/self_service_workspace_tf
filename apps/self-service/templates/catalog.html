@@ -57,7 +57,7 @@
         {% if item.more %}<a class="task-sop" href="{{ item.more[1] }}" target="_blank" rel="noopener">{{ item.more[0] }} {{ icon("external", "icon icon-xs") }}</a>{% endif %}
         {% elif ready %}
         {{ approval_label(approval.get(key), approval_labels,
-             ("Approved in Entra ID before your access changes" if key == "persona" else "An approver decides it in the approvals app") if approval.get(key) == "required" else "Runs straight away; the job checks the request") }}
+             ("Approved in Entra ID before your access changes" if key == "persona" else "An approver decides it in the admin app") if approval.get(key) == "required" else "Runs straight away; the job checks the request") }}
         {% if approval.get(key) == "auto" %}<span class="meta">Under 1 min</span>{% endif %}
         {% endif %}
         {% if ready and links.sop and links.sop[key] %}<a class="task-sop" href="{{ links.sop[key] }}" target="_blank" rel="noopener">SOP {{ icon("external", "icon icon-xs") }}</a>{% endif %}

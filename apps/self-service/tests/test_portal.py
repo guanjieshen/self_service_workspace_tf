@@ -1586,7 +1586,7 @@ class ManualFolders(unittest.TestCase):
         card = page[page.index("Request a workspace folder") - 300:page.index("Request a workspace folder") + 600]
         self.assertIn('href="/folder"', card)
         self.assertIn("Approval required", card)
-        self.assertIn("An approver decides it in the approvals app", card)
+        self.assertIn("An approver decides it in the admin app", card)
         form = self.http.get("/folder", headers=self.as_ana).text
         self.assertIn("A platform admin creates this folder for you once they approve it", form)
         self.assertIn(">Submit request</button>", form)

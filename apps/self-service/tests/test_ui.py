@@ -129,7 +129,10 @@ class ApprovalsMode(unittest.TestCase):
             with self.subTest(path=path):
                 r = http.get(path)
                 self.assertEqual(r.status_code, 200, r.text[:300])
-        self.assertIn('aria-current="page">Approvals', http.get("/approvals").text, "the header says which app this is")
+        page = http.get("/approvals").text
+        self.assertIn('aria-current="page">Approvals', page, "the inbox, in the nav")
+        self.assertIn('<span class="brand-rest">Admin</span></a>', page, "the header calls the app Admin (it is deployed as cd-approvals)")
+        self.assertIn(" · Admin", page.split("<title>", 1)[1].split("</title>", 1)[0], "its pages' titles too")
 
     def test_overview_has_periods_and_a_business_unit_filter(self):
         http = self.app("approvals")

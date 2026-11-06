@@ -102,7 +102,7 @@ def register(app, page, user_of, store, config=None):
         where = traceback.extract_tb(exc.__traceback__)[-1]
         return HTMLResponse(status_code=500, content=(
             f'<!doctype html><link rel="stylesheet" href="/static/app.css?v={getattr(request.app.state, "asset_version", "")}"><main><div class="page-head">'
-            "<h1>Something went wrong</h1><p class=\"lead\">The approvals app could not show this page.</p></div>"
+            "<h1>Something went wrong</h1><p class=\"lead\">The admin app could not show this page.</p></div>"
             f'<div class="callout error" role="alert"><div class="callout-body"><p class="strong">{html.escape(type(exc).__name__)}</p>'
             f"<p class=\"mono\">{html.escape(str(exc))[:1500]}</p>"
             f"<p class=\"meta\">{html.escape(pathlib.Path(where.filename).name)}, line {where.lineno}, in {html.escape(where.name)}</p></div></div></main>"))

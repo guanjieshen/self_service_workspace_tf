@@ -2,7 +2,7 @@
 {% from "_icons.html" import icon %}
 {% from "_components.html" import back, facts, conversation, callout, kv, copy_button %}
 {% from "approvals/_macros.html" import age, sla, status %}
-{% block title %}{{ r.name }} · Approvals{% endblock %}
+{% block title %}{{ r.name }} · Admin{% endblock %}
 {#- The Approval card's facts, one row each: the decision, who and when, then the job and its URL. -#}
 {%- macro approval_rows(decision, by, at) -%}
 {%- set job -%}{% if r.run %}{{ status(r.status) }}{% elif r.manual %}None: made by hand{% endif %}{%- endset -%}

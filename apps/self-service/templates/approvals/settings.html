@@ -2,7 +2,7 @@
 
 {% from "_components.html" import callout, field %}
 {#- One tab of the self-service app's settings (settings.py): the defaults, overridden here. -#}
-{% block title %}Settings · Approvals{% endblock %}
+{% block title %}Settings · Admin{% endblock %}
 {% block content %}
 {% include "approvals/_settings_head.html" %}
 {% if saved %}{% call callout("success", role="status") %}Saved. The Citizen Development app shows it within 15 seconds.{% endcall %}{% endif %}
