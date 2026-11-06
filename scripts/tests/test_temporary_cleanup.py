@@ -132,10 +132,11 @@ class PersonalSchemasMadeTemporary(unittest.TestCase):
         spark, report, error = run({"cd_ana": dict(personal)})
         self.assertIsNone(error)
         self.assertEqual([s for s in spark.sql_run if not s.startswith("SELECT")], [
-            "GRANT USE SCHEMA, SELECT, MODIFY, CREATE TABLE ON SCHEMA `fin_citizen_dev`.`cd_ana` TO `ana@contoso.com`",
             "REVOKE ALL PRIVILEGES, MANAGE ON SCHEMA `fin_citizen_dev`.`cd_ana` FROM `ana@contoso.com`",
+            "GRANT USE SCHEMA, SELECT, MODIFY, CREATE TABLE ON SCHEMA `fin_citizen_dev`.`cd_ana` TO `ana@contoso.com`",
             f"ALTER SCHEMA `fin_citizen_dev`.`cd_ana` SET TAGS ('cd_schema_kind' = 'temporary', 'cd_expires' = '{DAY(30)}', 'cd_converted_from' = 'personal')"],
-            "the new rights first, so they never lose access; then it expires like any temporary schema")
+            "the old rights go first: in Unity Catalog, revoking ALL PRIVILEGES revokes every privilege, even one "
+            "just granted (granting first left the owner with none, found in a real run); then it expires like any temporary schema")
         self.assertIn(f"Made 1 personal schema temporary, to be deleted on {DAY(30)}", report["summary"])
         self.assertIn("  ana@contoso.com: fin_citizen_dev.cd_ana", report["summary"])
         self.assertEqual([r["schema"] for r in report["schemas"]], ["cd_ana"], "and is then counted as a temporary schema, kept")
