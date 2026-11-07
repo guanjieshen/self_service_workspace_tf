@@ -10,6 +10,12 @@ is left alone.
 
 ## Unreleased
 
+- **`app.yaml` no longer repeats what Settings holds:** the persona request links, the FAQ pages
+  and the SOP links (all `null` there) are set only in the admin app's Settings. An `app.yaml`
+  that still sets them keeps working (they are Settings' defaults). The settings that keep a
+  real default in `app.yaml` (`title`, `onboarding.prompt`, `ai_model`,
+  `temporary_schema.limit`) say so: what a new install uses, and what Settings' Reset comes
+  back to.
 - **About our business** names the company: Enbridge Inc., headquartered in Calgary and listed
   on the TSX and NYSE (ENB), from public information only. The first plan updates the Genie Code
   instructions in every workspace.
