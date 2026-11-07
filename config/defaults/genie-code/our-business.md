@@ -14,6 +14,8 @@ characters of instructions in all, and the plan fails above that.
 
 ## What we do
 
+We are **Enbridge Inc.**, a North American energy infrastructure company headquartered in Calgary, Alberta, and listed on the Toronto and New York stock exchanges (ticker ENB). "We" and "our" on this page mean Enbridge.
+
 We move and deliver energy across North America: crude oil and other liquids through our pipelines, natural gas through our transmission systems and our gas utilities, and renewable power, mostly wind and solar. Our liquids network delivers roughly six million barrels a day.
 
 ## Our business units

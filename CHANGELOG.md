@@ -10,6 +10,16 @@ is left alone.
 
 ## Unreleased
 
+- **About our business** names the company: Enbridge Inc., headquartered in Calgary and listed
+  on the TSX and NYSE (ENB), from public information only. The first plan updates the Genie Code
+  instructions in every workspace.
+
+  **Baseline edits:**
+
+  | File | Change |
+  | --- | --- |
+  | `config/defaults/genie-code/our-business.md` | Optional: its new first paragraph (or describe your own organization) |
+
 ## 1.1.1
 
 - **Fix: an old personal schema's owner kept their access when it was made temporary.** 1.1.0's
