@@ -28,14 +28,14 @@ What people may do, and how the app behaves. Read the key's comment in the file 
 
 | They want to... | Key (under `self_service_app:` unless said) |
 | --- | --- |
-| The app's title in the header (its first word can be changed in Settings > Branding instead) | `title` |
 | Which requests wait for an approver | `human_approval` (from `project_schema`, `team_schema`, `temporary_schema`; the others are created straight away). Workspace folders always wait: an admin makes them by hand for now |
 | The Validate check on forms (AI advice on the name and reason) | `ai_check`: `"on"` or `"off"` |
 | Route people to their own business unit from a directory, instead of them choosing it once | `bu_lookup.function`: a SQL function, email in, business unit out (`catalog.schema.function`), run on `hub.warehouse_id` in `hub.yaml`. Its owner grants the self-service app EXECUTE, outside this repository. `null` = they choose |
 | The default AI model, for every AI feature (Validate, the approvers' summary, new schemas' comments) | `ai_model` (`null` = no AI; admins change it in Settings > AI). An `app.yaml` from 1.0.x names it `ai_summary` (`model:` under it): still read; replacing it with `ai_model` is optional |
 | A wiki link in the header, a short link to the app | `links.wiki`, `links.go_link` |
 | The **Add a group to your workspace** card (otherwise Coming soon) | `links.group_request`: their request form's URL |
-| The default FAQ links and prompt (Settings overrides them) | `faq.<section>`, `onboarding.prompt` |
+| The guided tour's default prompt (Settings > Onboarding overrides it; Reset comes back to it) | `onboarding.prompt` |
+| The header's title (Settings > Branding changes only its first word) | `title` |
 | The name prefix of every schema the app makes (`cd_`), or the rights of project and team schemas (and of a temporary schema kept as one) | `personal_schema.prefix`, `personal_schema.privileges` (under `jobs:`) |
 | How long a temporary schema lasts (its `cd_expires` tag; the daily cleanup job drops it after) | `temporary_schema.days` (under `jobs:`, 1 to 365) |
 | What a temporary schema's requester may do in it (they can never share it) | `temporary_schema.privileges` (under `jobs:`): never `MANAGE` or `ALL_PRIVILEGES`, the build refuses them |
