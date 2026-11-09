@@ -16,6 +16,9 @@ BARE_BASELINE = re.compile(r"(?<![\w/.-])(access|compute|cost|catalog|settings)\
 GENERATED = {"config/backend.hcl"}           # written by scripts/setup.py
 EXAMPLE_WORKSPACE = re.compile(r"config/workspaces/[a-z0-9-]+\.yaml")  # a workspace in an example
 SKIP = {"CHANGELOG.md"}                       # history: it names what was removed
+# An organization's copy (it has VERSION, install/copy_to_your_repo.py) gets a new baseline file
+# only if it adds it, so a guide may name one it has not added yet.
+INSTALLED = (ROOT / "VERSION").exists()
 # Keys and names that were removed or renamed, and must not come back.
 RETIRED = {
     "CHECKS_RUNNER / TERRAFORM_RUNNER (now RUNNER)": re.compile(r"\b(CHECKS|TERRAFORM)_RUNNER\b"),
@@ -61,7 +64,8 @@ class Docs(unittest.TestCase):
         for path in files():
             for n, line in text_lines(path):
                 for ref in PATH.findall(line):
-                    if "<" in ref or ref in GENERATED or EXAMPLE_WORKSPACE.fullmatch(ref):
+                    if "<" in ref or ref in GENERATED or EXAMPLE_WORKSPACE.fullmatch(ref) \
+                            or (INSTALLED and ref.startswith("config/defaults/")):
                         continue
                     if not (ROOT / ref).exists():
                         missing.append(f"{path.relative_to(ROOT)}:{n}: {ref}")

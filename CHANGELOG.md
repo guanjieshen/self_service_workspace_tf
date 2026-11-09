@@ -10,6 +10,14 @@ is left alone.
 
 ## Unreleased
 
+## 1.1.4
+
+- **Fix: a repository installed before 1.1.0 passes the tests after the upgrade.** An upgrade does
+  not copy new baseline files (`config/defaults/`), but a test failed when a guide named one the
+  repository did not have yet (`config/defaults/genie-code/our-business.md`, new in 1.1.0). In an
+  installed copy the test now allows it, and the skill **change-genie-code** says to create the
+  file when it is missing. Upgrade from 1.0.x straight to 1.1.4 (the 1.1.0 notes apply).
+
 ## 1.1.3
 
 - **Fix: an `app.yaml` from 1.0.x passes the tests.** 1.1.2 took `faq` out of the skill that

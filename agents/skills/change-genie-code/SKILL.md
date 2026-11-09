@@ -12,7 +12,7 @@ The person may not know Markdown or this repository. Ask what they want Genie Co
 | They want Genie Code to | Where it goes |
 | --- | --- |
 | Follow a rule on **every** answer (a convention, a guardrail) | `config/defaults/genie-code/instructions.md`: the default instructions, in every workspace |
-| Know about **the organization** (what it does, business units, terms, key data) | `config/defaults/genie-code/our-business.md`, shown as **About our business** |
+| Know about **the organization** (what it does, business units, terms, key data) | `config/defaults/genie-code/our-business.md`, shown as **About our business** (a copy installed before 1.1.0 may not have it yet: create it, with the framework's file as the example) |
 | Know how to do **one kind of task**, step by step (only when it comes up) | A skill: a new folder in `config/defaults/genie-code/skills/` |
 | Behave differently in **one workspace** only | `genie_code_instructions` in that workspace's file (the skill **change-one-workspace**) |
 
