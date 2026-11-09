@@ -10,6 +10,14 @@ is left alone.
 
 ## Unreleased
 
+## 1.1.3
+
+- **Fix: an `app.yaml` from 1.0.x passes the tests.** 1.1.2 took `faq` out of the skill that
+  explains each `app.yaml` key, and a test checks that every key in your `app.yaml` is
+  explained, so an `app.yaml` that still had `faq` (every one from 1.0.x) failed the Tests check.
+  The skill explains it again, as an older key Settings now holds. Upgrade from 1.0.x straight
+  to 1.1.3 (the 1.1.0 notes apply).
+
 ## 1.1.2
 
 Upgrade from 1.0.x straight to 1.1.2: the 1.1.0 notes apply (above all, "Before you upgrade":
