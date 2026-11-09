@@ -10,6 +10,11 @@ is left alone.
 
 ## Unreleased
 
+## 1.1.2
+
+Upgrade from 1.0.x straight to 1.1.2: the 1.1.0 notes apply (above all, "Before you upgrade":
+personal schemas become temporary). From 1.1.0 or 1.1.1, nothing to do first.
+
 - **`app.yaml` no longer repeats what Settings holds:** the persona request links, the FAQ pages
   and the SOP links (all `null` there) are set only in the admin app's Settings. An `app.yaml`
   that still sets them keeps working (they are Settings' defaults). The settings that keep a
