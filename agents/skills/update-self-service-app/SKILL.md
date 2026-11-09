@@ -35,6 +35,7 @@ What people may do, and how the app behaves. Read the key's comment in the file 
 | A wiki link in the header, a short link to the app | `links.wiki`, `links.go_link` |
 | The **Add a group to your workspace** card (otherwise Coming soon) | `links.group_request`: their request form's URL |
 | The guided tour's default prompt (Settings > Onboarding overrides it; Reset comes back to it) | `onboarding.prompt` |
+| FAQ, SOP and persona request links in an `app.yaml` from before 1.1.2 (`faq`, `links.sop`, `links.persona_request`) | Still read, as Settings' defaults; set them in Settings instead (Help links, Onboarding) and leave these as they are, or remove them |
 | The header's title (Settings > Branding changes only its first word) | `title` |
 | The name prefix of every schema the app makes (`cd_`), or the rights of project and team schemas (and of a temporary schema kept as one) | `personal_schema.prefix`, `personal_schema.privileges` (under `jobs:`) |
 | How long a temporary schema lasts (its `cd_expires` tag; the daily cleanup job drops it after) | `temporary_schema.days` (under `jobs:`, 1 to 365) |
