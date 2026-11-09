@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% from "_components.html" import back, status_badge, facts, kv, copy_button, conversation %}
+{% block title %}{{ r.status }} · {{ r.task }}{% endblock %}
+{% block content %}
+{%- set noun = "folder" if r.kind == "team_folder" else "schema" -%}
+{%- set needs = needs_approval -%}
+{{ back("/requests", "My requests") }}
+{#- What was asked for leads: the folder or schema itself, its status at the right. -#}
+<div class="request-head">
+  <div class="request-name">
+    <span class="request-icon">{{ icon(noun, "icon icon-sm") }}</span>
+    <h1 class="request-title">{{ r.resource }}</h1>
+    {{ copy_button(r.resource, "Copy the " ~ noun ~ " name") }}
+  </div>
+  {{ status_badge(r.status, id="live-status", pill=True) }}
+</div>
+{{ facts([("Workspace", r.workspace, "mono"), ("Can manage", "You and " ~ r.params["owner_group"] if r.params.get("owner_group") else "You")]) }}
+
+<div class="page-grid request-grid">
+  <div class="stack">
+    <section class="card card-body">
+      <h2 class="card-label">Request information</h2>
+      {%- set approval -%}
+        {% if needs %}<span class="approval-outcome ok">{{ icon("check", "icon icon-xs") }}Approved by {{ approver or "an approver" }}</span>
+        {% else %}<span class="strong">Not needed</span> <span class="hint">(Auto-approved by policy)</span>{% endif %}
+      {%- endset -%}
+      {{ kv([("Why", r.params.get("reason")), ("Approval", approval)]) }}
+    </section>
+
+    <section class="card card-flush live" id="live" data-poll="/api/requests/{{ r.workspace }}/{{ r.run_id }}"
+         data-status="{{ r.status }}" data-phase="{{ r.phase }}" data-started="{{ r.started_ms }}" data-noun="{{ noun }}">
+      {#- Each step with the time it began, once it has. -#}
+      <div class="card-band">
+        <ol class="steps" id="steps">
+          <li data-step="Submitted"><span class="step-dot">{{ icon("check", "icon step-check") }}</span>Submitted{% if r.started_ms %}<span class="step-time">{{ r.started_ms | local("seconds") }}</span>{% endif %}</li>
+          <li data-step="Starting"><span class="step-dot">{{ icon("check", "icon step-check") }}</span>Starting compute{% if r.started_ms %}<span class="step-time">{{ r.started_ms | local("seconds") }}</span>{% endif %}</li>
+          <li data-step="Running"><span class="step-dot">{{ icon("check", "icon step-check") }}</span>Running{% if r.running_ms %}<span class="step-time">{{ r.running_ms | local("seconds") }}</span>{% endif %}</li>
+          <li data-step="Done"><span class="step-dot">{{ icon("check", "icon step-check") }}</span>Done{% if r.ended_ms %}<span class="step-time">{{ r.ended_ms | local("seconds") }}</span>{% endif %}</li>
+        </ol>
+      </div>
+      <div class="card-pad">
+        <div class="live-message" id="live-message" role="status" aria-live="polite">
+          {% if r.status == "In progress" %}
+            <div><p class="strong">Working on it <span class="elapsed" id="elapsed"></span></p>
+            <p>This usually takes under a minute. You can leave this page; the result will show under <a href="/requests">My requests</a>.</p></div>
+          {% elif r.status == "Completed" %}
+            <div><p class="strong">Done: your {{ noun }} is ready</p>
+            <p>{{ noun | capitalize }} <span class="mono strong">{{ r.resource }}</span> is ready, and you can manage it.</p></div>
+            <div class="live-actions">
+              {% if r.link %}<a class="button primary" href="{{ r.link }}" target="_blank" rel="noopener">Open {{ noun }} {{ icon("external", "icon icon-xs") }}</a>{% endif %}
+              <button type="button" class="button" data-copy="{{ r.resource }}" aria-label="Copy the {{ noun }} name">Copy {{ "path" if noun == "folder" else "name" }}</button>
+            </div>
+          {% else %}
+            <div><p class="strong">It did not go through</p>
+            <p class="reason">{{ r.message or "The job failed; a platform admin can see why in its run." }}</p></div>
+            <div class="live-actions"><a class="button primary" href="{{ retry }}">Try again</a></div>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    {% if events %}
+    <section class="card card-body">
+      <h2 class="card-label">Conversation</h2>
+      {{ conversation(events, you=user) }}
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="stack">
+    <section class="card card-body">
+      <div class="card-head"><h2 class="card-label">Request details</h2>{{ copy_button(r.request_id, "Copy the request ID") }}</div>
+      {%- set rid -%}<span class="id-chip">{{ r.request_id }}</span>{%- endset -%}
+      {%- set took -%}{% if r.ended_ms and r.started_ms %}{% set s = ((r.ended_ms - r.started_ms) / 1000) | int %}{{ s // 60 ~ "m " if s >= 60 }}{{ s % 60 }}s{% endif %}{%- endset -%}
+      {%- set ws -%}<span class="mono">{{ r.workspace }}</span>{%- endset -%}
+      <div class="kv-side">{{ kv([("Request ID", rid), ("Started", r.started_ms | local), ("Duration", took | trim), ("Target workspace", ws)]) }}</div>
+    </section>
+
+    <section class="card card-body">
+      <div class="card-head"><h2 class="card-label">Access</h2></div>
+      {%- set level -%}<span class="id-chip plain">Can manage</span>{%- endset -%}
+      <div class="kv-side">{{ kv([("Access level", level), ("Shared with", r.params.get("owner_group") or "Only you"), ("Approval", "Approved by an approver" if needs else "Auto-approved by policy")]) }}</div>
+    </section>
+
+  </aside>
+</div>
+{% endblock %}

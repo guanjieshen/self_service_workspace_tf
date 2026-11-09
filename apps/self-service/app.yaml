@@ -1,0 +1,3 @@
+# Databricks Apps: how to start the self-service portal. The bundle deploys this folder
+# with a config.json scripts/app_build.py writes next to it.
+command: ["python", "main.py"]

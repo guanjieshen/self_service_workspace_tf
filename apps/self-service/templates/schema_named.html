@@ -1,0 +1,73 @@
+{#- A project schema (the requester's); with team set, a team schema (theirs and one of their groups');
+    with temporary set, a temporary schema (theirs, <prefix>tmp_<name>, for config.temporary_days). -#}
+{% extends "base.html" %}
+
+{% from "_components.html" import callout, field %}
+{% from "_icons.html" import icon %}
+{% block content %}
+{% set kind = "team_schema" if team else "temporary_schema" if temporary else "project_schema" %}
+{% if team %}
+{% set task_icon, task_name, task_text, task_category = "team_schema", "Request a team schema", "Create a schema your team manages together.", "Data" %}
+{% elif temporary %}
+{% set task_icon, task_name, task_text, task_category = "temporary_schema", "Create a temporary schema", "A short-term schema for experiments, yours for " ~ (config.temporary_days or 30) ~ " days.", "Data" %}
+{% else %}
+{% set task_icon, task_name, task_text, task_category = "project_schema", "Request a project schema", "Create a schema for your project.", "Data" %}
+{% endif %}
+{% set task_aside = True %}{% include "_task_header.html" %}
+
+<div class="page-grid form-grid">
+<form class="panel" method="post" action="/schema/{{ 'team' if team else 'temporary' if temporary else 'project' }}" data-submit>
+  <div class="panel-body">
+    {% call callout() %}
+      {% if temporary %}<span class="danger-text">Your temporary schema will be deleted after {{ config.temporary_days or 30 }} days.</span>
+      Until then you can create, read and change anything in it, but you can't share it with others. To keep your data, copy it to another schema before it expires. You can have {{ "one temporary schema" if (have.limit or 1) == 1 else (have.limit ~ " temporary schemas") }} at a time.
+      {% else %}{{ "You and your team will have" if team else "You'll have" }} full access to this schema and can manage permissions in Catalog Explorer.
+      Anyone you share it with will need the appropriate <a class="text-link" href="/persona">persona</a> to access it.{% endif %}{% endcall %}
+    {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
+    {% if not workspaces %}
+      {% if not error %}{% call callout("error") %}No workspace offers schemas yet.{% endcall %}{% endif %}
+    {% endif %}
+    {#- The temporary schemas they have (up to Settings > Schemas' limit), each with what they can do about it. -#}
+    {% if temporary and workspaces and have and have.schemas %}
+      {% for t in have.schemas %}
+      <div class="done-box">{{ icon("check") }}<div class="grow"><p class="strong">{{ "Your temporary schema" if have.schemas | length == 1 else "One of your temporary schemas" }}
+          {% if loop.first %}<span class="quota {{ 'full' if have.exists == True }}">{{ have.used }} of {{ have.limit }} used</span>{% endif %}</p>
+        <p class="mono">{{ t.name }}</p>
+        <p class="meta">Deleted on {{ t.expires }}.</p>
+        <p class="done-actions"><a class="button primary" href="{{ t.link }}" target="_blank" rel="noopener">Open schema {{ icon("external", "icon icon-xs") }}</a>
+          <a class="button" href="/schema/temporary/extend?schema={{ t.name | urlencode }}">Extend temporary schema</a></p></div></div>
+      {% endfor %}
+      {% if have.exists == True %}<p class="meta">That is the most you may have: ask for another once one expires.</p>{% endif %}
+    {% endif %}
+    {% if workspaces and not (temporary and have and have.exists == True) %}
+      {% set ws = (workspaces | selectattr("name", "equalto", chosen) | first) or workspaces[0] %}
+      {% set on_change, by = team, "catalog" %}{% include "_workspace_select.html" %}
+      {% call field("name", "Schema name", required=True, hint="Use lowercase letters, numbers, and underscores." if temporary else "Starts with your organization prefix. Use lowercase letters, numbers, and underscores.") %}
+        <div class="prefixed"><span class="prefix mono">{{ ws.jobs.personal_schema.tags.cd_catalog }}.{% if temporary %}{{ ws.jobs.personal_schema.tags.cd_prefix or "cd_" }}tmp_{% endif %}</span>
+          <input id="name" name="name" class="mono" required pattern="[a-z0-9][a-z0-9_]*" value="{{ name }}" placeholder="{{ 'try_join' if temporary else 'my_project' }}"></div>
+      {% endcall %}
+      {% set check_kind = kind %}{% include "_reason.html" %}
+      {% if team %}
+      {#- Typed, not chosen: the hub cannot list a person's groups in their workspace. -#}
+      {% call field("owner_group", "Team's Entra ID group", required=True,
+                    hint="Its exact name, for example sales-analysts. Everyone in it gets the same access as you.") %}
+        <input id="owner_group" name="owner_group" class="mono" required maxlength="200" pattern="[A-Za-z0-9 _.\-]+"
+               value="{{ owner_group }}" placeholder="sales-analysts" autocomplete="off">
+      {% endcall %}
+      {% endif %}
+      {% include "_ai_check.html" %}
+    {% endif %}
+  </div>
+  <div class="panel-foot form-foot">
+    <div class="form-actions">
+      {% if not (temporary and have and have.exists == True) %}
+      <button type="submit" class="primary" {{ 'disabled' if not workspaces }}>{{ "Submit request" if approval[kind] == "required" else "Create schema" }}</button>
+      {% endif %}
+      <a class="button" href="/">Cancel</a>
+    </div>
+    {% if not (have and have.exists == True) %}<p class="meta">{{ "Your schema will be created once approved." if approval[kind] == "required" else "Your schema will be ready in under a minute." }}</p>{% endif %}
+  </div>
+</form>
+{% include "_task_aside.html" %}
+</div>
+{% endblock %}
