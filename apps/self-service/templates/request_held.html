@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% from "_components.html" import back, status_badge, facts, kv, copy_button, conversation, callout %}
+{#- A request that waits for an approver (or was decided) and has no job run yet. -#}
+{%- set noun = "folder" if r.kind == "folder" else "schema" -%}
+{%- set decision = r.events | selectattr("type", "in", ["approved", "rejected"]) | first -%}
+{%- set question = r.events | selectattr("type", "equalto", "needs_info") | list | last -%}
+{%- set status = {"needs_info": "Reply needed", "rejected": "Rejected", "approved": "Completed" if r.manual else "In progress", "start_failed": "Failed"}.get(r.state, "Pending approval") -%}
+{% block title %}{{ status }} · {{ label }}{% endblock %}
+{% block content %}
+{{ back("/requests", "My requests") }}
+<div class="request-head">
+  <div class="request-name">
+    <span class="request-icon">{{ icon(noun, "icon icon-sm") }}</span>
+    <h1 class="request-title">{{ r.name }}</h1>
+    {{ copy_button(r.name, "Copy the " ~ noun ~ " name") }}
+  </div>
+  {{ status_badge(status, pill=True) }}
+</div>
+{{ facts([("Workspace", r.workspace, "mono"), ("Can manage", "You and " ~ r.owner_group if r.owner_group else "You")]) }}
+
+<div class="page-grid request-grid">
+  <div class="stack">
+    <section class="card card-body">
+      <h2 class="card-label">Request information</h2>
+      {%- set approval -%}
+        {% if decision and decision.type == "approved" %}<span class="approval-outcome ok">{{ icon("check", "icon icon-xs") }}Approved by {{ decision.actor }}</span>
+        {% elif decision %}<span class="approval-outcome bad">Rejected by {{ decision.actor }}</span>
+        {% elif r.state == "needs_info" %}<span class="strong">An approver asked you a question</span>
+        {% else %}<span class="strong">Waiting for an approver</span> <span class="hint">({{ label | lower }} requests need approval)</span>{% endif %}
+      {%- endset -%}
+      {{ kv([("Why", r.reason), ("Approval", approval)]) }}
+    </section>
+
+    <section class="card card-flush">
+      {#- Submitted, then the approver's step, then the job. -#}
+      {%- set approval_step = "failed" if decision and decision.type == "rejected" else "done" if decision else "current" -%}
+      <div class="card-band">
+        <ol class="steps">
+          <li class="done"><span class="step-dot">{{ icon("check", "icon step-check") }}</span>Submitted<span class="step-time">{{ r.created_at | local("seconds") }}</span></li>
+          <li class="{{ approval_step }}"><span class="step-dot">{{ icon("check", "icon step-check") }}</span>Approval{% if decision %}<span class="step-time">{{ decision.at | local("seconds") }}</span>{% elif question %}<span class="step-time">Question asked</span>{% endif %}</li>
+          {#- Made by hand (r.manual): approving it means it is done, so there is no run. -#}
+          {% if not r.manual %}<li class="{{ 'current' if decision and decision.type == 'approved' else '' }}"><span class="step-dot">{{ icon("check", "icon step-check") }}</span>Running</li>{% endif %}
+          <li class="{{ 'done' if r.manual and decision and decision.type == 'approved' else '' }}"><span class="step-dot">{{ icon("check", "icon step-check") }}</span>Done</li>
+        </ol>
+      </div>
+      <div class="card-pad">
+        <div class="live-message" role="status">
+          {% if decision and decision.type == "rejected" %}
+            <div><p class="strong">It was not approved</p>
+            {% if decision.body %}<p>{{ decision.body }}</p>{% endif %}
+            <p>You can ask again with the changes the approver asked for.</p></div>
+          {% elif decision and r.manual %}
+            <div><p class="strong">Your {{ noun }} is ready</p>
+            <p>A platform admin created it{% if r.path %} at <span class="mono">{{ r.path }}</span>{% endif %} in <span class="mono">{{ r.workspace }}</span>. You can manage it and share it with others in Databricks.</p></div>
+          {% elif decision and r.kind == "temporary_extension" %}
+            <div><p class="strong">Approved: {{ r.days }} more days are being added</p>
+            <p>Your temporary schema's new date shows under <a href="/schema/temporary">Create a temporary schema</a> in under a minute.</p></div>
+          {% elif decision and r.kind == "temporary_conversion" %}
+            <div><p class="strong">Approved: your temporary schema is being kept as a project schema</p>
+            <p>In under a minute it is no longer deleted, and you can share it like any project schema. It keeps its name.</p></div>
+          {% elif decision %}
+            <div><p class="strong">Approved: your {{ noun }} is being created</p>
+            <p>Its status shows under <a href="/requests">My requests</a> in under a minute.</p></div>
+          {% elif r.state == "needs_info" %}
+            <div><p class="strong">An approver needs more information</p>
+            <p>Answer below; your request goes back to the approvers with your reply.</p></div>
+            <div class="live-actions"><a class="button primary" href="#reply">Answer</a></div>
+          {% else %}
+            <div><p class="strong">With the approvers</p>
+            <p>An approver for your business unit decides it{% if r.manual %}, and a platform admin creates it{% endif %}. Any question they ask shows here and under <a href="/requests">My requests</a>.</p></div>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    <section class="card card-body">
+      <h2 class="card-label">Conversation</h2>
+      {{ conversation(r.events, you=user) }}
+      {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
+      {% if r.state == "needs_info" %}
+      <form method="post" action="/request/{{ r.id }}/reply" class="reply-form" data-submit>
+        <label for="reply">Your answer</label>
+        <textarea id="reply" name="body" rows="3" required maxlength="2000" placeholder="Answer the approver's question"></textarea>
+        <div><button type="submit" class="primary">Send answer</button></div>
+      </form>
+      {% endif %}
+    </section>
+  </div>
+
+  <aside class="stack">
+    <section class="card card-body">
+      <div class="card-head"><h2 class="card-label">Request details</h2>{{ copy_button(r.id, "Copy the request ID") }}</div>
+      {%- set rid -%}<span class="id-chip">{{ r.id }}</span>{%- endset -%}
+      {%- set ws -%}<span class="mono">{{ r.workspace }}</span>{%- endset -%}
+      <div class="kv-side">{{ kv([("Request ID", rid), ("Submitted", r.created_at | local), ("Type", label), ("Target workspace", ws)]) }}</div>
+    </section>
+
+    <section class="card card-body">
+      <div class="card-head"><h2 class="card-label">Access</h2></div>
+      {%- set level -%}<span class="id-chip plain">Can manage</span>{%- endset -%}
+      <div class="kv-side">{{ kv([("Access level", level), ("Shared with", r.owner_group or "Only you"), ("Approval", "Approval required")]) }}</div>
+    </section>
+  </aside>
+</div>
+{% endblock %}

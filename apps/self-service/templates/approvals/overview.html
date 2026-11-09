@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% from "_components.html" import filter_select %}
+{% block title %}Overview · Admin{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Overview</h1>
+  <p class="lead">Last {{ days }} days · {{ bu or ("All business units" if my_bus | length > 1 else my_bus | join("")) }}</p>
+</div>
+<div class="inbox-filters overview-filters">
+  <nav class="tabs" aria-label="Period">
+    {% for d in periods %}<a href="?{{ ({'days': d, 'bu': bu} if bu else {'days': d}) | urlencode }}" {% if d == days %}aria-current="page"{% endif %}>{{ d }} days</a>{% endfor %}
+  </nav>
+  <form method="get" action="/approvals/overview">
+    <input type="hidden" name="days" value="{{ days }}">
+    {{ filter_select("bu", [("", "All business units")] + (my_bus | map("pair") | list), bu, "Business unit") }}
+    <noscript><button type="submit" class="button">Apply</button></noscript>
+  </form>
+</div>
+<div class="stats">
+  <div class="stat"><span class="stat-label">Total requests</span><span class="stat-value">{{ o.total }}</span></div>
+  <div class="stat"><span class="stat-label">Auto-approved</span><span class="stat-value">{{ o.auto }}</span><span class="stat-sub">{{ o.auto_rate }}% of total</span></div>
+  <div class="stat {{ 'attention' if o.waiting }}"><span class="stat-label">Pending approval</span><span class="stat-value">{{ o.waiting }}</span>
+    {% if o.waiting %}<span class="stat-sub">oldest {{ o.oldest_hours }}h</span>{% endif %}</div>
+  <div class="stat"><span class="stat-label">Reviewed</span><span class="stat-value">{{ o.decided }}</span>
+    <span class="stat-sub">{{ o.approved_anyway }} approved · {{ o.decided - o.approved_anyway }} rejected</span></div>
+</div>
+<h2 class="section-title">By business unit</h2>
+<div class="list">
+  <div class="row row-head"><span class="row-main">Business unit</span><span class="col">Pending</span><span class="col">Reviewed</span></div>
+  {% for bu, n in o.by_bu.items() %}
+  <a class="row" href="/approvals?bu={{ bu }}"><span class="row-main row-title">{{ bu }}</span><span class="col">{{ n.waiting }}</span><span class="col">{{ n.decided }}</span></a>
+  {% endfor %}
+</div>
+{% endblock %}

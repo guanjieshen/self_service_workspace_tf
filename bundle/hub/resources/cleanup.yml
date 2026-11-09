@@ -1,0 +1,25 @@
+# Once a day, one job for every workspace the app serves: drops the temporary schemas whose
+# cd_expires date has passed, in each served workspace's catalog (Unity Catalog is the
+# metastore's, and every one is bound to the hub), and reports every temporary schema it looked
+# at, with a summary in plain words (ai_summarize): notebooks/temporary_cleanup.py, its catalogs
+# written in by scripts/app_build.py. Only workspace admins may run it by hand. dry_run=true
+# reports only.
+resources:
+  jobs:
+    temporary_cleanup:
+      name: Temporary schema cleanup
+      max_concurrent_runs: 1
+      tags:
+        cd_self_service: temporary_cleanup
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?"   # 06:00 UTC, every day
+        timezone_id: UTC
+        pause_status: UNPAUSED
+      parameters:
+        - {name: dry_run, default: ""}
+      tasks:
+        - task_key: cleanup
+          max_retries: 0
+          timeout_seconds: 3600
+          notebook_task:
+            notebook_path: ../build/temporary_cleanup.py

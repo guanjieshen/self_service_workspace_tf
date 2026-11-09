@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% from "_components.html" import callout %}
+{% block content %}
+{% set task_icon, task_name, task_text, task_category = "persona", "Request workspace access", "Choose the access level you need.", "Access" %}
+{% include "_task_header.html" %}
+{% set personas = [
+  ("explorer", "Explorer", "Query and explore data", ["Query data in SQL with the default warehouse", "Use dashboards and Genie", "A personal schema of your own"], True),
+  ("builder", "Builder", "Build notebooks, jobs and pipelines", ["Everything an explorer can do", "Notebooks, jobs and pipelines", "A personal cluster within the cluster policy"], True),
+  ("publisher", "Publisher", "Publish and share your work", ["Everything a builder can do", "For people who publish dashboards, apps and data for others"], False),
+] %}
+{% set request = persona_links %}
+
+{% call callout() %}{% if workspace %}This is access to <span class="strong">{{ workspace.bu }} · {{ workspace.name }}</span>, your business unit's workspace. {% endif %}Everyone starts with Consumer access to shared dashboards, Genie and apps. Additional access requires approval and typically takes effect within an hour.{% endcall %}
+
+<div class="options">
+  {% for key, name, summary, can, ready in personas %}
+  {% set href = request[key] if request is mapping else request %}
+  <div class="card option {{ 'is-soon' if not ready }}">
+    <div class="option-head">
+      <div class="option-title">
+        <h3>{{ name }}</h3>
+        {% if not ready %}<span class="access-label">Coming soon</span>{% endif %}
+      </div>
+      <p class="meta">{{ summary }}</p>
+    </div>
+    <ul class="checks">{% for c in can %}<li>{{ icon("check", "icon icon-xs") }}{{ c }}</li>{% endfor %}</ul>
+    {% if ready and href %}
+    <div class="option-foot">
+      {% if href %}<a class="button primary" href="{{ href }}" target="_blank" rel="noopener" aria-label="Request {{ name }} access">Request access {{ icon("external", "icon icon-xs") }}</a>
+{% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

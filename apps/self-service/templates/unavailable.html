@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% from "_components.html" import callout %}
+{#- Something the app needs does not answer just now (main.page): say so, and how to go on. -#}
+{% block title %}Try again in a minute · {{ config.title }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Try again in a minute</h1>
+</div>
+{% call callout("error", role="alert") %}{{ message }}{% endcall %}
+<p><a class="button" href="">Try again</a></p>
+{% endblock %}

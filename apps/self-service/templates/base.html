@@ -1,0 +1,47 @@
+{#- The layout every page shares: header with navigation and the signed-in account. -#}
+{%- from "_icons.html" import icon -%}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ config.title }}{% endblock %}</title>
+  <link rel="icon" href="/static/{{ 'favicon-approvals.svg' if mode == 'approvals' else 'favicon.svg' }}" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/app.css?v={{ asset_version }}">
+</head>
+<body>
+  <header class="topbar{{ ' topbar-admin' if mode == 'approvals' }}">
+    <div class="topbar-inner">
+      {% if mode == "approvals" %}
+      {#- The admin app (deployed as the approvals app) says so: "<brand> Admin", on a dark bar. -#}
+      <a class="brand" href="/approvals"><span class="brand-first"{% if brand.color %} style="color: {{ brand.color }}"{% endif %}>{{ brand.name }}</span><span class="brand-rest">Admin</span></a>
+      <nav aria-label="Main">
+        <a href="/approvals" {% if nav == 'queue' %}aria-current="page"{% endif %}>Approvals{% if waiting_count %} <span class="nav-count">{{ waiting_count }}</span>{% endif %}</a>
+        <a href="/approvals/overview" {% if nav == 'overview' %}aria-current="page"{% endif %}>Overview</a>
+        <a href="/approvals/settings" {% if nav == 'settings' %}aria-current="page"{% endif %}>Settings</a>
+      </nav>
+      {% else %}
+      <a class="brand" href="/">{%- set title_words = config.title.split(" ", 1) -%}<span class="brand-first"{% if brand.color %} style="color: {{ brand.color }}"{% endif %}>{{ brand.name }}</span>{% if title_words | length > 1 %}<span class="brand-rest">{{ title_words[1] }}</span>{% endif %}</a>
+      <nav aria-label="Main">
+        <a href="/" {% if nav == 'catalog' %}aria-current="page"{% endif %}>Catalog</a>
+        <a href="/requests" {% if nav == 'requests' %}aria-current="page"{% endif %}>My requests{% if replies_needed %} <span class="nav-count" title="{{ replies_needed }} {{ 'request needs' if replies_needed == 1 else 'requests need' }} your reply">{{ replies_needed }}</span>{% endif %}</a>
+      </nav>
+      {% endif %}
+      <div class="topbar-end">
+        {% if links.wiki %}<a class="toplink" href="{{ links.wiki }}" target="_blank" rel="noopener">Docs</a>{% endif %}
+        {#- The business unit sits in the account chip: a link to change it when the person chose it. -#}
+        {% set bu_label %}{% if business_unit %}<span class="account-bu">{{ business_unit }}</span>{% endif %}{% endset %}
+        {% if bu_changeable %}<a class="account" href="/business-unit" title="Signed in as {{ user }}{{ ', business unit ' ~ business_unit if business_unit }}. Change your business unit"><span class="avatar" aria-hidden="true">{{ user[:1] | upper }}</span>{{ bu_label }}<span class="account-email">{{ user }}</span></a>
+        {% else %}<span class="account" title="Signed in as {{ user }}{{ ', business unit ' ~ business_unit if business_unit }}"><span class="avatar" aria-hidden="true">{{ user[:1] | upper }}</span>{{ bu_label }}<span class="account-email">{{ user }}</span></span>{% endif %}
+      </div>
+    </div>
+  </header>
+  {#- The reminder: someone's temporary schema is deleted in 3 days or fewer (main.expiring). -#}
+  {% if expiring %}<div class="banner expiry-notice" role="status"><div class="banner-inner">{{ icon("alert", "icon") }}<span>Your temporary schema <span class="mono">{{ expiring.name }}</span> will be deleted on {{ expiring.expires }}{{ " (tomorrow)" if expiring.days_left == 1 else " (today)" if expiring.days_left == 0 else "" }}. Copy anything you want to keep, or <a class="text-link" href="/schema/temporary/extend">extend it</a>.</span></div></div>{% endif %}
+  {% if config.banner %}<div class="banner" role="status"><div class="banner-inner">{{ icon("info", "icon") }}<strong class="banner-title">Announcement</strong><span>{{ config.banner.text }}</span></div></div>{% endif %}
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <script src="/static/app.js?v={{ asset_version }}"></script>
+</body>
+</html>
