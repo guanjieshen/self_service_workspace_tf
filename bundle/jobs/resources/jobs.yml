@@ -1,0 +1,41 @@
+# The self-service jobs: one per workspace the app serves, deployed to the hub. What differs by
+# workspace (the catalog and workspace tags, who may run it, the usage policy) is in
+# build/<workspace>/target.yml. The folder job (notebooks/team_folder.py) is not deployed for now:
+# a folder is workspace specific, and the hub does not call other workspaces. To bring it back,
+# restore its resource here (git history) and its notebook in scripts/app_build.py build_jobs.
+resources:
+  # The jobs are the app's interface and its security boundary: the app asks, the job checks
+  # and acts. Each runs on serverless, on the workspace's usage policy, 20 requests side by
+  # side, more wait their turn. Only workspace admins and the hub's two apps (their service
+  # principals, in build/<workspace>/target.yml) can run them. The parameters are all empty:
+  # the app sets them. The settings a run must not change are written into the notebooks
+  # (scripts/app_build.py).
+  jobs:
+    personal_schema:
+      # One job for every schema: temporary (and its more time, or keeping it), project and team; personal
+      # ones only for an old request run again (the notebook tells them apart).
+      name: ${var.business_unit} schema requests
+      max_concurrent_runs: 20
+      queue:
+        enabled: true
+      # How the app finds the job, and what it says about itself (cd_catalog, cd_prefix: target.yml).
+      tags:
+        cd_self_service: personal_schema
+      parameters:
+        - {name: user, default: ""}
+        - {name: catalog, default: ""}
+        - {name: schema, default: ""}
+        - {name: owner_group, default: ""}
+        - {name: reason, default: ""}
+        - {name: request_id, default: ""}
+        - {name: temporary, default: ""}
+        - {name: action, default: ""}
+        - {name: days, default: ""}
+        - {name: comment_model, default: ""}
+        - {name: temporary_limit, default: ""}
+      tasks:
+        - task_key: create
+          max_retries: 0
+          timeout_seconds: 600
+          notebook_task:
+            notebook_path: ../build/${bundle.target}/personal_schema.py

@@ -1,0 +1,8 @@
+# Minimum versions the app is tested with. Databricks Apps may have older ones installed, which
+# an unpinned requirement accepts: an old databricks-sdk (no Postgres API) took both apps down once.
+fastapi>=0.139.0
+uvicorn>=0.51.0
+jinja2>=3.1.6
+python-multipart>=0.0.27
+databricks-sdk>=0.102.0
+psycopg[binary]>=3.3.6

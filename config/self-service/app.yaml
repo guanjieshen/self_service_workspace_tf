@@ -1,0 +1,123 @@
+# =============================================================================
+# SELF-SERVICE APP: the app's settings. The web app people use to ask for a personal,
+# project or team schema or a workspace folder (made by hand for now), the approvals app, and the schema job
+# they run for each workspace the app serves (in the hub). Deployed by the Databricks Asset
+# Bundles in bundle/ (not by Terraform): scripts/app_build.py reads this file,
+# config/self-service/hub.yaml and each served workspace's file and Terraform output, and checks
+# them.
+# =============================================================================
+
+self_service_app:
+  name: cd-self-service                  # the app's name (lowercase letters, digits, dashes)
+  # The app's name in the header (its first word in colour) and in the browser's tab titles.
+  # Platform admins change the first word, and its colour, in the admin app's Settings >
+  # Branding (no pull request); the rest of the title, and the tab titles, come from here.
+  title: Databricks Citizen Development
+  # Links shown in the app. null = not shown. Set in the admin app's Settings instead (no pull
+  # request, and per business unit where it applies): the persona request links (Onboarding),
+  # the FAQ pages and the standard operating procedures behind each task (Help links). An
+  # app.yaml that still sets them here (persona_request, sop, faq) keeps working: they are then
+  # Settings' defaults.
+  links:
+    wiki: null                           # header link to the platform's wiki
+    go_link: null                        # a short link to the app, shown on each page (for example go/cd-self-service)
+    # Where people ask for an Entra group to be added to their workspace with a persona (for
+    # example a ServiceNow form): the Add a group card. null = the card shows as Coming soon.
+    group_request: null
+    # Where people review data access requests in Databricks: the ones they made, and the ones
+    # others made for their data (Catalog Explorer's requests view). {host} and {workspace_id}
+    # are the person's own workspace's (their business unit's), not the hub's; or a full URL
+    # (for example on your own domain). null = no tile.
+    review_requests: "{host}/explore/data?o={workspace_id}&requestsView=audit"
+    # The workspace's Discover page: data assets curated by business domain. {host} and
+    # {workspace_id} as above; null = no Discover data card.
+    discover: "{host}/discover?o={workspace_id}"
+  # The app's database (Lakebase Postgres), always created with the app: requests and their
+  # history (what was asked, comments, decisions, the link to the job run) and the settings
+  # changed in the approvals app. Code first: the hub's bundle creates the project,
+  # scripts/app_deploy.py the database, and applies the SQL in apps/self-service/db/ (tables,
+  # view, grants). Scales to zero when idle. Who may read it: database.readers in hub.yaml.
+  database:
+    project_id: cd-self-service        # lowercase letters, digits and dashes
+    min_cu: 0.5                        # compute size while running, in capacity units
+    max_cu: 2
+    suspend_after: 300s                # idle time before it scales to zero
+    # The database's name in Unity Catalog (lowercase letters, digits and _), read by the jobs
+    # that require a request record (jobs.require_request_record below). null = none.
+    catalog: null
+  # Who is in which business unit: a Unity Catalog SQL function, catalog.schema.function, that
+  # takes a person's email and returns their business unit (a served workspace's prefix, any
+  # case), or null. With one, the forms offer only the person's own BU's workspace (its
+  # catalog, its folders) and refuse others; someone it does not know is asked to contact their
+  # platform admin. It runs on the hub's warehouse_id (hub.yaml; the bundle lets the
+  # self-service app use it).
+  # The function's owner grants its EXECUTE (and SELECT on what it reads) to the self-service
+  # app's service principal: outside this repository. null = no routing.
+  bu_lookup:
+    function: null
+  # The approvals app: the same code deployed a second time (mode approvals), which only the
+  # approvers can open. It lists every request in the business units the app serves (All
+  # requests) and the ones that need a person (Needs review). Who may open it:
+  # approvals_group in hub.yaml.
+  approvals:
+    name: cd-approvals                 # the app's name (lowercase letters, digits and dashes)
+  # The kinds of request a person must approve, in the approvals app, before their job runs
+  # (any of personal_schema, project_schema, team_schema, folder). The others run when asked.
+  human_approval: [project_schema, team_schema]
+  # The AI check of the name and the reason, on the project schema, team schema and folder
+  # forms: the app's rules, then the AI model (ai_model, below). Validate shows the requester what is
+  # unclear. Advice for the requester only: it never approves, refuses or routes a request
+  # (human_approval decides who must approve; approvers read the AI summary below).
+  #   on:  the Validate check
+  #   off: no check
+  ai_check: "on"
+  # The AI model every AI feature uses, through the hub's AI gateway: the Validate check (with
+  # ai_check on), the approvers' summary of a request that waits for them (a headline, what is
+  # asked and why, what to check), and the comment on a new project or team schema (what it is
+  # for, from the reason). Advice and descriptions only: it never approves, refuses or routes a
+  # request. The apps' and the pipeline's identities need EXECUTE on it (account users have it on
+  # system.ai by default). The default: platform admins change it in the approvals app's
+  # Settings (AI). null = no AI: Validate checks the rules only, no summaries, plain comments.
+  # This is the default: what a new install uses, and what Settings > AI's Reset goes back to.
+  ai_model: system.ai.claude-sonnet-5-5
+  # The guided tour: the Open Databricks Genie One card opens Genie One in the person's workspace with
+  # this question already asked, the first time (and when they start the tour again). Genie One
+  # does not start the onboard-me skill from a link, so the prompt spells out each step.
+  # {business_unit} and {catalog} (optional) are the person's business unit (its prefix, upper
+  # case) and its catalog. Keep it under about 1,500 characters: it travels in the link.
+  # This is the default: platform admins change it in the admin app's Settings > Onboarding
+  # (no pull request), and Reset comes back to it. "": no tour, Genie One opens with no question.
+  onboarding:
+    prompt: >-
+      I'm new here, in the {business_unit} business unit. Please onboard me, one step at a
+      time, in plain words and short answers.
+      1) In two or three sentences, tell me what I can do with Genie One in this workspace:
+      ask questions of data in plain language, find data, and build dashboards.
+      2) Look at the data assets I have access to, starting with my business unit's catalog,
+      {catalog}. Name the most useful ones, with one line each on what they seem to hold.
+      Describe only what you find, and say when you are guessing from names.
+      3) If I can't see any data yet, say so plainly, and that access comes from my platform team.
+      4) Suggest three specific questions I could ask right now that those data assets can answer,
+      and offer to answer one.
+      5) Then ask me my role and what I want to achieve with data, and suggest one small next step.
+
+# The self-service jobs (bundle/jobs/): one per workspace the app serves, in the hub. The catalog
+# a job creates schemas in is its workspace's own (its Terraform output, bound to the hub too),
+# never set here. The folder job is not deployed for now: admins make folders by hand, under folder_root.
+jobs:
+  # Where the jobs' notebooks live: at the top of the workspace, which grants only workspace
+  # admins (the jobs run with admin rights).
+  admin_path: /Workspace/Admin/self-service
+  folder_root: /Workspace             # where workspace folders are made (by an admin, for now)
+  catalog_owner: null                 # new schemas go to this group; null = the job's identity
+  personal_schema:                    # a person's own schema: cd_<email name>
+    prefix: cd_
+    privileges: [ALL_PRIVILEGES, MANAGE]
+  temporary_schema:                   # a person's short-term schema: <prefix>tmp_<name>, one at a time
+    days: 30                          # its cd_expires tag, this many days ahead; the daily cleanup job drops it after
+    limit: 1                          # how many each person may have at a time (1 to 10): the default; admins change it in Settings > Schemas
+    # What the requester may do in it: use it fully, but not share it (never MANAGE or
+    # ALL_PRIVILEGES, which let them grant it to others; the build refuses them).
+    privileges: [USE_SCHEMA, SELECT, MODIFY, CREATE_TABLE, CREATE_VOLUME, READ_VOLUME, WRITE_VOLUME,
+                 CREATE_FUNCTION, EXECUTE, CREATE_MATERIALIZED_VIEW]
+  require_request_record: false       # true: a job runs only for requests the app recorded

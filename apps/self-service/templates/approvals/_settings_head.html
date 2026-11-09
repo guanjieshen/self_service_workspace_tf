@@ -1,0 +1,12 @@
+{#- The Settings pages' title and tabs: one tab per group of settings (settings.TABS), and the
+    change history. tab: the current one. -#}
+<div class="page-head">
+  <h1>Settings</h1>
+  <p class="lead">What the Citizen Development app shows. Changes take effect within 15 seconds.</p>
+</div>
+<nav class="tabs settings-tabs" aria-label="Settings">
+  {% for key, label, _ in tabs %}
+  <a href="/approvals/settings?tab={{ key }}" {% if key == tab %}aria-current="page"{% endif %}>{{ label }}</a>
+  {% endfor %}
+  <a href="/approvals/settings/history" {% if tab == "history" %}aria-current="page"{% endif %}>Change history</a>
+</nav>
