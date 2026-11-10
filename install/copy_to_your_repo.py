@@ -231,6 +231,8 @@ def copy(target, actions, release):
         if action in ("new", "replace"):
             (target / path).parent.mkdir(parents=True, exist_ok=True)
             (target / path).write_bytes(release[path])
+            if release[path].startswith(b"#!"):   # a script stays runnable (scripts/tf.sh)
+                (target / path).chmod((target / path).stat().st_mode | 0o111)
             written += 1
         elif action == "merge":
             (target / path).write_text(merged_lines(release[path].decode(), (target / path).read_text()))

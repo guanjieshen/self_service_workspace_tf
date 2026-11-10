@@ -4,6 +4,7 @@ repository's own environment."""
 import importlib.util
 import pathlib
 import tempfile
+import os
 import unittest
 import unittest.mock
 
@@ -67,6 +68,7 @@ class Install(unittest.TestCase):
         self.assertIn("*.log", ignore, "their ignore rules stay")
         self.assertEqual(ignore.count(".terraform/"), 1)
         self.assertEqual((self.target / ".git/config").read_text(), "[theirs]\n")
+        self.assertTrue(os.access(self.target / "scripts/tf.sh", os.X_OK), "a script stays runnable")
         self.assertTrue(all(a in ("same", "keep") for a in self.plan().values()),
                         "a second run has nothing left to do")
 
