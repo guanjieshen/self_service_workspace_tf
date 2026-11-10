@@ -1,0 +1,26 @@
+# The self-service app's Python packages, in a virtual environment of the job's own. Never in the
+# runner's system Python: on a self-hosted runner that is the operating system's, which refuses
+# pip (externally-managed-environment) or holds packages pip cannot replace ("Cannot uninstall
+# typing_extensions ... installed by debian"). Every later step's python3 is the environment's.
+name: Python packages
+description: Creates a virtual environment, puts it first on the PATH, and installs the app's requirements and the given packages.
+inputs:
+  packages:
+    description: Packages to install as well as apps/self-service/requirements.txt, separated by spaces.
+    default: ""
+runs:
+  using: composite
+  steps:
+    - name: Python packages
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.packages }}
+      run: |
+        venv="$RUNNER_TEMP/python"
+        python3 -m venv "$venv" || {
+          echo "::error::python3 could not create a virtual environment: on Debian or Ubuntu, install python3-venv on the runner (docs/github-actions.md, Runners and network access)."
+          exit 1
+        }
+        echo "$venv/bin" >> "$GITHUB_PATH"
+        # shellcheck disable=SC2086 # PACKAGES is a list of package names
+        "$venv/bin/python3" -m pip install --quiet -r apps/self-service/requirements.txt $PACKAGES

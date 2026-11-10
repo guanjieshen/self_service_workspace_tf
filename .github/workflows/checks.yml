@@ -61,7 +61,9 @@ jobs:
           node-version: 22
       # The self-service app's packages, for its suite (scripts/test.sh app). Its database tests
       # need a Postgres (PG_TEST_DSN): they run in the Database tests job, and are skipped here.
-      - run: python3 -m pip install --quiet -r apps/self-service/requirements.txt httpx pyyaml
+      - uses: ./.github/actions/python
+        with:
+          packages: httpx pyyaml
       # Mocked providers: no workspace, credentials or network. Same as bash scripts/test.sh locally.
       - run: bash scripts/test.sh
 
@@ -88,7 +90,9 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           sign-in: "false"
-      - run: python3 -m pip install --quiet -r apps/self-service/requirements.txt coverage
+      - uses: ./.github/actions/python
+        with:
+          packages: coverage
       # Under coverage, so the log shows how much of the database code (store.py, db/) ran.
       - run: |
           python3 -m coverage run --include="apps/self-service/store.py,apps/self-service/db/*" \

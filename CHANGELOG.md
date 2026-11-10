@@ -10,6 +10,18 @@ is left alone.
 
 ## Unreleased
 
+- **Fix: the app's Python packages install on a self-hosted runner.** The jobs installed them
+  into the runner's own `python3`. On a self-hosted Debian or Ubuntu runner that is the operating
+  system's Python, which refuses pip (`externally-managed-environment`), or, with that switched
+  off, fails on packages apt installed (`Cannot uninstall typing_extensions ... installed by
+  debian`). Tests, Database tests, App plan and Deploy the app now install into a virtual
+  environment of the job's own (`.github/actions/python`), and nothing is installed into the
+  runner's Python.
+  **The runner needs `python3-venv`** (Debian, Ubuntu: `sudo apt install python3-venv`); a job
+  without it says so. If you switched pip's protection off on the runner for this
+  (`PIP_BREAK_SYSTEM_PACKAGES`, `break-system-packages`), you can switch it back on.
+  The first plan and deploy after it show nothing new: only how the packages are installed changed.
+
 ## 1.1.4
 
 - **Fix: a repository installed before 1.1.0 passes the tests after the upgrade.** An upgrade does

@@ -39,6 +39,14 @@ class Workflows(unittest.TestCase):
                         self.assertRegex(m.group(1), r"@[0-9a-f]{40}$", f"{path.name}:{n}: pin {m.group(1)} to a commit SHA")
                         self.assertRegex(line, r"#\s*v\d", f"{path.name}:{n}: name the version in a comment")
 
+    def test_python_packages_go_into_a_virtual_environment(self):
+        # A self-hosted runner's python3 is the operating system's: pip into it fails, or breaks it.
+        for path in WORKFLOWS:
+            for n, line in enumerate(path.read_text().splitlines(), 1):
+                with self.subTest(file=path.name, line=n):
+                    self.assertNotRegex(line, r"pip install", f"{path.name}:{n}: install with ./.github/actions/python")
+        self.assertIn('python3 -m venv', (ROOT / ".github/actions/python/action.yml").read_text())
+
     def test_every_job_has_its_own_permissions_and_a_time_limit(self):
         for path in WORKFLOWS:
             grants_nothing = re.search(r"(?m)^permissions: \{\}", path.read_text())
