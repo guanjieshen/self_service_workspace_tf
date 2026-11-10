@@ -47,6 +47,16 @@ class Workflows(unittest.TestCase):
                     self.assertNotRegex(line, r"pip install", f"{path.name}:{n}: install with ./.github/actions/python")
         self.assertIn('python3 -m venv', (ROOT / ".github/actions/python/action.yml").read_text())
 
+    def test_tools_a_job_uses_later_are_not_left_in_its_temp_folder(self):
+        # A self-hosted runner can lose RUNNER_TEMP during a job; the tool cache it keeps.
+        python = (ROOT / ".github/actions/python/action.yml").read_text()
+        self.assertNotIn("RUNNER_TEMP", python)
+        self.assertIn("RUNNER_TOOL_CACHE", python)
+        setup = (ROOT / ".github/actions/setup/action.yml").read_text()
+        keep = setup.index("name: Keep Terraform and the Databricks CLI")
+        self.assertLess(setup.index("hashicorp/setup-terraform@"), keep)
+        self.assertLess(setup.index("databricks/setup-cli@"), keep)
+
     def test_every_job_has_its_own_permissions_and_a_time_limit(self):
         for path in WORKFLOWS:
             grants_nothing = re.search(r"(?m)^permissions: \{\}", path.read_text())

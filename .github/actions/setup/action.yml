@@ -20,6 +20,27 @@ runs:
     # The Databricks CLI calls the model for the AI review (scripts/ai-plan-review.py).
     - uses: databricks/setup-cli@9625fdde9ba2607df0087e0d3ec7449198bf2180 # v1.23.0
       if: inputs.sign-in == 'true'
+    # setup-terraform and setup-cli leave Terraform and the CLI in the job's temp folder, which a
+    # self-hosted runner can lose during the job (another job emptying a shared _work/_temp):
+    # kept in the tool cache instead, one folder per build, written whole before it is used.
+    - name: Keep Terraform and the Databricks CLI
+      shell: bash
+      env:
+        SIGN_IN: ${{ inputs.sign-in }}
+      run: |
+        tools=(terraform)
+        [[ "$SIGN_IN" == "true" ]] && tools+=(databricks)
+        for tool in "${tools[@]}"; do
+          bin="$(command -v "$tool")"
+          dir="${RUNNER_TOOL_CACHE:-$HOME/.cache}/kept-tools/$tool/$(sha256sum "$bin" | cut -c1-16)"
+          if [[ ! -x "$dir/$tool" ]]; then
+            mkdir -p "$dir"
+            new="$(mktemp "$dir/.$tool.XXXXXX")"
+            cp "$bin" "$new" && chmod +x "$new"
+            mv -f "$new" "$dir/$tool"   # a rename: another job sees the old file or the new, never half
+          fi
+          echo "$dir" >> "$GITHUB_PATH"
+        done
     - name: Sign-in settings
       if: inputs.sign-in == 'true'
       shell: bash

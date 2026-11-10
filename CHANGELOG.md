@@ -10,6 +10,9 @@ is left alone.
 
 ## Unreleased
 
+- **The changelog check runs only in the framework repository.** In your copy (it has `VERSION`),
+  **Changelog for framework changes** now passes without checking: your framework changes come
+  from a release, with their entries.
 - **Fix: the app's Python packages install on a self-hosted runner.** The jobs installed them
   into the runner's own `python3`. On a self-hosted Debian or Ubuntu runner that is the operating
   system's Python, which refuses pip (`externally-managed-environment`), or, with that switched
@@ -21,6 +24,11 @@ is left alone.
   without it says so. If you switched pip's protection off on the runner for this
   (`PIP_BREAK_SYSTEM_PACKAGES`, `break-system-packages`), you can switch it back on.
   The first plan and deploy after it show nothing new: only how the packages are installed changed.
+- **Fix: "the Databricks CLI (databricks) is not installed" on a self-hosted runner,** in Preflight
+  right after the setup step passed. The CLI, and the app's Python environment, were in the job's
+  temp folder, which a self-hosted runner can empty during the job (another job starting in a
+  shared `_work` folder), and so was Terraform. All three are now kept in the runner's tool cache. Each runner instance should
+  still have its own folder: a shared one also mixes the jobs' checkouts.
 
 ## 1.1.4
 

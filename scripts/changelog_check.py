@@ -9,7 +9,11 @@ Lists the files the pull request changes (git diff <base>...HEAD). When it chang
 CHANGELOG.md, it fails, saying what to add. It also names the guide in agents/ that describes each
 changed part, as a reminder to keep it true (a reminder only: not every change needs one). An
 organization's own changes (config/, .github/CODEOWNERS) and docs need no entry.
+
+Only in the framework repository: an organization's copy (it has VERSION) takes the framework's
+changes with their entries from a release, so it passes without checking.
 """
+import pathlib
 import subprocess
 import sys
 
@@ -56,6 +60,9 @@ def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     if len(argv) != 1:
         raise SystemExit(__doc__.split("\n\n")[1])
+    if (pathlib.Path(__file__).resolve().parent.parent / "VERSION").exists():
+        print("An installed copy (VERSION): the changelog is the framework's, nothing to check.")
+        return 0
     changed = subprocess.run(["git", "diff", "--name-only", f"{argv[0]}...HEAD"], check=True, capture_output=True, text=True).stdout.split()
     ok, message = report(changed)
     print(message)

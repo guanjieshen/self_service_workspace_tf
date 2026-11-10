@@ -2,6 +2,8 @@
 # runner's system Python: on a self-hosted runner that is the operating system's, which refuses
 # pip (externally-managed-environment) or holds packages pip cannot replace ("Cannot uninstall
 # typing_extensions ... installed by debian"). Every later step's python3 is the environment's.
+# It is in the tool cache, not the job's temp folder, which a self-hosted runner can lose during
+# the job (another job emptying a shared _work/_temp); environments over a day old are removed.
 name: Python packages
 description: Creates a virtual environment, puts it first on the PATH, and installs the app's requirements and the given packages.
 inputs:
@@ -16,7 +18,10 @@ runs:
       env:
         PACKAGES: ${{ inputs.packages }}
       run: |
-        venv="$RUNNER_TEMP/python"
+        root="${RUNNER_TOOL_CACHE:-$HOME/.cache}/self-service-python"
+        mkdir -p "$root"
+        find "$root" -mindepth 1 -maxdepth 1 -mmin +1440 -exec rm -rf {} + 2>/dev/null || true
+        venv="$(mktemp -d "$root/$GITHUB_RUN_ID.XXXXXX")"
         python3 -m venv "$venv" || {
           echo "::error::python3 could not create a virtual environment: on Debian or Ubuntu, install python3-venv on the runner (docs/github-actions.md, Runners and network access)."
           exit 1
