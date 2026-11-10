@@ -265,7 +265,9 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
-      - run: python3 -m pip install --quiet -r apps/self-service/requirements.txt pyyaml
+      - uses: ./.github/actions/python
+        with:
+          packages: pyyaml
       - name: Plan
         run: python3 scripts/app_deploy.py --plan 2>&1 | tee .app-plan.txt
       - name: Summary
@@ -302,7 +304,9 @@ jobs:
             exit 1
           fi
       - uses: ./.github/actions/setup
-      - run: python3 -m pip install --quiet -r apps/self-service/requirements.txt pyyaml
+      - uses: ./.github/actions/python
+        with:
+          packages: pyyaml
       - name: Deploy
         run: python3 scripts/app_deploy.py
 
