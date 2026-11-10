@@ -20,6 +20,23 @@ runs:
     # The Databricks CLI calls the model for the AI review (scripts/ai-plan-review.py).
     - uses: databricks/setup-cli@9625fdde9ba2607df0087e0d3ec7449198bf2180 # v1.23.0
       if: inputs.sign-in == 'true'
+    # setup-cli leaves the CLI in the job's temp folder, which a self-hosted runner can lose
+    # during the job (another job emptying a shared _work/_temp): kept in the tool cache instead,
+    # one folder per CLI build, written whole before it is used.
+    - name: Keep the Databricks CLI
+      if: inputs.sign-in == 'true'
+      shell: bash
+      run: |
+        cli="$(command -v databricks)"
+        root="${RUNNER_TOOL_CACHE:-$HOME/.cache}/databricks-cli"
+        dir="$root/$(sha256sum "$cli" | cut -c1-16)"
+        if [[ ! -x "$dir/databricks" ]]; then
+          mkdir -p "$dir"
+          new="$(mktemp "$dir/.databricks.XXXXXX")"
+          cp "$cli" "$new" && chmod +x "$new"
+          mv -f "$new" "$dir/databricks"   # a rename: another job sees the old file or the new, never half
+        fi
+        echo "$dir" >> "$GITHUB_PATH"
     - name: Sign-in settings
       if: inputs.sign-in == 'true'
       shell: bash

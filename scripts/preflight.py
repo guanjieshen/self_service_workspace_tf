@@ -66,7 +66,9 @@ def cli_get(profile):
         try:
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         except FileNotFoundError:
-            raise SystemExit("error: the Databricks CLI (databricks) is not installed")
+            raise SystemExit("error: the Databricks CLI (databricks) is not installed. In GitHub Actions, where the "
+                             "setup step installs it: the runner lost it during the job, so check that each "
+                             "self-hosted runner has its own folder (docs/github-actions.md)")
         except subprocess.TimeoutExpired:
             return None, "timed out"
         if r.returncode != 0:
