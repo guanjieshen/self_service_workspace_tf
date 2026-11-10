@@ -10,6 +10,9 @@ is left alone.
 
 ## Unreleased
 
+- **The changelog check runs only in the framework repository.** In your copy (it has `VERSION`),
+  **Changelog for framework changes** now passes without checking: your framework changes come
+  from a release, with their entries.
 - **Fix: the app's Python packages install on a self-hosted runner.** The jobs installed them
   into the runner's own `python3`. On a self-hosted Debian or Ubuntu runner that is the operating
   system's Python, which refuses pip (`externally-managed-environment`), or, with that switched

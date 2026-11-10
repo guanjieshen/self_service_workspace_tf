@@ -37,6 +37,17 @@ class ChangelogCheck(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertFalse(check.report([path])[0])
 
+    def test_an_installed_copy_is_not_checked(self):
+        version = ROOT / "VERSION"
+        if version.exists():
+            self.assertEqual(check.main(["HEAD"]), 0)
+            return
+        version.write_text("v9.9.9\n")
+        try:
+            self.assertEqual(check.main(["no-such-ref"]), 0, "it returns before asking git")
+        finally:
+            version.unlink()
+
     def test_each_guide_it_names_exists(self):
         for _, guide in check.GUIDES:
             with self.subTest(guide=guide):
