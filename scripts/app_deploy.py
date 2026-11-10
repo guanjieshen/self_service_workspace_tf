@@ -70,7 +70,7 @@ def outputs(names):
     """Each served workspace's Terraform output self_service, read from its state."""
     out = {}
     for name in names:
-        r = subprocess.run([str(ROOT / "scripts/tf.sh"), name, "output", "-json", "self_service"],
+        r = subprocess.run(["bash", str(ROOT / "scripts/tf.sh"), name, "output", "-json", "self_service"],
                            cwd=ROOT, capture_output=True, text=True)
         text = r.stdout[r.stdout.find("{"):] if "{" in r.stdout else ""
         if r.returncode or not text:

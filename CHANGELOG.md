@@ -10,6 +10,10 @@ is left alone.
 
 ## Unreleased
 
+- **Fix: Deploy the app failed with `Permission denied: '.../scripts/tf.sh'`** where `tf.sh` had
+  lost its executable bit (a copy through Windows, a web upload or a Git folder, or
+  `install/copy_to_your_repo.py`, which did not keep it). The deploy now runs it with `bash`, as
+  the workflows do, and the copy tool keeps scripts executable.
 - **The changelog check runs only in the framework repository.** In your copy (it has `VERSION`),
   **Changelog for framework changes** now passes without checking: your framework changes come
   from a release, with their entries.
