@@ -24,7 +24,7 @@ is left alone.
 - **Fix: "the Databricks CLI (databricks) is not installed" on a self-hosted runner,** in Preflight
   right after the setup step passed. The CLI, and the app's Python environment, were in the job's
   temp folder, which a self-hosted runner can empty during the job (another job starting in a
-  shared `_work` folder). Both are now kept in the runner's tool cache. Each runner instance should
+  shared `_work` folder), and so was Terraform. All three are now kept in the runner's tool cache. Each runner instance should
   still have its own folder: a shared one also mixes the jobs' checkouts.
 
 ## 1.1.4

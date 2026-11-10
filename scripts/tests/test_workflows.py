@@ -53,7 +53,9 @@ class Workflows(unittest.TestCase):
         self.assertNotIn("RUNNER_TEMP", python)
         self.assertIn("RUNNER_TOOL_CACHE", python)
         setup = (ROOT / ".github/actions/setup/action.yml").read_text()
-        self.assertLess(setup.index("databricks/setup-cli@"), setup.index("name: Keep the Databricks CLI"))
+        keep = setup.index("name: Keep Terraform and the Databricks CLI")
+        self.assertLess(setup.index("hashicorp/setup-terraform@"), keep)
+        self.assertLess(setup.index("databricks/setup-cli@"), keep)
 
     def test_every_job_has_its_own_permissions_and_a_time_limit(self):
         for path in WORKFLOWS:
