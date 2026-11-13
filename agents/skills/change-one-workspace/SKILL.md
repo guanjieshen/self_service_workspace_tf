@@ -24,6 +24,7 @@ Common ones, in `config/workspaces/<name>.yaml`:
 | A label next to the workspace's name | `label: {text: DEV, color: lime}` (coral, lemon, lime, turquoise, indigo, purple, pink) |
 | An admin setting differs here | `settings.<key>` (`null` = leave it alone here) |
 | Genie Code knows about this workspace | `genie_code_instructions: |` then Markdown (added after the baseline's) |
+| A Genie Code skill for this workspace only | not this file: a folder next to it, `<name>/genie-code/skills/<skill>/SKILL.md` (the skill **change-genie-code**) |
 | Leave the self-service app out of it | `self_service: false` |
 | Stop managing it | delete the file: Terraform forgets it, **nothing in the workspace changes** |
 

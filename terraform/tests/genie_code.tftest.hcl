@@ -24,8 +24,8 @@ run "default_only" {
     error_message = "Without its own instructions.md, a workspace gets the default instructions only."
   }
   assert {
-    condition     = contains(keys(local.genie_skills), "build-tagged-assets/SKILL.md")
-    error_message = "Every workspace gets the default skills."
+    condition     = tolist(keys(local.genie_skills)) == tolist(["build-tagged-assets/SKILL.md", "how-this-workspace-works/SKILL.md", "onboard-me/SKILL.md"])
+    error_message = "Without skills of its own, a workspace gets the baseline's skills, and only those."
   }
 }
 
@@ -38,8 +38,16 @@ run "default_plus_workspace" {
     error_message = "A workspace's genie_code_instructions are appended after the default instructions."
   }
   assert {
-    condition     = tolist(keys(local.genie_skills)) == tolist(["build-tagged-assets/SKILL.md", "how-this-workspace-works/SKILL.md", "onboard-me/SKILL.md"])
-    error_message = "Every workspace gets the baseline's skills, and only those."
+    condition     = tolist(keys(local.genie_skills)) == tolist(["build-tagged-assets/SKILL.md", "how-this-workspace-works/SKILL.md", "monthly-volumes/SKILL.md", "onboard-me/SKILL.md"])
+    error_message = "A workspace gets the baseline's skills plus its own (genie-code/skills/ next to its file)."
+  }
+  assert {
+    condition     = strcontains(local.genie_skill_text["monthly-volumes/SKILL.md"], "`tst_citizen_dev.shared`") && !strcontains(local.genie_skill_text["monthly-volumes/SKILL.md"], "must not be deployed")
+    error_message = "A workspace's own skill gets its placeholders filled and its comments removed, like the baseline's."
+  }
+  assert {
+    condition     = strcontains(local.genie_skill_text["onboard-me/SKILL.md"], "this workspace's own")
+    error_message = "A workspace skill with a baseline skill's name replaces it, in that workspace."
   }
 }
 

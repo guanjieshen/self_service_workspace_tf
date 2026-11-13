@@ -1,13 +1,15 @@
-"""The baseline's Genie Code skills (config/defaults/genie-code/skills/): each is a folder named in
+"""The Genie Code skills, the baseline's (config/defaults/genie-code/skills/) and each workspace's
+(<workspace>/genie-code/skills/ next to its file): each is a folder named in
 lowercase letters, digits and hyphens, with a SKILL.md whose front matter gives that name and a
 description. Genie Code reads the description to decide when to use a skill, and ignores one
-it cannot read. Checks the organization's baseline and the copy the Terraform tests use."""
+it cannot read. Checks the organization's, and the copies the Terraform tests use."""
 import re
 import unittest
 
 from helpers import ROOT
 
-BASELINES = [ROOT / "config/defaults/genie-code/skills", ROOT / "terraform/tests/defaults/genie-code/skills"]
+BASELINES = [ROOT / "config/defaults/genie-code/skills", ROOT / "terraform/tests/defaults/genie-code/skills",
+             *sorted(p for d in ("config/workspaces", "dev/workspaces", "terraform/tests/fixtures") for p in ROOT.glob(f"{d}/*/genie-code/skills"))]
 
 
 def front_matter(text):

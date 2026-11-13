@@ -15,7 +15,8 @@ config/
 │   └── genie-code/           Genie Code instructions and skills, for every workspace
 ├── workspaces/               one file per workspace: the list of workspaces CI deploys
 │   ├── _example.yaml         the template to copy
-│   └── <name>.yaml           a workspace: prefix, host, its groups, and any change to the baseline
+│   ├── <name>.yaml           a workspace: prefix, host, its groups, and any change to the baseline
+│   └── <name>/genie-code/    optional: Genie Code skills for that workspace only
 ├── setup.yaml                the setup values (docs/SETUP.md, step 1), and the AI review's workspace
 └── backend.hcl               where Terraform state is kept (written by scripts/setup.py state)
 ```
@@ -94,10 +95,47 @@ The keys a workspace file usually sets. `prefix`, `host`, `genie_code_instructio
 | Leave a setting alone (something else manages it) | the key set to `null` in `defaults/` | the key set to `null` in its file |
 | Leave the serverless usage policy alone | `serverless_policy.enabled: false` in `defaults/cost.yaml` | the same in its file |
 | Change Genie Code instructions | `defaults/genie-code/instructions.md` | `genie_code_instructions` in its file (appended after the default) |
-| Add a Genie Code skill | a folder in `defaults/genie-code/skills/` | (every workspace gets the baseline's skills) |
+| Add a Genie Code skill | a folder in `defaults/genie-code/skills/` | a folder in `workspaces/<name>/genie-code/skills/` (added to the baseline's; the same name replaces one) |
 | Leave Genie Code alone (managed elsewhere) | `settings.genie_code` in `defaults/settings.yaml` | `settings.genie_code: null` in its file |
 | Show a label next to the workspace name | | `label` in its file |
 | Tell Genie Code about your business (what you do, business units, terms, key data) | `defaults/genie-code/our-business.md`: added to the instructions under **About our business** | (the same in every workspace; per workspace, `genie_code_instructions` in its file) |
+
+## Genie Code for one workspace
+
+Every workspace gets the baseline's instructions and skills (`defaults/genie-code/`). A workspace can add its own, without changing the others:
+
+| To add | Where | In the workspace |
+| --- | --- | --- |
+| **Instructions** (a rule or fact for every answer here) | `genie_code_instructions` in `workspaces/<name>.yaml` | Under **Workspace instructions**, after the default ones and About our business |
+| **A skill** (how to do one task, read only when it comes up) | `workspaces/<name>/genie-code/skills/<skill>/SKILL.md` | Next to the baseline's skills. A folder with a baseline skill's name **replaces** it, here only |
+
+For example, for a finance workspace, `workspaces/fin-dev.yaml`:
+
+```yaml
+genie_code_instructions: |
+  ## About this workspace
+  - This workspace is for the finance team's month-end reporting.
+  - Our curated tables are in `{CATALOG}.finance_shared`. Start there before raw data.
+  - Amounts are in Canadian dollars unless a column says otherwise.
+```
+
+And a skill for one task there, `workspaces/fin-dev/genie-code/skills/month-end-close/SKILL.md`:
+
+```markdown
+---
+name: month-end-close
+description: Use when someone asks to build or refresh the month-end close report, or check that this month's numbers balance.
+---
+
+# Month-end close
+
+1. Read this month's entries from `{CATALOG}.finance_shared.gl_entries`.
+2. ...
+```
+
+- **The same rules as the baseline's:** placeholders (`{CATALOG}`, `{WAREHOUSE}`, ..., [below](#conventions-in-the-baseline-files)) are filled in with this workspace's values, `<!-- comments -->` are removed, and a skill's front matter gives its folder's `name` and a `description` starting with "Use when". Start a skill from `agents/skills/change-genie-code/template-SKILL.md`.
+- **Instructions share a 20,000-character limit** with the default ones (the plan fails above it). Anything long or task-specific is better as a skill.
+- **A pull request plans only this workspace**, like any change to its file.
 
 After an edit: open a pull request. Its plan comments show what changes in each workspace it concerns. Locally: `./scripts/tf.sh <name> plan`, or `./scripts/tf.sh all plan` after changing `defaults/`. More examples: [docs/user-journeys.md](../docs/user-journeys.md).
 

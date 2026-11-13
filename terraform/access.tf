@@ -129,9 +129,17 @@ locals {
     try(local.config.sql_warehouse.auto_stop_minutes, null) == null ? "" : "stops after ${local.config.sql_warehouse.auto_stop_minutes} idle minutes",
   ]))
 
-  # Skills: one folder per skill under genie-code/skills/, each with a SKILL.md.
-  genie_skill_files   = [for f in fileset("${local.genie_default_dir}/skills", "*/**") : f if !startswith(basename(f), ".")]
-  genie_skill_sources = { for f in local.genie_skill_files : f => "${local.genie_default_dir}/skills/${f}" }
+  # Skills: one folder per skill under genie-code/skills/, each with a SKILL.md. The baseline's,
+  # plus this workspace's own (config/workspaces/<workspace>/genie-code/skills/); a workspace skill
+  # with a baseline skill's name replaces it, in this workspace.
+  genie_ws_skills_dir    = "${local.workspaces_dir}/${var.workspace}/genie-code/skills"
+  genie_skill_files      = [for f in fileset("${local.genie_default_dir}/skills", "*/**") : f if !startswith(basename(f), ".")]
+  genie_ws_skill_files   = [for f in fileset(local.genie_ws_skills_dir, "*/**") : f if !startswith(basename(f), ".")]
+  genie_ws_skill_folders = distinct([for f in local.genie_ws_skill_files : split("/", f)[0]])
+  genie_skill_sources = merge(
+    { for f in local.genie_skill_files : f => "${local.genie_default_dir}/skills/${f}" if !contains(local.genie_ws_skill_folders, split("/", f)[0]) },
+    { for f in local.genie_ws_skill_files : f => "${local.genie_ws_skills_dir}/${f}" },
+  )
 
   # Every text Genie Code gets (the instructions, and each skill's Markdown), rendered the same way.
   genie_raw = merge(
