@@ -24,6 +24,10 @@ class ReleaseZip(unittest.TestCase):
         self.assertNotIn("config/backend.hcl", out)
         self.assertEqual(sorted(p for p in out if p.startswith("config/workspaces/")), ["config/workspaces/_example.yaml"])
 
+    def test_leaves_out_a_workspace_folder(self):
+        out = rel.release_files({**self.files, "config/workspaces/x/genie-code/skills/y/SKILL.md": b"x"})
+        self.assertEqual(sorted(p for p in out if p.startswith("config/workspaces/")), ["config/workspaces/_example.yaml"])
+
     def test_blanks_the_values_and_keeps_the_instructions(self):
         out = rel.release_files(self.files)
         setup = out["config/setup.yaml"].decode()

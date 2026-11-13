@@ -1,6 +1,6 @@
 ---
 name: change-genie-code
-description: Use when someone wants to add, change or remove a Genie Code skill that every workspace gets, or change Genie Code's default instructions or the business context (about our business). Explains where each lives, the placeholders filled in per workspace, the house style, and hands over to pull-request-from-databricks.
+description: Use when someone wants to add, change or remove a Genie Code skill (for every workspace, or one), or change Genie Code's default instructions or the business context (about our business). Explains where each lives, the placeholders filled in per workspace, the house style, and hands over to pull-request-from-databricks.
 ---
 
 # Change Genie Code's instructions and skills
@@ -14,13 +14,14 @@ The person may not know Markdown or this repository. Ask what they want Genie Co
 | Follow a rule on **every** answer (a convention, a guardrail) | `config/defaults/genie-code/instructions.md`: the default instructions, in every workspace |
 | Know about **the organization** (what it does, business units, terms, key data) | `config/defaults/genie-code/our-business.md`, shown as **About our business** (a copy installed before 1.1.0 may not have it yet: create it, with the framework's file as the example) |
 | Know how to do **one kind of task**, step by step (only when it comes up) | A skill: a new folder in `config/defaults/genie-code/skills/` |
-| Behave differently in **one workspace** only | `genie_code_instructions` in that workspace's file (the skill **change-one-workspace**) |
+| Follow a rule or know a fact in **one workspace** only | `genie_code_instructions` in that workspace's file (the skill **change-one-workspace**) |
+| Know how to do a task in **one workspace** only | A skill in `config/workspaces/<name>/genie-code/skills/<skill>/` (a baseline skill's name replaces it there) |
 
 Prefer a skill for anything long or task-specific: the instructions apply to every answer and share a 20,000-character limit (the plan fails above it), while a skill is read only when its description matches the request.
 
 ## 2. Write it
 
-- **A new skill:** copy `agents/skills/change-genie-code/template-SKILL.md` to `config/defaults/genie-code/skills/<name>/SKILL.md`. The folder name is lowercase words and dashes, and the front matter's `name` is the same. The `description` starts with "Use when" and says plainly when Genie Code should use it: that's what it matches on.
+- **A new skill:** copy `agents/skills/change-genie-code/template-SKILL.md` to `config/defaults/genie-code/skills/<name>/SKILL.md` (or, for one workspace, `config/workspaces/<workspace>/genie-code/skills/<name>/SKILL.md`). The folder name is lowercase words and dashes, and the front matter's `name` is the same. The `description` starts with "Use when" and says plainly when Genie Code should use it: that's what it matches on.
 - **Placeholders** are filled in per workspace from its configuration (its file over the baseline), in the instructions and every skill: `{PREFIX}`, `{CATALOG}`, `{WAREHOUSE}`, `{WAREHOUSE_DETAILS}`, `{TAGS}`, `{WORKSPACE_TAGS}`, `{PERSONAS}`, `{CLASSIC_POLICIES}` (what each holds: `config/README.md`). Use them instead of writing a name or a limit by hand, so the text stays right when the configuration changes.
 - **`<!-- comments -->`** are removed before deploying: use them for notes to the next editor.
 
@@ -35,4 +36,4 @@ Prefer a skill for anything long or task-specific: the instructions apply to eve
 
 1. Read it back in plain words: what Genie Code will now do, and where.
 2. In the framework repository only: copy the same change to `terraform/tests/defaults/genie-code/` (the tests check the two match), and run `./scripts/test.sh`.
-3. Hand over to the skill **pull-request-from-databricks**. **Every workspace is planned:** each plan comment shows the instructions or the skill's file changing, and nothing else.
+3. Hand over to the skill **pull-request-from-databricks**. **Every workspace is planned** (only that one, for a workspace's own skill or instructions): each plan comment shows the instructions or the skill's file changing, and nothing else.

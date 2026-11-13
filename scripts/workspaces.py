@@ -224,7 +224,9 @@ def affected(base, head, plan=False):
     every = lambda p: re.match(EVERYTHING, p) and not re.match(NOT_DEPLOYED, p)
     if any(every(p) or (plan and re.match(PLAN_ONLY, p)) for _, p in paths):
         return {"workspaces": current, "removed": removed}
-    touched = {m.group(2) for _, p in paths for m in [workspace_file.match(p)] if m}
+    # Its file, or its own folder next to it (its Genie Code skills).
+    workspace_path = re.compile(r"^(config|dev)/workspaces/([^/_][^/]*?)(\.yaml$|/)")
+    touched = {m.group(2) for _, p in paths for m in [workspace_path.match(p)] if m}
     return {"workspaces": sorted(touched & set(current)), "removed": removed}
 
 

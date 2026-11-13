@@ -39,7 +39,8 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 import workspaces as wsf  # noqa: E402  (the same YAML reading as the other scripts)
 
-LEFT_OUT = re.compile(r"^(dev/|config/backend\.hcl$|config/workspaces/(?!_example\.yaml$)[^/]+\.yaml$)")
+# The workspaces: their files and their own folders (Genie Code skills); only the example ships.
+LEFT_OUT = re.compile(r"^(dev/|config/backend\.hcl$|config/workspaces/(?!_example\.yaml$))")
 # Blanked, but not identifiers: an Azure region is a common word, found in examples too.
 NOT_IDENTIFIERS = {"state_location"}
 OWNER = "@your-org/databricks-platform"

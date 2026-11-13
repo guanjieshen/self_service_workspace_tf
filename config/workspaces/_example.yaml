@@ -43,7 +43,9 @@ groups:
 #   text: DEV
 #   color: lime
 
-# Genie Code instructions for this workspace, after the baseline's (Markdown).
+# Genie Code instructions for this workspace, after the baseline's (Markdown). Skills for this
+# workspace only go in a folder next to this file: <name>/genie-code/skills/<skill>/SKILL.md
+# (config/README.md, "Genie Code for one workspace").
 # genie_code_instructions: |
 #   ## About this workspace
 #   - Our curated tables are in `xyz_citizen_dev.shared`.

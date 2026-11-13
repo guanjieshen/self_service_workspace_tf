@@ -36,8 +36,9 @@ locals {
   # ---- This workspace: config/workspaces/<workspace>.yaml ----
   # One file: who the workspace is (workspace_keys), and any baseline key it changes, at the
   # top level with the same name and shape. A file with only comments counts as empty.
-  ws_file = "${coalesce(var.workspaces_dir, "${local.project_root}/config/workspaces")}/${var.workspace}.yaml"
-  ws_all  = try({ for k, v in yamldecode(file(local.ws_file)) : k => v }, {})
+  workspaces_dir = coalesce(var.workspaces_dir, "${local.project_root}/config/workspaces")
+  ws_file        = "${local.workspaces_dir}/${var.workspace}.yaml"
+  ws_all         = try({ for k, v in yamldecode(file(local.ws_file)) : k => v }, {})
   # Keys only a workspace has, besides the baseline's own sections.
   workspace_keys = ["prefix", "host", "id", "label", "auth", "genie_code_instructions", "self_service"]
   workspace      = { for k in setsubtract(local.workspace_keys, ["genie_code_instructions"]) : k => local.ws_all[k] if contains(keys(local.ws_all), k) }

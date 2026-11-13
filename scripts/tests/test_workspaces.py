@@ -178,6 +178,10 @@ class Affected(unittest.TestCase):
         self.change("config/workspaces/delta.yaml")
         self.assertEqual(self.affected()["workspaces"], ["delta"])
 
+    def test_a_workspace_folder_concerns_that_workspace(self):
+        self.change("config/workspaces/beta/genie-code/skills/x/SKILL.md")
+        self.assertEqual(self.affected(), {"workspaces": ["beta"], "removed": []})
+
     def test_dev_workspaces_too(self):
         self.change("dev/workspaces/gamma.yaml")
         self.assertEqual(self.affected()["workspaces"], ["gamma"])

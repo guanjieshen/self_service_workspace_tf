@@ -10,6 +10,14 @@ is left alone.
 
 ## Unreleased
 
+- **Genie Code skills for one workspace.** A workspace can have its own skills, in a folder next
+  to its file: `config/workspaces/<name>/genie-code/skills/<skill>/SKILL.md`, laid out like the
+  baseline's and with the same placeholders. They are added to the baseline's skills in that
+  workspace only; a folder with a baseline skill's name replaces it there. A change plans only
+  that workspace. `config/README.md`, "Genie Code for one workspace", shows it with an example,
+  next to the workspace's own instructions (`genie_code_instructions`). Nothing changes in a
+  workspace without such a folder. **Baseline edits:** none.
+
 ## 1.1.4
 
 - **Fix: a repository installed before 1.1.0 passes the tests after the upgrade.** An upgrade does
