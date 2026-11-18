@@ -11,7 +11,7 @@
 # A domain's groups are persona groups (access.tf): they get their persona's access, the
 # catch-all's warehouse and usage policy, and their domain's. The domain's policy is named to
 # sort before the catch-all's ({PREFIX}-0-SELF-SERVICE), so it is the one its members' usage
-# goes to when they do not pick one (cost.yaml). A workspace without domains changes nothing.
+# goes to when they do not pick one (config/defaults/cost.yaml). A workspace without domains changes nothing.
 
 locals {
   domains_in = try({ for d, v in local.ws_all.domains : d => v }, {})
