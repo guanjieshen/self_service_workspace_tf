@@ -20,6 +20,7 @@ Common ones, in `config/workspaces/<name>.yaml`:
 | Use another Entra group for an access level | `groups.<persona>` (users, explorer, builder, publisher; `null` = nobody) |
 | A bigger or smaller default warehouse here | `sql_warehouse.size` |
 | Set this workspace's APPID, or another tag value | `tags.APPID`; `tags.<KEY>: null` drops a tag here |
+| Give some groups their own usage policy, SQL warehouse and APPID here (a domain), on top of the workspace's | `domains.<name>`: `groups` by persona (one name or a list), `tags.APPID` (required, not NONE), optional `sql_warehouse` keys and `serverless_policy.name` (with `{PREFIX}`). A group is in one domain only and not also under `groups:`; the groups must be Entra account groups |
 | Let people share folders with an Entra group (it gets no access by itself) | `sharing_groups: [<group>]` (not a persona, admins or users group) |
 | A label next to the workspace's name | `label: {text: DEV, color: lime}` (coral, lemon, lime, turquoise, indigo, purple, pink) |
 | An admin setting differs here | `settings.<key>` (`null` = leave it alone here) |

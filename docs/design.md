@@ -112,6 +112,17 @@ workspace. What keeps that safe:
 - Each workspace names its own persona groups (`groups:` in its file); only
   `{prefix}_platform_admins` comes from the baseline. A persona without a group is skipped.
 
+**Domains.** A workspace's file may give some groups their own serverless usage policy, SQL
+warehouse and chargeback tags (`domains:`, `terraform/domains.tf`), on top of the workspace's own:
+
+- **Access is the personas':** a domain's groups are listed by persona and get that persona's
+  entitlements and grants, the workspace's warehouse and usage policy, and their domain's.
+- **Chargeback:** the domain's policy and warehouse carry the workspace's tags with the domain's
+  over them (its own `APPID`, required) and `DOMAIN`. The policy is named
+  `{PREFIX}-0-DOMAIN-<NAME>`, which sorts before the workspace's `{PREFIX}-0-SELF-SERVICE`, so a
+  member's serverless usage goes to their domain when they pick no policy.
+- **Additive:** a workspace without `domains:` plans as before; adding one only adds resources.
+
 **Sharing groups.** A workspace folder can be shared only with a group assigned to the
 workspace. `sharing_groups` (in a workspace's file) assigns other Entra groups there **with
 every entitlement off**, so people can share with them:

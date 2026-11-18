@@ -84,6 +84,43 @@ resource "terraform_data" "config_checks" {
       error_message = "sharing_groups needs settings.users_group_entitlements (config/defaults/settings.yaml) to set every entitlement to false: the built-in users group's entitlements reach every sharing group's members. Turn them off, or remove sharing_groups."
     }
     precondition {
+      condition = alltrue([for d, v in local.domains_in : can(regex("^[a-z][a-z0-9_]*$", d)) && can(keys(v)) && alltrue([
+        for k in try(keys(v), []) : contains(["groups", "tags", "serverless_policy", "sql_warehouse"], k)
+      ])]) && (try(local.ws_all.domains, null) == null || can(keys(local.ws_all.domains)))
+      error_message = "domains (the workspace's file): each domain is a name of lowercase letters, digits and _ (starting with a letter), and may set only groups, tags, serverless_policy and sql_warehouse."
+    }
+    precondition {
+      condition = alltrue([for d, v in local.domains_in : can(keys(v.groups)) && length(local.domain_members[d]) > 0 && alltrue([
+        for p, gs in try(v.groups, {}) : contains(keys(local.personas), p) && alltrue([for g in flatten([gs]) : can(regex("^[^\\s]", g))])
+      ])])
+      error_message = "domains.<domain>.groups: each domain needs at least one group, under a persona this workspace has (${join(", ", sort(keys(local.personas)))}): a group name or a list of them."
+    }
+    precondition {
+      condition = length(flatten([for d, ps in local.domain_groups : values(ps)])) == length(distinct(flatten([for d, ps in local.domain_groups : values(ps)]))) && length(setintersection(
+        toset(flatten([for d, ps in local.domain_groups : values(ps)])), toset(concat(values(local.group_names), local.sharing_groups))
+      )) == 0
+      error_message = "domains.<domain>.groups: a group belongs to one domain and one persona, and is not also in groups: (the workspace's own personas, platform_admins, users) or sharing_groups."
+    }
+    precondition {
+      condition = alltrue([for d, v in local.domains_in : can(keys(v.tags)) && !contains(["", "NONE"], upper(try(tostring(v.tags.APPID), ""))) && alltrue([
+        for k, x in try(v.tags, {}) : can(regex("^[A-Za-z0-9_.-]+$", k)) && (x == null || can(tostring(x)))
+      ])])
+      error_message = "domains.<domain>.tags: each domain sets its own APPID (not NONE), and each tag key is letters, digits, _, . or - with a single value (or null to drop the workspace's tag)."
+    }
+    precondition {
+      condition = length(local.domains_in) == 0 || (try(local.sp.enabled, null) == true && alltrue([for d, v in local.domains_in : try(v.serverless_policy, null) == null || (
+        can(keys(v.serverless_policy)) && alltrue([for k in keys(v.serverless_policy) : k == "name"]) &&
+        (try(v.serverless_policy.name, null) == null || can(regex("\\{(PREFIX|prefix)\\}", v.serverless_policy.name)))
+      )]))
+      error_message = "domains.<domain>.serverless_policy: domains need serverless_policy.enabled: true (config/defaults/cost.yaml), and may set only name, which must contain {PREFIX} (usage policies are account-wide, so the name must not clash with another workspace's)."
+    }
+    precondition {
+      condition = alltrue([for d, v in local.domains_in : try(v.sql_warehouse, null) == null || (can(keys(v.sql_warehouse)) && alltrue([
+        for k in keys(v.sql_warehouse) : contains(setsubtract(keys(local.defaults.sql_warehouse), ["workspace_default"]), k)
+      ]))])
+      error_message = "domains.<domain>.sql_warehouse: may set only ${join(", ", sort(setsubtract(keys(local.defaults.sql_warehouse), ["workspace_default"])))} (the baseline's sql_warehouse keys)."
+    }
+    precondition {
       condition     = try(local.settings.compliance_security_profile, null) == null || can(tolist(local.settings.compliance_security_profile))
       error_message = "settings.compliance_security_profile must be null (leave alone) or a list of compliance standards."
     }

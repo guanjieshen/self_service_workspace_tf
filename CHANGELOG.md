@@ -10,6 +10,20 @@ is left alone.
 
 ## Unreleased
 
+- **Domains: groups inside a workspace with their own usage policy, SQL warehouse and APPID.**
+  A workspace's file may add `domains:` (see `config/workspaces/_example.yaml`). Each domain lists
+  its Entra groups by persona (one name or a list), which then get that persona's access like the
+  workspace's own groups, and sets its own `tags.APPID`. It gets:
+  - a serverless usage policy, `{PREFIX}-0-DOMAIN-<NAME>`, with the workspace's tags, the domain's
+    over them and `DOMAIN`, for the domain's groups and the platform admins; it sorts before the
+    workspace's policy, so a member's usage goes to their domain when they pick none;
+  - a SQL warehouse, `{PREFIX} <Name> Warehouse`, with the baseline's settings (a domain may change
+    any of its keys) and the domain's tags, which its groups may use and the platform admins manage.
+
+  Additive: nothing changes for a workspace without `domains:`, and the baseline gains no key.
+  Adding a domain, the plan shows only new resources: its groups' assignments, entitlements and
+  catalog grants, one usage policy and one warehouse with its permissions. Preflight checks the
+  domain groups are account groups.
 ## 1.1.4
 
 - **Fix: a repository installed before 1.1.0 passes the tests after the upgrade.** An upgrade does

@@ -112,6 +112,37 @@ def nested(path, section, key):
                  for m in [re.match(rf"^\s{{2}}{key}:\s*(.*)$", l)] if m), None)
 
 
+def _items(value):
+    """The names in a YAML value: one name, or a [flow, list]."""
+    value = value.strip()
+    if value.startswith("[") and value.endswith("]"):
+        return [v for v in (scalar(x) for x in value[1:-1].split(",")) if v]
+    return [v for v in [scalar(value)] if v]
+
+
+def domain_groups(path):
+    """(domain, persona, group) for every group under domains.<domain>.groups in a workspace file
+    (terraform/domains.tf). Block style, as config/workspaces/_example.yaml writes it; a persona
+    takes one name, a [list] or "- name" lines, and groups may also be one {flow: map}."""
+    out, domain, persona, in_groups = [], None, None, False
+    for l in block(path, "domains"):
+        if m := re.match(r"^  (\w+):\s*$", l):
+            domain, persona, in_groups = m.group(1), None, False
+        elif m := re.match(r"^    groups:\s*(.*)$", l):
+            in_groups, flow = True, m.group(1).strip()
+            if flow.startswith("{") and flow.endswith("}"):
+                for p, value in re.findall(r"(\w+):\s*(\[[^\]]*\]|[^,}]+)", flow[1:-1]):
+                    out += [(domain, p, g) for g in _items(value)]
+        elif re.match(r"^    \S", l):
+            in_groups = False
+        elif in_groups and (m := re.match(r"^      (\w+):\s*(.*)$", l)):
+            persona = m.group(1)
+            out += [(domain, persona, g) for g in _items(m.group(2))]
+        elif in_groups and persona and (m := re.match(r"^\s{8,}-\s*(.*)$", l)):
+            out += [(domain, persona, g) for g in _items(m.group(1))]
+    return out
+
+
 def defaults_file(section):
     """The baseline file that defines a top-level section, or None."""
     return next((f for f in sorted(DEFAULTS.glob("*.yaml")) if section in top_level(f)), None)

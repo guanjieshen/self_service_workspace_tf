@@ -1,0 +1,11 @@
+# Test fixture: domain-no-appid (one workspace file). A domain sets its own APPID.
+prefix: tst
+account_id: 00000000-0000-0000-0000-000000000000
+host: https://adb-1111111111111111.1.azuredatabricks.net
+id: 1111111111111111
+tags: {APPID: TST-APP}
+auth: {workspace_profile: null, account_profile: null}
+groups: {explorer: tst-explorers}
+domains:
+  finance:
+    groups: {explorer: tst-finance}

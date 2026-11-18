@@ -19,7 +19,7 @@ run "scaffolded_workspace" {
     error_message = "prefix and host come from the workspace's file, the workspace ID from the host, the account ID from the baseline."
   }
   assert {
-    condition     = local.persona_groups == { explorer = ["scf-explorers"] } && local.platform_admins == tolist(["scf_platform_admins"])
+    condition     = jsonencode(local.persona_groups) == jsonencode({ explorer = ["scf-explorers"] }) && local.platform_admins == tolist(["scf_platform_admins"])
     error_message = "Only the personas the file names a group for are granted; the platform admins group comes from the baseline."
   }
   assert {

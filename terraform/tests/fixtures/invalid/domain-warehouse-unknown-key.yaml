@@ -1,0 +1,13 @@
+# Test fixture: domain-warehouse-unknown-key (one workspace file). A domain's warehouse takes the baseline's keys only.
+prefix: tst
+account_id: 00000000-0000-0000-0000-000000000000
+host: https://adb-1111111111111111.1.azuredatabricks.net
+id: 1111111111111111
+tags: {APPID: TST-APP}
+auth: {workspace_profile: null, account_profile: null}
+groups: {explorer: tst-explorers}
+domains:
+  finance:
+    groups: {explorer: tst-finance}
+    tags: {APPID: FIN-APP}
+    sql_warehouse: {workspace_default: true}

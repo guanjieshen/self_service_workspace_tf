@@ -116,13 +116,17 @@ def checks(ws, get):
             metastore.setdefault("metastore_id", assignment["metastore_id"])
         out.append(("ok", f"metastore {(metastore or {}).get('name', assignment['metastore_id'])}"))
 
-    # Groups: in this workspace's file, or the baseline's (platform admins). A
-    # persona without a group is skipped: nobody gets it here.
+    # Groups: in this workspace's file, or the baseline's (platform admins), then its domains'
+    # (terraform/domains.tf). A persona without a group is skipped: nobody gets it here.
+    groups = []
     for key in GROUP_KEYS:
         name = wsf.setting(f, "groups", key)
         if not name:
             out.append(("ok", f"no {key} group: skipped (nobody gets it in this workspace)"))
-            continue
+        else:
+            groups.append((key, name, f"groups.{key}"))
+    groups += [(f"{p}, domain {d}", g, f"domains.{d}.groups.{p}") for d, p, g in wsf.domain_groups(f)]
+    for key, name, where in groups:
         name = name.replace("{prefix}", prefix).replace("{PREFIX}", prefix.upper())
         flt = urllib.parse.quote(f'displayName eq "{name}"')
         found, err = get(f"/api/2.0/account/scim/v2/Groups?filter={flt}&attributes=displayName,members")
@@ -141,7 +145,7 @@ def checks(ws, get):
             what = ("exists only in this workspace (a workspace-local group)" if (local or {}).get("totalResults", 0)
                     else "does not exist in the account")
             out.append(("error", f"group {name} ({key}) {what}: create it in Entra ID and sync it to the account, "
-                               f"or name another group under groups.{key} in the workspace's file"))
+                               f"or name another group under {where} in the workspace's file"))
 
     if info.get("serverless_policy") and info.get("account"):
         out.append(billing_admin(get, info["account"], me, who))

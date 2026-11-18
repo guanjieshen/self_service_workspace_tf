@@ -1,0 +1,13 @@
+# Test fixture: domain-policy-disabled (one workspace file). Domains need the serverless usage policy.
+prefix: tst
+account_id: 00000000-0000-0000-0000-000000000000
+host: https://adb-1111111111111111.1.azuredatabricks.net
+id: 1111111111111111
+tags: {APPID: TST-APP}
+auth: {workspace_profile: null, account_profile: null}
+groups: {explorer: tst-explorers}
+serverless_policy: {enabled: false}
+domains:
+  finance:
+    groups: {explorer: tst-finance}
+    tags: {APPID: FIN-APP}

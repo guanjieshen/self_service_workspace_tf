@@ -17,6 +17,7 @@ overrides.tf   which keys a workspace may set; what each setting owns (setting_a
                so that leaving it alone releases it instead of destroying it
 checks.tf      plain-language validation (preconditions on terraform_data.config_checks)
 access.tf      persona groups and grants;  chargeback.tf  usage policies and tag values
+domains.tf     a workspace's domains: their groups join the personas; a usage policy and warehouse each
 main.tf        module inputs, then one block per module
         │
         ▼

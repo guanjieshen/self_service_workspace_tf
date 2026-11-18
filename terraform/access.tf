@@ -6,7 +6,12 @@ locals {
   group_names = {
     for k, g in local.config.groups : k => replace(replace(g, "{PREFIX}", local.prefix_upper), "{prefix}", local.prefix) if g != null
   }
-  persona_groups  = { for p in keys(local.personas) : p => [local.group_names[p]] if contains(keys(local.group_names), p) }
+  # Each persona's groups: the workspace's (groups:), then its domains' (domains.tf).
+  domain_persona_groups = { for p in keys(local.personas) : p => distinct(flatten([for d, ps in local.domain_groups : try(ps[p], [])])) }
+  persona_groups = {
+    for p in keys(local.personas) : p => distinct(concat(contains(keys(local.group_names), p) ? [local.group_names[p]] : [], local.domain_persona_groups[p]))
+    if contains(keys(local.group_names), p) || length(local.domain_persona_groups[p]) > 0
+  }
   platform_admins = compact([try(local.group_names.platform_admins, "")])
   users_group     = try(local.group_names.users, null)
 

@@ -1,0 +1,13 @@
+# Test fixture: domain-policy-name-no-prefix (one workspace file). A domain's policy name contains {PREFIX}.
+prefix: tst
+account_id: 00000000-0000-0000-0000-000000000000
+host: https://adb-1111111111111111.1.azuredatabricks.net
+id: 1111111111111111
+tags: {APPID: TST-APP}
+auth: {workspace_profile: null, account_profile: null}
+groups: {explorer: tst-explorers}
+domains:
+  finance:
+    groups: {explorer: tst-finance}
+    tags: {APPID: FIN-APP}
+    serverless_policy: {name: FINANCE}

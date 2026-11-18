@@ -30,6 +30,19 @@ groups:
 # members still need a persona to sign in). Not a persona, platform admins or users group.
 # sharing_groups: [fin-finance-analysts]
 
+# Optional: domains, groups with their own serverless usage policy, SQL warehouse and APPID, on
+# top of this workspace's own (which everyone keeps). A domain's groups get their persona's
+# access, like the groups above. Each domain sets its own APPID; the rest is optional.
+# domains:
+#   finance:                        # lowercase letters, digits and _
+#     groups:
+#       explorer: [xyz-finance-explorers]
+#       builder: xyz-finance-builders
+#     tags:
+#       APPID: APP-5678             # required: the domain's own application ID
+#     sql_warehouse: {size: Small}  # optional: the baseline's warehouse keys (name: {PREFIX} Finance Warehouse)
+#     serverless_policy: {name: "{PREFIX}-0-DOMAIN-FINANCE"}   # optional: this is the default name
+
 # ---- OPTIONAL: this workspace only --------------------------------------------
 
 # Chargeback tags (tags: in config/defaults/cost.yaml): change a value, add a tag, or

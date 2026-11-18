@@ -14,6 +14,10 @@ output "cluster_policy_ids" {
   value = module.compute.cluster_policy_ids
 }
 
+output "domain_warehouse_ids" {
+  value = { for d, w in databricks_sql_endpoint.domain : d => w.id }
+}
+
 output "serverless_policy_ids" {
   value = try(module.budget_policies[0].policy_ids, {})
 }

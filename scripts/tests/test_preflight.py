@@ -155,6 +155,19 @@ class Preflight(Base):
         api = FakeApi(account_groups=(ACCOUNT_GROUPS - {"fin_builder"}) | {"data-builders"})
         self.assertEqual(self.levels(self.run_checks(api), "error"), [])
 
+    def test_domain_groups_must_be_account_groups_too(self):
+        self.set("domains", "domains:\n  finance:\n    groups:\n      explorer: [fin-fa, \"{prefix}-fb\"]   # two\n"
+                            "      builder:\n        - fin-fc\n    tags: {APPID: FIN}\n"
+                            "  supply_chain:\n    groups: {explorer: fin-sc, builder: [fin-sd]}\n")
+        results = self.run_checks(FakeApi(account_groups=ACCOUNT_GROUPS | {"fin-fa", "fin-fb", "fin-sc", "fin-sd"}))
+        self.assertEqual(self.levels(results, "error"), ["group fin-fc (builder, domain finance) does not exist in the account: "
+                                                          "create it in Entra ID and sync it to the account, or name another group "
+                                                          "under domains.finance.groups.builder in the workspace's file"])
+        oks = " ".join(self.levels(results, "ok"))
+        for g in ("fin-fa (explorer, domain finance)", "fin-fb (explorer, domain finance)", "fin-sc (explorer, domain supply_chain)",
+                  "fin-sd (builder, domain supply_chain)"):
+            self.assertIn(f"account group {g}", oks)
+
     def test_a_persona_without_a_group_is_skipped(self):
         self.set("access", "groups:\n  explorer: fin_explorer\n")
         results = self.run_checks(FakeApi())

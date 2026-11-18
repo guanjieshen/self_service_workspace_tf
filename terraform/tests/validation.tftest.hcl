@@ -174,3 +174,80 @@ run "bad_access_tier" {
   variables { workspace = "bad-access-tier" }
   expect_failures = [terraform_data.config_checks]
 }
+
+# A domain name must be lowercase.
+run "domain_bad_name" {
+  command = plan
+  variables { workspace = "domain-bad-name" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# A domain may set only groups, tags, serverless_policy and sql_warehouse.
+run "domain_unknown_key" {
+  command = plan
+  variables { workspace = "domain-unknown-key" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# A domain needs at least one group.
+run "domain_no_groups" {
+  command = plan
+  variables { workspace = "domain-no-groups" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# Groups go under a persona the workspace has.
+run "domain_unknown_persona" {
+  command = plan
+  variables { workspace = "domain-unknown-persona" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# A group belongs to one domain.
+run "domain_group_twice" {
+  command = plan
+  variables { workspace = "domain-group-twice" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# A domain group is not also one of the workspace's own groups.
+run "domain_group_is_workspace_group" {
+  command = plan
+  variables { workspace = "domain-group-is-workspace-group" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# A domain sets its own APPID.
+run "domain_no_appid" {
+  command = plan
+  variables { workspace = "domain-no-appid" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# A domain's APPID is not NONE.
+run "domain_appid_none" {
+  command = plan
+  variables { workspace = "domain-appid-none" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# A domain's policy name contains {PREFIX}.
+run "domain_policy_name_no_prefix" {
+  command = plan
+  variables { workspace = "domain-policy-name-no-prefix" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# Domains need the serverless usage policy.
+run "domain_policy_disabled" {
+  command = plan
+  variables { workspace = "domain-policy-disabled" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# A domain's warehouse takes the baseline's keys only.
+run "domain_warehouse_unknown_key" {
+  command = plan
+  variables { workspace = "domain-warehouse-unknown-key" }
+  expect_failures = [terraform_data.config_checks]
+}
