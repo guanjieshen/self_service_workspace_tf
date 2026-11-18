@@ -13,6 +13,7 @@ domains:
       builder: tst-finance-builders
     tags: {APPID: FIN-APP, COST_CATEGORY: null}
     sql_warehouse: {size: Small, max_clusters: 2}
+    folder: true
   supply_chain:
     groups: {explorer: tst-supply-explorers}
     tags: {APPID: SC-APP}

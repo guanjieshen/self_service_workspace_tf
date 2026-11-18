@@ -88,6 +88,9 @@ def check(s):
     rights = temporary_privileges(jobs)
     need(all(isinstance(p, str) and re.fullmatch(r"[A-Z_]+", p) for p in rights) and not {"MANAGE", "ALL_PRIVILEGES"} & set(rights),
          "app.yaml jobs.temporary_schema.privileges: privileges such as SELECT or CREATE_TABLE; never MANAGE or ALL_PRIVILEGES, which let the requester share it.")
+    root = str(jobs.get("folder_root") or "/Workspace").rstrip("/")
+    need(not (root + "/").startswith("/Workspace/Domains/"),
+         "app.yaml jobs.folder_root: not /Workspace/Domains or inside it, where Terraform makes the domains' folders (terraform/domains.tf): one owner per folder.")
     need(re.fullmatch(r"[\w.-]{0,100}", ai_model(app)), "app.yaml self_service_app.ai_model: a model's name (for example system.ai.claude-sonnet-5-5), or null.")
     need(set(app.get("human_approval") or []) <= set(KINDS), f"app.yaml self_service_app.human_approval lists kinds of request: {', '.join(KINDS)}.")
     need(all(u is None or re.match(r"https?://", u) for u in (app.get("faq") or {}).values()),

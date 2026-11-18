@@ -18,7 +18,13 @@ is left alone.
     over them and `DOMAIN`, for the domain's groups and the platform admins; it sorts before the
     workspace's policy, so a member's usage goes to their domain when they pick none;
   - a SQL warehouse, `{PREFIX} <Name> Warehouse`, with the baseline's settings (a domain may change
-    any of its keys) and the domain's tags, which its groups may use and the platform admins manage.
+    any of its keys) and the domain's tags, which its groups may use and the platform admins manage;
+  - with `folder: true`, a folder, `/Workspace/Domains/<Name>`, for the domain's groups only (read
+    for a persona without workspace access, manage with it) and the platform admins. Removing it
+    plans a delete that the plan guard lists and Databricks refuses while the folder holds anything.
+
+  The self-service app's `folder_root` may no longer be `/Workspace/Domains` or inside it (one owner
+  per folder; `docs/design.md`, section 9, "Declared, or asked for?").
 
   Additive: nothing changes for a workspace without `domains:`, and the baseline gains no key.
   Adding a domain, the plan shows only new resources: its groups' assignments, entitlements and

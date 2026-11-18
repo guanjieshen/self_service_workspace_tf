@@ -95,13 +95,35 @@ run "each_domain_has_its_own_warehouse" {
   }
 }
 
+run "a_domain_may_have_its_own_folder" {
+  command = plan
+  variables { workspace = "domains" }
+
+  assert {
+    condition     = local.domain_folders == { finance = "/Workspace/Domains/Finance" } && length(databricks_directory.domain) == 1
+    error_message = "Only a domain with folder: true gets a folder, /Workspace/Domains/<Name>. Got: ${jsonencode(local.domain_folders)}"
+  }
+  assert {
+    condition     = local.domain_folder_acl.finance == { "tst-finance-explorers" = "CAN_READ", "tst-finance-analysts" = "CAN_READ", "tst-finance-builders" = "CAN_MANAGE", "tst-admins" = "CAN_MANAGE" }
+    error_message = "The domain's groups only: read for a persona without workspace access, manage with it; the platform admins manage. Got: ${jsonencode(local.domain_folder_acl.finance)}"
+  }
+  assert {
+    condition     = !contains(keys(local.domain_folder_acl.finance), "tst-explorers") && !contains(keys(local.domain_folder_acl.finance), "tst-builders")
+    error_message = "The workspace's own persona groups get nothing on a domain's folder."
+  }
+  assert {
+    condition     = databricks_directory.domain["finance"].delete_recursive == false && databricks_permissions.domain_folder["finance"].directory_path == "/Workspace/Domains/Finance"
+    error_message = "A domain's folder is never deleted with what is in it, and its permissions are on that folder."
+  }
+}
+
 run "a_workspace_without_domains_is_unchanged" {
   command = plan
   variables { workspace = "basic" }
 
   assert {
-    condition     = length(databricks_sql_endpoint.domain) == 0 && length(databricks_permissions.domain_warehouse) == 0
-    error_message = "No domains: no domain warehouses."
+    condition     = length(databricks_sql_endpoint.domain) == 0 && length(databricks_permissions.domain_warehouse) == 0 && length(databricks_directory.domain) == 0
+    error_message = "No domains: no domain warehouses or folders."
   }
   assert {
     condition     = tolist(keys(local.serverless_policies)) == tolist(["self_service"])

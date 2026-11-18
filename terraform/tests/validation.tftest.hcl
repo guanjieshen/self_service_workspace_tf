@@ -251,3 +251,10 @@ run "domain_warehouse_unknown_key" {
   variables { workspace = "domain-warehouse-unknown-key" }
   expect_failures = [terraform_data.config_checks]
 }
+
+# A domain's folder is true or false
+run "domain_folder_not_bool" {
+  command = plan
+  variables { workspace = "domain-folder-not-bool" }
+  expect_failures = [terraform_data.config_checks]
+}

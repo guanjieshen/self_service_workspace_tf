@@ -108,7 +108,7 @@ jobs:
   # Where the jobs' notebooks live: at the top of the workspace, which grants only workspace
   # admins (the jobs run with admin rights).
   admin_path: /Workspace/Admin/self-service
-  folder_root: /Workspace             # where workspace folders are made (by an admin, for now)
+  folder_root: /Workspace             # where workspace folders are made (by an admin, for now); never /Workspace/Domains (the domains' folders)
   catalog_owner: null                 # new schemas go to this group; null = the job's identity
   personal_schema:                    # a person's own schema: cd_<email name>
     prefix: cd_

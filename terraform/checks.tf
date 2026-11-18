@@ -85,9 +85,9 @@ resource "terraform_data" "config_checks" {
     }
     precondition {
       condition = alltrue([for d, v in local.domains_in : can(regex("^[a-z][a-z0-9_]*$", d)) && can(keys(v)) && alltrue([
-        for k in try(keys(v), []) : contains(["groups", "tags", "serverless_policy", "sql_warehouse"], k)
+        for k in try(keys(v), []) : contains(["groups", "tags", "serverless_policy", "sql_warehouse", "folder"], k)
       ])]) && (try(local.ws_all.domains, null) == null || can(keys(local.ws_all.domains)))
-      error_message = "domains (the workspace's file): each domain is a name of lowercase letters, digits and _ (starting with a letter), and may set only groups, tags, serverless_policy and sql_warehouse."
+      error_message = "domains (the workspace's file): each domain is a name of lowercase letters, digits and _ (starting with a letter), and may set only groups, tags, serverless_policy, sql_warehouse and folder."
     }
     precondition {
       condition = alltrue([for d, v in local.domains_in : can(keys(v.groups)) && length(local.domain_members[d]) > 0 && alltrue([
@@ -113,6 +113,10 @@ resource "terraform_data" "config_checks" {
         (try(v.serverless_policy.name, null) == null || can(regex("\\{(PREFIX|prefix)\\}", v.serverless_policy.name)))
       )]))
       error_message = "domains.<domain>.serverless_policy: domains need serverless_policy.enabled: true (config/defaults/cost.yaml), and may set only name, which must contain {PREFIX} (usage policies are account-wide, so the name must not clash with another workspace's)."
+    }
+    precondition {
+      condition     = alltrue([for d, v in local.domains_in : try(v.folder, null) == null || can(tobool(v.folder))])
+      error_message = "domains.<domain>.folder: true (the domain gets its own folder, /Workspace/Domains/<Name>) or false."
     }
     precondition {
       condition = alltrue([for d, v in local.domains_in : try(v.sql_warehouse, null) == null || (can(keys(v.sql_warehouse)) && alltrue([

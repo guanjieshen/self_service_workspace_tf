@@ -7,11 +7,16 @@
 #       tags: {APPID: APP-5678}           required: the domain's own APPID
 #       serverless_policy: {name: ...}    optional: the default is {PREFIX}-0-DOMAIN-<NAME>
 #       sql_warehouse: {size: Small}      optional: the baseline's sql_warehouse, key by key
+#       folder: true                      optional: /Workspace/Domains/<Name>, for its groups only
 #
 # A domain's groups are persona groups (access.tf): they get their persona's access, the
 # catch-all's warehouse and usage policy, and their domain's. The domain's policy is named to
 # sort before the catch-all's ({PREFIX}-0-SELF-SERVICE), so it is the one its members' usage
 # goes to when they do not pick one (config/defaults/cost.yaml). A workspace without domains changes nothing.
+#
+# Who owns what (docs/design.md): a domain is declared here, so its folder is too, and only the
+# top folder: what people make inside it is theirs. Folders people ask for come from the
+# self-service app, never under /Workspace/Domains (scripts/app_build.py refuses that folder_root).
 
 locals {
   domains_in = try({ for d, v in local.ws_all.domains : d => v }, {})
@@ -53,6 +58,16 @@ locals {
       name = replace(replace(try(tostring(v.sql_warehouse.name), "{PREFIX} ${title(lower(replace(d, "_", " ")))} Warehouse"), "{PREFIX}", local.prefix_upper), "{prefix}", local.prefix)
     })
   }
+  # The domain's own folder (folder: true): its groups only, not the workspace's own persona
+  # groups. Groups of a persona with workspace access manage it; the others may read it.
+  domain_folders = { for d, v in local.domains_in : d => "/Workspace/Domains/${title(lower(replace(d, "_", " ")))}" if try(v.folder, false) == true }
+  domain_folder_acl = {
+    for d in keys(local.domain_folders) : d => merge(
+      merge([for p, gs in local.domain_groups[d] : { for g in gs : g => try(local.personas[p].access, "") == "workspace" ? "CAN_MANAGE" : "CAN_READ" }]...),
+      { for g in local.platform_admins : g => "CAN_MANAGE" },
+    )
+  }
+
   domain_warehouse_acl = {
     for d, members in local.domain_members : d => merge(
       { for g in members : g => "CAN_USE" },
@@ -98,5 +113,31 @@ resource "databricks_permissions" "domain_warehouse" {
   }
 
   # The groups must be assigned to the workspace before they can be granted.
+  depends_on = [module.personas]
+}
+
+# Never deleted with what is in it: removing the domain or its folder: true plans a delete (the
+# plan guard lists it under Before merging), which Databricks refuses while the folder is not empty.
+resource "databricks_directory" "domain" {
+  for_each         = local.domain_folders
+  path             = each.value
+  delete_recursive = false
+
+  depends_on = [terraform_data.config_checks]
+}
+
+# Authoritative on the top folder only: sharing it by hand is undone; what is inside inherits it.
+resource "databricks_permissions" "domain_folder" {
+  for_each       = local.domain_folders
+  directory_path = databricks_directory.domain[each.key].path
+
+  dynamic "access_control" {
+    for_each = local.domain_folder_acl[each.key]
+    content {
+      group_name       = access_control.key
+      permission_level = access_control.value
+    }
+  }
+
   depends_on = [module.personas]
 }

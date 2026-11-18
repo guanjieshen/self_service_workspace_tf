@@ -121,6 +121,9 @@ warehouse and chargeback tags (`domains:`, `terraform/domains.tf`), on top of th
   over them (its own `APPID`, required) and `DOMAIN`. The policy is named
   `{PREFIX}-0-DOMAIN-<NAME>`, which sorts before the workspace's `{PREFIX}-0-SELF-SERVICE`, so a
   member's serverless usage goes to their domain when they pick no policy.
+- **Its folder** (`folder: true`): `/Workspace/Domains/<Name>`, for the domain's groups only (read
+  for a persona without workspace access, manage with it) and the platform admins. Removing it
+  plans a delete, which the plan guard lists and Databricks refuses while the folder holds anything.
 - **Additive:** a workspace without `domains:` plans as before; adding one only adds resources.
 
 **Sharing groups.** A workspace folder can be shared only with a group assigned to the
@@ -236,13 +239,29 @@ app changes far more often than the baseline.
 
 **Every object has one owner.** Terraform's grants on catalogs, warehouses, usage policies and
 entitlements are authoritative, so anything the bundles granted there would be removed by the
-next apply. What the app needs on those, Terraform grants (`terraform/self_service.tf`):
+next apply. What the app needs on those, Terraform grants (`terraform/self_service.tf`).
+
+**Declared, or asked for?** Before adding an object, decide its owner with one question: would
+the platform team **declare** it, or would a person **ask for** it?
+
+- **Declared** (few, known in advance, exists as long as a file says so, reviewed in a pull
+  request): **Terraform**. A domain is declared, so everything it brings is too: its groups'
+  access, its usage policy, its warehouse and its folder (`terraform/domains.tf`).
+- **Asked for** (many, over time, with an owner and a lifecycle: approved, extended, expired):
+  **the app**, recorded in Lakebase: schemas, temporary schemas, team and project folders.
+- **Declared, with people's work inside:** Terraform owns the container only (a domain's top
+  folder); what people make inside it is theirs.
+- **Never two writers on one object or path:** the domains' folders are under `/Workspace/Domains`,
+  and the app's `folder_root` may not be there (`scripts/app_build.py` refuses it).
+
 
 | Object | Owner | The other never |
 | --- | --- | --- |
 | Workspace settings, persona groups, entitlements, workspace assignment | Terraform | the bundles touch none |
 | The catalog `{prefix}_citizen_dev` and its grants, including the apps' `USE_CATALOG` and `BROWSE` | Terraform | the bundles and the jobs never grant on the catalog |
 | Schemas in the catalog and their grants | The jobs, on request | Terraform never manages them |
+| A domain's folder, `/Workspace/Domains/<Name>` (the top folder and its permissions) | Terraform (`terraform/domains.tf`) | the app never makes or grants folders under `/Workspace/Domains` |
+| Folders people ask for (team, project), under `folder_root` | The app (by hand for now, later its folder job) | Terraform never manages them |
 | The catalog's and the usage policy's binding to the hub | Terraform (`terraform/self_service.tf`, `main.tf`) | the bundles never bind |
 | The usage policy and who may use it (including the jobs' identity) | Terraform | the bundles only refer to its ID |
 | The jobs, their notebooks and who may run them (the hub's two apps) | `bundle/jobs/` | Terraform never manages them |
