@@ -59,8 +59,9 @@ SQL, dashboards and Genie, edm-gds-finance-builder the full workspace, both with
   is the one their serverless usage goes to when they pick none, because it sorts before the
   workspace's. They can still pick the workspace's.
 - **Its folder** (with `folder: true`): `/Workspace/Domains/<Name>`. Only the domain's groups
-  get it: those under explorer may open it, those under builder or publisher manage it, and the
-  platform admins manage it. The workspace's own groups do not get it. What people make inside
+  get it: those under explorer may read it, those under builder or publisher manage it, and the
+  platform admins manage it. Explorers have no workspace access (SQL, dashboards and Genie only), so
+  they do not browse folders: reading it lets them open the dashboards and Genie spaces kept there. The workspace's own groups do not get it. What people make inside
   it inherits that. Sharing the domain's folder itself by hand is undone at the next deploy:
   change the domain's groups instead.
 - **Dashboards and Genie spaces** use the warehouse their builder chose: tell the domain's builders

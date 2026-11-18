@@ -122,7 +122,9 @@ warehouse and chargeback tags (`domains:`, `terraform/domains.tf`), on top of th
   `{PREFIX}-0-DOMAIN-<NAME>`, which sorts before the workspace's `{PREFIX}-0-SELF-SERVICE`, so a
   member's serverless usage goes to their domain when they pick no policy.
 - **Its folder** (`folder: true`): `/Workspace/Domains/<Name>`, for the domain's groups only (read
-  for a persona without workspace access, manage with it) and the platform admins. Removing it
+  for a persona without workspace access, which opens the dashboards and Genie spaces kept there
+  without browsing folders; manage with it) and the platform admins. With workspace object access
+  control on (Premium), a new folder starts with no permissions, so nobody else gets it. Removing it
   plans a delete, which the plan guard lists and Databricks refuses while the folder holds anything.
 - **Additive:** a workspace without `domains:` plans as before; adding one only adds resources.
 
