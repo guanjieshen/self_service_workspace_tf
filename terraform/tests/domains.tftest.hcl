@@ -100,8 +100,8 @@ run "a_domain_may_have_its_own_folder" {
   variables { workspace = "domains" }
 
   assert {
-    condition     = local.domain_folders == { finance = "/Workspace/Domains/Finance" } && length(databricks_directory.domain) == 1
-    error_message = "Only a domain with folder: true gets a folder, /Workspace/Domains/<Name>. Got: ${jsonencode(local.domain_folders)}"
+    condition     = local.domain_folders == { finance = "/Workspace/Domains/TST_FINANCE" } && length(databricks_directory.domain) == 1
+    error_message = "Only a domain with folder: true gets a folder, /Workspace/Domains/<PREFIX>_<DOMAIN>. Got: ${jsonencode(local.domain_folders)}"
   }
   assert {
     condition     = local.domain_folder_acl.finance == { "tst-finance-explorers" = "CAN_READ", "tst-finance-analysts" = "CAN_READ", "tst-finance-builders" = "CAN_MANAGE", "tst-admins" = "CAN_MANAGE" }
@@ -112,7 +112,7 @@ run "a_domain_may_have_its_own_folder" {
     error_message = "The workspace's own persona groups get nothing on a domain's folder."
   }
   assert {
-    condition     = databricks_directory.domain["finance"].delete_recursive == false && databricks_permissions.domain_folder["finance"].directory_path == "/Workspace/Domains/Finance"
+    condition     = databricks_directory.domain["finance"].delete_recursive == false && databricks_permissions.domain_folder["finance"].directory_path == "/Workspace/Domains/TST_FINANCE"
     error_message = "A domain's folder is never deleted with what is in it, and its permissions are on that folder."
   }
 }

@@ -7,7 +7,7 @@
 #       tags: {APPID: APP-5678}           required: the domain's own APPID
 #       serverless_policy: {name: ...}    optional: the default is {PREFIX}-0-DOMAIN-<NAME>
 #       sql_warehouse: {size: Small}      optional: the baseline's sql_warehouse, key by key
-#       folder: true                      optional: /Workspace/Domains/<Name>, for its groups only
+#       folder: true                      optional: /Workspace/Domains/<PREFIX>_<DOMAIN>, for its groups only
 #
 # A domain's groups are persona groups (access.tf): they get their persona's access, the
 # catch-all's warehouse and usage policy, and their domain's. The domain's policy is named to
@@ -60,7 +60,7 @@ locals {
   }
   # The domain's own folder (folder: true): its groups only, not the workspace's own persona
   # groups. Groups of a persona with workspace access manage it; the others may read it.
-  domain_folders = { for d, v in local.domains_in : d => "/Workspace/Domains/${title(lower(replace(d, "_", " ")))}" if try(v.folder, false) == true }
+  domain_folders = { for d, v in local.domains_in : d => "/Workspace/Domains/${local.prefix_upper}_${upper(d)}" if try(v.folder, false) == true }
   domain_folder_acl = {
     for d in keys(local.domain_folders) : d => merge(
       merge([for p, gs in local.domain_groups[d] : { for g in gs : g => try(local.personas[p].access, "") == "workspace" ? "CAN_MANAGE" : "CAN_READ" }]...),

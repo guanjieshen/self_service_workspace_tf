@@ -19,7 +19,7 @@ is left alone.
     workspace's policy, so a member's usage goes to their domain when they pick none;
   - a SQL warehouse, `{PREFIX} <Name> Warehouse`, with the baseline's settings (a domain may change
     any of its keys) and the domain's tags, which its groups may use and the platform admins manage;
-  - with `folder: true`, a folder, `/Workspace/Domains/<Name>`, for the domain's groups only (read
+  - with `folder: true`, a folder, `/Workspace/Domains/<PREFIX>_<DOMAIN>`, for the domain's groups only (read
     for a persona without workspace access, manage with it) and the platform admins. Removing it
     plans a delete that the plan guard lists and Databricks refuses while the folder holds anything.
 

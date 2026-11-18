@@ -158,7 +158,7 @@ class Builds(unittest.TestCase):
                 (lambda s: s["app"].update(bu_lookup={"function": "a.b.c"}), "warehouse_id"),
                 (lambda s: s["adopt"].update(database="cd-self-service"), "adopt.database"),
                 (lambda s: s["jobs"].update(folder_root="/Workspace/Domains"), "folder_root"),
-                (lambda s: s["jobs"].update(folder_root="/Workspace/Domains/Finance/"), "folder_root")):
+                (lambda s: s["jobs"].update(folder_root="/Workspace/Domains/GTM_IRM/"), "folder_root")):
             with self.subTest(setting=setting):
                 bad = json.loads(json.dumps(self.s))
                 change(bad)

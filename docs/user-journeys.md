@@ -108,7 +108,7 @@ policy and APPID, on top of what the whole workspace has. In Genie Code, the ski
 | --- | --- | --- |
 | 1 | Have the domain's Entra groups (one per access level it needs) and its APPID | The groups must be in the Databricks account: the plan's preflight checks |
 | 2 | Add `domains.<name>` to the workspace's file: its `groups` by persona and `tags.APPID`, and `folder: true` if it needs its own folder | See `config/workspaces/_example.yaml` |
-| 3 | Open the pull request | That workspace's plan: the groups' assignments, entitlements and catalog grants, one usage policy `{PREFIX}-0-DOMAIN-<NAME>`, one warehouse `{PREFIX} <Name> Warehouse` and its permissions, and with `folder: true` the folder `/Workspace/Domains/<Name>`. Nothing else |
+| 3 | Open the pull request | That workspace's plan: the groups' assignments, entitlements and catalog grants, one usage policy `{PREFIX}-0-DOMAIN-<NAME>`, one warehouse `{PREFIX} <Name> Warehouse` and its permissions, and with `folder: true` the folder `/Workspace/Domains/<PREFIX>_<DOMAIN>`. Nothing else |
 | 4 | Merge | The domain's members see their warehouse; their serverless usage goes to their domain's policy unless they pick another |
 
 Removing or renaming a domain deletes its warehouse and policy: the plan lists them under

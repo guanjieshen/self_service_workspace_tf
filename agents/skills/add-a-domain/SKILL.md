@@ -23,7 +23,7 @@ instead; for every workspace, **change-all-workspaces**.
 | Its groups, for each access level | `groups.explorer`, `groups.builder`, `groups.publisher` | Entra groups that already exist **in the Databricks account** (the plan's preflight checks). One name or a list. A group is in **one** domain only, and not also under the workspace's own `groups:` |
 | Its application ID | `tags.APPID` | **Required**, and not `NONE`. Ask for the exact ID: it is what costs are charged to |
 | A warehouse size, only if they say | `sql_warehouse.size` | 2X-Small, X-Small, Small, Medium, Large, ... Otherwise the workspace's default size |
-| Whether the domain needs its own folder | `folder: true` | `/Workspace/Domains/<Name>`. Only the domain's groups see it. For a folder for a team or a project, use the self-service app instead (a folder request): that is not a domain |
+| Whether the domain needs its own folder | `folder: true` | `/Workspace/Domains/<PREFIX>_<DOMAIN>`: the workspace's prefix and the domain's name in upper case, for example `irm` in the gtm workspace is `/Workspace/Domains/GTM_IRM`. Only the domain's groups see it. For a folder for a team or a project, use the self-service app instead (a folder request): that is not a domain |
 
 Optional, only if they bring it up: other tag values (`tags.<KEY>`; `null` drops the workspace's
 tag for this domain), other warehouse keys (`auto_stop_minutes`, `min_clusters`, `max_clusters`,
@@ -58,7 +58,7 @@ SQL, dashboards and Genie, edm-gds-finance-builder the full workspace, both with
 - **Its usage policy:** `{PREFIX}-0-DOMAIN-<NAME>`, for its groups (and the platform admins). It
   is the one their serverless usage goes to when they pick none, because it sorts before the
   workspace's. They can still pick the workspace's.
-- **Its folder** (with `folder: true`): `/Workspace/Domains/<Name>`. Only the domain's groups
+- **Its folder** (with `folder: true`): `/Workspace/Domains/<PREFIX>_<DOMAIN>`. Only the domain's groups
   get it: those under explorer may read it, those under builder or publisher manage it, and the
   platform admins manage it. Explorers have no workspace access (SQL, dashboards and Genie only), so
   they do not browse folders: reading it lets them open the dashboards and Genie spaces kept there. The workspace's own groups do not get it. What people make inside
