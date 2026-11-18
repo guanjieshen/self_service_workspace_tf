@@ -116,7 +116,7 @@ resource "terraform_data" "config_checks" {
     }
     precondition {
       condition     = alltrue([for d, v in local.domains_in : try(v.folder, null) == null || can(tobool(v.folder))])
-      error_message = "domains.<domain>.folder: true (the domain gets its own folder, /Workspace/Domains/<PREFIX>_<DOMAIN>) or false."
+      error_message = "domains.<domain>.folder: true (the default: the domain gets its own folder, /Workspace/Domains/<DOMAIN>) or false (no folder)."
     }
     precondition {
       condition = alltrue([for d, v in local.domains_in : try(v.sql_warehouse, null) == null || (can(keys(v.sql_warehouse)) && alltrue([

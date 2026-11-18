@@ -40,9 +40,9 @@ groups:
 #       builder: xyz-finance-builders
 #     tags:
 #       APPID: APP-5678             # required: the domain's own application ID
-#     sql_warehouse: {size: Small}  # optional: the baseline's warehouse keys (name: {PREFIX} Finance Warehouse)
+#     sql_warehouse: {size: Small}  # optional: the baseline's warehouse keys (name: {PREFIX} FINANCE Warehouse)
 #     serverless_policy: {name: "{PREFIX}-0-DOMAIN-FINANCE"}   # optional: this is the default name
-#     folder: true                  # optional: /Workspace/Domains/XYZ_FINANCE, for the domain's groups only
+#     folder: false                 # optional: no folder (the default is /Workspace/Domains/FINANCE, for the domain's groups only)
 
 # ---- OPTIONAL: this workspace only --------------------------------------------
 

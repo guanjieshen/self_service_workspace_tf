@@ -121,7 +121,8 @@ warehouse and chargeback tags (`domains:`, `terraform/domains.tf`), on top of th
   over them (its own `APPID`, required) and `DOMAIN`. The policy is named
   `{PREFIX}-0-DOMAIN-<NAME>`, which sorts before the workspace's `{PREFIX}-0-SELF-SERVICE`, so a
   member's serverless usage goes to their domain when they pick no policy.
-- **Its folder** (`folder: true`): `/Workspace/Domains/<PREFIX>_<DOMAIN>`, for the domain's groups only (read
+- **Its folder** (unless `folder: false`): `/Workspace/Domains/<DOMAIN>` (no prefix: the workspace
+  already says which business unit), for the domain's groups only (read
   for a persona without workspace access, which opens the dashboards and Genie spaces kept there
   without browsing folders; manage with it) and the platform admins. With workspace object access
   control on (Premium), a new folder starts with no permissions, so nobody else gets it. Removing it
@@ -262,7 +263,7 @@ the platform team **declare** it, or would a person **ask for** it?
 | Workspace settings, persona groups, entitlements, workspace assignment | Terraform | the bundles touch none |
 | The catalog `{prefix}_citizen_dev` and its grants, including the apps' `USE_CATALOG` and `BROWSE` | Terraform | the bundles and the jobs never grant on the catalog |
 | Schemas in the catalog and their grants | The jobs, on request | Terraform never manages them |
-| A domain's folder, `/Workspace/Domains/<PREFIX>_<DOMAIN>` (the top folder and its permissions) | Terraform (`terraform/domains.tf`) | the app never makes or grants folders under `/Workspace/Domains` |
+| A domain's folder, `/Workspace/Domains/<DOMAIN>` (the top folder and its permissions) | Terraform (`terraform/domains.tf`) | the app never makes or grants folders under `/Workspace/Domains` |
 | Folders people ask for (team, project), under `folder_root` | The app (by hand for now, later its folder job) | Terraform never manages them |
 | The catalog's and the usage policy's binding to the hub | Terraform (`terraform/self_service.tf`, `main.tf`) | the bundles never bind |
 | The usage policy and who may use it (including the jobs' identity) | Terraform | the bundles only refer to its ID |

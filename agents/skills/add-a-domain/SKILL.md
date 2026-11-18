@@ -23,7 +23,7 @@ instead; for every workspace, **change-all-workspaces**.
 | Its groups, for each access level | `groups.explorer`, `groups.builder`, `groups.publisher` | Entra groups that already exist **in the Databricks account** (the plan's preflight checks). One name or a list. A group is in **one** domain only, and not also under the workspace's own `groups:` |
 | Its application ID | `tags.APPID` | **Required**, and not `NONE`. Ask for the exact ID: it is what costs are charged to |
 | A warehouse size, only if they say | `sql_warehouse.size` | 2X-Small, X-Small, Small, Medium, Large, ... Otherwise the workspace's default size |
-| Whether the domain needs its own folder | `folder: true` | `/Workspace/Domains/<PREFIX>_<DOMAIN>`: the workspace's prefix and the domain's name in upper case, for example `irm` in the gtm workspace is `/Workspace/Domains/GTM_IRM`. Only the domain's groups see it. For a folder for a team or a project, use the self-service app instead (a folder request): that is not a domain |
+| Only if they say it needs no folder | `folder: false` | Every domain gets `/Workspace/Domains/<DOMAIN>` (the domain's name in upper case, for example `irm` is `/Workspace/Domains/IRM`; no prefix, the workspace already says which business unit). Only the domain's groups see it. For a folder for a team or a project, use the self-service app instead (a folder request): that is not a domain |
 
 Optional, only if they bring it up: other tag values (`tags.<KEY>`; `null` drops the workspace's
 tag for this domain), other warehouse keys (`auto_stop_minutes`, `min_clusters`, `max_clusters`,
@@ -42,23 +42,24 @@ domains:
     tags:
       APPID: APP-5678                   # the domain's own application ID
     sql_warehouse: {size: Small}        # only if they asked for a size
-    folder: true                        # only if they want the domain's folder
 ```
 
 Then read it back in plain words: "In gds, the finance domain: edm-gds-finance-explorer can use
 SQL, dashboards and Genie, edm-gds-finance-builder the full workspace, both with their own
-**GDS Finance Warehouse** and usage policy **GDS-0-DOMAIN-FINANCE**, charged to APP-5678."
+**GDS FINANCE Warehouse**, usage policy **GDS-0-DOMAIN-FINANCE** and folder
+**/Workspace/Domains/FINANCE**, charged to APP-5678."
 
 ## 3. What it does, so you can explain it
 
 - **Access:** the domain's groups get their persona's access, like the workspace's own groups:
   sign-in, the catalog, the workspace's default warehouse and usage policy.
-- **Its warehouse:** `{PREFIX} <Name> Warehouse`, which only its groups may use (the platform
+- **Its warehouse:** `{PREFIX} <DOMAIN> Warehouse` (for example `GTM IRM Warehouse`), which only its groups may use (the platform
   admins manage it), tagged with the domain's APPID and `DOMAIN`.
 - **Its usage policy:** `{PREFIX}-0-DOMAIN-<NAME>`, for its groups (and the platform admins). It
   is the one their serverless usage goes to when they pick none, because it sorts before the
   workspace's. They can still pick the workspace's.
-- **Its folder** (with `folder: true`): `/Workspace/Domains/<PREFIX>_<DOMAIN>`. Only the domain's groups
+- **Its folder** (unless `folder: false`): `/Workspace/Domains/<DOMAIN>`, with no tags (Databricks
+  folders have none; the APPID is on the warehouse and the policy). Only the domain's groups
   get it: those under explorer may read it, those under builder or publisher manage it, and the
   platform admins manage it. Explorers have no workspace access (SQL, dashboards and Genie only), so
   they do not browse folders: reading it lets them open the dashboards and Genie spaces kept there. The workspace's own groups do not get it. What people make inside
@@ -72,7 +73,7 @@ SQL, dashboards and Genie, edm-gds-finance-builder the full workspace, both with
 - **Removing a domain, or renaming it,** deletes its warehouse and its usage policy (the plan
   lists them under **Before merging**). Dashboards and Genie spaces on that warehouse stop working
   until they are moved to another one. Say so plainly and get a yes first.
-- **Removing its folder** (the domain, or `folder: true`) is refused by Databricks while the folder
+- **Removing its folder** (the domain, or `folder: false`) is refused by Databricks while the folder
   holds anything, so the deploy fails rather than deleting work: its contents must be moved first.
 - **Removing a group from a domain** removes that group's access to the workspace, unless it is
   in another persona group too.
@@ -84,5 +85,5 @@ SQL, dashboards and Genie, edm-gds-finance-builder the full workspace, both with
 
 Hand over to the skill **pull-request-from-databricks**. Only this workspace is planned: go through
 its plan comment with them. Adding a domain shows only new resources: its groups' assignments,
-entitlements and catalog grants, one usage policy, one warehouse with its permissions, and with
-`folder: true` one folder with its permissions.
+entitlements and catalog grants, one usage policy, one warehouse with its permissions, and one
+folder with its permissions (none with `folder: false`).

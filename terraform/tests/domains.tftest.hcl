@@ -1,4 +1,4 @@
-# Domains (terraform/domains.tf): fixtures/domains has two, on top of the workspace's own groups;
+# Domains (terraform/domains.tf): fixtures/domains has three, on top of the workspace's own groups;
 # fixtures/basic has none and must plan exactly as before.
 # Lists are compared with tolist() on both sides: YAML lists are tuples, which never equal lists.
 
@@ -18,7 +18,7 @@ run "domain_groups_are_persona_groups" {
   variables { workspace = "domains" }
 
   assert {
-    condition     = tolist(local.persona_groups.explorer) == tolist(["tst-explorers", "tst-finance-explorers", "tst-finance-analysts", "tst-supply-explorers"])
+    condition     = tolist(local.persona_groups.explorer) == tolist(["tst-explorers", "tst-dataops-explorers", "tst-finance-explorers", "tst-finance-analysts", "tst-supply-explorers"])
     error_message = "A domain's groups join their persona after the workspace's own, with {prefix} filled in. Got: ${jsonencode(local.persona_groups)}"
   }
   assert {
@@ -26,12 +26,20 @@ run "domain_groups_are_persona_groups" {
     error_message = "A persona takes one group or a list. Got: ${jsonencode(local.persona_groups.builder)}"
   }
   assert {
-    condition     = alltrue([for g in ["tst-finance-explorers", "tst-finance-analysts", "tst-finance-builders", "tst-supply-explorers"] : tolist(module.personas.assigned_groups[g]) == tolist(["USER"])])
+    condition     = tolist(local.persona_groups.publisher) == tolist(["tst-dataops-publishers"])
+    error_message = "A persona the workspace has no group for still gets its domains' groups. Got: ${jsonencode(local.persona_groups)}"
+  }
+  assert {
+    condition     = alltrue([for g in ["tst-finance-explorers", "tst-finance-analysts", "tst-finance-builders", "tst-supply-explorers", "tst-dataops-explorers", "tst-dataops-publishers"] : tolist(module.personas.assigned_groups[g]) == tolist(["USER"])])
     error_message = "Domain groups are assigned to the workspace as USER, like the persona groups."
   }
   assert {
     condition     = local.catalog_grants["tst-finance-builders"] == local.catalog_grants["tst-builders"] && local.warehouse_acl["tst-supply-explorers"] == local.warehouse_acl["tst-explorers"]
     error_message = "A domain group gets its persona's catalog privileges and the default (catch-all) warehouse's permission."
+  }
+  assert {
+    condition     = contains(local.entitlement_groups.explorer, "tst-dataops-explorers") && contains(local.entitlement_groups.publisher, "tst-dataops-publishers") && contains(local.entitlement_groups.builder, "tst-finance-builders")
+    error_message = "A domain group gets its persona's entitlements: it is one of that persona's groups."
   }
 }
 
@@ -40,15 +48,15 @@ run "each_domain_has_its_own_usage_policy" {
   variables { workspace = "domains" }
 
   assert {
-    condition     = tolist(sort(keys(local.serverless_policies))) == tolist(["domain_finance", "domain_supply_chain", "self_service"])
+    condition     = tolist(sort(keys(local.serverless_policies))) == tolist(["domain_data_ops", "domain_finance", "domain_supply_chain", "self_service"])
     error_message = "The catch-all policy, and one per domain. Got: ${jsonencode(keys(local.serverless_policies))}"
   }
   assert {
-    condition     = local.serverless_policies.domain_finance.name == "TST-0-DOMAIN-FINANCE" && local.serverless_policies.domain_supply_chain.name == "TST-0-DOMAIN-SUPPLY"
+    condition     = local.serverless_policies.domain_finance.name == "TST-0-DOMAIN-FINANCE" && local.serverless_policies.domain_supply_chain.name == "TST-0-DOMAIN-SUPPLY" && local.serverless_policies.domain_data_ops.name == "TST-0-DOMAIN-DATA-OPS"
     error_message = "A domain's policy is {PREFIX}-0-DOMAIN-<NAME>, or the name it sets with {PREFIX} filled in."
   }
   assert {
-    condition     = alltrue([for d in ["domain_finance", "domain_supply_chain"] : sort([local.serverless_policies[d].name, local.serverless_policies.self_service.name])[0] == local.serverless_policies[d].name])
+    condition     = alltrue([for d in ["domain_data_ops", "domain_finance", "domain_supply_chain"] : sort([local.serverless_policies[d].name, local.serverless_policies.self_service.name])[0] == local.serverless_policies[d].name])
     error_message = "A domain's policy sorts before the catch-all's, so its members' usage goes to it when they pick none."
   }
   assert {
@@ -67,6 +75,10 @@ run "each_domain_has_its_own_usage_policy" {
     condition     = contains(local.serverless_policies.self_service.groups, "tst-finance-explorers") && local.serverless_policies.self_service.tags.APPID == "TST-APP"
     error_message = "The catch-all policy keeps the workspace's APPID, and domain members may use it too."
   }
+  assert {
+    condition     = tolist(local.serverless_policies.domain_data_ops.groups) == tolist(["tst-dataops-explorers", "tst-dataops-publishers", "tst-admins"]) && local.serverless_policies.domain_data_ops.tags == { BUSINESS_UNIT = "TST", APPID = "DO-APP", COST_CATEGORY = "CITIZEN_SELF_SERVICE", DOMAIN = "DATA-OPS" }
+    error_message = "Every persona of a domain may use its policy, which carries its APPID. Got: ${jsonencode(local.serverless_policies.domain_data_ops)}"
+  }
 }
 
 run "each_domain_has_its_own_warehouse" {
@@ -74,11 +86,11 @@ run "each_domain_has_its_own_warehouse" {
   variables { workspace = "domains" }
 
   assert {
-    condition     = databricks_sql_endpoint.domain["finance"].name == "TST Finance Warehouse" && databricks_sql_endpoint.domain["finance"].cluster_size == "Small" && databricks_sql_endpoint.domain["finance"].max_num_clusters == 2
-    error_message = "A domain's warehouse: {PREFIX} <Name> Warehouse, with its own keys over the baseline's."
+    condition     = databricks_sql_endpoint.domain["finance"].name == "TST FINANCE Warehouse" && databricks_sql_endpoint.domain["finance"].cluster_size == "Small" && databricks_sql_endpoint.domain["finance"].max_num_clusters == 2
+    error_message = "A domain's warehouse: {PREFIX} <DOMAIN> Warehouse, with its own keys over the baseline's."
   }
   assert {
-    condition     = databricks_sql_endpoint.domain["supply_chain"].name == "TST Supply Chain Warehouse" && databricks_sql_endpoint.domain["supply_chain"].cluster_size == "Medium" && databricks_sql_endpoint.domain["supply_chain"].enable_serverless_compute
+    condition     = databricks_sql_endpoint.domain["supply_chain"].name == "TST SUPPLY CHAIN Warehouse" && databricks_sql_endpoint.domain["supply_chain"].cluster_size == "Medium" && databricks_sql_endpoint.domain["supply_chain"].enable_serverless_compute
     error_message = "A domain that sets nothing gets the baseline's warehouse settings."
   }
   assert {
@@ -90,18 +102,22 @@ run "each_domain_has_its_own_warehouse" {
     error_message = "The domain's groups may use its warehouse; the platform admins manage it. Got: ${jsonencode(local.domain_warehouse_acl.finance)}"
   }
   assert {
-    condition     = length(databricks_permissions.domain_warehouse) == 2
+    condition     = local.domain_warehouse_acl.data_ops == { "tst-dataops-explorers" = "CAN_USE", "tst-dataops-publishers" = "CAN_USE", "tst-admins" = "CAN_MANAGE" } && { for t in databricks_sql_endpoint.domain["data_ops"].tags[0].custom_tags : t.key => t.value }.APPID == "DO-APP"
+    error_message = "Every persona of a domain (here explorer and publisher) may use its warehouse, which carries its APPID."
+  }
+  assert {
+    condition     = length(databricks_permissions.domain_warehouse) == 3
     error_message = "Each domain's warehouse has its permissions."
   }
 }
 
-run "a_domain_may_have_its_own_folder" {
+run "each_domain_has_its_own_folder_unless_it_opts_out" {
   command = plan
   variables { workspace = "domains" }
 
   assert {
-    condition     = local.domain_folders == { finance = "/Workspace/Domains/TST_FINANCE" } && length(databricks_directory.domain) == 1
-    error_message = "Only a domain with folder: true gets a folder, /Workspace/Domains/<PREFIX>_<DOMAIN>. Got: ${jsonencode(local.domain_folders)}"
+    condition     = local.domain_folders == { data_ops = "/Workspace/Domains/DATA_OPS", finance = "/Workspace/Domains/FINANCE" } && length(databricks_directory.domain) == 2
+    error_message = "Every domain gets /Workspace/Domains/<DOMAIN> (no prefix), except one with folder: false (supply_chain). Got: ${jsonencode(local.domain_folders)}"
   }
   assert {
     condition     = local.domain_folder_acl.finance == { "tst-finance-explorers" = "CAN_READ", "tst-finance-analysts" = "CAN_READ", "tst-finance-builders" = "CAN_MANAGE", "tst-admins" = "CAN_MANAGE" }
@@ -112,7 +128,11 @@ run "a_domain_may_have_its_own_folder" {
     error_message = "The workspace's own persona groups get nothing on a domain's folder."
   }
   assert {
-    condition     = databricks_directory.domain["finance"].delete_recursive == false && databricks_permissions.domain_folder["finance"].directory_path == "/Workspace/Domains/TST_FINANCE"
+    condition     = local.domain_folder_acl.data_ops == { "tst-dataops-explorers" = "CAN_READ", "tst-dataops-publishers" = "CAN_MANAGE", "tst-admins" = "CAN_MANAGE" }
+    error_message = "A publisher group (workspace access) manages its domain's folder. Got: ${jsonencode(local.domain_folder_acl.data_ops)}"
+  }
+  assert {
+    condition     = databricks_directory.domain["finance"].delete_recursive == false && databricks_permissions.domain_folder["finance"].directory_path == "/Workspace/Domains/FINANCE"
     error_message = "A domain's folder is never deleted with what is in it, and its permissions are on that folder."
   }
 }

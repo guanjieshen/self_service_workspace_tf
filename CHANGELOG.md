@@ -17,9 +17,9 @@ is left alone.
   - a serverless usage policy, `{PREFIX}-0-DOMAIN-<NAME>`, with the workspace's tags, the domain's
     over them and `DOMAIN`, for the domain's groups and the platform admins; it sorts before the
     workspace's policy, so a member's usage goes to their domain when they pick none;
-  - a SQL warehouse, `{PREFIX} <Name> Warehouse`, with the baseline's settings (a domain may change
+  - a SQL warehouse, `{PREFIX} <DOMAIN> Warehouse`, with the baseline's settings (a domain may change
     any of its keys) and the domain's tags, which its groups may use and the platform admins manage;
-  - with `folder: true`, a folder, `/Workspace/Domains/<PREFIX>_<DOMAIN>`, for the domain's groups only (read
+  - a folder, `/Workspace/Domains/<DOMAIN>` (no prefix; `folder: false` for none), for the domain's groups only (read
     for a persona without workspace access, manage with it) and the platform admins. Removing it
     plans a delete that the plan guard lists and Databricks refuses while the folder holds anything.
 
