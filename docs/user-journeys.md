@@ -113,4 +113,3 @@ policy and APPID, on top of what the whole workspace has. In Genie Code, the ski
 
 Removing or renaming a domain deletes its warehouse and policy: the plan lists them under
 **Before merging**.
-
