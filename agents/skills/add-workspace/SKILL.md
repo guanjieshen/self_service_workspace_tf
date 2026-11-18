@@ -34,7 +34,7 @@ Also ask whether the workspace's catalog needs its own storage (the metastore ha
 | The group for the full workspace (notebooks, jobs, pipelines) | `groups.builder` | exact name, or `null` |
 | The group for publishing (often nobody yet) | `groups.publisher` | exact name, or `null` |
 
-Optional, only if they bring it up: `label` (a coloured tag next to the workspace name: text, and one of coral, lemon, lime, turquoise, indigo, purple, pink), `tags.APPID`, `catalog.storage_root`, `sql_warehouse.size` (2X-Small, X-Small, Small, Medium, Large, X-Large, ...; the baseline's is Medium), `sharing_groups`. For anything else, use the skill change-one-workspace after this.
+Optional, only if they bring it up: `label` (a coloured tag next to the workspace name: text, and one of coral, lemon, lime, turquoise, indigo, purple, pink), `tags.APPID`, `catalog.storage_root`, `sql_warehouse.size` (2X-Small, X-Small, Small, Medium, Large, X-Large, ...; the baseline's is Medium), `sharing_groups`. For anything else, use the skill change-one-workspace after this; for a domain (some groups with their own warehouse, usage policy and APPID), the skill add-a-domain.
 
 Check before writing: the prefix and the host are not already used by another file in `config/workspaces/` (open them and look).
 

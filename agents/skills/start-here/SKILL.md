@@ -20,6 +20,7 @@ Read the request and decide which of these it is. If it is unclear, ask **at mos
 | A setting of the apps changed (banner, links, branding, the AI model, who approves, the guided tour) | An app setting | **update-self-service-app** |
 | A new workspace managed | A new workspace | **add-workspace** |
 | One workspace's settings changed (its groups, warehouse, sharing groups) | One workspace | **change-one-workspace** |
+| Some groups in a workspace with their own warehouse, usage policy or APPID ("a finance domain", "charge supply chain separately") | A domain | **add-a-domain** |
 | Every workspace's defaults changed | All workspaces | **change-all-workspaces** |
 | Genie Code's own instructions or skills in the workspaces changed | Genie Code content | **change-genie-code** |
 | What the apps store changed (a new field, a new table) | The database | **change-the-database** |

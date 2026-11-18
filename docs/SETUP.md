@@ -112,6 +112,7 @@ Your repository's Git folder comes with **Genie Code skills** (`agents/skills/`)
 | `add-workspace` | Onboard a workspace |
 | `change-all-workspaces` | Change a default for every workspace |
 | `change-one-workspace` | Change one workspace's own configuration, or retire it |
+| `add-a-domain` | Give some groups in a workspace their own warehouse, usage policy and APPID |
 | `update-self-service-app` | The self-service app: its settings, the hub, a new business unit |
 | `change-the-database` | What the apps store (the database), changed safely |
 | `change-the-app-code` | The framework's own code, with its tests, guides and changelog |

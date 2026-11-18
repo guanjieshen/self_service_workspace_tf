@@ -10,6 +10,7 @@ request; nothing reaches a workspace until it is merged. The one-time setup is i
 | [2. Change one workspace](#2-change-one-workspace) | Its file | That one |
 | [3. Change every workspace](#3-change-every-workspace) | One file in `config/defaults/` | All of them |
 | [4. Give someone access](#4-give-someone-access) | None (Entra ID) | None |
+| [6. Give some groups their own warehouse and APPID](#6-give-some-groups-their-own-warehouse-and-appid) | One workspace's file | That one |
 | [5. Retire a workspace](#5-retire-a-workspace) | Delete its file | None (its state is removed) |
 
 ## 1. Add a workspace
@@ -96,3 +97,20 @@ group holds each persona; who is in the group is Entra ID's business.
 2. Merge. The workspace's Terraform state is removed, so Terraform no longer manages it.
    **Nothing in the workspace changes:** its settings, groups and data stay as they are.
    Deleting the workspace itself is a separate decision, outside this repository.
+
+## 6. Give some groups their own warehouse and APPID
+
+A **domain**: Entra groups inside one workspace with their own SQL warehouse, serverless usage
+policy and APPID, on top of what the whole workspace has. In Genie Code, the skill
+**add-a-domain** asks for what it needs and writes it.
+
+| # | Step | What you see |
+| --- | --- | --- |
+| 1 | Have the domain's Entra groups (one per access level it needs) and its APPID | The groups must be in the Databricks account: the plan's preflight checks |
+| 2 | Add `domains.<name>` to the workspace's file: its `groups` by persona and `tags.APPID` | See `config/workspaces/_example.yaml` |
+| 3 | Open the pull request | That workspace's plan: the groups' assignments, entitlements and catalog grants, one usage policy `{PREFIX}-0-DOMAIN-<NAME>`, one warehouse `{PREFIX} <Name> Warehouse` and its permissions. Nothing else |
+| 4 | Merge | The domain's members see their warehouse; their serverless usage goes to their domain's policy unless they pick another |
+
+Removing or renaming a domain deletes its warehouse and policy: the plan lists them under
+**Before merging**.
+
