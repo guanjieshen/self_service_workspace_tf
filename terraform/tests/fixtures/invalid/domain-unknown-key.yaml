@@ -1,4 +1,4 @@
-# Test fixture: domain-unknown-key (one workspace file). A domain may set only groups, tags, serverless_policy and sql_warehouse.
+# Test fixture: domain-unknown-key (one workspace file). A domain may set only groups, tags, serverless_policy, sql_warehouse and folder.
 prefix: tst
 account_id: 00000000-0000-0000-0000-000000000000
 host: https://adb-1111111111111111.1.azuredatabricks.net

@@ -28,7 +28,7 @@ is left alone.
 
   Additive: nothing changes for a workspace without `domains:`, and the baseline gains no key.
   Adding a domain, the plan shows only new resources: its groups' assignments, entitlements and
-  catalog grants, one usage policy and one warehouse with its permissions. Preflight checks the
+  catalog grants, one usage policy, one warehouse and one folder, each with its permissions. Preflight checks the
   domain groups are account groups.
 
 ## 1.1.4

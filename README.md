@@ -84,7 +84,7 @@ In your repository's Databricks Git folder, Genie Code walks an admin through ea
 | Add a new workspace | `add-workspace` |
 | Change a default for every workspace | `change-all-workspaces` |
 | Change one workspace's configuration, or stop managing it | `change-one-workspace` |
-| Give some groups in a workspace their own warehouse, usage policy and APPID (a domain) | `add-a-domain` |
+| Give some groups in a workspace their own warehouse, usage policy, folder and APPID (a domain) | `add-a-domain` |
 | Change the self-service app (its settings, its hub, a new business unit) | `update-self-service-app` |
 | Change what the apps store (the database), safely | `change-the-database` |
 | Change the framework's own code (a card, a form, a job), with its tests, guides and changelog | `change-the-app-code` |

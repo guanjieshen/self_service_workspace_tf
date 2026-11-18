@@ -182,7 +182,7 @@ run "domain_bad_name" {
   expect_failures = [terraform_data.config_checks]
 }
 
-# A domain may set only groups, tags, serverless_policy and sql_warehouse.
+# A domain may set only groups, tags, serverless_policy, sql_warehouse and folder.
 run "domain_unknown_key" {
   command = plan
   variables { workspace = "domain-unknown-key" }
