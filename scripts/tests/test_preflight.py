@@ -168,6 +168,12 @@ class Preflight(Base):
                   "fin-sd (builder, domain supply_chain)"):
             self.assertIn(f"account group {g}", oks)
 
+    def test_domains_on_one_line_are_not_read_and_it_says_so(self):
+        self.set("domains", "domains: {finance: {groups: {explorer: fin-fa}, tags: {APPID: FIN}}}\n")
+        results = self.run_checks(FakeApi())
+        self.assertEqual(self.levels(results, "error"), [])
+        self.assertIn("domains is written on one line, so its groups were not checked", " ".join(self.levels(results, "warning")))
+
     def test_a_persona_without_a_group_is_skipped(self):
         self.set("access", "groups:\n  explorer: fin_explorer\n")
         results = self.run_checks(FakeApi())

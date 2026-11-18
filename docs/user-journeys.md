@@ -10,8 +10,8 @@ request; nothing reaches a workspace until it is merged. The one-time setup is i
 | [2. Change one workspace](#2-change-one-workspace) | Its file | That one |
 | [3. Change every workspace](#3-change-every-workspace) | One file in `config/defaults/` | All of them |
 | [4. Give someone access](#4-give-someone-access) | None (Entra ID) | None |
-| [6. Give some groups their own warehouse and APPID](#6-give-some-groups-their-own-warehouse-and-appid) | One workspace's file | That one |
 | [5. Retire a workspace](#5-retire-a-workspace) | Delete its file | None (its state is removed) |
+| [6. Give some groups their own warehouse and APPID](#6-give-some-groups-their-own-warehouse-and-appid) | One workspace's file | That one |
 
 ## 1. Add a workspace
 

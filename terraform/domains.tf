@@ -3,7 +3,7 @@
 #
 #   domains:                              in the workspace's file only, never the baseline
 #     finance:
-#       groups: {explorer: [edm-gds-finance-explorer], builder: edm-gds-finance-builder}
+#       groups: {explorer: [xyz-finance-explorers], builder: xyz-finance-builders}
 #       tags: {APPID: APP-5678}           required: the domain's own APPID
 #       serverless_policy: {name: ...}    optional: the default is {PREFIX}-0-DOMAIN-<NAME>
 #       sql_warehouse: {size: Small}      optional: the baseline's sql_warehouse, key by key

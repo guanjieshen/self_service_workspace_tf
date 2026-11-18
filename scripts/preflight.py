@@ -126,6 +126,9 @@ def checks(ws, get):
         else:
             groups.append((key, name, f"groups.{key}"))
     groups += [(f"{p}, domain {d}", g, f"domains.{d}.groups.{p}") for d, p, g in wsf.domain_groups(f)]
+    if wsf.top_level(f).get("domains"):   # domains: {...} on one line: the reader takes block style only
+        out.append(("warning", "domains is written on one line, so its groups were not checked: write it as a block, "
+                               "as config/workspaces/_example.yaml does"))
     for key, name, where in groups:
         name = name.replace("{prefix}", prefix).replace("{PREFIX}", prefix.upper())
         flt = urllib.parse.quote(f'displayName eq "{name}"')

@@ -258,3 +258,38 @@ run "domain_folder_not_bool" {
   variables { workspace = "domain-folder-not-bool" }
   expect_failures = [terraform_data.config_checks]
 }
+
+# A domain's tags written as a single value
+run "domain_scalar_tags" {
+  command = plan
+  variables { workspace = "domain-scalar-tags" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# A domain's serverless_policy written as a single value
+run "domain_scalar_serverless_policy" {
+  command = plan
+  variables { workspace = "domain-scalar-serverless-policy" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# A domain's sql_warehouse written as a single value
+run "domain_scalar_sql_warehouse" {
+  command = plan
+  variables { workspace = "domain-scalar-sql-warehouse" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# A domain's groups written as a single value
+run "domain_scalar_groups" {
+  command = plan
+  variables { workspace = "domain-scalar-groups" }
+  expect_failures = [terraform_data.config_checks]
+}
+
+# A domain's folder written as a single value
+run "domain_scalar_folder" {
+  command = plan
+  variables { workspace = "domain-scalar-folder" }
+  expect_failures = [terraform_data.config_checks]
+}

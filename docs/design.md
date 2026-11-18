@@ -125,7 +125,8 @@ warehouse and chargeback tags (`domains:`, `terraform/domains.tf`), on top of th
   already says which business unit), for the domain's groups only (read
   for a persona without workspace access, which opens the dashboards and Genie spaces kept there
   without browsing folders; manage with it) and the platform admins. With workspace object access
-  control on (Premium), a new folder starts with no permissions, so nobody else gets it. Removing it
+  control on, a new folder starts with no permissions of its own, so nobody else is given it; check
+  a new domain's folder once (Permissions) for access inherited from `/Workspace`. Removing it
   plans a delete, which the plan guard lists and Databricks refuses while the folder holds anything.
 - **Additive:** a workspace without `domains:` plans as before; adding one only adds resources.
 

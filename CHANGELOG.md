@@ -30,6 +30,7 @@ is left alone.
   Adding a domain, the plan shows only new resources: its groups' assignments, entitlements and
   catalog grants, one usage policy and one warehouse with its permissions. Preflight checks the
   domain groups are account groups.
+
 ## 1.1.4
 
 - **Fix: a repository installed before 1.1.0 passes the tests after the upgrade.** An upgrade does

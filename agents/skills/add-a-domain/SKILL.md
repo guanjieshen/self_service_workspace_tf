@@ -23,7 +23,7 @@ instead; for every workspace, **change-all-workspaces**.
 | Its groups, for each access level | `groups.explorer`, `groups.builder`, `groups.publisher` | Entra groups that already exist **in the Databricks account** (the plan's preflight checks). One name or a list. A group is in **one** domain only, and not also under the workspace's own `groups:` |
 | Its application ID | `tags.APPID` | **Required**, and not `NONE`. Ask for the exact ID: it is what costs are charged to |
 | A warehouse size, only if they say | `sql_warehouse.size` | 2X-Small, X-Small, Small, Medium, Large, ... Otherwise the workspace's default size |
-| Only if they say it needs no folder | `folder: false` | Every domain gets `/Workspace/Domains/<DOMAIN>` (the domain's name in upper case, for example `irm` is `/Workspace/Domains/IRM`; no prefix, the workspace already says which business unit). Only the domain's groups see it. For a folder for a team or a project, use the self-service app instead (a folder request): that is not a domain |
+| Only if they say it needs no folder | `folder: false` | Every domain gets `/Workspace/Domains/<DOMAIN>` (the domain's name in upper case, for example `finance` is `/Workspace/Domains/FINANCE`; no prefix, the workspace already says which business unit). Only the domain's groups see it. For a folder for a team or a project, use the self-service app instead (a folder request): that is not a domain |
 
 Optional, only if they bring it up: other tag values (`tags.<KEY>`; `null` drops the workspace's
 tag for this domain), other warehouse keys (`auto_stop_minutes`, `min_clusters`, `max_clusters`,
@@ -37,23 +37,23 @@ In the workspace's file, two spaces per level, with a comment saying who asked a
 domains:
   finance:                              # Finance analytics (asked by <who>, <date>)
     groups:
-      explorer: [edm-gds-finance-explorer]
-      builder: edm-gds-finance-builder
+      explorer: [xyz-finance-explorers]
+      builder: xyz-finance-builders
     tags:
       APPID: APP-5678                   # the domain's own application ID
     sql_warehouse: {size: Small}        # only if they asked for a size
 ```
 
-Then read it back in plain words: "In gds, the finance domain: edm-gds-finance-explorer can use
-SQL, dashboards and Genie, edm-gds-finance-builder the full workspace, both with their own
-**GDS FINANCE Warehouse**, usage policy **GDS-0-DOMAIN-FINANCE** and folder
+Then read it back in plain words: "In xyz, the finance domain: xyz-finance-explorers can use
+SQL, dashboards and Genie, xyz-finance-builders the full workspace, both with their own
+**XYZ FINANCE Warehouse**, usage policy **XYZ-0-DOMAIN-FINANCE** and folder
 **/Workspace/Domains/FINANCE**, charged to APP-5678."
 
 ## 3. What it does, so you can explain it
 
 - **Access:** the domain's groups get their persona's access, like the workspace's own groups:
   sign-in, the catalog, the workspace's default warehouse and usage policy.
-- **Its warehouse:** `{PREFIX} <DOMAIN> Warehouse` (for example `GTM IRM Warehouse`), which only its groups may use (the platform
+- **Its warehouse:** `{PREFIX} <DOMAIN> Warehouse` (for example `XYZ FINANCE Warehouse`), which only its groups may use (the platform
   admins manage it), tagged with the domain's APPID and `DOMAIN`.
 - **Its usage policy:** `{PREFIX}-0-DOMAIN-<NAME>`, for its groups (and the platform admins). It
   is the one their serverless usage goes to when they pick none, because it sorts before the
