@@ -900,7 +900,8 @@ class Cards(unittest.TestCase):
         self.assertEqual([c["more"] for _, _, cs in toured for c in cs if c["card"].key == "open_workspace"],
                          [("Restart guided tour", "/open?tour=1")])
         only_data = [(k, t, [c for c in cs if c["card"].section == "data"]) for k, t, cs in cards.groups({})]
-        self.assertEqual([k for k, _, cs in cards.groups({}) if k == "data"], [], "Data has only link cards: hidden without links")
+        self.assertEqual([[c["card"].key for c in cs] for k, _, cs in cards.groups({}) if k == "data"], [["domain"]],
+                         "without links, Data shows only Request a domain (a page of the app)")
 
     def test_adding_a_group_is_the_apps_own_form_for_sharing_folders(self):
         import cards

@@ -56,6 +56,12 @@ CARDS = [
          "See the requests you made and the ones made for data you manage.", link="review_requests", icon="requests",
          opens="Opens in Databricks · Workspace access required"),
 
+    # The domain card is a preview for now: Coming soon, its form opens but sends nothing. To take it
+    # live, remove preview=True: the form, the request and the approver's steps are ready.
+    Card("domain", "data", "Request a domain",
+         "Give a team its own SQL warehouse, budget policy and folder: a new domain, or a subdomain of one.",
+         href="/domain", preview=True),
+
     Card("temporary_schema", "workspace", "Create a temporary schema",
          "A short-term schema for experiments, tagged with the date it expires.", href="/schema/temporary", icon="schema"),
     # One form for a project schema (theirs) and a team schema (theirs and an Entra group's): the group is optional.
@@ -66,14 +72,9 @@ CARDS = [
     Card("folder", "workspace", "Request a workspace folder",
          "Create a shared workspace folder and control who can access it.", href="/folder"),
     # Both made by hand (portal.ALWAYS_BY_HAND): an admin does it in a pull request, then approves it.
-    # The domain card is a preview for now: Coming soon, its form opens but sends nothing. To take it
-    # live, remove preview=True: the form, the request and the approver's steps are ready.
     Card("group_request", "workspace", "Add a group to your workspace",
          "Add an Entra ID group to your workspace so you can share folders with it. It gives no access by itself.",
          href="/group", icon="group"),
-    Card("domain", "workspace", "Request a domain",
-         "Give a team its own SQL warehouse, budget policy and folder: a new domain, or a subdomain of one.",
-         href="/domain", preview=True),
 
     Card("warehouses", "compute", "Manage SQL warehouses", "Create and manage SQL warehouses for your workloads."),
     Card("classic_compute", "compute", "Request classic compute access",
