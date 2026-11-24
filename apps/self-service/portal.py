@@ -72,7 +72,10 @@ def approval_of(config, manual=()):
     people = set(config.get("human_approval", ())) | set(manual) | ALWAYS_APPROVED
     task_kind = {"schema": "personal_schema", "project_schema": "project_schema", "team_schema": "team_schema",
                  "temporary_schema": "temporary_schema", "temporary_extension": "temporary_extension", "folder": "folder"}
-    return {**APPROVAL, **{task: "required" for task, kind in task_kind.items() if kind in people}}
+    out = {**APPROVAL, **{task: "required" for task, kind in task_kind.items() if kind in people}}
+    # The custom schema form makes either: it waits for an approver if either kind does.
+    out["custom_schema"] = "required" if "required" in (out["project_schema"], out["team_schema"]) else "auto"
+    return out
 SCHEMA = r"[a-z0-9][a-z0-9_]*"
 # Where a run is, as the status page shows it: waiting for serverless compute, or running.
 PHASES = {"QUEUED": "Starting", "PENDING": "Starting", "BLOCKED": "Starting", "WAITING_FOR_RETRY": "Starting",

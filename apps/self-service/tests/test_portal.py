@@ -984,7 +984,7 @@ class Pages(unittest.TestCase):
     def test_tasks_say_how_they_are_approved(self):
         page = self.http.get("/", headers=self.as_ana).text
         self.assertIn("<h1>Citizen Development Tasks</h1>", page, "the catalog's heading: title case, the app's name")
-        self.assertEqual(page.count("Auto-approved"), 4, "project, team and temporary schemas, and folders (their job is in this hub)")
+        self.assertEqual(page.count("Auto-approved"), 3, "custom and temporary schemas, and folders (their job is in this hub)")
         self.assertEqual(page.count(">Approval required"), 1, "workspace access (approved in Entra)")
         self.assertIn("Approval required", self.http.get("/persona", headers=self.as_ana).text)
         self.assertIn("Auto-approved", self.http.get("/folder", headers=self.as_ana).text)
@@ -1026,7 +1026,10 @@ class Pages(unittest.TestCase):
     def test_validate_on_the_forms(self):
         self.main.CONFIG["ai_check"] = "on"
         try:
-            self.assertIn('data-ai-check="team_schema"', self.http.get("/schema/team", headers=self.as_ana).text)
+            self.assertIn('data-ai-check="custom_schema"', self.http.get("/schema/custom", headers=self.as_ana).text)
+            team = self.http.post("/api/check", data={"kind": "custom_schema", "workspace": "fin", "name": "sales_forecast", "reason": WHY,
+                                                      "owner_group": "fin-data-eng"}, headers=self.as_ana)
+            self.assertEqual(team.status_code, 200, "a custom schema is checked as a team schema with a group, a project one without")
             self.assertIn('data-ai-check="folder"', self.http.get("/folder", headers=self.as_ana).text)
             r = self.http.post("/api/check", data={"kind": "project_schema", "workspace": "fin", "name": "sales_forecast", "reason": WHY}, headers=self.as_ana)
             self.assertNotIn("verdict", r.json(), "the checks only: no verdict")
@@ -1120,9 +1123,25 @@ class Pages(unittest.TestCase):
         self.assertEqual(r.status_code, 503)
         self.assertEqual(r.json()["database"], "AttributeError: no postgres", "the reason a deploy is broken, as the app sees it")
 
-    def test_old_custom_schema_links_still_work(self):
-        r = self.http.get("/schema/custom?name=sales_bookings", headers=self.as_ana, follow_redirects=False)
-        self.assertEqual((r.status_code, r.headers["location"]), (301, "/schema/project?name=sales_bookings"))
+    def test_project_and_team_schemas_are_one_custom_schema_form(self):
+        page = self.http.get("/", headers=self.as_ana).text
+        self.assertIn('href="/schema/custom"', page)
+        self.assertNotIn('href="/schema/project"', page)
+        self.assertNotIn('href="/schema/team"', page)
+        for old in ("project", "team"):   # old links and bookmarks still open it
+            r = self.http.get(f"/schema/{old}?name=sales_bookings", headers=self.as_ana, follow_redirects=False)
+            self.assertEqual((r.status_code, r.headers["location"]), (301, "/schema/custom?name=sales_bookings"))
+        form = self.http.get("/schema/custom", headers=self.as_ana).text
+        self.assertIn("Team&#39;s Entra ID group (optional)", form)
+        self.assertNotIn('name="owner_group" class="mono" required', form, "the group is optional")
+        self.assertIn('action="/schema/custom"', form)
+        r = self.http.post("/schema/custom", data={"workspace": "fin", "name": "sales_forecast", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
+        self.assertEqual(r.status_code, 303)
+        self.assertEqual(self.fake.started[-1][1]["owner_group"], "", "no group: a project schema")
+        r = self.http.post("/schema/custom", data={"workspace": "fin", "name": "sales_shared", "reason": WHY, "owner_group": "fin-data-eng"},
+                           headers=self.as_ana, follow_redirects=False)
+        self.assertEqual(r.status_code, 303)
+        self.assertEqual(self.fake.started[-1][1]["owner_group"], "fin-data-eng", "a group: a team schema")
 
     def test_the_review_requests_tile_opens_catalog_explorer(self):
         self.assertNotIn("View data access requests", self.http.get("/", headers=self.as_ana).text)
@@ -1152,7 +1171,7 @@ class Pages(unittest.TestCase):
 
     def test_the_business_unit_comes_first(self):
         as_bo = {"X-Forwarded-Email": BO}   # Bo has not chosen yet (Ana chose FIN in setUp)
-        for path in ("/", "/folder", "/schema/project", "/persona"):
+        for path in ("/", "/folder", "/schema/custom", "/persona"):
             with self.subTest(path=path):
                 r = self.http.get(path, headers=as_bo, follow_redirects=False)
                 self.assertEqual((r.status_code, r.headers["location"]), (303, f"/business-unit?next={path}"))
@@ -1681,8 +1700,8 @@ class ApprovalRequests(unittest.TestCase):
         self.assertIn(f'href="{r.headers["location"]}"', self.http.get("/requests", headers=self.as_ana).text)
 
     def test_the_catalog_and_the_form_say_an_approver_decides(self):
-        self.assertEqual(self.http.get("/", headers=self.as_ana).text.count(">Approval required"), 3, "project and team schemas, and personas")
-        form = self.http.get("/schema/project", headers=self.as_ana).text
+        self.assertEqual(self.http.get("/", headers=self.as_ana).text.count(">Approval required"), 2, "custom schemas, and personas")
+        form = self.http.get("/schema/custom", headers=self.as_ana).text
         self.assertIn(">Submit request</button>", form)
         self.assertIn("Your schema will be created once approved.", form)
 
@@ -1780,7 +1799,7 @@ class AccountsNotesAndDomains(unittest.TestCase):
         domains = [{"key": "irm", "label": "IRM", "depth": 0}, {"key": "irm.asset_integrity", "label": "IRM / ASSET INTEGRITY", "depth": 1}]
         cfg = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
         json.dump({**CONFIG, "temporary_account_prefix": "azure-", "persona_notes": {"explorer": "Request with your regular account.",
-                                                                                     "builder": "Request with your azure- account."},
+                                                                                     "builder": "Request with your Azure PIM account, `azure-<username>@...`."},
                    "workspaces": [{**CONFIG["workspaces"][0], "domains": domains}, *CONFIG["workspaces"][1:]]}, cfg)
         cfg.close()
         os.environ["PORTAL_CONFIG"] = cfg.name
@@ -1816,7 +1835,9 @@ class AccountsNotesAndDomains(unittest.TestCase):
     def test_each_access_level_shows_its_note(self):
         page = self.http.get("/persona", headers={"X-Forwarded-Email": ANA}).text
         self.assertIn("Request with your regular account.", page)
-        self.assertIn("Request with your azure- account.", page)
+        self.assertIn('Request with your Azure PIM account, <span class="mono nowrap">azure-&lt;username&gt;@...</span>.', page,
+                      "an address in backticks stays on one line")
+        self.assertNotIn('class="callout', page.split('<div class="options">', 1)[1], "a light line, not a box")
 
     def test_request_a_domain_is_a_preview_of_a_form_that_sends_nothing(self):
         catalog = self.http.get("/", headers={"X-Forwarded-Email": ANA}).text

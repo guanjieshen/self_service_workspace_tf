@@ -58,10 +58,9 @@ CARDS = [
 
     Card("temporary_schema", "workspace", "Create a temporary schema",
          "A short-term schema for experiments, tagged with the date it expires.", href="/schema/temporary", icon="schema"),
-    Card("project_schema", "workspace", "Request a project schema",
-         "Create a dedicated schema for your project.", href="/schema/project", icon="schema"),
-    Card("team_schema", "workspace", "Request a team schema",
-         "Create a shared schema your team can manage together.", href="/schema/team", icon="schema"),
+    # One form for a project schema (theirs) and a team schema (theirs and an Entra group's): the group is optional.
+    Card("custom_schema", "workspace", "Request a custom schema",
+         "Create a schema for your project, on your own or managed together with your team.", href="/schema/custom", icon="schema"),
     # Made by hand while its job is not deployed (portal.BY_HAND): a folder is workspace specific, and the hub does not
     # call other workspaces. The request is tracked in the approvals app like any other.
     Card("folder", "workspace", "Request a workspace folder",

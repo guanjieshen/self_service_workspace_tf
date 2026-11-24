@@ -66,10 +66,10 @@ self_service_app:
   # others run when asked: more time for a temporary schema (temporary_extension) runs straight away.
   human_approval: [project_schema, team_schema]
   # A short note under each access level on the Request workspace access page, for example which
-  # account to ask with. null = no note.
+  # account to ask with. Text in `backticks` (an address) stays on one line. null = no note.
   persona_notes:
     explorer: null                    # for example: Request with your regular account.
-    builder: null                     # for example: Request with your admin account (azure-<username>@...).
+    builder: null                     # for example: "Request with your Azure PIM account, `azure-<username>@...`."
     publisher: null
   # The AI check of the name and the reason, on the project schema, team schema and folder
   # forms: the app's rules, then the AI model (ai_model, below). Validate shows the requester what is

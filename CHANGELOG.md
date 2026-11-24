@@ -18,6 +18,11 @@ is left alone.
   another account which one to use, and the schema job refuses it. `null` (the default) = any account.
 - **A note under each access level** on the Request workspace access page
   (`self_service_app.persona_notes` in `app.yaml`), for example which account to ask with.
+- **One card and form for project and team schemas: Request a custom schema** (`/schema/custom`).
+  The team's Entra group is optional: without it, a project schema; with it, a team schema the
+  group manages too. Both kinds, their approval (`human_approval`) and the job are unchanged; the
+  old `/schema/project` and `/schema/team` links open the new form. Settings > Help links has one
+  SOP for it (the project schema's, now labelled Custom schema); the team schema's SOP setting is gone.
 - **Request a domain (Coming soon):** a new catalog card whose form can be opened but sends
   nothing yet: a new domain, or a subdomain under any domain or subdomain of the workspace.
 - **Upgrading:** add `persona_notes` and `jobs.temporary_schema.account_prefix` to your `app.yaml`
