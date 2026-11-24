@@ -1828,6 +1828,28 @@ class AccountsNotesAndDomains(unittest.TestCase):
         self.assertEqual(r.status_code, 303)
         self.assertEqual(self.fake.started[-1][1]["user"], self.AZ)
 
+    def test_the_temporary_schema_tile_is_greyed_out_for_another_account(self):
+        import datetime as dt
+        tile = lambda page: page.split("Create a temporary schema", 1)[0].rsplit('<div class="card task', 1)[1] + page.split("Create a temporary schema", 1)[1].split('<div class="card task', 1)[0]
+        mine = tile(self.http.get("/", headers={"X-Forwarded-Email": ANA}).text)
+        self.assertIn("is-soon", mine.split(">", 1)[0], "greyed out")
+        self.assertNotIn('href="/schema/temporary"', mine, "not a link")
+        self.assertIn("azure- account only", mine)
+        self.assertIn("Sign in with your azure- account to create one", mine)
+        self.assertNotIn("Extend temporary schema", mine, "nothing of theirs to extend")
+        theirs = tile(self.http.get("/", headers={"X-Forwarded-Email": self.AZ}).text)
+        self.assertIn('href="/schema/temporary"', theirs, "the azure- account: a normal tile")
+        self.assertNotIn("account only", theirs)
+        self.fake.schemas_.add("fin_citizen_dev.cd_tmp_old")
+        self.fake.tags_["fin_citizen_dev.cd_tmp_old"] = {"cd_schema_kind": "temporary", "cd_user": ANA,
+                                                         "cd_expires": (dt.date.today() + dt.timedelta(days=5)).isoformat()}
+        self.db.record_request({"id": "ss-old", "kind": "temporary_schema", "workspace": "fin", "bu": "FIN", "requested_by": ANA,
+                                "name": "cd_tmp_old", "reason": WHY})
+        self.main.PORTAL._personal.clear()
+        old = tile(self.http.get("/", headers={"X-Forwarded-Email": ANA}).text)
+        self.assertIn('href="/schema/temporary/extend">Extend temporary schema', old, "one made before the check: its owner still extends it")
+        self.assertIn("cd_tmp_old", old)
+
     def test_its_owner_extends_one_made_before_the_check_with_their_regular_account(self):
         import datetime as dt
         self.fake.schemas_.add("fin_citizen_dev.cd_tmp_old")

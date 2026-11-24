@@ -30,7 +30,7 @@ is left alone.
   waiting for an approver at the upgrade keeps working: approved, it adds its 7 days.
 - **Who may make temporary schemas** (`jobs.temporary_schema.account_prefix` in `app.yaml`, for
   example `azure-` for admin accounts): the form tells someone signed in with another account which
-  one to use, and the schema job refuses it. `null` (the default) = any account. Extending one is for
+  one to use, the catalog's tile is greyed out for them, and the schema job refuses it. `null` (the default) = any account. Extending one is for
   its owner, with the account that made it: a temporary schema made before the check, with a regular
   account, is still extended by its owner.
 - **A note under each access level** on the Request workspace access page

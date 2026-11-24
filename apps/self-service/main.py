@@ -229,7 +229,7 @@ def catalog(request: Request):
     links = {**PORTAL.links_for(user, shown.get("links")), "workspace": "/open" if mine else None,
              "tour": "/open?tour=1" if mine and shown["onboarding"]["prompt"] else None}
     return page(request, "catalog.html", nav="catalog", groups=cards.groups(links),
-                quotas={"temporary_schema": temporary_schema(user)})
+                quotas={"temporary_schema": temporary_schema(user)}, temporary_account=temporary_account(user))
 
 
 @app.get("/schema", include_in_schema=False)
