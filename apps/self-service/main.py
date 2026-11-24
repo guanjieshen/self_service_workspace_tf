@@ -372,11 +372,15 @@ def domain_form(request: Request, workspace: str = "", error: str = "", form: di
     domains = PORTAL.domains()
     if domains is None:
         domains = next((w.get("domains") or [] for w in CONFIG.get("workspaces", []) if w["name"] == chosen), [])
-    return page(request, "domain.html", nav="catalog", workspaces=workspaces, chosen=chosen, domains=domains, error=error or why, form=form)
+    preview = next(c.preview for c in cards.CARDS if c.key == "domain")   # Coming soon: the form sends nothing
+    return page(request, "domain.html", nav="catalog", workspaces=workspaces, chosen=chosen, domains=domains, error=error or why, form=form,
+                preview=preview)
 
 
 @app.post("/domain")
 async def domain_submit(request: Request):
+    if next(c.preview for c in cards.CARDS if c.key == "domain"):   # Coming soon: nothing is recorded
+        raise HTTPException(404)
     form = {k: v for k, v in (await request.form()).items() if isinstance(v, str)}
     workspace = form.get("workspace", "")
     try:

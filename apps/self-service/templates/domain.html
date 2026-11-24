@@ -11,6 +11,7 @@
 <div class="page-grid form-grid">
 <form class="panel" method="post" action="/domain" data-submit>
   <div class="panel-body">
+    {% if preview %}{% call callout("warning") %}<span class="strong">Coming soon.</span> This is a preview of the form: nothing is sent yet. Until then, ask your platform admin for a domain.{% endcall %}{% endif %}
     {% call callout() %}A domain gives a team its own SQL warehouse, budget policy and folder. A platform admin reviews your request, asks you for anything else it needs, and sets it up.{% endcall %}
     {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
     {% if workspaces %}
@@ -36,10 +37,10 @@
   </div>
   <div class="panel-foot form-foot">
     <div class="form-actions">
-      <button type="submit" class="primary" {{ 'disabled' if not workspaces }}>Submit request</button>
-      <a class="button" href="/">Cancel</a>
+      <button type="submit" class="primary" {{ 'disabled' if preview or not workspaces }}>{{ "Coming soon" if preview else "Submit request" }}</button>
+      <a class="button" href="/">{{ "Back to the catalog" if preview else "Cancel" }}</a>
     </div>
-    <p class="meta">A platform admin reviews it and sets it up; you can follow it under My requests.</p>
+    <p class="meta">{{ "Preview only: this form sends nothing yet." if preview else "A platform admin reviews it and sets it up; you can follow it under My requests." }}</p>
   </div>
 </form>
 {% include "_task_aside.html" %}

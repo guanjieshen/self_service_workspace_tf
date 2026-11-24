@@ -52,7 +52,9 @@ browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py
   out), or from the workspace file's `domains:` (`app_build.domain_tree`) when it cannot be read.
   **The app's identity needs the `MANAGE DISCOVER` permission** to read the account's domains (the
   API's rule for callers outside the UI); without it the form offers the workspace file's domains.
-- A card can still be a **preview** (`Card(..., preview=True)`: Coming soon, but its page opens).
+- **Request a domain is a preview for now** (`Card(..., preview=True)`: Coming soon, its form opens
+  with the submit disabled, and `POST /domain` is refused). Remove `preview=True` to take it live:
+  the request, its details and the approver's steps are ready.
 - **Persona notes** (`self_service_app.persona_notes`): a line under each access level on the
   workspace access page, for example which account to ask with.
 - **Temporary schemas replace personal ones** (the card and `/schema` are gone; `/schema`

@@ -40,7 +40,8 @@ is left alone.
   for sharing workspace folders with the group. It asks for the workspace, the Entra ID group and why; a platform admin adds it to the workspace file's
   `sharing_groups` (no entitlements: only something to share folders with) and approves it.
   `links.group_request` in `app.yaml` is no longer used: remove it.
-- **Request a domain:** a new card and a short form, approval required: its name, where it goes (a
+- **Request a domain (Coming soon):** a new card whose short form opens as a preview and sends
+  nothing yet (`preview=True` in `cards.py`; removing it takes the form live, approval required): its name, where it goes (a
   new domain, or a subdomain under any of the account's Databricks domains, from the Domains API;
   the workspace file's `domains:` when it cannot be read: the self-service app's identity needs
   `MANAGE DISCOVER` to read them), and why. A platform admin asks for anything else (its

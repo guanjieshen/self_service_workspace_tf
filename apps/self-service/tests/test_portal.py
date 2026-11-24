@@ -986,7 +986,7 @@ class Pages(unittest.TestCase):
         page = self.http.get("/", headers=self.as_ana).text
         self.assertIn("<h1>Citizen Development Tasks</h1>", page, "the catalog's heading: title case, the app's name")
         self.assertEqual(page.count("Auto-approved"), 3, "custom and temporary schemas, and folders (their job is in this hub)")
-        self.assertEqual(page.count(">Approval required"), 3, "workspace access (approved in Entra), and a group and a domain (made by an admin)")
+        self.assertEqual(page.count(">Approval required"), 2, "workspace access (approved in Entra), and a group (made by an admin)")
         self.assertIn("Approval required", self.http.get("/persona", headers=self.as_ana).text)
         self.assertIn("Auto-approved", self.http.get("/folder", headers=self.as_ana).text)
 
@@ -1701,7 +1701,7 @@ class ApprovalRequests(unittest.TestCase):
         self.assertIn(f'href="{r.headers["location"]}"', self.http.get("/requests", headers=self.as_ana).text)
 
     def test_the_catalog_and_the_form_say_an_approver_decides(self):
-        self.assertEqual(self.http.get("/", headers=self.as_ana).text.count(">Approval required"), 4, "permanent schemas, personas, groups and domains")
+        self.assertEqual(self.http.get("/", headers=self.as_ana).text.count(">Approval required"), 3, "permanent schemas, personas and groups")
         form = self.http.get("/schema/permanent", headers=self.as_ana).text
         self.assertIn(">Submit request</button>", form)
         self.assertIn("Your schema will be created once approved.", form)
@@ -1851,11 +1851,26 @@ class AccountsNotesAndDomains(unittest.TestCase):
         self.assertIn(">Unavailable", page, "a Coming soon persona (publisher) keeps a disabled button")
         self.assertNotIn('class="callout', page.split('<div class="options">', 1)[1], "a light line, not a box")
 
-    def test_request_a_domain_is_sent_to_an_admin_who_sets_it_up(self):
+    def test_request_a_domain_is_coming_soon_its_form_a_preview(self):
         catalog = self.http.get("/", headers={"X-Forwarded-Email": ANA}).text
         card = catalog.split(">Request a domain</a>", 1)[1].split('class="card task', 1)[0]
-        self.assertIn("Approval required", card)
-        self.assertNotIn("Coming soon", card)
+        self.assertIn('href="/domain"', catalog.split(">Request a domain</a>", 1)[0][-200:], "it opens")
+        self.assertIn("Coming soon", card)
+        self.assertIn("Preview: see the form; nothing is sent yet", card)
+        form = self.http.get("/domain", headers={"X-Forwarded-Email": ANA}).text
+        self.assertIn('<button type="submit" class="primary" disabled>Coming soon</button>', form)
+        self.assertIn("This is a preview of the form: nothing is sent yet", form)
+        r = self.http.post("/domain", data={"workspace": "fin", "name": "integrity", "reason": WHY}, headers={"X-Forwarded-Email": ANA})
+        self.assertEqual(r.status_code, 404, "nothing is recorded while it is a preview")
+        self.assertEqual(self.db.requests, {})
+
+    def test_request_a_domain_once_live_is_sent_to_an_admin_who_sets_it_up(self):
+        import cards
+        import dataclasses
+        live = [dataclasses.replace(c, preview=False) if c.key == "domain" else c for c in cards.CARDS]
+        patcher = mock.patch.object(cards, "CARDS", live)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.fake.domains_ = [{"domain_id": "d1", "tag_key": "Upstream"}, {"domain_id": "d2", "tag_key": "Upstream/Oil Sands", "parent_domain_id": "d1"},
                               {"domain_id": "d3", "tag_key": "Draft", "effective_draft": True}]
         form = self.http.get("/domain", headers={"X-Forwarded-Email": ANA}).text
