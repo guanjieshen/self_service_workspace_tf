@@ -1,0 +1,18 @@
+# =============================================================================
+# GOVERNED TAGS: account-wide tags with a fixed list of allowed values.
+#
+# A governed tag belongs to the whole Databricks account, not to one workspace, so exactly one
+# state creates it: the self-service hub's workspace (hub.host in config/self-service/hub.yaml).
+# Its allowed values come from the workspace files, never typed here: adding a workspace adds
+# its value. Every workspace then tags its own catalog with its value.
+# Account-wide, so a workspace's file cannot change these.
+# =============================================================================
+
+governed_tags:
+  # The tag on every workspace's catalog; its value is the workspace's prefix (gtm, gds, ...).
+  # null = no business unit tag.
+  business_unit: business_unit
+  # Who may edit the governed tags and grant them to others: account groups. null = the hub
+  # workspace's platform admins. Every workspace's persona groups and platform admins, and the
+  # pipeline, may assign them (put them on catalogs, schemas and tables they may tag).
+  managers: null

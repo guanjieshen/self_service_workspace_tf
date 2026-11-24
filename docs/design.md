@@ -149,6 +149,19 @@ Terraform's: people get them from the self-service app.
 - The grants are authoritative: anything else granted on the catalog by hand is removed
   on the next apply. A principal that needs a catalog privilege, such as the self-service
   app's service principal, is listed under `other_privileges`.
+- **Each catalog carries its business unit as a governed tag** (`business_unit` = the
+  workspace's prefix; `config/defaults/governed-tags.yaml`, `terraform/governed_tags.tf`). A
+  governed tag is one object for the whole account, so **one state owns it: the self-service
+  hub's workspace.** It creates the tag with every workspace file's prefix as its allowed values,
+  and its permissions: the managers (`null` = the hub's platform admins) may change it and grant
+  it; every workspace's persona groups, platform admins and the pipeline may assign it. Each
+  workspace tags its own catalog **once its value is allowed**: until the hub applies a new
+  workspace's value, that workspace's plan leaves the tag out instead of failing, and its next
+  apply adds it. A new or retired workspace file plans the hub too (`scripts/workspaces.py`).
+  Creating a governed tag needs the account's CREATE permission on governed tags, which
+  workspace admins have unless an account admin turned that off, and room for one more: an
+  account has a maximum number of governed tags ("The maximum number of tag policies allowed is
+  reached for the account" fails the hub's apply).
 
 ## 6. Caveats
 
