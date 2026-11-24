@@ -21,9 +21,6 @@ self_service_app:
   links:
     wiki: null                           # header link to the platform's wiki
     go_link: null                        # a short link to the app, shown on each page (for example go/cd-self-service)
-    # Where people ask for an Entra group to be added to their workspace with a persona (for
-    # example a ServiceNow form): the Add a group card. null = the card shows as Coming soon.
-    group_request: null
     # Where people review data access requests in Databricks: the ones they made, and the ones
     # others made for their data (Catalog Explorer's requests view). {host} and {workspace_id}
     # are the person's own workspace's (their business unit's), not the hub's; or a full URL
@@ -69,7 +66,7 @@ self_service_app:
   # account to ask with. Text in `backticks` (an address) stays on one line. null = no note.
   persona_notes:
     explorer: null                    # for example: Request with your regular account.
-    builder: null                     # for example: "Request with your Azure PIM account, `azure-<username>@...`."
+    builder: null                     # for example: Request with your Azure PIM account.
     publisher: null
   # The AI check of the name and the reason, on the project schema, team schema and folder
   # forms: the app's rules, then the AI model (ai_model, below). Validate shows the requester what is

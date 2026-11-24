@@ -83,7 +83,7 @@ No bold inside paragraphs.
   (`tests/test_ui.py`). Ages and waits: "6h ago", "3d" (`approvals/_macros.html` `age`).
 - **One word per state, the same in both apps:** "Pending approval" (not waiting, awaiting
   or in review), "Reply needed", "In progress", "Completed", "Failed", "Rejected". Request
-  names match their form's title: "Request a custom schema".
+  names match their form's title: "Request a permanent schema".
 - **Plain words.** Short, direct, the words people use; say what happens. Buttons say the
   action ("Submit request", "Create folder", "Approve"). No marketing or filler: not
   "seamlessly", "empower", "unlock", "streamline", "leverage". Keep technical terms where

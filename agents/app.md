@@ -43,10 +43,14 @@ browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py
   has passed: only schemas tagged `cd_managed_by=self_service` and `cd_schema_kind=temporary`
   and named `<prefix>tmp_<name>`, and it reports every one in its run. A run again never changes
   a schema's kind or extends its date.
-- **Request a domain is a preview** (`Card(..., preview=True)`: Coming soon, but `/domain` opens).
-  Its form sends nothing: a domain is declared in its workspace's file. It offers a new domain or a
-  subdomain under any domain or subdomain, from the workspace file's `domains:` (and `subdomains:`),
-  which the build passes as each workspace's `domains` (`app_build.domain_tree`).
+- **Requests an admin makes by hand, always** (`portal.ALWAYS_BY_HAND`): **a domain** (`/domain`,
+  kind `domain`) and **a group for sharing folders** (`/group`, kind `workspace_group`). Recorded
+  with their details (migration 009's `details`: a domain's parent, application ID and groups) and
+  sent to the approvals app, whose steps say what to change in the workspace's file; approving
+  marks them done. Nothing runs. The domain form's places come from the Databricks Domains API
+  (`Portal.domains`: `/api/2.0/domains`, subdomains under their `parent_domain_id`, drafts left
+  out), or from the workspace file's `domains:` (`app_build.domain_tree`) when it cannot be read.
+- A card can still be a **preview** (`Card(..., preview=True)`: Coming soon, but its page opens).
 - **Persona notes** (`self_service_app.persona_notes`): a line under each access level on the
   workspace access page, for example which account to ask with.
 - **Temporary schemas replace personal ones** (the card and `/schema` are gone; `/schema`

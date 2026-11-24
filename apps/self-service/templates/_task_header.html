@@ -3,11 +3,11 @@
     "About this request" card instead (_task_aside.html). -#}
 {%- from "_icons.html" import icon -%}
 {%- from "_components.html" import back, status_badge -%}
-{%- set sop_key = "project_schema" if task_icon == "custom_schema" else task_icon -%}
+{%- set sop_key = "project_schema" if task_icon == "permanent_schema" else task_icon -%}
 {{ back("/", "Catalog") }}
 <div class="request-head">
   <div class="request-name">
-    <span class="request-icon">{{ icon("schema" if task_icon.endswith("schema") or task_icon.startswith("temporary_") else task_icon, "icon icon-sm") }}</span>
+    <span class="request-icon">{{ icon("schema" if task_icon.endswith("schema") or task_icon.startswith("temporary_") else "group" if task_icon == "group_request" else task_icon, "icon icon-sm") }}</span>
     <h1>{{ task_name }}</h1>
   </div>
   {% if approval.get(task_icon) %}{{ status_badge(approval_labels[approval.get(task_icon)], "approval-" ~ approval.get(task_icon), pill=True) }}{% endif %}

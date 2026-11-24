@@ -1,6 +1,6 @@
-{#- Request a domain: a preview (Coming soon). The form shows what a request will ask for; it sends
-    nothing yet. A domain is declared in its workspace's file (a pull request); a subdomain goes
-    under any domain or subdomain (domains, from the build), so domains can nest. -#}
+{#- Request a domain: a new one, or a subdomain under any of the account's domains (domains: the
+    Domains API, or the workspace file's). Recorded for an admin, who declares it in the workspace's
+    file (a pull request) and approves it: nothing runs here. -#}
 {% extends "base.html" %}
 
 {% from "_components.html" import callout, field %}
@@ -9,54 +9,52 @@
 {% set task_aside = True %}{% include "_task_header.html" %}
 
 <div class="page-grid form-grid">
-<form class="panel" onsubmit="return false">
+<form class="panel" method="post" action="/domain" data-submit>
   <div class="panel-body">
-    {% call callout("warning") %}<span class="strong">Coming soon.</span> This is a preview of the form: nothing is sent yet. Until then, ask your platform admin for a domain.{% endcall %}
-    {% call callout() %}A domain is a team inside your workspace with its own SQL warehouse, budget policy and folder, charged to its own application ID. Its people keep everything the workspace gives them.{% endcall %}
+    {% call callout() %}A domain is a team inside your workspace with its own SQL warehouse, budget policy and folder, charged to its own application ID. Its people keep everything the workspace gives them. A platform admin reviews your request and sets it up.{% endcall %}
     {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
     {% if workspaces %}
       {% set on_change = True %}{% include "_workspace_select.html" %}
 
       {% call field("parent", "Where does it go?", required=True,
-                    hint="A new domain, or a subdomain under one of your workspace's domains." if domains else "Your workspace has no domains yet, so this is a new domain.") %}
+                    hint="A new domain, or a subdomain under one of your organization's domains." if domains else "There are no domains yet, so this is a new domain.") %}
         <select id="parent" name="parent">
           <option value="">At the top (a new domain)</option>
-          {% for d in domains %}<option value="{{ d.key }}">{% for _ in range(d.depth + 1) %}&nbsp;&nbsp;&nbsp;{% endfor %}Under {{ d.label }}</option>{% endfor %}
+          {% for d in domains %}<option value="{{ d.key }}" {{ 'selected' if form.parent == d.key }}>{% for _ in range(d.depth + 1) %}&nbsp;&nbsp;&nbsp;{% endfor %}Under {{ d.label }}</option>{% endfor %}
         </select>
       {% endcall %}
 
       {% call field("name", "Name", required=True, hint="Lowercase letters, numbers and underscores, for example asset_integrity. It names the warehouse, the budget policy and the folder, so choose it once.") %}
-        <input id="name" name="name" class="mono" required pattern="[a-z][a-z0-9_]*" placeholder="asset_integrity">
+        <input id="name" name="name" class="mono" required pattern="[a-z][a-z0-9_]*" maxlength="41" value="{{ form.name or '' }}" placeholder="asset_integrity">
       {% endcall %}
 
       {% call field("appid", "Application ID", required=True, hint="The CMDB application its costs are charged to, for example APP-5678.") %}
-        <input id="appid" name="appid" class="mono" required placeholder="APP-5678">
+        <input id="appid" name="appid" class="mono" required maxlength="64" value="{{ form.appid or '' }}" placeholder="APP-5678">
       {% endcall %}
 
       {% for key, label, hint in [("explorer", "Explorer group", "SQL, dashboards and Genie: reads the domain's folder."),
                                   ("builder", "Builder group", "Notebooks, jobs and pipelines: manages the domain's folder."),
                                   ("publisher", "Publisher group", "Publishes and shares: manages the domain's folder.")] %}
-      {% call field("group_" ~ key, label, hint="An Entra ID group's exact name. " ~ hint ~ " Leave empty if none.") %}
-        <input id="group_{{ key }}" name="group_{{ key }}" class="mono" maxlength="200" placeholder="{{ (workspaces[0].bu or 'bu') | lower }}-asset-integrity-{{ key }}s" autocomplete="off">
+      {% call field("group_" ~ key, label, hint="An Entra ID group's exact name. " ~ hint ~ " Leave empty if none; give at least one.") %}
+        <input id="group_{{ key }}" name="group_{{ key }}" class="mono" maxlength="200" pattern="[A-Za-z0-9 _.\-]+" value="{{ form['group_' ~ key] or '' }}" placeholder="{{ (workspaces[0].bu or 'bu') | lower }}-asset-integrity-{{ key }}s" autocomplete="off">
       {% endcall %}
       {% endfor %}
 
       {% call field("reason", "Why does this team need its own domain?", required=True) %}
-        <textarea id="reason" name="reason" rows="3" minlength="10" maxlength="1000"
-                  placeholder="What the team works on, and why its costs or access should be separate."></textarea>
+        <textarea id="reason" name="reason" rows="3" required minlength="10" maxlength="1000"
+                  placeholder="What the team works on, and why its costs or access should be separate.">{{ form.reason or '' }}</textarea>
       {% endcall %}
 
-      {% call callout() %}Once approved, the domain gets a SQL warehouse (<span class="mono">{{ workspaces[0].bu }} &lt;NAME&gt; Warehouse</span>), a budget policy
-        (<span class="mono">{{ workspaces[0].bu }}-0-DOMAIN-&lt;NAME&gt;</span>) and a folder (<span class="mono">/Workspace/Domains/&lt;NAME&gt;</span>,
-        or inside its parent's folder for a subdomain), for its groups only.{% endcall %}
+      {% call callout() %}Once set up, the domain gets a SQL warehouse (<span class="mono">{{ workspaces[0].bu }} &lt;NAME&gt; Warehouse</span>), a budget policy
+        (<span class="mono">{{ workspaces[0].bu }}-0-DOMAIN-&lt;NAME&gt;</span>) and a folder (<span class="mono">/Workspace/Domains/&lt;NAME&gt;</span>), for its groups only.{% endcall %}
     {% endif %}
   </div>
   <div class="panel-foot form-foot">
     <div class="form-actions">
-      <button type="submit" class="primary" disabled>Coming soon</button>
-      <a class="button" href="/">Back to the catalog</a>
+      <button type="submit" class="primary" {{ 'disabled' if not workspaces }}>Submit request</button>
+      <a class="button" href="/">Cancel</a>
     </div>
-    <p class="meta">Preview only: this form sends nothing yet.</p>
+    <p class="meta">A platform admin reviews it and sets it up; you can follow it under My requests.</p>
   </div>
 </form>
 {% include "_task_aside.html" %}

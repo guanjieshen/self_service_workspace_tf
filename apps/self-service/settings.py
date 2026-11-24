@@ -18,8 +18,8 @@ import cards
 log = logging.getLogger(__name__)
 
 PERSONAS = ("explorer", "builder", "publisher")
-# project_schema: the custom schema form's (project and team schemas share it; the key stays, so a link set before is kept).
-SOPS = {"project_schema": "Custom schema", "temporary_schema": "Temporary schema",
+# project_schema: the permanent schema form's (project and team schemas share it; the key stays, so a link set before is kept).
+SOPS = {"project_schema": "Permanent schema", "temporary_schema": "Temporary schema",
         "persona": "Workspace access", "folder": "Workspace folder", "warehouses": "SQL warehouses"}
 # How it works (the "New here?" line), then one FAQ per catalog section, named as it is.
 FAQS = {"getting_started": "How it works", **dict(cards.SECTIONS)}

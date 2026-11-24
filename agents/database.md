@@ -49,7 +49,7 @@ On every merge to `main`, **Deploy the app** (`scripts/app_deploy.py`) does, in 
 
 Migrations run **before** the new code starts, so new code never meets an old database. But the
 **old code keeps running** while the migration runs, so every migration must work with the
-version already running (below). The deploy's log says `migrations applied: 008_...`.
+version already running (below). The deploy's log says `migrations applied: 009_...`.
 
 The project is protected: `lifecycle.prevent_destroy: true` in `bundle/hub/resources/apps.yml`
 stops the bundle from ever deleting it. Never remove that line.

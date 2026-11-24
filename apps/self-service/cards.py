@@ -59,19 +59,19 @@ CARDS = [
     Card("temporary_schema", "workspace", "Create a temporary schema",
          "A short-term schema for experiments, tagged with the date it expires.", href="/schema/temporary", icon="schema"),
     # One form for a project schema (theirs) and a team schema (theirs and an Entra group's): the group is optional.
-    Card("custom_schema", "workspace", "Request a custom schema",
-         "Create a schema for your project, on your own or managed together with your team.", href="/schema/custom", icon="schema"),
+    Card("permanent_schema", "workspace", "Request a permanent schema",
+         "Create a schema for your project, on your own or managed together with your team.", href="/schema/permanent", icon="schema"),
     # Made by hand while its job is not deployed (portal.BY_HAND): a folder is workspace specific, and the hub does not
     # call other workspaces. The request is tracked in the approvals app like any other.
     Card("folder", "workspace", "Request a workspace folder",
          "Create a shared workspace folder and control who can access it.", href="/folder"),
-    Card("group_request", "workspace", "Add a group to your workspace",
-         "Add an Entra ID group and assign its workspace access level.",
-         link="group_request", icon="group", soon=True, opens="Opens your organization's request form"),
-    # A preview: the form opens, nothing is sent. A domain is declared in the workspace's file (a pull request).
+    # Both made by hand (portal.ALWAYS_BY_HAND): an admin does it in a pull request, then approves it.
+    Card("group_request", "workspace", "Add a group for sharing folders",
+         "Add an Entra ID group to your workspace so you can share folders with it. It gives no access by itself.",
+         href="/group", icon="group"),
     Card("domain", "workspace", "Request a domain",
          "Give a team its own SQL warehouse, budget policy and folder: a new domain, or a subdomain of one.",
-         href="/domain", preview=True),
+         href="/domain"),
 
     Card("warehouses", "compute", "Manage SQL warehouses", "Create and manage SQL warehouses for your workloads."),
     Card("classic_compute", "compute", "Request classic compute access",

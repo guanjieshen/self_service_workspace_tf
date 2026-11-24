@@ -1,20 +1,20 @@
-{#- A custom schema: a project schema (the requester's), or with a team's group, a team schema (theirs and the group's);
+{#- A permanent schema: a project schema (the requester's), or with a team's group, a team schema (theirs and the group's);
     with temporary set, a temporary schema (theirs, <prefix>tmp_<name>, for config.temporary_days). -#}
 {% extends "base.html" %}
 
 {% from "_components.html" import callout, field, wrong_account %}
 {% from "_icons.html" import icon %}
 {% block content %}
-{% set kind = "temporary_schema" if temporary else "custom_schema" %}
+{% set kind = "temporary_schema" if temporary else "permanent_schema" %}
 {% if not temporary %}
-{% set task_icon, task_name, task_text, task_category = "custom_schema", "Request a custom schema", "Create a schema for your project, on your own or managed together with your team.", "Data" %}
+{% set task_icon, task_name, task_text, task_category = "permanent_schema", "Request a permanent schema", "Create a schema for your project, on your own or managed together with your team.", "Data" %}
 {% else %}
 {% set task_icon, task_name, task_text, task_category = "temporary_schema", "Create a temporary schema", "A short-term schema for experiments, yours for " ~ (config.temporary_days or 30) ~ " days.", "Data" %}
 {% endif %}
 {% set task_aside = True %}{% include "_task_header.html" %}
 
 <div class="page-grid form-grid">
-<form class="panel" method="post" action="/schema/{{ 'temporary' if temporary else 'custom' }}" data-submit>
+<form class="panel" method="post" action="/schema/{{ 'temporary' if temporary else 'permanent' }}" data-submit>
   <div class="panel-body">
     {% call callout() %}
       {% if temporary %}<span class="danger-text">Your temporary schema will be deleted after {{ config.temporary_days or 30 }} days.</span>
