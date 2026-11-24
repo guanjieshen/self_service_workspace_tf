@@ -41,11 +41,11 @@ resource "databricks_tag_policy" "business_unit" {
   depends_on = [terraform_data.config_checks]
 }
 
-# Authoritative: who may change the tag, and who may put it on objects.
+# Authoritative: who may change the tag, and who may put it on objects. Through the workspace
+# (the account access control proxy): no account-level sign-in needed, and its creator holds MANAGE.
 resource "databricks_access_control_rule_set" "business_unit" {
-  count    = local.gt_owner ? 1 : 0
-  provider = databricks.account
-  name     = "accounts/${local.account_id}/tagPolicies/${databricks_tag_policy.business_unit[0].id}/ruleSets/default"
+  count = local.gt_owner ? 1 : 0
+  name  = "accounts/${local.account_id}/tagPolicies/${databricks_tag_policy.business_unit[0].id}/ruleSets/default"
 
   grant_rules {
     principals = [for g in local.gt_managers : "groups/${g}"]
