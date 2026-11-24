@@ -159,7 +159,9 @@ Terraform's: people get them from the self-service app.
   workspace's value, that workspace's plan leaves the tag out instead of failing, and its next
   apply adds it. A new or retired workspace file plans the hub too (`scripts/workspaces.py`).
   Creating a governed tag needs the account's CREATE permission on governed tags, which
-  workspace admins have unless an account admin turned that off.
+  workspace admins have unless an account admin turned that off, and room for one more: an
+  account has a maximum number of governed tags ("The maximum number of tag policies allowed is
+  reached for the account" fails the hub's apply).
 
 ## 6. Caveats
 
