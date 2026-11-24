@@ -11,8 +11,8 @@
 # MAGIC which may not start with the personal prefix), `owner_group` (optional, a team schema: a group
 # MAGIC the user belongs to, which gets the same rights), `reason` (why they need it; kept with the run) and
 # MAGIC `request_id` (optional), `temporary_limit` (how many temporary schemas a person may have, from the
-# MAGIC app's Settings; 1 when empty), `action` (empty: make the schema; "extend": add `days` (7) to an existing
-# MAGIC temporary schema's `cd_expires`, once an approver approved it; "hold": while it waits
+# MAGIC app's Settings; 1 when empty), `action` (empty: make the schema; "extend": add `days` (30) to an existing
+# MAGIC temporary schema's `cd_expires`, straight away or once an approver approved it; "hold": while it waits
 # MAGIC for an approver, tag it `cd_pending_request=<request_id>`, which the daily cleanup never deletes;
 # MAGIC "release": the approver rejected it, so the tag goes and it expires as before), `temporary` ("true": a temporary schema, named `<prefix>tmp_<name>`, tagged
 # MAGIC `cd_expires` a set number of days ahead; one per person until it expires), and `comment_model` (optional: the model, from the app's Settings, that writes
@@ -35,6 +35,9 @@ allowed_catalogs = ${jsonencode(allowed_catalogs)}
 temporary_days = ${jsonencode(temporary_days)}   # how long a temporary schema lasts: its cd_expires tag
 # What a temporary schema's requester may do: use it, never share it (no MANAGE, no ALL_PRIVILEGES).
 temporary_privileges = ${jsonencode(temporary_privileges)}
+# Who may create and extend a temporary schema: an email starting with this (for example an
+# admin account's prefix); empty = anyone.
+temporary_account_prefix = ${jsonencode(temporary_account_prefix)}
 # The request record check (below): the app's records, this workspace's name in them, and
 # the kinds that always need an approver. requests_catalog empty = off.
 requests_catalog = ${jsonencode(requests_catalog)}
@@ -89,8 +92,12 @@ if action and not temporary:
     raise ValueError("more time, or keeping it as a project schema, is for a temporary schema")
 if not re.fullmatch(r"[1-9]|10", limit):
     raise ValueError(f"temporary_limit is 1 to 10, not {limit!r}")
-if action == "extend" and days != "7":   # the app's EXTENSION_DAYS
-    raise ValueError(f"days is 7, not {days!r}")
+if action == "extend" and days != "30":   # the app's EXTENSION_DAYS
+    raise ValueError(f"days is 30, not {days!r}")
+if (kind == "temporary" and action in ("", "extend")) and temporary_account_prefix \
+        and not user.lower().startswith(temporary_account_prefix.lower()):
+    raise ValueError(f"temporary schemas are made and extended with an account whose email starts with "
+                     f"{temporary_account_prefix}, not {user}")
 if not isinstance(temporary_days, int) or not 1 <= temporary_days <= 365:
     raise ValueError(f"temporary_days is 1 to 365, not {temporary_days!r}")
 if owner_group and kind == "personal":

@@ -7,6 +7,8 @@ To add a card, add one Card to CARDS: its section, title and text, and where it 
   adds: "workspace", "tour"); the card is left out while that link is not set;
 - neither: Coming soon.
 
+A card with href and preview=True shows as Coming soon but opens its page, a form that sends nothing yet.
+
 A link card with soon=True shows as Coming soon until its link is set, instead of being left out.
 A link card's more=(text, link name) is a second, smaller link in its foot, shown when that link is set.
 
@@ -35,6 +37,7 @@ class Card:
     soon: bool = False  # a link card: Coming soon (not left out) while its link is not set
     opens: str = "Opens in Databricks"   # a link card's foot: where it goes, and what it needs
     more: tuple = ()  # a link card's second link: (its text, links.<name>)
+    preview: bool = False  # an href card: Coming soon, but its page opens (a form that sends nothing yet)
 
 
 CARDS = [
@@ -66,6 +69,10 @@ CARDS = [
     Card("group_request", "workspace", "Add a group to your workspace",
          "Add an Entra ID group and assign its workspace access level.",
          link="group_request", icon="group", soon=True, opens="Opens your organization's request form"),
+    # A preview: the form opens, nothing is sent. A domain is declared in the workspace's file (a pull request).
+    Card("domain", "workspace", "Request a domain",
+         "Give a team its own SQL warehouse, budget policy and folder: a new domain, or a subdomain of one.",
+         href="/domain", preview=True),
 
     Card("warehouses", "compute", "Manage SQL warehouses", "Create and manage SQL warehouses for your workloads."),
     Card("classic_compute", "compute", "Request classic compute access",
@@ -97,7 +104,7 @@ def groups(links):
                 more = c.more and links.get(c.more[1]) and (c.more[0], links[c.more[1]])
                 shown.append({"card": c, "href": href, "external": True, "ready": True, "more": more or None})
             else:
-                shown.append({"card": c, "href": c.href, "external": False, "ready": bool(c.href), "more": None})
+                shown.append({"card": c, "href": c.href, "external": False, "ready": bool(c.href), "more": None, "preview": c.preview})
         if shown:
             out.append((key, title, shown))
     return out

@@ -277,10 +277,16 @@ def schema_submit(request: Request):
     return RedirectResponse("/schema/temporary", status_code=303)   # never a personal schema now
 
 
+def temporary_account(user):
+    """Whether this account may make and extend temporary schemas (app.yaml
+    jobs.temporary_schema.account_prefix), and the prefix, for the forms to say which to use."""
+    return {"ok": PORTAL.temporary_account(user), "prefix": CONFIG.get("temporary_account_prefix") or ""}
+
+
 @app.get("/schema/temporary/{action}", response_class=HTMLResponse)
 def temporary_action_form(request: Request, action: str, schema: str = "", days: str = "", reason: str = "", error: str = ""):
-    """More time for one of the person's temporary schemas (portal.EXTENSION_DAYS): a request an
-    approver always decides."""
+    """More time for one of the person's temporary schemas (portal.EXTENSION_DAYS): added straight
+    away, or once an approver approves it (app.yaml human_approval lists temporary_extension)."""
     if action != "extend":   # keeping one as a project schema: not offered for now
         raise HTTPException(404)
     workspaces, why = offered(user_of(request), "personal_schema")
@@ -288,7 +294,8 @@ def temporary_action_form(request: Request, action: str, schema: str = "", days:
     names = [t["name"] for t in have.get("schemas") or []]
     chosen = schema if schema in names else (names[0] if len(names) == 1 else "")
     return page(request, "temporary_action.html", nav="catalog", action=action, have=have, chosen=chosen,
-                workspaces=workspaces, days=days, reason=reason, choices=portal.EXTENSION_DAYS, error=error or why)
+                workspaces=workspaces, days=days, reason=reason, choices=portal.EXTENSION_DAYS, error=error or why,
+                needs_approval=PORTAL.needs_approval("temporary_extension"), account=temporary_account(user_of(request)))
 
 
 @app.post("/schema/temporary/{action}")
@@ -322,6 +329,7 @@ def named_schema_form(request: Request, kind: str, workspace: str = "", name: st
     error = error or why
     return page(request, "schema_named.html", nav="catalog", team=kind == "team", temporary=kind == "temporary",
                 have=temporary_schema(user_of(request)) if kind == "temporary" else None,
+                account=temporary_account(user_of(request)) if kind == "temporary" else None,
                 workspaces=workspaces, chosen=chosen,
                 name=name, owner_group=owner_group,
                 reason=reason, error=error)
@@ -345,6 +353,16 @@ def named_schema_submit(request: Request, kind: str, workspace: str = Form(""), 
     except portal.RequestError as e:
         return named_schema_form(request, kind, workspace=workspace, name=name, owner_group=owner_group, reason=reason, error=str(e))
     return sent(workspace, started)
+
+
+@app.get("/domain", response_class=HTMLResponse)
+def domain_form(request: Request, workspace: str = ""):
+    """Request a domain: a preview of the form (Coming soon), which sends nothing. A new domain, or
+    a subdomain under any domain or subdomain of the workspace (its file's domains:, from the build)."""
+    workspaces, why = offered(user_of(request), "personal_schema")
+    chosen = workspace if workspace in {w.name for w in workspaces} else (workspaces[0].name if workspaces else "")
+    domains = next((w.get("domains") or [] for w in CONFIG.get("workspaces", []) if w["name"] == chosen), [])
+    return page(request, "domain.html", nav="catalog", workspaces=workspaces, chosen=chosen, domains=domains, error=why)
 
 
 @app.get("/folder", response_class=HTMLResponse)

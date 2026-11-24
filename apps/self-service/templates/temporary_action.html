@@ -1,11 +1,11 @@
-{#- More time for one of the person's temporary schemas (portal.EXTENSION_DAYS), which waits for an
-    approver. (Keeping one as a project schema is not offered for now.) -#}
+{#- More time for one of the person's temporary schemas (portal.EXTENSION_DAYS): added straight away, or
+    once an approver approves it (needs_approval). (Keeping one as a project schema is not offered for now.) -#}
 {% extends "base.html" %}
 
-{% from "_components.html" import callout, field %}
+{% from "_components.html" import callout, field, wrong_account %}
 {% block content %}
 {% set extend = True %}
-{% set task_icon, task_name, task_text, task_category = "temporary_extension", "Extend temporary schema", "Ask for 7 more days before your temporary schema is deleted.", "Data" %}
+{% set task_icon, task_name, task_text, task_category = "temporary_extension", "Extend temporary schema", "Add " ~ choices[0] ~ " more days before your temporary schema is deleted.", "Data" %}
 {% set task_aside = True %}{% include "_task_header.html" %}
 
 <div class="page-grid form-grid">
@@ -13,10 +13,12 @@
   <div class="panel-body">
     {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
     {% set mine = (have.schemas if have else []) or [] %}
+    {% set wrong = account and not account.ok %}
+    {% if wrong %}{{ wrong_account(account, user, "Temporary schemas are extended") }}{% endif %}
     {% set this = (mine | selectattr("name", "equalto", chosen) | first) if chosen else none %}
     {% if not mine %}
       {% if not error %}{% call callout("error") %}You have no temporary schema to ask about. <a class="text-link" href="/schema/temporary">Create one</a> first.{% endcall %}{% endif %}
-    {% else %}
+    {% elif not wrong %}
       <input type="hidden" name="workspace" value="{{ workspaces[0].name if workspaces else '' }}">
       {% if mine | length > 1 %}
       {% call field("schema", "Which temporary schema?", required=True) %}
@@ -26,9 +28,11 @@
       {% endcall %}
       {% else %}<input type="hidden" name="schema" value="{{ mine[0].name }}">{% endif %}
       {% call callout() %}
-        {% if this %}<span class="mono">{{ this.name }}</span> is deleted on {{ this.expires }}. {% endif %}It is kept until an approver decides.
+        {% if this %}<span class="mono">{{ this.name }}</span> is deleted on {{ this.expires }}. {% endif %}
+        {% if needs_approval %}It is kept until an approver decides.
         You're asking for {{ choices | join(" or ") }} more days; once approved, they are added to its date.
         If the request is rejected, it is deleted as before.
+        {% else %}{{ choices | join(" or ") }} more days are added to its date straight away. You can extend it again before it expires.{% endif %}
       {% endcall %}
       {% if extend and choices | length == 1 %}<input type="hidden" name="days" value="{{ choices[0] }}">
       {% elif extend %}
@@ -46,10 +50,10 @@
   </div>
   <div class="panel-foot form-foot">
     <div class="form-actions">
-      <button type="submit" class="primary" {{ 'disabled' if not mine }}>Submit request</button>
+      <button type="submit" class="primary" {{ 'disabled' if not mine or wrong }}>{{ "Submit request" if needs_approval else "Add " ~ choices[0] ~ " days" }}</button>
       <a class="button" href="/schema/temporary">Cancel</a>
     </div>
-    <p class="meta">An approver decides; you can follow it under My requests.</p>
+    <p class="meta">{{ "An approver decides; you can follow it under My requests." if needs_approval else "Runs straight away; you can follow it under My requests." }}</p>
   </div>
 </form>
 {% include "_task_aside.html" %}

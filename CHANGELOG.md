@@ -10,6 +10,19 @@ is left alone.
 
 ## Unreleased
 
+- **More time for a temporary schema runs straight away, and adds 30 days.** It no longer waits for
+  an approver, and a person may extend as often as they need. To put an approver back, add
+  `temporary_extension` to `human_approval` in `config/self-service/app.yaml`.
+- **Who may make and extend temporary schemas** (`jobs.temporary_schema.account_prefix` in
+  `app.yaml`, for example `azure-` for admin accounts): the form tells someone signed in with
+  another account which one to use, and the schema job refuses it. `null` (the default) = any account.
+- **A note under each access level** on the Request workspace access page
+  (`self_service_app.persona_notes` in `app.yaml`), for example which account to ask with.
+- **Request a domain (Coming soon):** a new catalog card whose form can be opened but sends
+  nothing yet: a new domain, or a subdomain under any domain or subdomain of the workspace.
+- **Upgrading:** add `persona_notes` and `jobs.temporary_schema.account_prefix` to your `app.yaml`
+  (both off as `null`; see the framework's). The next deploy changes the apps and the schema jobs only.
+
 ## 1.1.4
 
 - **Fix: a repository installed before 1.1.0 passes the tests after the upgrade.** An upgrade does

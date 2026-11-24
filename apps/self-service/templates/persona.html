@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon %}
 {% from "_components.html" import callout %}
+{% set notes = config.persona_notes or {} %}
 {% block content %}
 {% set task_icon, task_name, task_text, task_category = "persona", "Request workspace access", "Choose the access level you need.", "Access" %}
 {% include "_task_header.html" %}
@@ -25,6 +26,7 @@
       <p class="meta">{{ summary }}</p>
     </div>
     <ul class="checks">{% for c in can %}<li>{{ icon("check", "icon icon-xs") }}{{ c }}</li>{% endfor %}</ul>
+    {% if notes[key] %}{% call callout() %}{{ notes[key] }}{% endcall %}{% endif %}
     {% if ready and href %}
     <div class="option-foot">
       {% if href %}<a class="button primary" href="{{ href }}" target="_blank" rel="noopener" aria-label="Request {{ name }} access">Request access {{ icon("external", "icon icon-xs") }}</a>

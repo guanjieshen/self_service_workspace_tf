@@ -45,16 +45,18 @@ TASKS = {"personal_schema": "Create a personal schema", "team_folder": "Request 
 # team schema (the requester's and one of their groups').
 PROJECT_SCHEMA, TEAM_SCHEMA = "Request a project schema", "Request a team schema"
 # ... and a temporary schema: the requester's alone, <prefix>tmp_<name>, tagged to expire (one at a time),
-# with more time for it: a request an approver always decides. (Keeping one as a project schema,
-# temporary_conversion, is not offered for now: it may need a rename. Its label stays, for any sent.)
+# with more time for it: straight away, unless app.yaml human_approval lists temporary_extension. (Keeping
+# one as a project schema, temporary_conversion, is not offered for now: it may need a rename. Its label
+# stays, for any sent.)
 TEMPORARY_SCHEMA = "Create a temporary schema"
 TEMPORARY_EXTENSION, TEMPORARY_CONVERSION = "Extend temporary schema", "Keep as a project schema"
-ALWAYS_APPROVED = {"temporary_extension", "temporary_conversion"}   # whatever app.yaml human_approval says
-EXTENSION_DAYS = (7,)   # the more time someone may ask for at once (one choice for now)
+ALWAYS_APPROVED = {"temporary_conversion"}   # whatever app.yaml human_approval says
+EXTENSION_DAYS = (30,)   # the more time someone may ask for at once (one choice for now)
 # How each task is approved, as the catalog and task pages label it. The app's own tasks run
 # straight away (the jobs check every request); a persona is approved in Entra ID.
 APPROVAL = {"schema": "auto", "project_schema": "auto", "team_schema": "auto", "temporary_schema": "auto", "folder": "auto",
-            "persona": "required", "temporary_extension": "required", "temporary_conversion": "required"}
+            "persona": "required", "temporary_extension": "auto", "temporary_conversion": "required",
+            "domain": "required"}   # a domain is declared in its workspace's file, by a pull request
 # A request whose job is not deployed in the hub is made by hand (Portal.manual): recorded and
 # tracked like the others, always for an approver, who makes it (the approvals app says what) and
 # then approves it, which marks it done. The database's kind -> its job. Today the folder job is
@@ -69,7 +71,7 @@ def approval_of(config, manual=()):
     and those made by hand: manual)."""
     people = set(config.get("human_approval", ())) | set(manual) | ALWAYS_APPROVED
     task_kind = {"schema": "personal_schema", "project_schema": "project_schema", "team_schema": "team_schema",
-                 "temporary_schema": "temporary_schema", "folder": "folder"}
+                 "temporary_schema": "temporary_schema", "temporary_extension": "temporary_extension", "folder": "folder"}
     return {**APPROVAL, **{task: "required" for task, kind in task_kind.items() if kind in people}}
 SCHEMA = r"[a-z0-9][a-z0-9_]*"
 # Where a run is, as the status page shows it: waiting for serverless compute, or running.
@@ -662,6 +664,7 @@ class Portal:
         job = w.jobs["personal_schema"]
         prefix = job["tags"].get("cd_prefix", "cd_")
         if temporary:
+            self.check_temporary_account(user)
             if not schema or owner_group:
                 raise RequestError("A temporary schema needs a name, and is yours alone.")
             check_schema(schema, prefix)
@@ -692,13 +695,28 @@ class Portal:
 
     def request_more_time(self, ws_name, user, days, reason="", schema=""):
         """More time for one of the user's temporary schemas (EXTENSION_DAYS; schema: its name, or
-        their only one): recorded, and run once an approver approves it; the job adds the days to
-        its cd_expires. Returns the request's ID."""
+        their only one): recorded and run straight away (the run's ID), or, when app.yaml
+        human_approval lists temporary_extension, run once an approver approves it (the request's
+        ID); the job adds the days to its cd_expires."""
         if days not in EXTENSION_DAYS:
             raise RequestError(f"More time is {' or '.join(map(str, EXTENSION_DAYS))} days.")
         return self._about_temporary(ws_name, user, "extend", reason, schema, days)
 
+    def temporary_account(self, user):
+        """Whether this account may create and extend temporary schemas: its email starts with
+        app.yaml jobs.temporary_schema.account_prefix (for example an admin account), or no prefix
+        is set. The job checks again."""
+        prefix = (self.config.get("temporary_account_prefix") or "").lower()
+        return not prefix or (user or "").lower().startswith(prefix)
+
+    def check_temporary_account(self, user):
+        if not self.temporary_account(user):
+            prefix = self.config["temporary_account_prefix"]
+            raise RequestError(f"Temporary schemas are made with your {prefix} account: sign in with the account whose email "
+                               f"starts with {prefix} (for example {prefix}{user.split('@', 1)[0]}@...) and ask again.")
+
     def _about_temporary(self, ws_name, user, action, reason, schema="", days=None):
+        self.check_temporary_account(user)
         check_reason(reason)
         w = self.workspace(ws_name, "personal_schema")
         self._check_bu(user, w, "personal_schema")
@@ -713,7 +731,10 @@ class Portal:
         self._personal.pop((ws_name, user, "temporary"), None)
         params = {"user": user, "catalog": catalog, "schema": schema, "owner_group": "", "reason": reason,
                   "temporary": "true", "action": action, "days": str(days or "")}
-        request_id = self._start(w, "personal_schema", user, schema, "", reason, params)
+        started = self._start(w, "personal_schema", user, schema, "", reason, params)
+        if not isinstance(started, str):   # no approver (app.yaml human_approval): it ran straight away
+            return started
+        request_id = started
         # While it waits for an approver, the schema is held: tagged with this request, which the
         # daily cleanup never deletes (the job writes the tag: the app writes nothing in a catalog).
         try:
@@ -730,7 +751,7 @@ class Portal:
         """An approver rejected more time, or keeping it: the hold goes (the job), so the schema
         expires as before, and the next daily cleanup deletes it if its date has passed. Never
         stops the rejection: if it cannot run, the hold stays and the schema is kept (say so)."""
-        if row["kind"] not in ALWAYS_APPROVED:
+        if row["kind"] not in ("temporary_extension", "temporary_conversion"):
             return
         try:
             w = self.workspace(row["workspace"], "personal_schema")
