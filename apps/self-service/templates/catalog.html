@@ -44,7 +44,7 @@
         <h3>{% if ready %}<a class="stretched" href="{{ href }}" {% if external %}target="_blank" rel="noopener"{% endif %}>{{ name }}</a>{% else %}{{ name }}{% endif %}</h3>
         {% if asked %}<span class="quota pending" title="Your request is in progress">Requested</span>
         {% elif key in quotas and q.exists is not none %}<span class="quota {{ 'full' if have }}" title="{{ 'The most you may have at a time' if have else ('Up to ' ~ q.limit ~ ' at a time') }}">{{ q.used }} of {{ q.limit }} used</span>{% endif %}
-        {% if locked %}<span class="soon" title="Sign in with your {{ temporary_account.prefix }} account">{{ temporary_account.prefix }} account only</span>
+        {% if locked %}
         {% elif not ready or item.preview %}<span class="soon">Coming soon</span>{% else %}{{ icon("external" if external else "arrow", "icon task-arrow") }}{% endif %}
       </div>
       <p>{{ text }}</p>

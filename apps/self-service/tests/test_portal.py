@@ -1834,12 +1834,11 @@ class AccountsNotesAndDomains(unittest.TestCase):
         mine = tile(self.http.get("/", headers={"X-Forwarded-Email": ANA}).text)
         self.assertIn("is-soon", mine.split(">", 1)[0], "greyed out")
         self.assertNotIn('href="/schema/temporary"', mine, "not a link")
-        self.assertIn("azure- account only", mine)
         self.assertIn("Sign in with your azure- account to create one", mine)
         self.assertNotIn("Extend temporary schema", mine, "nothing of theirs to extend")
         theirs = tile(self.http.get("/", headers={"X-Forwarded-Email": self.AZ}).text)
         self.assertIn('href="/schema/temporary"', theirs, "the azure- account: a normal tile")
-        self.assertNotIn("account only", theirs)
+        self.assertNotIn("Sign in with your azure- account", theirs)
         self.fake.schemas_.add("fin_citizen_dev.cd_tmp_old")
         self.fake.tags_["fin_citizen_dev.cd_tmp_old"] = {"cd_schema_kind": "temporary", "cd_user": ANA,
                                                          "cd_expires": (dt.date.today() + dt.timedelta(days=5)).isoformat()}
