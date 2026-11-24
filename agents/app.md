@@ -50,6 +50,8 @@ browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py
   marks them done. Nothing runs. The domain form's places come from the Databricks Domains API
   (`Portal.domains`: `/api/2.0/domains`, subdomains under their `parent_domain_id`, drafts left
   out), or from the workspace file's `domains:` (`app_build.domain_tree`) when it cannot be read.
+  **The app's identity needs the `MANAGE DISCOVER` permission** to read the account's domains (the
+  API's rule for callers outside the UI); without it the form offers the workspace file's domains.
 - A card can still be a **preview** (`Card(..., preview=True)`: Coming soon, but its page opens).
 - **Persona notes** (`self_service_app.persona_notes`): a line under each access level on the
   workspace access page, for example which account to ask with.

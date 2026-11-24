@@ -25,7 +25,8 @@ is left alone.
   `links.group_request` in `app.yaml` is no longer used: remove it.
 - **Request a domain:** a new card and form, approval required. A new domain, or a subdomain under
   any of the account's Databricks domains (the Domains API; the workspace file's `domains:` when it
-  cannot be read), with its application ID, its groups and why. A platform admin declares it in the
+  cannot be read: the self-service app's identity needs `MANAGE DISCOVER` to read them), with its
+  application ID, its groups and why. A platform admin declares it in the
   workspace's file and approves it: nothing runs from the app.
 - **One card and form for project and team schemas: Request a permanent schema** (`/schema/permanent`).
   The team's Entra group is optional: without it, a project schema; with it, a team schema the
