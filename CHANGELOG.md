@@ -26,7 +26,8 @@ is left alone.
   framework's): an upgrade never copies new baseline files, and without it nothing is tagged.
 - **More time for a temporary schema runs straight away, and adds 30 days.** It no longer waits for
   an approver, and a person may extend as often as they need. To put an approver back, add
-  `temporary_extension` to `human_approval` in `config/self-service/app.yaml`.
+  `temporary_extension` to `human_approval` in `config/self-service/app.yaml`. A 7-day request still
+  waiting for an approver at the upgrade keeps working: approved, it adds its 7 days.
 - **Who may make and extend temporary schemas** (`jobs.temporary_schema.account_prefix` in
   `app.yaml`, for example `azure-` for admin accounts): the form tells someone signed in with
   another account which one to use, and the schema job refuses it. `null` (the default) = any account.
@@ -37,11 +38,12 @@ is left alone.
   for sharing workspace folders with the group. It asks for the workspace, the Entra ID group and why; a platform admin adds it to the workspace file's
   `sharing_groups` (no entitlements: only something to share folders with) and approves it.
   `links.group_request` in `app.yaml` is no longer used: remove it.
-- **Request a domain:** a new card and form, approval required. A new domain, or a subdomain under
-  any of the account's Databricks domains (the Domains API; the workspace file's `domains:` when it
-  cannot be read: the self-service app's identity needs `MANAGE DISCOVER` to read them), with its
-  application ID, its groups and why. A platform admin declares it in the
-  workspace's file and approves it: nothing runs from the app.
+- **Request a domain:** a new card and a short form, approval required: its name, where it goes (a
+  new domain, or a subdomain under any of the account's Databricks domains, from the Domains API;
+  the workspace file's `domains:` when it cannot be read: the self-service app's identity needs
+  `MANAGE DISCOVER` to read them), and why. A platform admin asks for anything else (its
+  application ID, its groups), declares it in the workspace's file and approves it: nothing runs
+  from the app.
 - **One card and form for project and team schemas: Request a permanent schema** (`/schema/permanent`).
   The team's Entra group is optional: without it, a project schema; with it, a team schema the
   group manages too. Both kinds, their approval (`human_approval`) and the job are unchanged; the

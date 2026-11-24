@@ -768,25 +768,18 @@ class Portal:
         except Exception as e:
             warn(f"releasing the hold of {row['id']} on {row['name']} (it is kept until someone does)", e)
 
-    def request_domain(self, ws_name, user, name, parent="", parent_label="", appid="", groups=None, reason=""):
-        """A domain (or a subdomain of parent: a Databricks domain's ID): recorded for an approver,
-        who declares it in the workspace's file and approves it. Nothing runs. Returns the request's ID."""
+    def request_domain(self, ws_name, user, name, parent="", parent_label="", reason=""):
+        """A domain (or a subdomain of parent: a Databricks domain's ID): recorded for an admin, who
+        asks for anything else it needs (its application ID, its groups), sets it up and approves
+        it. Nothing runs. Returns the request's ID."""
         name = (name or "").strip().lower()
         if not re.fullmatch(r"[a-z][a-z0-9_]{0,40}", name):
             raise RequestError("Give the domain a name: lowercase letters, numbers and underscores, starting with a letter.")
-        appid = (appid or "").strip()
-        if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", appid) or appid.upper() == "NONE":
-            raise RequestError("Give the application ID its costs are charged to, for example APP-5678.")
-        groups = {p: g.strip() for p, g in (groups or {}).items() if p in ("explorer", "builder", "publisher") and (g or "").strip()}
-        if not groups:
-            raise RequestError("Give at least one Entra ID group: the domain's explorers, builders or publishers.")
-        if not all(re.fullmatch(GROUP, g) for g in groups.values()):
-            raise RequestError("Each group must be an Entra ID group's name: letters, digits, spaces and . _ -.")
         check_reason(reason)
         w = self.workspace(ws_name, "domain")
         self._check_bu(user, w, "domain")
         return self._start(w, "domain", user, name, "", reason, {}, kind="domain",
-                           details={"parent": parent or "", "parent_label": parent_label or "", "appid": appid, "groups": groups})
+                           details={"parent": parent or "", "parent_label": parent_label or ""})
 
     def request_group(self, ws_name, user, group, reason=""):
         """An Entra ID group added to the workspace so people can share folders with it (the

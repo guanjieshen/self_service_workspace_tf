@@ -11,7 +11,7 @@
 <div class="page-grid form-grid">
 <form class="panel" method="post" action="/domain" data-submit>
   <div class="panel-body">
-    {% call callout() %}A domain is a team inside your workspace with its own SQL warehouse, budget policy and folder, charged to its own application ID. Its people keep everything the workspace gives them. A platform admin reviews your request and sets it up.{% endcall %}
+    {% call callout() %}A domain gives a team its own SQL warehouse, budget policy and folder. A platform admin reviews your request, asks you for anything else it needs, and sets it up.{% endcall %}
     {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
     {% if workspaces %}
       {% set on_change = True %}{% include "_workspace_select.html" %}
@@ -24,29 +24,14 @@
         </select>
       {% endcall %}
 
-      {% call field("name", "Name", required=True, hint="Lowercase letters, numbers and underscores, for example asset_integrity. It names the warehouse, the budget policy and the folder, so choose it once.") %}
+      {% call field("name", "Name", required=True, hint="Lowercase letters, numbers and underscores, for example asset_integrity.") %}
         <input id="name" name="name" class="mono" required pattern="[a-z][a-z0-9_]*" maxlength="41" value="{{ form.name or '' }}" placeholder="asset_integrity">
       {% endcall %}
 
-      {% call field("appid", "Application ID", required=True, hint="The CMDB application its costs are charged to, for example APP-5678.") %}
-        <input id="appid" name="appid" class="mono" required maxlength="64" value="{{ form.appid or '' }}" placeholder="APP-5678">
-      {% endcall %}
-
-      {% for key, label, hint in [("explorer", "Explorer group", "SQL, dashboards and Genie: reads the domain's folder."),
-                                  ("builder", "Builder group", "Notebooks, jobs and pipelines: manages the domain's folder."),
-                                  ("publisher", "Publisher group", "Publishes and shares: manages the domain's folder.")] %}
-      {% call field("group_" ~ key, label, hint="An Entra ID group's exact name. " ~ hint ~ " Leave empty if none; give at least one.") %}
-        <input id="group_{{ key }}" name="group_{{ key }}" class="mono" maxlength="200" pattern="[A-Za-z0-9 _.\-]+" value="{{ form['group_' ~ key] or '' }}" placeholder="{{ (workspaces[0].bu or 'bu') | lower }}-asset-integrity-{{ key }}s" autocomplete="off">
-      {% endcall %}
-      {% endfor %}
-
-      {% call field("reason", "Why does this team need its own domain?", required=True) %}
+      {% call field("reason", "Why do you need it?", required=True) %}
         <textarea id="reason" name="reason" rows="3" required minlength="10" maxlength="1000"
                   placeholder="What the team works on, and why its costs or access should be separate.">{{ form.reason or '' }}</textarea>
       {% endcall %}
-
-      {% call callout() %}Once set up, the domain gets a SQL warehouse (<span class="mono">{{ workspaces[0].bu }} &lt;NAME&gt; Warehouse</span>), a budget policy
-        (<span class="mono">{{ workspaces[0].bu }}-0-DOMAIN-&lt;NAME&gt;</span>) and a folder (<span class="mono">/Workspace/Domains/&lt;NAME&gt;</span>), for its groups only.{% endcall %}
     {% endif %}
   </div>
   <div class="panel-foot form-foot">

@@ -45,7 +45,7 @@ browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py
   a schema's kind or extends its date.
 - **Requests an admin makes by hand, always** (`portal.ALWAYS_BY_HAND`): **a domain** (`/domain`,
   kind `domain`) and **a group for sharing folders** (`/group`, kind `workspace_group`). Recorded
-  with their details (migration 009's `details`: a domain's parent, application ID and groups) and
+  with their details (migration 009's `details`: a domain's parent) and
   sent to the approvals app, whose steps say what to change in the workspace's file; approving
   marks them done. Nothing runs. The domain form's places come from the Databricks Domains API
   (`Portal.domains`: `/api/2.0/domains`, subdomains under their `parent_domain_id`, drafts left

@@ -382,8 +382,7 @@ async def domain_submit(request: Request):
     try:
         labels = {d["key"]: d["label"] for d in (PORTAL.domains() or [])}
         started = PORTAL.request_domain(workspace, user_of(request), form.get("name", ""), parent=form.get("parent", ""),
-                                        parent_label=labels.get(form.get("parent", ""), form.get("parent", "")), appid=form.get("appid", ""),
-                                        groups={p: form.get(f"group_{p}", "") for p in ("explorer", "builder", "publisher")},
+                                        parent_label=labels.get(form.get("parent", ""), form.get("parent", "")),
                                         reason=form.get("reason", "").strip())
     except portal.RequestError as e:
         return domain_form(request, workspace=workspace, error=str(e), form=form)

@@ -156,12 +156,18 @@ class PersonalSchema(unittest.TestCase):
         self.assertEqual(sql, [f"ALTER SCHEMA `fin_citizen_dev`.`cd_tmp_x` SET TAGS ('cd_expires' = '{until}')"], "from its current date; nothing else")
         self.assertEqual((result["action"], result["expires"]), ("extend", until))
 
+    def test_an_extension_asked_for_before_it_was_30_days_still_runs(self):
+        import datetime as dt
+        mine = {"cd_tmp_x": {"cd_user": "a@contoso.com", "cd_schema_kind": "temporary", "cd_expires": (dt.date.today() + dt.timedelta(days=2)).isoformat()}}
+        _, result = run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "extend", "days": "7"}, mine)
+        self.assertEqual(result["expires"], (dt.date.today() + dt.timedelta(days=9)).isoformat(), "a 7-day request waiting at the upgrade, approved after it")
+
     def test_more_time_is_only_for_a_temporary_schema_of_theirs(self):
         for params, schemas, message in (
                 ({"days": "30", "action": "extend"}, {}, "not a temporary schema of"),
                 ({"days": "30", "action": "extend"}, {"cd_tmp_x": {"cd_user": "bo@contoso.com", "cd_schema_kind": "temporary"}}, "not a@contoso.com's"),
                 ({"action": "extend", "days": "30"}, {"cd_tmp_x": {"cd_user": "a@contoso.com", "cd_schema_kind": "project"}}, "already a project schema"),
-                ({"days": "7", "action": "extend"}, {}, "days is 30"),
+                ({"days": "14", "action": "extend"}, {}, "days is 30"),
                 ({"action": "convert"}, {}, "action is extend, hold, release or empty"),   # keeping it: not offered for now
                 ({"action": "hold"}, {}, "names the request it is for")):
             with self.subTest(params=params), self.assertRaisesRegex(ValueError, message):

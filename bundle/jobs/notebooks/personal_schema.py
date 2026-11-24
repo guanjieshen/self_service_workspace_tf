@@ -92,7 +92,7 @@ if action and not temporary:
     raise ValueError("more time, or keeping it as a project schema, is for a temporary schema")
 if not re.fullmatch(r"[1-9]|10", limit):
     raise ValueError(f"temporary_limit is 1 to 10, not {limit!r}")
-if action == "extend" and days != "30":   # the app's EXTENSION_DAYS
+if action == "extend" and days not in ("30", "7"):   # the app's EXTENSION_DAYS; 7: one asked for before it was 30
     raise ValueError(f"days is 30, not {days!r}")
 if (kind == "temporary" and action in ("", "extend")) and temporary_account_prefix \
         and not user.lower().startswith(temporary_account_prefix.lower()):

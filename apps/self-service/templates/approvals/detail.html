@@ -87,7 +87,7 @@
         {% call callout() %}<p class="strong">Set up by a platform admin</p>
           <ol class="manual-steps">
             <li>In the repository, add the domain <span class="mono">{{ r.name }}</span> to <span class="mono">{{ r.workspace }}</span>'s file, under <span class="mono">domains:</span>{% if d.parent_label %}, under <span class="strong">{{ d.parent_label }}</span>{% endif %}</li>
-            <li>Its application ID: <span class="mono">{{ d.appid }}</span>; its groups: {% for p, g in (d.groups or {}).items() %}{{ p }} <span class="mono">{{ g }}</span>{{ ", " if not loop.last }}{% endfor %}</li>
+            <li>It needs its application ID and its Explorer, Builder and Publisher groups: if the request does not say them, <span class="strong">Ask a question</span> below</li>
             <li>Merge the pull request, then approve here: the requester sees it as set up</li>
           </ol>{% endcall %}
         {% elif r.kind == "workspace_group" %}

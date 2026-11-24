@@ -1853,17 +1853,16 @@ class AccountsNotesAndDomains(unittest.TestCase):
         self.assertIn('value="d1" >&nbsp;&nbsp;&nbsp;Under Upstream</option>', form, "the account's domains, from the Domains API")
         self.assertIn('value="d2" >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Under Upstream / Oil Sands</option>', form, "a subdomain sits under its domain")
         self.assertNotIn("Draft", form, "drafts are not offered")
-        bad = self.http.post("/domain", data={"workspace": "fin", "name": "integrity", "parent": "d2", "appid": "APP-1", "reason": WHY},
+        self.assertNotIn('name="appid"', form, "kept simple: a name, where it goes, and why")
+        bad = self.http.post("/domain", data={"workspace": "fin", "name": "integrity", "parent": "d2", "reason": "short"},
                              headers={"X-Forwarded-Email": ANA})
-        self.assertIn("Give at least one Entra ID group", bad.text)
         self.assertIn('value="integrity"', bad.text, "what they typed is kept")
-        r = self.http.post("/domain", data={"workspace": "fin", "name": "integrity", "parent": "d2", "appid": "APP-1", "reason": WHY,
-                                            "group_builder": "fin-integrity-builders"}, headers={"X-Forwarded-Email": ANA}, follow_redirects=False)
+        r = self.http.post("/domain", data={"workspace": "fin", "name": "integrity", "parent": "d2", "reason": WHY},
+                           headers={"X-Forwarded-Email": ANA}, follow_redirects=False)
         self.assertRegex(r.headers["location"], r"^/request/ss-", "waits for an admin")
         self.assertEqual(self.fake.started, [], "nothing runs")
         row = next(x for x in self.db.requests.values() if x["kind"] == "domain")
-        self.assertEqual((row["name"], row["details"]), ("integrity", {"parent": "d2", "parent_label": "Upstream / Oil Sands", "appid": "APP-1",
-                                                                         "groups": {"builder": "fin-integrity-builders"}}))
+        self.assertEqual((row["name"], row["details"]), ("integrity", {"parent": "d2", "parent_label": "Upstream / Oil Sands"}))
 
     def test_the_domain_form_falls_back_to_the_workspace_files_domains(self):
         self.fake.domains_ = None   # the Domains API cannot be read
