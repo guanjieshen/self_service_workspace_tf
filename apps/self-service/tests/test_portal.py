@@ -1827,11 +1827,21 @@ class AccountsNotesAndDomains(unittest.TestCase):
         self.assertEqual(r.status_code, 303)
         self.assertEqual(self.fake.started[-1][1]["user"], self.AZ)
 
-    def test_more_time_needs_the_named_account_too(self):
-        r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "30", "reason": WHY}, headers={"X-Forwarded-Email": ANA})
-        self.assertIn("sign in with the account whose email starts with azure-", r.text)
+    def test_its_owner_extends_one_made_before_the_check_with_their_regular_account(self):
+        import datetime as dt
+        self.fake.schemas_.add("fin_citizen_dev.cd_tmp_old")
+        self.fake.tags_["fin_citizen_dev.cd_tmp_old"] = {"cd_schema_kind": "temporary", "cd_user": ANA,
+                                                         "cd_expires": (dt.date.today() + dt.timedelta(days=5)).isoformat()}
+        self.db.record_request({"id": "ss-old", "kind": "temporary_schema", "workspace": "fin", "bu": "FIN", "requested_by": ANA,
+                                "name": "cd_tmp_old", "reason": WHY})
+        self.main.PORTAL._personal.clear()
         form = self.http.get("/schema/temporary/extend", headers={"X-Forwarded-Email": ANA}).text
-        self.assertIn("Temporary schemas are extended with your", form)
+        self.assertNotIn("sign in with the account", form, "no account message to extend: it is theirs")
+        self.assertIn(">Add 30 days</button>", form)
+        r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "30", "reason": WHY}, headers={"X-Forwarded-Email": ANA},
+                           follow_redirects=False)
+        self.assertEqual(r.status_code, 303)
+        self.assertEqual((self.fake.started[-1][1]["user"], self.fake.started[-1][1]["action"]), (ANA, "extend"), "the job checks it is theirs")
 
     def test_each_access_level_shows_its_note(self):
         page = self.http.get("/persona", headers={"X-Forwarded-Email": ANA}).text

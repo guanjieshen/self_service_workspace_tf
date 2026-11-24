@@ -2,7 +2,7 @@
     once an approver approves it (needs_approval). (Keeping one as a project schema is not offered for now.) -#}
 {% extends "base.html" %}
 
-{% from "_components.html" import callout, field, wrong_account %}
+{% from "_components.html" import callout, field %}
 {% block content %}
 {% set extend = True %}
 {% set task_icon, task_name, task_text, task_category = "temporary_extension", "Extend temporary schema", "Add " ~ choices[0] ~ " more days before your temporary schema is deleted.", "Data" %}
@@ -13,8 +13,7 @@
   <div class="panel-body">
     {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
     {% set mine = (have.schemas if have else []) or [] %}
-    {% set wrong = account and not account.ok %}
-    {% if wrong %}{{ wrong_account(account, user, "Temporary schemas are extended") }}{% endif %}
+    {% set wrong = False %}{#- extending is for the schema's owner, with any account (the job checks) -#}
     {% set this = (mine | selectattr("name", "equalto", chosen) | first) if chosen else none %}
     {% if not mine %}
       {% if not error %}{% call callout("error") %}You have no temporary schema to ask about. <a class="text-link" href="/schema/temporary">Create one</a> first.{% endcall %}{% endif %}

@@ -180,13 +180,16 @@ class PersonalSchema(unittest.TestCase):
         sql, _ = run({"user": "a@contoso.com", "schema": "cd_a", "temporary": "true", "action": "extend", "days": "30"}, mine)
         self.assertTrue(sql[0].startswith("ALTER SCHEMA `fin_citizen_dev`.`cd_a` SET TAGS ('cd_expires' = '2099-01-31')"))
 
-    def test_only_the_named_accounts_make_and_extend_temporary_schemas(self):
+    def test_only_the_named_accounts_make_temporary_schemas_their_owner_extends_them(self):
         prefix = {"temporary_account_prefix": "azure-"}
         with self.assertRaisesRegex(ValueError, "an account whose email starts with azure-, not a@contoso.com"):
             run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true"}, config=prefix)
         mine = {"cd_tmp_x": {"cd_user": "a@contoso.com", "cd_schema_kind": "temporary", "cd_expires": "2099-01-01"}}
-        with self.assertRaisesRegex(ValueError, "starts with azure-"):
-            run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "extend", "days": "30"}, mine, config=prefix)
+        _, result = run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "extend", "days": "30"}, mine, config=prefix)
+        self.assertEqual(result["action"], "extend", "made before the check with a regular account: its owner extends it")
+        with self.assertRaisesRegex(ValueError, "not a@contoso.com's"):
+            run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "extend", "days": "30"},
+                {"cd_tmp_x": {**mine["cd_tmp_x"], "cd_user": "azure-a@contoso.com"}}, config=prefix)
         _, result = run({"user": "Azure-A@contoso.com", "schema": "cd_tmp_x", "temporary": "true"}, config=prefix)
         self.assertTrue(result["created"], "its own account (any case)")
         _, result = run({"user": "a@contoso.com", "schema": "sales", "reason": "Monthly sales reporting."}, config=prefix)

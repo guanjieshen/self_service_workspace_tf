@@ -278,8 +278,8 @@ def schema_submit(request: Request):
 
 
 def temporary_account(user):
-    """Whether this account may make and extend temporary schemas (app.yaml
-    jobs.temporary_schema.account_prefix), and the prefix, for the forms to say which to use."""
+    """Whether this account may make temporary schemas (app.yaml jobs.temporary_schema.account_prefix),
+    and the prefix, for the form to say which to use."""
     return {"ok": PORTAL.temporary_account(user), "prefix": CONFIG.get("temporary_account_prefix") or ""}
 
 
@@ -295,7 +295,7 @@ def temporary_action_form(request: Request, action: str, schema: str = "", days:
     chosen = schema if schema in names else (names[0] if len(names) == 1 else "")
     return page(request, "temporary_action.html", nav="catalog", action=action, have=have, chosen=chosen,
                 workspaces=workspaces, days=days, reason=reason, choices=portal.EXTENSION_DAYS, error=error or why,
-                needs_approval=PORTAL.needs_approval("temporary_extension"), account=temporary_account(user_of(request)))
+                needs_approval=PORTAL.needs_approval("temporary_extension"))
 
 
 @app.post("/schema/temporary/{action}")

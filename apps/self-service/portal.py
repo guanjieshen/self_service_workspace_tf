@@ -711,9 +711,9 @@ class Portal:
         return self._about_temporary(ws_name, user, "extend", reason, schema, days)
 
     def temporary_account(self, user):
-        """Whether this account may create and extend temporary schemas: its email starts with
-        app.yaml jobs.temporary_schema.account_prefix (for example an admin account), or no prefix
-        is set. The job checks again."""
+        """Whether this account may create a temporary schema: its email starts with app.yaml
+        jobs.temporary_schema.account_prefix (for example an admin account), or no prefix is set.
+        Extending one is for its owner, with the account that made it. The job checks again."""
         prefix = (self.config.get("temporary_account_prefix") or "").lower()
         return not prefix or (user or "").lower().startswith(prefix)
 
@@ -724,7 +724,7 @@ class Portal:
                                f"starts with {prefix} (for example {prefix}{user.split('@', 1)[0]}@...) and ask again.")
 
     def _about_temporary(self, ws_name, user, action, reason, schema="", days=None):
-        self.check_temporary_account(user)
+        # Any account its owner made it with: one made before account_prefix keeps its owner's account.
         check_reason(reason)
         w = self.workspace(ws_name, "personal_schema")
         self._check_bu(user, w, "personal_schema")

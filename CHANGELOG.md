@@ -28,9 +28,11 @@ is left alone.
   an approver, and a person may extend as often as they need. To put an approver back, add
   `temporary_extension` to `human_approval` in `config/self-service/app.yaml`. A 7-day request still
   waiting for an approver at the upgrade keeps working: approved, it adds its 7 days.
-- **Who may make and extend temporary schemas** (`jobs.temporary_schema.account_prefix` in
-  `app.yaml`, for example `azure-` for admin accounts): the form tells someone signed in with
-  another account which one to use, and the schema job refuses it. `null` (the default) = any account.
+- **Who may make temporary schemas** (`jobs.temporary_schema.account_prefix` in `app.yaml`, for
+  example `azure-` for admin accounts): the form tells someone signed in with another account which
+  one to use, and the schema job refuses it. `null` (the default) = any account. Extending one is for
+  its owner, with the account that made it: a temporary schema made before the check, with a regular
+  account, is still extended by its owner.
 - **A note under each access level** on the Request workspace access page
   (`self_service_app.persona_notes` in `app.yaml`), for example which account to ask with; an access
   level that is Coming soon shows an Unavailable button.

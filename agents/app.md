@@ -62,9 +62,10 @@ browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py
   with `action=extend` (adds the days to `cd_expires`), at once or once approved. **Keeping one as a project schema is not offered
   for now** (it may need a rename): migration 008's `temporary_conversion` kind stays, unused. The app reads the schema's tags from Unity Catalog (`Portal.temporary_schema`,
   the entity tag assignments API), so the card, the form and the reminder (every page, 3 days or
-  fewer: `main.expiring`) follow an extension. **Which accounts may make and extend one:**
-  `jobs.temporary_schema.account_prefix` (for example `azure-`): the forms say which account to sign in
-  with (`Portal.check_temporary_account`), and the job refuses others. **A request waiting for an approver holds its
+  fewer: `main.expiring`) follow an extension. **Which accounts may make one:**
+  `jobs.temporary_schema.account_prefix` (for example `azure-`): the form says which account to sign in
+  with (`Portal.check_temporary_account`), and the job refuses others. **Extending one is for its owner**
+  (the job checks `cd_user`), with the account that made it, so one made before the check keeps working. **A request waiting for an approver holds its
   schema:** sent, the job tags it `cd_pending_request` (`action=hold`); the cleanup never deletes a
   held schema; approved, the tag goes with the change; rejected, `Portal.release_hold` runs the job
   with `action=release`. How many temporary schemas a person may have is Settings > Schemas

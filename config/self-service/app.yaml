@@ -120,8 +120,8 @@ jobs:
   temporary_schema:                   # a person's short-term schema: <prefix>tmp_<name>, one at a time
     days: 30                          # its cd_expires tag, this many days ahead; the daily cleanup job drops it after
     limit: 1                          # how many each person may have at a time (1 to 10): the default; admins change it in Settings > Schemas
-    # Only accounts whose email starts with this may create and extend one (the form and the job
-    # check), for example azure- for admin accounts. null = any account.
+    # Only accounts whose email starts with this may create one (the form and the job check), for
+    # example azure- for admin accounts; its owner extends it. null = any account.
     account_prefix: null
     # What the requester may do in it: use it fully, but not share it (never MANAGE or
     # ALL_PRIVILEGES, which let them grant it to others; the build refuses them).

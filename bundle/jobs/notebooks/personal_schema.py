@@ -35,8 +35,8 @@ allowed_catalogs = ${jsonencode(allowed_catalogs)}
 temporary_days = ${jsonencode(temporary_days)}   # how long a temporary schema lasts: its cd_expires tag
 # What a temporary schema's requester may do: use it, never share it (no MANAGE, no ALL_PRIVILEGES).
 temporary_privileges = ${jsonencode(temporary_privileges)}
-# Who may create and extend a temporary schema: an email starting with this (for example an
-# admin account's prefix); empty = anyone.
+# Who may create a temporary schema: an email starting with this (for example an admin account's
+# prefix); empty = anyone. Extending one is for its owner (below), with the account that made it.
 temporary_account_prefix = ${jsonencode(temporary_account_prefix)}
 # The request record check (below): the app's records, this workspace's name in them, and
 # the kinds that always need an approver. requests_catalog empty = off.
@@ -94,9 +94,9 @@ if not re.fullmatch(r"[1-9]|10", limit):
     raise ValueError(f"temporary_limit is 1 to 10, not {limit!r}")
 if action == "extend" and days not in ("30", "7"):   # the app's EXTENSION_DAYS; 7: one asked for before it was 30
     raise ValueError(f"days is 30, not {days!r}")
-if (kind == "temporary" and action in ("", "extend")) and temporary_account_prefix \
+if kind == "temporary" and not action and temporary_account_prefix \
         and not user.lower().startswith(temporary_account_prefix.lower()):
-    raise ValueError(f"temporary schemas are made and extended with an account whose email starts with "
+    raise ValueError(f"temporary schemas are made with an account whose email starts with "
                      f"{temporary_account_prefix}, not {user}")
 if not isinstance(temporary_days, int) or not 1 <= temporary_days <= 365:
     raise ValueError(f"temporary_days is 1 to 365, not {temporary_days!r}")

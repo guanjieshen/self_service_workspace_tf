@@ -23,7 +23,7 @@ Find them: Catalog Explorer in the person's workspace > the catalog > the schema
 | They ask | Do |
 | --- | --- |
 | "When is it deleted?" | Its `cd_expires`; also on the app's card (a bar: N of M days left) and the form |
-| "Extend it" | The owner: in the app, the temporary schema > **Extend temporary schema** (30 days, with a reason), signed in with the account `jobs.temporary_schema.account_prefix` names if one is set. It is added straight away, as often as they ask. Only if `human_approval` lists `temporary_extension` does it wait for an approver (the schema is held meanwhile): the admin app > Pending Approvals > approve or reject |
+| "Extend it" | The owner: in the app, the temporary schema > **Extend temporary schema** (30 days, with a reason), signed in with the account that made it. It is added straight away, as often as they ask. Only if `human_approval` lists `temporary_extension` does it wait for an approver (the schema is held meanwhile): the admin app > Pending Approvals > approve or reject |
 | "Why was it deleted?" | The cleanup's run of that day (the hub > Jobs > Temporary schema cleanup > the run's output): it lists each deleted schema, whose, and how many tables. Nothing deletes one early |
 | "Can I get it back?" | Not from the app. Within 7 days of the deletion a platform admin may recover managed tables (Unity Catalog `UNDROP`); after that, no |
 | "I can't create another" | They are at the limit (the card: N of N used). Wait for one to expire, or extend or drop one |
