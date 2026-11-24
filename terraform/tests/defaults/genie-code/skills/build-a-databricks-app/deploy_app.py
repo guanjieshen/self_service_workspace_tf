@@ -118,7 +118,11 @@ def deploy(prefix, name, folder, description, warehouse, tags=None, lakebase=Tru
                 "APP": full, "OWNER": me, "CREATED_WITH": "genie-code",
                 "EXPIRES": (datetime.date.today() + datetime.timedelta(days=30)).isoformat()}
     if lakebase:
-        if not _get(f"/api/2.0/postgres/projects/{full}"):
+        found = _get(f"/api/2.0/postgres/projects/{full}")
+        if found and found.get("delete_time"):   # removed in the last 7 days: its name is still taken, so bring it back
+            _do("POST", f"/api/2.0/postgres/projects/{full}/undelete", body={})
+            print(f"Restored the Lakebase database {full} (removed on {found['delete_time'][:10]}), with its data.")
+        elif not found:
             # The smallest size, suspended after 5 idle minutes, tagged for chargeback and cleanup.
             _do("POST", "/api/2.0/postgres/projects", query={"project_id": full},
                 body={"spec": {"display_name": f"{full}: {description}"[:256], "pg_version": 17,

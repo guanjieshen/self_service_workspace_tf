@@ -84,4 +84,4 @@ When it's no longer needed (and before its `EXPIRES` date), with their yes, beca
 remove(prefix="{prefix}", name="<name>")
 ```
 
-Then delete its folder.
+Then delete its folder. A removed database is kept for 7 days: deploying the same name in that time brings it back, with its data.
