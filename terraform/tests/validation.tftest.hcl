@@ -104,6 +104,13 @@ run "bad_label" {
   expect_failures = [terraform_data.config_checks]
 }
 
+# Governed tags are account-wide: a workspace's file cannot change them
+run "governed_tags_in_a_workspace" {
+  command = plan
+  variables { workspace = "governed-tags-in-workspace" }
+  expect_failures = [terraform_data.config_checks]
+}
+
 # A misspelt setting under settings: is not in the baseline
 run "unknown_override" {
   command = plan

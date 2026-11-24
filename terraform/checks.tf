@@ -19,6 +19,10 @@ resource "terraform_data" "config_checks" {
       error_message = "self_service in the workspace's file must be true (the self-service app serves the workspace; the default) or false (it does not, for example the hub itself)."
     }
     precondition {
+      condition     = !contains(keys(local.ws_all), "governed_tags")
+      error_message = "governed_tags is account-wide: set it in config/defaults/governed-tags.yaml, not in a workspace's file."
+    }
+    precondition {
       condition     = length(local.unknown_keys) == 0
       error_message = "The workspace file has keys that are neither a baseline setting nor a workspace key (usually a typo): ${join(", ", local.unknown_keys)}. Workspace keys: ${join(", ", local.workspace_keys)}; baseline settings: ${join(", ", sort(local.defaults_sections))}."
     }

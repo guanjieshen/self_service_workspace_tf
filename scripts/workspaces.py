@@ -208,6 +208,13 @@ def names():
     return [f.stem for f in files()]
 
 
+def hub_workspace():
+    """The workspace whose host is the self-service hub's (config/self-service/hub.yaml), or None."""
+    hub = ROOT / "config/self-service/hub.yaml"
+    host = (nested(hub, "hub", "host") or "").rstrip("/") if hub.exists() else ""
+    return next((f.stem for f in files() if host and (top_level(f).get("host") or "").rstrip("/") == host), None)
+
+
 def affected(base, head, plan=False):
     """{"workspaces": what to plan or apply, "removed": workspaces whose file was deleted}."""
     def git(*args):
@@ -225,6 +232,10 @@ def affected(base, head, plan=False):
     if any(every(p) or (plan and re.match(PLAN_ONLY, p)) for _, p in paths):
         return {"workspaces": current, "removed": removed}
     touched = {m.group(2) for _, p in paths for m in [workspace_file.match(p)] if m}
+    # A workspace added or retired changes the governed tags' allowed values, which the
+    # self-service hub's workspace owns (terraform/governed_tags.tf): plan it too.
+    if any(status in ("A", "D") and workspace_file.match(p) for status, p in paths):
+        touched |= {h for h in [hub_workspace()] if h}
     return {"workspaces": sorted(touched & set(current)), "removed": removed}
 
 
