@@ -65,7 +65,9 @@ break the framework's tests. When you change a baseline file, change it in both 
   (`x == null ? "" : x`).
 - **Tests:** `mock_provider` runs cannot see child-module resources from the root (assert
   on locals, or run the module on its own); after the first failing run in a file the
-  rest are skipped; `expect_failures` cannot check which message.
+  rest are skipped; `expect_failures` cannot check which message; `override_data` cannot fill
+  a data source's nested list attribute (for example `databricks_tag_policies.tag_policies`):
+  it comes back empty, so test that path against a workspace.
 - **Finding a setting's API name:** `GET /api/2.1/settings-metadata` is not complete; also
   check the SDK's settings types and the provider's list of `workspace_conf` keys. Probe
   read-only with `GET /api/2.0/workspace-conf?keys=X`.

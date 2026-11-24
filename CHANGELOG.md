@@ -10,6 +10,20 @@ is left alone.
 
 ## Unreleased
 
+- **Each workspace's catalog is tagged with its business unit, as a governed tag:**
+  `business_unit` = the workspace's prefix (for example `gtm`, `gds`). The tag is account-wide,
+  so the self-service hub's workspace creates it, with every workspace's prefix as its allowed
+  values, and sets who may use it: its managers (the hub's platform admins unless
+  `governed_tags.managers` names others) change it; every workspace's persona groups, platform
+  admins and the pipeline may assign it. Each workspace then tags its own catalog. A workspace
+  added later is tagged on its first apply after the hub's. Adding or retiring a workspace
+  plans the hub too.
+  **The first plan after an upgrade:** in the hub's workspace, a new governed tag, its
+  permissions and its catalog's tag; in every other workspace, nothing until the hub has
+  applied, then its catalog's tag. **Needs:** the pipeline can create governed tags (workspace
+  admins can, unless an account admin turned it off).
+  **Baseline edits:** add the new file `config/defaults/governed-tags.yaml` (copy the
+  framework's): an upgrade never copies new baseline files, and without it nothing is tagged.
 - **More time for a temporary schema runs straight away, and adds 30 days.** It no longer waits for
   an approver, and a person may extend as often as they need. To put an approver back, add
   `temporary_extension` to `human_approval` in `config/self-service/app.yaml`.

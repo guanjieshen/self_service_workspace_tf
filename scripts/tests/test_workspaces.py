@@ -178,6 +178,23 @@ class Affected(unittest.TestCase):
         self.change("config/workspaces/delta.yaml")
         self.assertEqual(self.affected()["workspaces"], ["delta"])
 
+    def test_a_new_or_retired_workspace_plans_the_hub_too(self):
+        # The hub's workspace owns the governed tags, whose allowed values are every workspace's prefix.
+        (self.repo / "config/workspaces/alpha.yaml").write_text("prefix: alpha\nhost: https://adb-1.1.azuredatabricks.net\n")
+        (self.repo / "config/self-service").mkdir(parents=True)
+        (self.repo / "config/self-service/hub.yaml").write_text("hub:\n  host: https://adb-1.1.azuredatabricks.net  # the hub\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "a hub")
+        self.base = self.git("rev-parse", "HEAD").strip()
+        self.change("config/workspaces/delta.yaml")
+        self.assertEqual(self.affected()["workspaces"], ["alpha", "delta"], "added: the hub plans its new value")
+        self.base = self.git("rev-parse", "HEAD").strip()
+        self.change(delete=["config/workspaces/delta.yaml"])
+        self.assertEqual(self.affected(), {"workspaces": ["alpha"], "removed": ["delta"]}, "retired: the hub drops its value")
+        self.base = self.git("rev-parse", "HEAD").strip()
+        self.change("config/workspaces/beta.yaml")
+        self.assertEqual(self.affected()["workspaces"], ["beta"], "a change to one workspace's file is only its own")
+
     def test_dev_workspaces_too(self):
         self.change("dev/workspaces/gamma.yaml")
         self.assertEqual(self.affected()["workspaces"], ["gamma"])

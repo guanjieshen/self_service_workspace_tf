@@ -12,6 +12,7 @@ config/
 │   ├── cost.yaml             the account ID, chargeback tags, usage (budget) policies
 │   ├── catalog.yaml          the workspace catalog and its grants
 │   ├── settings.yaml         admin console settings (security, downloads, tokens, Genie Code, ...)
+│   ├── governed-tags.yaml    account-wide governed tags (the business unit tag on each catalog)
 │   └── genie-code/           Genie Code instructions and skills, for every workspace
 ├── workspaces/               one file per workspace: the list of workspaces CI deploys
 │   ├── _example.yaml         the template to copy
@@ -96,6 +97,8 @@ The keys a workspace file usually sets. `prefix`, `host`, `genie_code_instructio
 | Change Genie Code instructions | `defaults/genie-code/instructions.md` | `genie_code_instructions` in its file (appended after the default) |
 | Add a Genie Code skill | a folder in `defaults/genie-code/skills/` | (every workspace gets the baseline's skills) |
 | Leave Genie Code alone (managed elsewhere) | `settings.genie_code` in `defaults/settings.yaml` | `settings.genie_code: null` in its file |
+| Tag each catalog with its business unit (a governed tag) | `governed_tags.business_unit` in `defaults/governed-tags.yaml` (the tag key; `null` = no tag). Its values are the workspaces' prefixes; the self-service hub's workspace owns it | (account-wide: not in a workspace file) |
+| Choose who manages the governed tags | `governed_tags.managers` in `defaults/governed-tags.yaml` (`null` = the hub's platform admins) | |
 | Show a label next to the workspace name | | `label` in its file |
 | Tell Genie Code about your business (what you do, business units, terms, key data) | `defaults/genie-code/our-business.md`: added to the instructions under **About our business** | (the same in every workspace; per workspace, `genie_code_instructions` in its file) |
 
