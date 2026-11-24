@@ -34,7 +34,7 @@ What people may do, and how the app behaves. Read the key's comment in the file 
 | Route people to their own business unit from a directory, instead of them choosing it once | `bu_lookup.function`: a SQL function, email in, business unit out (`catalog.schema.function`), run on `hub.warehouse_id` in `hub.yaml`. Its owner grants the self-service app EXECUTE, outside this repository. `null` = they choose |
 | The default AI model, for every AI feature (Validate, the approvers' summary, new schemas' comments) | `ai_model` (`null` = no AI; admins change it in Settings > AI). An `app.yaml` from 1.0.x names it `ai_summary` (`model:` under it): still read; replacing it with `ai_model` is optional |
 | A wiki link in the header, a short link to the app | `links.wiki`, `links.go_link` |
-| `links.group_request` (an older key) | No longer used: the **Add a group for sharing folders** card opens the app's own form, which an admin approves. Remove it from `app.yaml` |
+| `links.group_request` (an older key) | No longer used: the **Add a group to your workspace** card opens the app's own form, which an admin approves. Remove it from `app.yaml` |
 | The guided tour's default prompt (Settings > Onboarding overrides it; Reset comes back to it) | `onboarding.prompt` |
 | FAQ, SOP and persona request links in an `app.yaml` from before 1.1.2 (`faq`, `links.sop`, `links.persona_request`) | Still read, as Settings' defaults; set them in Settings instead (Help links, Onboarding) and leave these as they are, or remove them |
 | The header's title (Settings > Branding changes only its first word) | `title` |

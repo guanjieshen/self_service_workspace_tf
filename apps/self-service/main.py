@@ -392,7 +392,7 @@ async def domain_submit(request: Request):
 
 @app.get("/group", response_class=HTMLResponse)
 def group_form(request: Request, workspace: str = "", error: str = "", form: dict = None):
-    """Add a group for sharing folders: an Entra ID group assigned to the workspace with no access of
+    """Add a group to your workspace (for sharing folders): an Entra ID group assigned to the workspace with no access of
     its own, so people can share folders with it. An admin adds it, then approves it."""
     workspaces, why = offered(user_of(request), "workspace_group")
     chosen = workspace if workspace in {w.name for w in workspaces} else (workspaces[0].name if workspaces else "")

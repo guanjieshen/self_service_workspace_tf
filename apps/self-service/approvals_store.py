@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 # Every kind of request, as approvers read it (the database's kinds).
 TYPES = {"personal_schema": "Personal schema", "project_schema": "Project schema", "team_schema": "Team schema", "temporary_schema": "Temporary schema",
          "temporary_extension": "More time for a temporary schema", "temporary_conversion": "Temporary schema to keep as a project schema",
-         "folder": "Workspace folder", "domain": "Domain", "workspace_group": "Group for sharing folders"}
+         "folder": "Workspace folder", "domain": "Domain", "workspace_group": "Group added to the workspace"}
 WAITING = ("submitted", "replied", "needs_info")   # states in which a request that needs a person waits
 
 

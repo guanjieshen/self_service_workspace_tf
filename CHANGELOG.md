@@ -33,8 +33,8 @@ is left alone.
 - **A note under each access level** on the Request workspace access page
   (`self_service_app.persona_notes` in `app.yaml`), for example which account to ask with; an access
   level that is Coming soon shows an Unavailable button.
-- **Add a group for sharing folders** (was a Coming soon link): a form in the app, approval required.
-  It asks for an Entra ID group and why; a platform admin adds it to the workspace file's
+- **Add a group to your workspace** (was a Coming soon link): a form in the app, approval required,
+  for sharing workspace folders with the group. It asks for the workspace, the Entra ID group and why; a platform admin adds it to the workspace file's
   `sharing_groups` (no entitlements: only something to share folders with) and approves it.
   `links.group_request` in `app.yaml` is no longer used: remove it.
 - **Request a domain:** a new card and form, approval required. A new domain, or a subdomain under

@@ -66,7 +66,7 @@ CARDS = [
     Card("folder", "workspace", "Request a workspace folder",
          "Create a shared workspace folder and control who can access it.", href="/folder"),
     # Both made by hand (portal.ALWAYS_BY_HAND): an admin does it in a pull request, then approves it.
-    Card("group_request", "workspace", "Add a group for sharing folders",
+    Card("group_request", "workspace", "Add a group to your workspace",
          "Add an Entra ID group to your workspace so you can share folders with it. It gives no access by itself.",
          href="/group", icon="group"),
     Card("domain", "workspace", "Request a domain",

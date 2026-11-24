@@ -1873,6 +1873,8 @@ class AccountsNotesAndDomains(unittest.TestCase):
     def test_a_group_for_sharing_folders_is_sent_to_an_admin(self):
         form = self.http.get("/group", headers={"X-Forwarded-Email": ANA}).text
         self.assertIn("sharing folders", form)
+        self.assertIn("<h1>Add a group to your workspace</h1>", form)
+        self.assertIn("Why do you need this group added?", form)
         self.assertIn("no access of its own", form)
         bad = self.http.post("/group", data={"workspace": "fin", "group": "users", "reason": WHY}, headers={"X-Forwarded-Email": ANA})
         self.assertIn("is every user of a workspace", bad.text)

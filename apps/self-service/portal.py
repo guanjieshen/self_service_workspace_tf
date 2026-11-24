@@ -66,7 +66,7 @@ BY_HAND = {"folder": "team_folder"}
 # Always made by hand: an approver does it in a pull request (a domain, or a group for sharing folders,
 # in its workspace's file), then approves it, which marks it done.
 ALWAYS_BY_HAND = {"domain", "workspace_group"}
-DOMAIN, WORKSPACE_GROUP = "Request a domain", "Add a group for sharing folders"
+DOMAIN, WORKSPACE_GROUP = "Request a domain", "Add a group to your workspace"
 APPROVAL_LABELS = {"auto": "Auto-approved", "required": "Approval required"}
 
 
@@ -146,7 +146,7 @@ def load_config(path):
 APPROVAL_TYPES = {"personal_schema": "Personal schema", "project_schema": "Project schema", "team_schema": "Team schema",
                   "temporary_schema": "Temporary schema", "temporary_extension": "More time for a temporary schema",
                   "temporary_conversion": "Temporary schema to keep as a project schema", "folder": "Workspace folder",
-                  "domain": "Domain", "workspace_group": "Group for sharing folders"}
+                  "domain": "Domain", "workspace_group": "Group added to the workspace"}
 # The states in which a request waits for a person (the database's request_status).
 WAITING = ("submitted", "replied", "needs_info")
 
