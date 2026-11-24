@@ -122,6 +122,7 @@ Put the reason for a difference in a comment next to it: the reviewer sees it in
 | `{PREFIX}` / `{prefix}` | The workspace's `prefix`, upper / lower case. |
 | `{TAGS}`, `{WORKSPACE_TAGS}` (Genie Code text) | Every chargeback tag; the ones set for you, with their values. |
 | `{CATALOG}`, `{WAREHOUSE}` (Genie Code text) | The workspace catalog's name; the default SQL warehouse's name. |
+| `{prefix}`, `{WORKSPACE_TAGS_JSON}` (Genie Code text) | The workspace's prefix in lower case (`gtm`), for names such as `gtm-app-<name>`; the workspace's chargeback tags as a JSON object, for code a skill runs |
 | `{WAREHOUSE_DETAILS}`, `{PERSONAS}`, `{CLASSIC_POLICIES}` (Genie Code text) | The default warehouse's size and auto-stop; the personas this workspace has and what each can do; each classic cluster policy with its limits. All from this workspace's configuration (its file over the baseline) |
 | `CAN_USE`, `CAN_RESTART`, ... | Databricks permission levels, as shown in the workspace UI. |
 | `ONE-WAY` in a comment | Cannot be undone once applied. |

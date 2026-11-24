@@ -10,6 +10,22 @@ is left alone.
 
 ## Unreleased
 
+- **A Genie Code skill to build web apps: `build-a-databricks-app`** (a default skill, in every
+  workspace). Someone asks Genie Code for an app, a dashboard, a tracker or a form, and gets a
+  working one: it asks for a short design brief first (what it's for, the data it reads and keeps,
+  its screens, its name, where its code goes), then starts from a tested React starter (a Node
+  server for the SQL warehouse and Lakebase, shared components and design tokens) and deploys it
+  with `deploy_app.py` from a notebook. The standards it applies: the name `<prefix>-app-<name>`
+  for the app and its Lakebase database; the person's default usage policy on both; the default
+  warehouse; queries run as the signed-in person (user authorization); Lakebase at its smallest
+  size, suspended after 5 idle minutes, tagged with the workspace's tags and `APP`, `OWNER`,
+  `CREATED_WITH` and `EXPIRES` (30 days); `remove()` deletes the app and its data. New Genie Code
+  placeholders: `{prefix}` (the prefix, lower case) and `{WORKSPACE_TAGS_JSON}`.
+  **The first plan after an upgrade:** in every workspace, the skill's files and the instructions'
+  one new line. **Baseline edits:** copy the folder `config/defaults/genie-code/skills/build-a-databricks-app/`
+  from the framework (an upgrade never copies baseline files), and the one line in
+  `config/defaults/genie-code/instructions.md` that names it.
+
 - **Each workspace's catalog is tagged with its business unit, as a governed tag:**
   `business_unit` = the workspace's prefix (for example `gtm`, `gds`). The tag is account-wide,
   so the self-service hub's workspace creates it, with every workspace's prefix as its allowed
