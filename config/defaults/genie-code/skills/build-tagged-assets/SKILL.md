@@ -10,7 +10,7 @@ in every workspace.
 -->
 ---
 name: build-tagged-assets
-description: Use when creating or changing anything that runs on compute, such as a job, pipeline, cluster, serverless notebook, model serving endpoint or SQL warehouse, so that it carries the tags used for chargeback. Also use when asked why an asset is missing tags or which tags or usage policy to use.
+description: Use when creating or changing anything that runs on compute or that people use, such as a job, pipeline, cluster, serverless notebook, model serving endpoint, SQL warehouse, app, dashboard or Genie space, so that it carries the tags used for chargeback. Also use when asked why an asset is missing tags or which tags or usage policy to use.
 ---
 
 # Build assets that carry the chargeback tags
@@ -25,7 +25,8 @@ Untagged work can't be charged back, so treat the tags as required, not optional
 ## Before you build
 
 1. Find out the owner's value for each tag the user must fill in (team, project). If the user has not said, ask them. Don't guess or make up values.
-2. Values are upper case letters, digits, `_` and `-`, for example `RISK_CLASSIFICATION`.
+2. **The APPID:** use the project's (in its `AGENTS.md`, set by the skill start-a-project) if it has its own CMDB application ID; otherwise the workspace's, which the usage policy already adds.
+3. Values are upper case letters, digits, `_` and `-`, for example `RISK_CLASSIFICATION`.
 
 ## How to tag each kind of asset
 
@@ -35,6 +36,7 @@ Untagged work can't be charged back, so treat the tags as required, not optional
 - **Pipelines on classic compute**: put the tags in the custom tags of the pipeline's clusters and use the `{PREFIX} Classic Pipelines` cluster policy.
 - **Model serving endpoints and other assets that offer tags or a usage policy**: set the usage policy if offered and add the tags.
 - **SQL**: use the shared `{WAREHOUSE}` warehouse rather than creating a new one; it's already tagged. Dashboards and Genie spaces are charged through the warehouse they use.
+- **Apps, dashboards and Genie spaces**: also tag the asset itself, so people can find whose it is and what it's for: the project's tags (its APPID, `OWNER`), and on an app `LEAVE_ON` (`true` or `false`: ask them; `false` lets the platform team turn it off when it isn't needed). Use the entity tags API: `POST /api/2.0/entity-tag-assignments` with `entity_type` (`apps`, `dashboards` or `geniespaces`), `entity_id` (the app's name, or the dashboard's or space's ID), `tag_key` and `tag_value`.
 
 ## Check before you finish
 
