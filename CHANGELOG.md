@@ -10,6 +10,29 @@ is left alone.
 
 ## Unreleased
 
+- **Genie Code skills to build web apps** (default skills, in every workspace), for people who know
+  their business but aren't software engineers:
+  - **`plan-a-databricks-app`** interviews them in plain words (the work today, the people, the
+    decision the app helps with, the data) and suggests a dashboard or a Genie space when that
+    serves them better; its brief goes to:
+  - **`build-a-databricks-app`**: a tested React starter (a Node server for the SQL warehouse and
+    Lakebase, shared components, design tokens, an `AGENTS.md` and a `README.md` it fills in) and
+    `deploy_app.py` (`new_app`, `deploy`, `remove`) run from a notebook. The standards it applies:
+    the name `<prefix>-app-<name>` for the app and its database; the person's default usage policy
+    on both; the default warehouse; queries run as the signed-in person; Lakebase at its smallest
+    size, suspended after 5 idle minutes; the app and its database tagged with the workspace's tags
+    and `APP`, `OWNER`, `CREATED_WITH`, and the app with `LEAVE_ON` (`true` or `false`, asked each
+    time: `false` lets it be turned off when it isn't needed). Every app also gets its
+    `databricks.yml`: the app and its database as a Databricks Asset Bundle.
+  - **`take-an-app-to-production`** binds the app and its database to that bundle (nothing
+    recreated, no data lost), sets production tags and permissions, and, with a repository, adds a
+    GitHub Actions workflow (`ci/github-actions-deploy.yml`) that checks pull requests and deploys
+    on merge.
+  New Genie Code placeholders: `{prefix}` (the prefix, lower case) and `{WORKSPACE_TAGS_JSON}`.
+  **The first plan after an upgrade:** in every workspace, the three skills' files and the
+  instructions' one new line. **Baseline edits:** copy the three skill folders from the
+  framework's `config/defaults/genie-code/skills/` (an upgrade never copies baseline files), and
+  the line in `config/defaults/genie-code/instructions.md` that names them.
 - **Each workspace's catalog is tagged with its business unit, as a governed tag:**
   `business_unit` = the workspace's prefix (for example `gtm`, `gds`). The tag is account-wide,
   so the self-service hub's workspace creates it, with every workspace's prefix as its allowed

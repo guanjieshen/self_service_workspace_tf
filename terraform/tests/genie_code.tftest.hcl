@@ -38,7 +38,7 @@ run "default_plus_workspace" {
     error_message = "A workspace's genie_code_instructions are appended after the default instructions."
   }
   assert {
-    condition     = tolist(keys(local.genie_skills)) == tolist(["build-tagged-assets/SKILL.md", "how-this-workspace-works/SKILL.md", "onboard-me/SKILL.md"])
+    condition     = tolist(keys(local.genie_skills)) == tolist(["build-a-databricks-app/SKILL.md", "build-a-databricks-app/deploy_app.py", "build-a-databricks-app/template/AGENTS.md", "build-a-databricks-app/template/README.md", "build-a-databricks-app/template/index.html", "build-a-databricks-app/template/package.json", "build-a-databricks-app/template/server/databricks.mjs", "build-a-databricks-app/template/server/index.mjs", "build-a-databricks-app/template/src/App.jsx", "build-a-databricks-app/template/src/api.js", "build-a-databricks-app/template/src/components/ui.jsx", "build-a-databricks-app/template/src/main.jsx", "build-a-databricks-app/template/src/styles.css", "build-a-databricks-app/template/vite.config.js", "build-tagged-assets/SKILL.md", "how-this-workspace-works/SKILL.md", "onboard-me/SKILL.md", "plan-a-databricks-app/SKILL.md", "take-an-app-to-production/SKILL.md", "take-an-app-to-production/ci/github-actions-deploy.yml"])
     error_message = "Every workspace gets the baseline's skills, and only those."
   }
 }
