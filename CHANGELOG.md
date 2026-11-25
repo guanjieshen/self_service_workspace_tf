@@ -10,6 +10,11 @@ is left alone.
 
 ## Unreleased
 
+- **An app that is part of a project goes in the project's `app/` folder** (the skill
+  build-a-databricks-app), so a project's pipeline, dashboards and app move into Git as one
+  repository. An app on its own still goes in `apps/<prefix>-app-<name>`.
+  **The first plan after an upgrade:** in every workspace, two changed skill files.
+
 - **Five new Genie Code skills with this organization's rules for building**, and the workspace's
   design rules in the default instructions. They don't repeat what Genie Code already knows
   (finding tables, writing pipelines, building dashboards):

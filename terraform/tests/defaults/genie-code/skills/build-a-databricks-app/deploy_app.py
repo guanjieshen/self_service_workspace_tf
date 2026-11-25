@@ -4,7 +4,7 @@ In a notebook (serverless), as the person building the app:
 
     import sys; sys.path.append("/Workspace/.assistant/skills/build-a-databricks-app")
     from deploy_app import new_app, deploy, remove
-    new_app("/Workspace/Users/me@example.com/apps/gtm-app-well-tracker")   # a new app: the starter, once
+    new_app("/Workspace/Users/me@example.com/projects/gtm-well-tests/app")   # a new app: the starter, once
     deploy(prefix="gtm", name="well-tracker", folder=..., description=..., warehouse=..., leave_on=False, tags={...})
     remove(prefix="gtm", name="well-tracker")                               # the app, its database and its data
 
