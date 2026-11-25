@@ -4,14 +4,15 @@ In a notebook (serverless), as the person building the app:
 
     import sys; sys.path.append("/Workspace/.assistant/skills/build-a-databricks-app")
     from deploy_app import new_app, deploy, remove
-    new_app("/Workspace/Users/me@example.com/apps/gtm-app-well-tracker")   # the starter, once
+    new_app("/Workspace/Users/me@example.com/apps/gtm-app-well-tracker")   # a new app: the starter, once
     deploy(prefix="gtm", name="well-tracker", folder=..., description=..., warehouse=..., tags={...})
     remove(prefix="gtm", name="well-tracker")                               # the app, its database and its data
 
 Safe to run again: what exists is updated, never made twice. The standards it applies: the name
 <prefix>-app-<name> for the app and its database; the creator's default usage policy on both;
 Lakebase at its smallest size, suspended after 5 idle minutes, tagged with the workspace's tags
-and APP, OWNER, CREATED_WITH and EXPIRES (30 days); queries run as the signed-in person.
+and APP, OWNER, CREATED_WITH and EXPIRES (30 days after the last deploy); queries run as the
+signed-in person.
 """
 import base64
 import datetime
@@ -20,12 +21,17 @@ import os
 import re
 import shutil
 import time
+import urllib.parse
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+SMALLEST = {"autoscaling_limit_min_cu": 0.5, "autoscaling_limit_max_cu": 0.5, "suspend_timeout_duration": "300s"}
 _w = None
 
+
+# ---- Calling Databricks ----
 
 def _client():
     global _w
@@ -38,15 +44,19 @@ def _do(method, path, **kw):
 
 
 def _get(path):
+    """GET, or None when it does not exist."""
     try:
         return _do("GET", path)
-    except Exception as e:
-        if any(s in str(e) for s in ("not found", "does not exist", "RESOURCE_DOES_NOT_EXIST", "Not Found")):
+    except NotFound:
+        return None
+    except Exception as e:   # some APIs answer a missing object with a plain message
+        if "does not exist" in str(e) or "RESOURCE_DOES_NOT_EXIST" in str(e):
             return None
         raise
 
 
 def _wait(what, check, minutes=15):
+    """check() until it returns something; a timeout says that deploy() can simply run again."""
     end = time.time() + minutes * 60
     while time.time() < end:
         out = check()
@@ -56,23 +66,27 @@ def _wait(what, check, minutes=15):
     raise TimeoutError(f"{what}: not ready after {minutes} minutes. Run deploy() again: it carries on.")
 
 
+# ---- Workspace files (through the Workspace API: what a deployment reads) ----
+
 def _api_path(path):
-    return path[len("/Workspace"):] if path.startswith("/Workspace/") else path
+    path = path[len("/Workspace"):] if path.startswith("/Workspace/") else path
+    return urllib.parse.quote(path, safe="/@")
 
 
 def _read(path):
-    """A workspace file's text, through the Workspace API (what a deployment reads), or None."""
     out = _get(f"/api/2.0/workspace/export?path={_api_path(path)}&format=AUTO")
     return base64.b64decode(out["content"]).decode() if out and out.get("content") else None
 
 
 def _write(path, text):
-    """Write a workspace file through the Workspace API, then wait until it reads back: a deployment
-    started right after a write through /Workspace (open()) can miss the file."""
-    _do("POST", "/api/2.0/workspace/import", body={"path": _api_path(path), "format": "AUTO", "overwrite": True,
-                                                    "content": base64.b64encode(text.encode()).decode()})
+    """Write a file, then wait until it reads back: a deployment started right after a write through
+    /Workspace (open()) can miss the file."""
+    _do("POST", "/api/2.0/workspace/import", body={"path": urllib.parse.unquote(_api_path(path)), "format": "AUTO",
+                                                    "overwrite": True, "content": base64.b64encode(text.encode()).decode()})
     _wait(f"{path} to be saved", lambda: _read(path) == text, 2)
 
+
+# ---- Names and the starter ----
 
 def app_name(prefix, name):
     """The naming standard: <prefix>-app-<name>, at most 30 characters."""
@@ -88,13 +102,153 @@ def app_name(prefix, name):
 
 
 def new_app(folder):
-    """Copy the starter (template/) into folder: a working app to change, not one to write from scratch."""
+    """A new app: copy the starter (template/) into an empty folder. To change an app that exists,
+    edit its folder and run deploy() again instead."""
     folder = folder.rstrip("/")
+    if os.path.exists(os.path.join(folder, "package.json")):
+        raise FileExistsError(f"{folder} already has an app: change its files and run deploy() again")
     if os.path.exists(folder) and os.listdir(folder):
-        raise FileExistsError(f"{folder} is not empty: choose a new folder, or change the app that is there")
+        raise FileExistsError(f"{folder} is not empty: choose a new folder for a new app")
     shutil.copytree(os.path.join(HERE, "template"), folder, dirs_exist_ok=True)
     return sorted(os.path.relpath(os.path.join(d, f), folder) for d, _, fs in os.walk(folder) for f in fs)
 
+
+# ---- The steps of deploy() ----
+
+def _warehouse(wanted):
+    whs = _do("GET", "/api/2.0/sql/warehouses").get("warehouses", [])
+    wh = next((x for x in whs if wanted in (x["id"], x["name"])), None)
+    if not wh:
+        raise ValueError(f"No SQL warehouse {wanted!r} you can use. Yours: {', '.join(x['name'] for x in whs) or 'none'}")
+    return wh
+
+
+def _tags(name, tags):
+    """The workspace's tags, then the app's own: who it belongs to, and until when it is needed."""
+    return {**{k: str(v) for k, v in (tags or {}).items() if v not in (None, "")},
+            "APP": name, "OWNER": _client().current_user.me().user_name, "CREATED_WITH": "genie-code",
+            "EXPIRES": (datetime.date.today() + datetime.timedelta(days=30)).isoformat()}
+
+
+def _ensure_database(name, description, tags):
+    """The app's Lakebase project: made, brought back (removed in the last 7 days), or brought in
+    line (tags, size, suspend). Returns (its endpoint, the app resource for its database)."""
+    spec = {"display_name": f"{name}: {description}"[:256], "custom_tags": [{"key": k, "value": v} for k, v in tags.items()],
+            "default_endpoint_settings": SMALLEST}
+    found = _get(f"/api/2.0/postgres/projects/{name}")
+    if found and found.get("delete_time"):   # its name is still taken for 7 days
+        _do("POST", f"/api/2.0/postgres/projects/{name}/undelete", body={})
+        print(f"Restored the database {name} (removed on {found['delete_time'][:10]}), with its data.")
+    if not found:
+        _do("POST", "/api/2.0/postgres/projects", query={"project_id": name}, body={"spec": {**spec, "pg_version": 17}})
+        print(f"Creating the database {name}...")
+    else:
+        _do("PATCH", f"/api/2.0/postgres/projects/{name}", query={"update_mask": "spec.display_name,spec.custom_tags,spec.default_endpoint_settings"},
+            body={"spec": spec})
+    branch = _wait("the database", lambda: ((_get(f"/api/2.0/postgres/projects/{name}") or {}).get("status") or {}).get("default_branch"))
+    endpoint = _wait("its endpoint", lambda: next(iter((_get(f"/api/2.0/postgres/{branch}/endpoints") or {}).get("endpoints", [])), None))["name"]
+    dbs = (_get(f"/api/2.0/postgres/{branch}/databases") or {}).get("databases", [])
+    database = next((d["name"] for d in dbs if (d.get("status") or {}).get("postgres_database") == "databricks_postgres"),
+                    dbs[0]["name"] if dbs else None)
+    if not database:
+        raise RuntimeError(f"{branch} has no database yet: run deploy() again in a minute")
+    return endpoint, {"name": "database", "postgres": {"branch": branch, "database": database, "permission": "CAN_CONNECT_AND_CREATE"}}
+
+
+def _app_state(name):
+    return ((_get(f"/api/2.0/apps/{name}") or {}).get("compute_status") or {}).get("state")
+
+
+def _ensure_app(name, description, resources):
+    """The app, made or updated, and running. No usage policy named: Databricks applies the creator's default."""
+    spec = {"description": description, "resources": resources, "user_api_scopes": ["sql"]}
+    try:
+        if _get(f"/api/2.0/apps/{name}"):
+            _do("PATCH", f"/api/2.0/apps/{name}", body=spec)
+        else:
+            _do("POST", "/api/2.0/apps", body={"name": name, **spec})
+            print(f"Creating the app {name} (its compute takes a few minutes)...")
+    except Exception as e:
+        if "already exists" in str(e) or "PERMISSION_DENIED" in str(e):
+            raise RuntimeError(f"The name {name} is taken by an app you can't change: choose another name") from e
+        raise
+    if _app_state(name) in ("STOPPED", "ERROR"):   # stopped by someone: start it, or nothing can be deployed
+        _do("POST", f"/api/2.0/apps/{name}/start", body={})
+        print(f"Starting the app {name}...")
+    _wait("the app's compute", lambda: _app_state(name) == "ACTIVE", 20)
+    return _do("GET", f"/api/2.0/apps/{name}")
+
+
+def _write_app_yaml(folder, endpoint):
+    yaml = ("# Written by deploy(): run it again rather than editing this.\ncommand: ['npm', 'run', 'start']\nenv:\n"
+            "  - name: DATABRICKS_WAREHOUSE_ID\n    valueFrom: sql-warehouse\n")
+    if endpoint:
+        yaml += f"  - name: LAKEBASE_ENDPOINT\n    value: '{endpoint}'\n"
+    _write(f"{folder}/app.yaml", yaml)
+    _wait("the app's files", lambda: _read(f"{folder}/package.json"), 2)   # new_app() may have just run
+
+
+def _yaml(value):
+    """value as YAML (JSON is valid YAML: quoted strings, so names and tags never need escaping)."""
+    return json.dumps(value)
+
+
+def _write_bundle(folder, name, description, warehouse_id, tags, database, policy):
+    """databricks.yml: the app (and its database) as a Databricks Asset Bundle, the same as deploy()
+    made them, so the app can move into Git and CI/CD (the skill take-an-app-to-production) as it is."""
+    lines = [
+        "# The app as a Databricks Asset Bundle: everything deploy() made, in code, so it can move into Git and",
+        "# CI/CD as it is (the skill take-an-app-to-production). Written by deploy(): run it again rather than",
+        "# editing this. Once the app is in production, this file is its definition: change it through Git.",
+        f"bundle:\n  name: {_yaml(name)}\n",
+        "variables:\n  warehouse_id:\n    description: The SQL warehouse the app queries",
+        f"    default: {_yaml(warehouse_id)}\n",
+        "resources:",
+    ]
+    if database:
+        lines += [
+            "  postgres_projects:\n    database:",
+            f"      project_id: {_yaml(name)}\n      display_name: {_yaml(f'{name}: {description}'[:256])}\n      pg_version: 17",
+            f"      custom_tags: {_yaml([{'key': k, 'value': v} for k, v in tags.items()])}",
+            f"      default_endpoint_settings: {_yaml(SMALLEST)}",
+        ] + ([f"      budget_policy_id: {_yaml(policy)}"] if policy else [])
+    lines += [
+        "  apps:\n    app:",
+        f"      name: {_yaml(name)}\n      description: {_yaml(description)}\n      source_code_path: .",
+        "      user_api_scopes: [sql]\n      resources:",
+        "        - name: sql-warehouse\n          sql_warehouse:\n            id: ${var.warehouse_id}\n            permission: CAN_USE",
+    ]
+    if database:
+        db_id = database["postgres"]["database"].rsplit("/", 1)[1]
+        lines += ["        - name: database\n          postgres:",
+                  "            branch: ${resources.postgres_projects.database.name}/branches/production",
+                  f"            database: ${{resources.postgres_projects.database.name}}/branches/production/databases/{db_id}",
+                  "            permission: CAN_CONNECT_AND_CREATE"]
+    lines += ["", "targets:\n  production:\n    mode: production\n    default: true",
+              f"    workspace:\n      host: {_yaml(_client().config.host)}",
+              "      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}"]
+    _write(f"{folder}/databricks.yml", "\n".join(lines) + "\n")
+
+
+def _start_deployment(name, folder):
+    """Ask for a deployment; while another is in progress (starting a stopped app redeploys its last
+    version, and the API does not always show that one), wait and ask again."""
+    def ask():
+        try:
+            return _do("POST", f"/api/2.0/apps/{name}/deployments", body={"source_code_path": folder, "mode": "SNAPSHOT"})
+        except Exception as e:
+            if "deployment in progress" in str(e):
+                return None
+            raise
+    return _wait("the deployment already running", ask, 20)
+
+
+def _deployment_done(name, deployment_id):
+    d = _do("GET", f"/api/2.0/apps/{name}/deployments/{deployment_id}")
+    return d if (d.get("status") or {}).get("state") in ("SUCCEEDED", "FAILED", "CANCELLED") else None
+
+
+# ---- What the skill calls ----
 
 def deploy(prefix, name, folder, description, warehouse, tags=None, lakebase=True):
     """Make or update the app (and its Lakebase database), then deploy folder. Returns what was made."""
@@ -105,88 +259,48 @@ def deploy(prefix, name, folder, description, warehouse, tags=None, lakebase=Tru
     if os.path.exists(os.path.join(folder, "package-lock.json")):
         os.remove(os.path.join(folder, "package-lock.json"))   # one made elsewhere points at another registry: the install fails
     description = (description or "").strip()[:200] or f"{full}: made with Genie Code"
-    me = _client().current_user.me().user_name
 
-    whs = _do("GET", "/api/2.0/sql/warehouses").get("warehouses", [])
-    wh = next((x for x in whs if warehouse in (x["id"], x["name"])), None)
-    if not wh:
-        raise ValueError(f"No SQL warehouse {warehouse!r} you can use. Yours: {', '.join(x['name'] for x in whs) or 'none'}")
-    resources = [{"name": "sql-warehouse", "sql_warehouse": {"id": wh["id"], "permission": "CAN_USE"}}]
-
-    endpoint = None
-    all_tags = {**{k: str(v) for k, v in (tags or {}).items() if v not in (None, "")},
-                "APP": full, "OWNER": me, "CREATED_WITH": "genie-code",
-                "EXPIRES": (datetime.date.today() + datetime.timedelta(days=30)).isoformat()}
+    warehouse_id = _warehouse(warehouse)["id"]
+    resources = [{"name": "sql-warehouse", "sql_warehouse": {"id": warehouse_id, "permission": "CAN_USE"}}]
+    endpoint = database = None
+    all_tags = _tags(full, tags)
     if lakebase:
-        found = _get(f"/api/2.0/postgres/projects/{full}")
-        if found and found.get("delete_time"):   # removed in the last 7 days: its name is still taken, so bring it back
-            _do("POST", f"/api/2.0/postgres/projects/{full}/undelete", body={})
-            print(f"Restored the Lakebase database {full} (removed on {found['delete_time'][:10]}), with its data.")
-        elif not found:
-            # The smallest size, suspended after 5 idle minutes, tagged for chargeback and cleanup.
-            _do("POST", "/api/2.0/postgres/projects", query={"project_id": full},
-                body={"spec": {"display_name": f"{full}: {description}"[:256], "pg_version": 17,
-                               "custom_tags": [{"key": k, "value": v} for k, v in all_tags.items()],
-                               "default_endpoint_settings": {"autoscaling_limit_min_cu": 0.5, "autoscaling_limit_max_cu": 0.5,
-                                                             "suspend_timeout_duration": "300s"}}})
-            print(f"Creating the Lakebase database {full}...")
-        branch = _wait("the Lakebase project", lambda: ((_get(f"/api/2.0/postgres/projects/{full}") or {}).get("status") or {}).get("default_branch"))
-        ep = _wait("its endpoint", lambda: next(iter((_get(f"/api/2.0/postgres/{branch}/endpoints") or {}).get("endpoints", [])), None))
-        endpoint = ep["name"]
-        dbs = (_get(f"/api/2.0/postgres/{branch}/databases") or {}).get("databases", [])
-        database = next((d["name"] for d in dbs if (d.get("status") or {}).get("postgres_database") == "databricks_postgres"),
-                        dbs[0]["name"] if dbs else None)
-        if not database:
-            raise RuntimeError(f"{branch} has no database yet: run deploy() again in a minute")
-        resources.append({"name": "database", "postgres": {"branch": branch, "database": database, "permission": "CAN_CONNECT_AND_CREATE"}})
-
-    # The app. No usage policy named: Databricks applies the creator's default one (it carries the tags).
-    spec = {"description": description, "resources": resources, "user_api_scopes": ["sql"]}
-    existing = _get(f"/api/2.0/apps/{full}")
-    if existing:
-        _do("PATCH", f"/api/2.0/apps/{full}", body=spec)
-    else:
-        _do("POST", "/api/2.0/apps", body={"name": full, **spec})
-        print(f"Creating the app {full} (its compute takes a few minutes)...")
-    app = _wait("the app's compute", lambda: (lambda a: a if (a.get("compute_status") or {}).get("state") == "ACTIVE" else None)(_do("GET", f"/api/2.0/apps/{full}")), 20)
+        endpoint, database = _ensure_database(full, description, all_tags)
+        resources.append(database)
+    app = _ensure_app(full, description, resources)
     policy = app.get("effective_usage_policy_id") or app.get("effective_budget_policy_id")
-    if endpoint and policy:   # the database is charged to the app's policy
+    if not policy:
+        print("Warning: no usage policy applies to you, so this app's costs are not charged to your business unit. "
+              "Ask your platform admin for access to the workspace's usage policy.")
+    elif endpoint:   # the database is charged to the app's policy
         _do("PATCH", f"/api/2.0/postgres/projects/{full}", query={"update_mask": "spec.budget_policy_id"},
             body={"spec": {"budget_policy_id": policy}})
+    _write_app_yaml(folder, endpoint)
+    _write_bundle(folder, full, description, warehouse_id, all_tags, database, policy)
 
-    # app.yaml: how the server finds the warehouse and the database; always matches the resources.
-    yaml = ("# Written by deploy(): run it again rather than editing this.\ncommand: ['npm', 'run', 'start']\nenv:\n"
-            "  - name: DATABRICKS_WAREHOUSE_ID\n    valueFrom: sql-warehouse\n")
-    if endpoint:
-        yaml += f"  - name: LAKEBASE_ENDPOINT\n    value: '{endpoint}'\n"
-    _write(f"{folder}/app.yaml", yaml)
-    # The deployment reads the folder through the Workspace API: wait until it sees the app (new_app() just ran?).
-    _wait("the app's files", lambda: _read(f"{folder}/package.json"), 2)
-
-    # Deploy: Databricks runs npm install, npm run build, then npm run start.
-    dep = _do("POST", f"/api/2.0/apps/{full}/deployments", body={"source_code_path": folder, "mode": "SNAPSHOT"})
-    print("Deploying (npm install and the build take a few minutes)...")
-    done = _wait("the deployment", lambda: (lambda d: d if (d.get("status") or {}).get("state") in ("SUCCEEDED", "FAILED", "CANCELLED") else None)(
-        _do("GET", f"/api/2.0/apps/{full}/deployments/{dep['deployment_id']}")), 20)
+    print("Deploying: Databricks installs the packages and builds the page, which takes a few minutes...")
+    dep = _start_deployment(full, folder)
+    done = _wait("the deployment", lambda: _deployment_done(full, dep["deployment_id"]), 20)
     app = _do("GET", f"/api/2.0/apps/{full}")
     out = {"app": full, "url": app.get("url"), "deployment": done["status"]["state"], "message": done["status"].get("message", ""),
-           "logs": f"{app.get('url')}/logz", "lakebase": endpoint, "usage_policy": policy,
+           "logs": f"{app.get('url')}/logz", "database": endpoint, "usage_policy": policy,
            "queries_run_as": "the signed-in person" if app.get("effective_user_api_scopes") else "the app"}
     print(json.dumps(out, indent=1))
     if done["status"]["state"] != "SUCCEEDED":
-        raise RuntimeError(f"The deployment {done['status']['state']}: {done['status'].get('message', '')}. Read the logs: {out['logs']}")
+        raise RuntimeError(f"The deployment {done['status']['state']}: {done['status'].get('message', '')}. The logs: {out['logs']}")
     return out
 
 
 def remove(prefix, name, lakebase=True):
-    """Delete the app and its Lakebase database (and with it the app's data)."""
+    """Delete the app and its Lakebase database (and with it the app's data). Safe to run again."""
     full = app_name(prefix, name)
     removed = []
     if _get(f"/api/2.0/apps/{full}"):
         _do("DELETE", f"/api/2.0/apps/{full}")
         removed.append(f"the app {full}")
-    if lakebase and _get(f"/api/2.0/postgres/projects/{full}"):
+    found = _get(f"/api/2.0/postgres/projects/{full}") if lakebase else None
+    if found and not found.get("delete_time"):   # a deleted one still answers for 7 days
         _do("DELETE", f"/api/2.0/postgres/projects/{full}")
-        removed.append(f"the Lakebase database {full} and its data")
-    print("Removed " + (" and ".join(removed) if removed else f"nothing: {full} does not exist"))
+        removed.append(f"the database {full} and its data")
+    print("Removed " + (" and ".join(removed) if removed else f"nothing: {full} does not exist (or was removed already)"))
     return removed

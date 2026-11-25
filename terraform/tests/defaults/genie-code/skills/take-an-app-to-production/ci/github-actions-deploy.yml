@@ -1,0 +1,56 @@
+# Deploys a Databricks App from its bundle (databricks.yml), made with Genie Code's skills
+# build-a-databricks-app and take-an-app-to-production. Copy to .github/workflows/ in the repository.
+#
+#   pull request: builds the page and validates the bundle (nothing is deployed)
+#   merge to main: deploys the bundle and starts the new version
+#
+# Sign-in, as a service principal (never a person), one of:
+#   - GitHub OIDC (no secret): a federation policy on the service principal for this repository;
+#     set the repository variables DATABRICKS_HOST and DATABRICKS_CLIENT_ID.
+#   - An OAuth secret: also the repository secret DATABRICKS_CLIENT_SECRET, and remove
+#     DATABRICKS_AUTH_TYPE below.
+name: Deploy app
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write   # GitHub OIDC
+  contents: read
+
+env:
+  APP_DIR: apps/my-app            # the app's folder in the repository: change it
+  DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+  DATABRICKS_CLIENT_ID: ${{ vars.DATABRICKS_CLIENT_ID }}
+  DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+  DATABRICKS_AUTH_TYPE: github-oidc
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: "${{ env.APP_DIR }}" } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: The page builds
+        run: npm install --no-audit --no-fund && npm run build
+      - uses: databricks/setup-cli@main
+      - name: The bundle is valid
+        run: databricks bundle validate
+
+  deploy:
+    if: github.event_name == 'push'
+    needs: check
+    runs-on: ubuntu-latest
+    concurrency: deploy-${{ github.repository }}
+    defaults: { run: { working-directory: "${{ env.APP_DIR }}" } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: databricks/setup-cli@main
+      - name: Deploy
+        run: databricks bundle deploy
+      - name: Start the new version
+        run: databricks bundle run app

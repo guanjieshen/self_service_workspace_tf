@@ -1,84 +1,89 @@
 <!--
 DEFAULT GENIE CODE SKILL: deployed to /Workspace/.assistant/skills/build-a-databricks-app/ in
 every workspace, with deploy_app.py and template/ (the starter app) next to it. Terraform fills in
-{prefix}, {WAREHOUSE}, {WORKSPACE_TAGS_JSON} and {CATALOG} from this workspace's configuration.
+{prefix}, {WAREHOUSE}, {WORKSPACE_TAGS_JSON} and {CATALOG} from this workspace's configuration;
+the other files are deployed as they are.
 -->
 ---
 name: build-a-databricks-app
-description: Use when someone wants to build, change, deploy or remove a web app (a Databricks App) (a dashboard, a tracker, a form, a tool) that reads data through the SQL warehouse or keeps its own data. Builds it in React from a tested starter, with Lakebase for its data, named, tagged and charged the way this workspace requires.
+description: Use when someone wants to build, change, deploy or remove a custom web app (a Databricks App), such as a tracker, a request or review form, or an internal tool over their data, that reads data through the SQL warehouse or keeps its own data. Builds it in React from a tested starter, with Lakebase for its data, named, tagged and charged the way this workspace requires. For charts over data alone, an AI/BI dashboard is simpler: suggest that first.
 ---
 
 # Build a Databricks App
 
-People one-shot apps here: make it **work and look good the first time**. Don't write the plumbing: the starter (`template/`) and `deploy_app.py` already do the server, the SQL warehouse, Lakebase, the build and the deploy, tested. You write the app's own screens and routes.
+People one-shot apps here: make it **work and look good the first time**, for few tokens. Don't write the plumbing: the starter (`template/`) and `deploy_app.py` already do the server, the SQL warehouse, the database, the build and the deploy, tested. You write the app's own routes and screens, and its two documents.
 
-## 1. The design brief: ask first, build after
+**Read only what you need:** this file, then the starter's `AGENTS.md`, `server/index.mjs`, `src/App.jsx` and `src/components/ui.jsx`. Don't read `deploy_app.py` or `server/databricks.mjs`: you call them, you don't change them.
 
-Don't write code until you have these, and they agreed to your summary. Ask at most two questions at a time, in plain words; suggest an answer when you can.
+## 1. The brief: one message, then build
 
-| Ask | Why |
+If they describe a problem rather than an app ("our inspections live in spreadsheets"), or aren't sure what it should do, use the skill **plan-a-databricks-app** first: it interviews them and hands back a brief. Then propose an answer for each row yourself, from what they asked and what you can see, and send it as **one message** ending "Shall I build it? Change anything you like." Don't write code before they agree. In plain words: say "the app's own database" (not Lakebase) and "the table's full name" (not `catalog.schema.table`).
+
+| Propose | Why |
 | --- | --- |
-| **What it's for, and who uses it** (one or two sentences) | The description, and what the first screen shows |
-| **The data it reads:** which tables (`catalog.schema.table`) | Queries run **as the person using the app**: anyone who can't read a table sees an error for it. Check you can read them (`DESCRIBE TABLE`) and use real column names |
-| **The data it keeps** (notes, statuses, requests...), or none | Its own Lakebase database. None: no database |
-| **The screens and actions:** what people see and do | At most three or four screens to start |
-| **Its name** | It becomes `{prefix}-app-<name>`: lowercase letters, digits and dashes, 30 characters in all. **Say the full name and confirm it** |
-| **Where its code goes** | A new folder; suggest `/Workspace/Users/<their email>/apps/{prefix}-app-<name>` |
+| **What it's for, and who uses it** (one sentence) | The app's description and its first screen |
+| **The data it reads:** each table's full name | Queries run **as the person using the app**: anyone who can't read a table sees an error. Check you can read it (`DESCRIBE TABLE`) and use its real column names. Their workspace's catalog is `{CATALOG}` |
+| **The data it keeps** (notes, statuses, requests...), or none | Kept in the app's own database. None: no database (`lakebase=False`) |
+| **Its screens and actions** | Two to four screens to start, as tabs |
+| **Its name** | It becomes **`{prefix}-app-<name>`** (lowercase letters, digits and dashes; 30 characters in all): write the full name |
+| **Where its code goes** | `/Workspace/Users/<their email>/apps/{prefix}-app-<name>` |
 
-Then write the brief back in five lines and ask "Shall I build it?".
-
-## 2. Start from the starter
-
-In a notebook cell (serverless):
+## 2. Start: a new app, or the one that exists
 
 ```python
 import sys; sys.path.append("/Workspace/.assistant/skills/build-a-databricks-app")
 from deploy_app import new_app, deploy, remove
-new_app("<the folder>")
+new_app("<the folder>")   # a new app only
 ```
 
-It copies a working app: `server/index.mjs` (the API), `server/databricks.mjs` (the SQL warehouse and Lakebase: don't change it), `src/App.jsx` (the page), `src/components/ui.jsx` (the components), `src/styles.css` (the design tokens).
+- **A new app:** run the cell above (in a notebook, on serverless). It copies a working app into the folder.
+- **An app that exists** (its folder has a `package.json`): don't run `new_app()`. Read its `AGENTS.md` first, then change it. **If `AGENTS.md` says it's in production,** don't use `deploy()`: change its files, then deploy it from its bundle (the skill **take-an-app-to-production**, step 4).
 
 ## 3. Build it
 
-Change only `server/index.mjs` and `src/` (add pages as `src/pages/<Name>.jsx`). Keep the starter's patterns:
+Change `server/index.mjs` and `src/`, following the rules in the starter's `AGENTS.md` (they are this app's rules from now on):
 
-- **SQL:** `sql(statement, params, userToken(req))`, with **named parameters** (`:zip`), never values pasted into the SQL. Numbers and booleans keep their type (a `LIMIT` needs a number). Full table names. Aggregate in SQL, not in the browser; always `LIMIT`.
-- **Lakebase:** `db.query(text, [values])` with `$1` placeholders. Tables in the `app` schema, made in `migrate()` with `CREATE TABLE IF NOT EXISTS`; a new column: `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`. Record who did what with `who(req)`.
-- **The API:** every route wrapped in `handle()`; check input on the server (required, length, allowed values) and throw plain-English messages.
-- **The page:** build from `ui.jsx` (`Shell`, `PageHead`, `Card`, `Stat`, `DataTable`, `Button`, `Field`, `Async`, `Empty`, `ErrorNote`); call the API with `useApi` and `call`. Every data card shows its loading, empty and error states (`Async`).
-- **Design:** the tokens in `styles.css` only, no inline colours or sizes, no other UI or CSS library. One primary button per card. Plain, short labels (sentence case). Numbers right-aligned in tables. A new component goes in `ui.jsx`, built from the tokens.
-- **Clean code:** small functions, clear names, no dead code, no secrets or hosts in the code, no new npm packages unless the app can't work without one. Never add a `package-lock.json`.
+- **Replace the examples** (the taxi trips, the notes, the `app.notes` table) with the app's own, and delete what it doesn't use. No database: delete `migrate()`'s tables, every `db.query` route, and the notes screen.
+- **Routes:** `sql(statement, {name: value}, userToken(req))` with named parameters (`:name`), never values pasted into SQL; `db.query(text, [values])` with `$1`; every route in `handle()`; check input on the server and `throw bad("...")` with a message people can act on; `intParam()` for numbers from the query string.
+- **The database's tables:** in the `app` schema, made in `migrate()` with `CREATE TABLE IF NOT EXISTS`; a later change adds to it (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`), never drops.
+- **Screens:** tabs in `App.jsx` (`Tabs`), each a function; a long one moves to `src/pages/<Name>.jsx`. Only `ui.jsx`'s components; every data card through `Async`; `statValue()` for a `Stat`. Set `APP_TITLE`.
+- **Design:** the tokens in `styles.css` only, no inline styles, no other UI or CSS library; one primary button per card; short, plain, sentence-case labels; numbers right-aligned.
+- **Clean code:** small functions, clear names, a short comment where the why isn't obvious, no dead code, no secrets or hosts in the code. No new npm package unless the app can't work without one. Never a `package-lock.json`.
+- **Document it:** fill in the starter's `README.md` (for people) and `AGENTS.md` (for whoever changes it next: the brief, the files, a line in Changes) from the brief. On every later change, update both.
 
 ## 4. Deploy
 
 ```python
 deploy(prefix="{prefix}", name="<name>", folder="<the folder>",
-       description="<one sentence: what it's for>", warehouse="{WAREHOUSE}",
-       tags={WORKSPACE_TAGS_JSON}, lakebase=True)   # lakebase=False when it keeps no data
+       description="<what it's for, one sentence>", warehouse="{WAREHOUSE}",
+       tags={WORKSPACE_TAGS_JSON}, lakebase=True)   # lakebase=False when it keeps nothing
 ```
 
-It takes 5 to 10 minutes the first time. It applies this workspace's standards: the name `{prefix}-app-<name>` for the app and its database; the person's **default usage policy** on both; the default warehouse; Lakebase at its smallest size, **suspended after 5 idle minutes**, tagged with the workspace's tags and `APP`, `OWNER`, `CREATED_WITH: genie-code` and `EXPIRES` (30 days). Run it again after every change: it updates, never duplicates.
+Tell them it takes **5 to 10 minutes** the first time (it prints what it is doing). It applies this workspace's standards for them: the name `{prefix}-app-<name>` for the app and its database; their **default usage policy** on both (so the costs go to their business unit); the default SQL warehouse; the database at its smallest size, paused after 5 minutes unused, tagged with the workspace's tags and `APP`, `OWNER`, `CREATED_WITH: genie-code` and `EXPIRES`. Run it again after every change: it updates, never duplicates, and moves `EXPIRES` 30 days on.
 
-Then open the URL it prints (the first visit asks the person to allow the app to use their data: that's expected) and check each screen.
+It also writes `databricks.yml`: the app and its database as a Databricks Asset Bundle, so it can move into Git and CI/CD when it's ready (the skill **take-an-app-to-production**).
+
+Then **they** open the URL it prints (you can't). The first visit asks them to allow the app to use their data: that's expected. Ask them to check each screen and tell you what they see.
 
 ## 5. When something goes wrong
 
-Read the logs first: the app's URL + `/logz`. Its first line says which settings it has.
+Ask them for the logs: the app's URL + `/logz` (its first line says which settings it has). Then:
 
-| You see | It means | Do |
+| They see, or `deploy()` says | It means | Do |
 | --- | --- | --- |
-| Deploy FAILED: **Error installing packages** | A bad `package.json` or a `package-lock.json` | Fix the dependency; delete the lock file; deploy again |
-| **App Not Available** | The server didn't start | `/logz`: usually a syntax error in `server/`; it listens on `DATABRICKS_APP_PORT` |
-| `INVALID_LIMIT_LIKE_EXPRESSION` or a type mismatch | A parameter passed as text | Pass numbers as numbers |
-| `PERMISSION_DENIED` / table not found | The person can't read that table (queries run as them) | They ask the table's owner for access (Catalog Explorer > Request access); not something to work around |
-| `Lakebase is not ready` in the logs | The database was waking up or still being made | Wait a minute and reload; deploy again if it lasts |
-| **Name already taken** | Another app has it | Choose another name, and confirm it |
-| A blank page | The build failed or `App.jsx` threw | `/logz` for the build; the browser console for the page |
+| `The deployment FAILED: Error installing packages` | A bad `package.json` | Fix the package's name or version; deploy again |
+| `The deployment FAILED` with another message, or **App Not Available** | The build or the server failed | `/logz`: usually a syntax error in `server/` or `src/`; fix, deploy again |
+| `This app can't read data for you yet` | The person hasn't allowed the app, or its user authorization is off | They reload and allow it; if it lasts, deploy again |
+| `INVALID_LIMIT_LIKE_EXPRESSION` or a type mismatch | A number passed as text | Pass numbers as numbers (`intParam()`) |
+| `PERMISSION_DENIED`, `TABLE_OR_VIEW_NOT_FOUND` | That person can't read the table (queries run as them) | They ask its owner (Catalog Explorer > Request access): never work around it |
+| `"database": "starting"` in `/api/health` | The database was paused or is still being made | Wait a minute and reload |
+| `The name ... is taken by an app you can't change` | Someone else's app has that name | Propose another name, and confirm it |
+| `Warning: no usage policy applies to you` | Its costs aren't charged to their business unit | They ask their platform admin; the app still works |
+| `TimeoutError: ... Run deploy() again` | Something was slow to start | Run `deploy()` again: it carries on |
 
 ## 6. Remove it
 
-When it's no longer needed (and before its `EXPIRES` date), with their yes, because it deletes the app's data:
+When it's no longer needed (admins may remove it after its `EXPIRES` date), and with their yes, because it deletes the app's data:
 
 ```python
 remove(prefix="{prefix}", name="<name>")
