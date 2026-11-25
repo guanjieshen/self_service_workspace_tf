@@ -98,6 +98,9 @@ def check(s):
     for key, name in (("name", app.get("name")), ("approvals.name", (app.get("approvals") or {}).get("name"))):
         need(re.fullmatch(r"[a-z0-9-]{2,30}", name or ""), f"app.yaml self_service_app.{key}: 2 to 30 lowercase letters, digits and dashes.")
     need(str(app.get("ai_check")) in ("on", "off"), "app.yaml self_service_app.ai_check: on or off.")
+    n = app.get("instances")
+    need(n is None or (isinstance(n, int) and not isinstance(n, bool) and 1 <= n <= 5),
+         "app.yaml self_service_app.instances: how many copies of the app run, 1 to 5 (2 for deploys without an outage), or null for one.")
     days = (jobs.get("temporary_schema") or {}).get("days", 30)
     need(isinstance(days, int) and not isinstance(days, bool) and 1 <= days <= 365, "app.yaml jobs.temporary_schema.days: a whole number of days, 1 to 365.")
     limit = (jobs.get("temporary_schema") or {}).get("limit", 1)
@@ -201,6 +204,8 @@ def hub_target(s, database=True):
                                               "permission": "CAN_CONNECT_AND_CREATE"}}] if database else []
     warehouse = [{"name": "warehouse", "sql_warehouse": {"id": hub["warehouse_id"], "permission": "CAN_USE"}}] \
         if (app.get("bu_lookup") or {}).get("function") else []   # the business unit lookup runs on it, as the app
+    n = app.get("instances")   # horizontal scaling: a fixed number of copies (app_deploy.py converts first)
+    scaled = {"compute_min_instances": n, "compute_max_instances": n} if n else {}
     return {"targets": {"hub": {
         "mode": "production",
         "workspace": {"host": hub["host"], "root_path": f"{s['jobs']['admin_path']}/bundle/hub"},
@@ -214,7 +219,7 @@ def hub_target(s, database=True):
             "database_suspend_after": db["suspend_after"],
         },
         "resources": {"apps": {
-            "self_service": {"resources": uses + warehouse, "permissions": can_use(hub.get("users_group"))},
+            "self_service": {"resources": uses + warehouse, "permissions": can_use(hub.get("users_group")), **scaled},
             "approvals": {"resources": uses, "permissions": can_use(hub.get("approvals_group"))},
         }},
     }}}

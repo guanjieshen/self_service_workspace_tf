@@ -12,7 +12,7 @@
 hub:
   name: guanjie_self_service                               # the hub, as the apps name it
   host: https://adb-7405607317299160.0.azuredatabricks.net # its per-workspace URL
-  users_group: users           # may open the self-service app (Consumer access is enough)
+  users_group: users           # may open the self-service app (Consumer access is enough); account users = anyone in the organization
   approvals_group: null        # may open the approvals app; null = workspace admins only
   warehouse_id: null           # the SQL warehouse the business unit lookup runs on
 

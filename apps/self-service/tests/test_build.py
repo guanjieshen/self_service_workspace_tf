@@ -102,6 +102,25 @@ class Builds(unittest.TestCase):
         self.assertEqual([r["name"] for r in apps["self_service"]["resources"]], ["database"], "no jobs: they are in other workspaces")
         first = app_build.hub_target(self.s, database=False)["targets"]["hub"]["resources"]["apps"]
         self.assertEqual(first["self_service"]["resources"], [], "a first install's first pass: no database yet")
+        standard = json.loads(json.dumps(self.s))
+        standard["app"]["instances"] = None   # this repository's app.yaml may set it
+        self.assertNotIn("compute_min_instances", app_build.hub_target(standard)["targets"]["hub"]["resources"]["apps"]["self_service"],
+                         "instances null: a standard app")
+
+    def test_instances_scale_only_the_self_service_app(self):
+        s = json.loads(json.dumps(self.s))
+        s["app"]["instances"] = 2
+        apps = app_build.hub_target(s)["targets"]["hub"]["resources"]["apps"]
+        self.assertEqual((apps["self_service"]["compute_min_instances"], apps["self_service"]["compute_max_instances"]), (2, 2))
+        self.assertNotIn("compute_min_instances", apps["approvals"], "the approvals app stays standard")
+
+    def test_account_users_opens_the_self_service_app_to_the_organization(self):
+        s = json.loads(json.dumps(self.s))
+        s["hub"]["users_group"] = "account users"
+        apps = app_build.hub_target(s)["targets"]["hub"]["resources"]["apps"]
+        self.assertEqual(apps["self_service"]["permissions"], [{"level": "CAN_USE", "group_name": "account users"}],
+                         "what the app's 'Anyone in my organization can use' sets")
+        self.assertEqual(apps["approvals"]["permissions"], [{"level": "CAN_USE", "group_name": "platform-admins"}])
 
     def test_each_served_workspace_gets_its_schema_job_in_the_hub(self):
         out = app_build.build_jobs(self.s, self.spokes[0], ["11111111-1111-1111-1111-111111111111"], root=self.tmp)
@@ -159,7 +178,9 @@ class Builds(unittest.TestCase):
                 (lambda s: s["adopt"].update(database="cd-self-service"), "adopt.database"),
                 (lambda s: s["jobs"].update(temporary_schema={"account_prefix": "azure- ; drop"}), "temporary_schema.account_prefix"),
                 (lambda s: s["app"].update(persona_notes={"admin": "x"}), "persona_notes"),
-                (lambda s: s["app"].update(persona_notes={"builder": "x" * 301}), "persona_notes")):
+                (lambda s: s["app"].update(persona_notes={"builder": "x" * 301}), "persona_notes"),
+                (lambda s: s["app"].update(instances=6), "instances"),
+                (lambda s: s["app"].update(instances="2"), "instances")):
             with self.subTest(setting=setting):
                 bad = json.loads(json.dumps(self.s))
                 change(bad)

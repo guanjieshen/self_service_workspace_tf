@@ -128,6 +128,42 @@ class DeployHub(unittest.TestCase):
         self.assertFalse(any(c[:2] == ("postgres", "create-database") for c in fake.called))
 
 
+class ConvertToScaled(unittest.TestCase):
+    """Databricks converts a standard app to horizontal scaling only at 1 copy: the deploy does that
+    first, then the bundle sets the number."""
+
+    def convert(self, app, instances=2):
+        calls = []
+        def cli(host, *args, missing_ok=False):
+            calls.append(args)
+            return app if args[:2] == ("apps", "get") else {}
+        with mock.patch.object(app_deploy, "cli", cli), mock.patch.object(app_deploy.time, "sleep"):
+            app_deploy.convert_to_scaled("https://hub", "cd-self-service", instances)
+        return [c for c in calls if c[:2] == ("apps", "create-update")]
+
+    def test_a_standard_app_is_converted_at_one_copy(self):
+        update = self.convert({"compute_status": {"state": "ACTIVE"}})
+        self.assertEqual(len(update), 1)
+        self.assertIn('"compute_min_instances": 1, "compute_max_instances": 1', update[0][-1])
+
+    def test_nothing_to_convert(self):
+        self.assertEqual(self.convert({"compute_min_instances": 2, "compute_status": {"state": "ACTIVE"}}), [], "already scaled")
+        self.assertEqual(self.convert(None), [], "a new app: the bundle makes it scaled")
+        self.assertEqual(self.convert({"compute_status": {"state": "ACTIVE"}}, instances=None), [], "instances null")
+
+    def test_the_hub_deploy_converts_before_the_bundle_deploy(self):
+        fake = FakeDatabricks()
+        s = {"hub": {"host": "https://hub"}, "adopt": {}, "database": {"readers": []}, "app_ids": {"self_service": "sp-1", "approvals": "sp-2"},
+             "app": {"name": "cd-self-service", "approvals": {"name": "cd-approvals"}, "database": {"project_id": "cd-self-service"}, "instances": 2}}
+        order = []
+        with mock.patch.object(app_deploy, "cli", fake.cli), mock.patch.object(app_deploy, "bind_adopted"), \
+                mock.patch.object(app_deploy, "run", side_effect=lambda h, c, *a: order.append(" ".join(a))), \
+                mock.patch.object(app_deploy, "convert_to_scaled", side_effect=lambda h, n, i: order.append(f"convert {n} {i}")), \
+                mock.patch.object(app_deploy.app_build, "build_hub"):
+            app_deploy.deploy_hub(s, [], False)
+        self.assertEqual(order[:2], ["convert cd-self-service 2", "databricks bundle deploy -t hub --auto-approve"])
+
+
 class EnsureDatabase(unittest.TestCase):
     def test_the_database_is_created_owned_by_the_deploying_identity_with_a_role_per_reader(self):
         fake = FakeDatabricks(database=False)
