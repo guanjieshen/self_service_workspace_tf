@@ -13,7 +13,7 @@ description: Use when someone asks about a temporary schema (cd_tmp_...), such a
 | `cd_schema_kind` = `temporary` | It will be deleted after its date |
 | `cd_expires` | The date: deleted after it (still kept on the day itself) |
 | `cd_created` | When it was made |
-| `cd_pending_request` | An extension waits for an approver: **never deleted while it waits** |
+| `cd_pending_request` | An extension waits for an approver (only when `human_approval` lists `temporary_extension`): **never deleted while it waits** |
 | `cd_converted_from` = `personal` | It was a personal schema, made temporary |
 
 Find them: Catalog Explorer in the person's workspace > the catalog > the schema > **Details**.
@@ -23,7 +23,7 @@ Find them: Catalog Explorer in the person's workspace > the catalog > the schema
 | They ask | Do |
 | --- | --- |
 | "When is it deleted?" | Its `cd_expires`; also on the app's card (a bar: N of M days left) and the form |
-| "Extend it" | The owner: in the app, the temporary schema > **Extend temporary schema** (7 days, with a reason). It waits for an approver; the schema is held meanwhile. An approver: the admin app > Pending Approvals > approve or reject (rejected: deleted at the next cleanup if its date has passed) |
+| "Extend it" | The owner: in the app, the temporary schema > **Extend temporary schema** (30 days, with a reason), signed in with the account that made it. It is added straight away, as often as they ask. Only if `human_approval` lists `temporary_extension` does it wait for an approver (the schema is held meanwhile): the admin app > Pending Approvals > approve or reject |
 | "Why was it deleted?" | The cleanup's run of that day (the hub > Jobs > Temporary schema cleanup > the run's output): it lists each deleted schema, whose, and how many tables. Nothing deletes one early |
 | "Can I get it back?" | Not from the app. Within 7 days of the deletion a platform admin may recover managed tables (Unity Catalog `UNDROP`); after that, no |
 | "I can't create another" | They are at the limit (the card: N of N used). Wait for one to expire, or extend or drop one |
@@ -33,5 +33,5 @@ Find them: Catalog Explorer in the person's workspace > the catalog > the schema
 
 ## Never
 
-- Never change a schema's tags or rights by hand to "extend" it: an extension is a request an approver decides, so it is recorded.
+- Never change a schema's tags or rights by hand to "extend" it: an extension is a request, so it is recorded.
 - Never run the cleanup without `dry_run` by hand.

@@ -47,6 +47,37 @@ is left alone.
   admins can, unless an account admin turned it off).
   **Baseline edits:** add the new file `config/defaults/governed-tags.yaml` (copy the
   framework's): an upgrade never copies new baseline files, and without it nothing is tagged.
+- **More time for a temporary schema runs straight away, and adds 30 days.** It no longer waits for
+  an approver, and a person may extend as often as they need. To put an approver back, add
+  `temporary_extension` to `human_approval` in `config/self-service/app.yaml`. A 7-day request still
+  waiting for an approver at the upgrade keeps working: approved, it adds its 7 days.
+- **Who may make temporary schemas** (`jobs.temporary_schema.account_prefix` in `app.yaml`, for
+  example `azure-` for admin accounts): the form tells someone signed in with another account which
+  one to use, the catalog's tile is greyed out for them, and the schema job refuses it. `null` (the default) = any account. Extending one is for
+  its owner, with the account that made it: a temporary schema made before the check, with a regular
+  account, is still extended by its owner.
+- **A note under each access level** on the Request workspace access page
+  (`self_service_app.persona_notes` in `app.yaml`), for example which account to ask with; an access
+  level that is Coming soon shows an Unavailable button.
+- **Add a group to your workspace** (was a Coming soon link): a form in the app, approval required,
+  for sharing workspace folders with the group. It asks for the workspace, the Entra ID group and why; a platform admin adds it to the workspace file's
+  `sharing_groups` (no entitlements: only something to share folders with) and approves it.
+  `links.group_request` in `app.yaml` is no longer used: remove it.
+- **Request a domain (Coming soon),** in the catalog's Data section: a new card whose short form opens as a preview and sends
+  nothing yet (`preview=True` in `cards.py`; removing it takes the form live, approval required): its name, where it goes (a
+  new domain, or a subdomain under any of the account's Databricks domains, from the Domains API;
+  the workspace file's `domains:` when it cannot be read: the self-service app's identity needs
+  `MANAGE DISCOVER` to read them), and why. A platform admin asks for anything else (its
+  application ID, its groups), declares it in the workspace's file and approves it: nothing runs
+  from the app.
+- **One card and form for project and team schemas: Request a permanent schema** (`/schema/permanent`).
+  The team's Entra group is optional: without it, a project schema; with it, a team schema the
+  group manages too. Both kinds, their approval (`human_approval`) and the job are unchanged; the
+  old `/schema/project` and `/schema/team` links open the new form. Settings > Help links has one
+  SOP for it (the project schema's, now labelled Permanent schema); the team schema's SOP setting is gone.
+- **Upgrading:** add `persona_notes` and `jobs.temporary_schema.account_prefix` to your `app.yaml`
+  (both off as `null`; see the framework's). The next deploy changes the apps and the schema jobs,
+  and runs database migration `009` (two new kinds of request, and a `details` column).
 
 ## 1.1.4
 

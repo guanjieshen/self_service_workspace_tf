@@ -1,0 +1,37 @@
+{#- Add a group to your workspace (for sharing folders): an Entra ID group assigned to the workspace with no access of its
+    own (the workspace file's sharing_groups), so people can share folders with it. Recorded for an
+    admin, who adds it in a pull request and approves it: nothing runs here. -#}
+{% extends "base.html" %}
+
+{% from "_components.html" import callout, field %}
+{% block content %}
+{% set task_icon, task_name, task_text, task_category = "group_request", "Add a group to your workspace", "Add an Entra ID group to your workspace so you can share folders with it.", "Build" %}
+{% set task_aside = True %}{% include "_task_header.html" %}
+
+<div class="page-grid form-grid">
+<form class="panel" method="post" action="/group" data-submit>
+  <div class="panel-body">
+    {% call callout() %}This is for <span class="strong">sharing folders</span> only. The group gets <span class="strong">no access of its own</span>: its members still need an access level (a <a class="text-link" href="/persona">persona</a>) to sign in, and then see what you share with the group.{% endcall %}
+    {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
+    {% if workspaces %}
+      {% set on_change = True %}{% include "_workspace_select.html" %}
+      {% call field("group", "Entra ID group", required=True, hint="Its exact name, for example sales-analysts.") %}
+        <input id="group" name="group" class="mono" required maxlength="200" pattern="[A-Za-z0-9 _.\-]+" value="{{ form.group or '' }}" placeholder="sales-analysts" autocomplete="off">
+      {% endcall %}
+      {% call field("reason", "Why do you need this group added?", required=True) %}
+        <textarea id="reason" name="reason" rows="3" required minlength="10" maxlength="1000"
+                  placeholder="Which folders you'll share with it, and who is in the group.">{{ form.reason or '' }}</textarea>
+      {% endcall %}
+    {% endif %}
+  </div>
+  <div class="panel-foot form-foot">
+    <div class="form-actions">
+      <button type="submit" class="primary" {{ 'disabled' if not workspaces }}>Submit request</button>
+      <a class="button" href="/">Cancel</a>
+    </div>
+    <p class="meta">A platform admin reviews it and adds the group; you can follow it under My requests.</p>
+  </div>
+</form>
+{% include "_task_aside.html" %}
+</div>
+{% endblock %}

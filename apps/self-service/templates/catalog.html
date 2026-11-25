@@ -35,13 +35,17 @@
     {% set q = quotas.get(key) or {} %}
     {% set have = q.exists == True %}
     {% set asked = q.exists == "pending" %}
+    {#- A temporary schema needs the account app.yaml names (account_prefix): another account sees the tile greyed out. -#}
+    {% set locked = key == "temporary_schema" and temporary_account and not temporary_account.ok %}
+    {% set ready = ready and not locked %}
     <div class="card task {{ 'is-soon' if not ready }}" data-search="{{ (name ~ ' ' ~ text ~ ' ' ~ title) | lower }}">
       <div class="task-top">
         <span class="task-icon">{{ icon(c.icon or key) }}</span>
         <h3>{% if ready %}<a class="stretched" href="{{ href }}" {% if external %}target="_blank" rel="noopener"{% endif %}>{{ name }}</a>{% else %}{{ name }}{% endif %}</h3>
         {% if asked %}<span class="quota pending" title="Your request is in progress">Requested</span>
         {% elif key in quotas and q.exists is not none %}<span class="quota {{ 'full' if have }}" title="{{ 'The most you may have at a time' if have else ('Up to ' ~ q.limit ~ ' at a time') }}">{{ q.used }} of {{ q.limit }} used</span>{% endif %}
-        {% if not ready %}<span class="soon">Coming soon</span>{% else %}{{ icon("external" if external else "arrow", "icon task-arrow") }}{% endif %}
+        {% if locked %}
+        {% elif not ready or item.preview %}<span class="soon">Coming soon</span>{% else %}{{ icon("external" if external else "arrow", "icon task-arrow") }}{% endif %}
       </div>
       <p>{{ text }}</p>
       {#- Each temporary schema they have: how much of its time is left, and when it is deleted. -#}
@@ -53,7 +57,11 @@
       {% endfor %}{% endif %}
       {#- Every card has a foot, so they all have the same shape: how it is approved, or where it opens. -#}
       <div class="task-foot">
-        {% if ready and external %}<span class="meta">{{ c.opens }}</span>
+        {% if locked %}<span class="meta">Sign in with your {{ temporary_account.prefix }} account to create one</span>
+        {#- One made before the check, with this account: its owner still extends it. -#}
+        {% if q.schemas %}<a class="task-sop" href="/schema/temporary/extend">Extend temporary schema</a>{% endif %}
+        {% elif item.preview %}<span class="meta">Preview: see the form; nothing is sent yet</span>
+        {% elif ready and external %}<span class="meta">{{ c.opens }}</span>
         {% if item.more %}<a class="task-sop" href="{{ item.more[1] }}" target="_blank" rel="noopener">{{ item.more[0] }} {{ icon("external", "icon icon-xs") }}</a>{% endif %}
         {% elif ready %}
         {{ approval_label(approval.get(key), approval_labels,

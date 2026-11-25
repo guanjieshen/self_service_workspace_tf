@@ -45,22 +45,28 @@ TASKS = {"personal_schema": "Create a personal schema", "team_folder": "Request 
 # team schema (the requester's and one of their groups').
 PROJECT_SCHEMA, TEAM_SCHEMA = "Request a project schema", "Request a team schema"
 # ... and a temporary schema: the requester's alone, <prefix>tmp_<name>, tagged to expire (one at a time),
-# with more time for it: a request an approver always decides. (Keeping one as a project schema,
-# temporary_conversion, is not offered for now: it may need a rename. Its label stays, for any sent.)
+# with more time for it: straight away, unless app.yaml human_approval lists temporary_extension. (Keeping
+# one as a project schema, temporary_conversion, is not offered for now: it may need a rename. Its label
+# stays, for any sent.)
 TEMPORARY_SCHEMA = "Create a temporary schema"
 TEMPORARY_EXTENSION, TEMPORARY_CONVERSION = "Extend temporary schema", "Keep as a project schema"
-ALWAYS_APPROVED = {"temporary_extension", "temporary_conversion"}   # whatever app.yaml human_approval says
-EXTENSION_DAYS = (7,)   # the more time someone may ask for at once (one choice for now)
+ALWAYS_APPROVED = {"temporary_conversion"}   # whatever app.yaml human_approval says
+EXTENSION_DAYS = (30,)   # the more time someone may ask for at once (one choice for now)
 # How each task is approved, as the catalog and task pages label it. The app's own tasks run
 # straight away (the jobs check every request); a persona is approved in Entra ID.
 APPROVAL = {"schema": "auto", "project_schema": "auto", "team_schema": "auto", "temporary_schema": "auto", "folder": "auto",
-            "persona": "required", "temporary_extension": "required", "temporary_conversion": "required"}
+            "persona": "required", "temporary_extension": "auto", "temporary_conversion": "required",
+            "domain": "required", "group_request": "required"}   # both made by hand by an approver (ALWAYS_BY_HAND)
 # A request whose job is not deployed in the hub is made by hand (Portal.manual): recorded and
 # tracked like the others, always for an approver, who makes it (the approvals app says what) and
 # then approves it, which marks it done. The database's kind -> its job. Today the folder job is
 # not deployed (a folder is workspace specific, and the hub does not call other workspaces);
 # deploy it again and folders run it, with no change here.
 BY_HAND = {"folder": "team_folder"}
+# Always made by hand: an approver does it in a pull request (a domain, or a group for sharing folders,
+# in its workspace's file), then approves it, which marks it done.
+ALWAYS_BY_HAND = {"domain", "workspace_group"}
+DOMAIN, WORKSPACE_GROUP = "Request a domain", "Add a group to your workspace"
 APPROVAL_LABELS = {"auto": "Auto-approved", "required": "Approval required"}
 
 
@@ -69,8 +75,11 @@ def approval_of(config, manual=()):
     and those made by hand: manual)."""
     people = set(config.get("human_approval", ())) | set(manual) | ALWAYS_APPROVED
     task_kind = {"schema": "personal_schema", "project_schema": "project_schema", "team_schema": "team_schema",
-                 "temporary_schema": "temporary_schema", "folder": "folder"}
-    return {**APPROVAL, **{task: "required" for task, kind in task_kind.items() if kind in people}}
+                 "temporary_schema": "temporary_schema", "temporary_extension": "temporary_extension", "folder": "folder"}
+    out = {**APPROVAL, **{task: "required" for task, kind in task_kind.items() if kind in people}}
+    # The permanent schema form makes either: it waits for an approver if either kind does.
+    out["permanent_schema"] = "required" if "required" in (out["project_schema"], out["team_schema"]) else "auto"
+    return out
 SCHEMA = r"[a-z0-9][a-z0-9_]*"
 # Where a run is, as the status page shows it: waiting for serverless compute, or running.
 PHASES = {"QUEUED": "Starting", "PENDING": "Starting", "BLOCKED": "Starting", "WAITING_FOR_RETRY": "Starting",
@@ -136,7 +145,8 @@ def load_config(path):
 # Each kind of request, as the requester reads it.
 APPROVAL_TYPES = {"personal_schema": "Personal schema", "project_schema": "Project schema", "team_schema": "Team schema",
                   "temporary_schema": "Temporary schema", "temporary_extension": "More time for a temporary schema",
-                  "temporary_conversion": "Temporary schema to keep as a project schema", "folder": "Workspace folder"}
+                  "temporary_conversion": "Temporary schema to keep as a project schema", "folder": "Workspace folder",
+                  "domain": "Domain", "workspace_group": "Group added to the workspace"}
 # The states in which a request waits for a person (the database's request_status).
 WAITING = ("submitted", "replied", "needs_info")
 
@@ -208,7 +218,7 @@ def check_schema(name, prefix):
     if not re.fullmatch(SCHEMA, name or "") or len(name) > 100:
         raise RequestError("The schema name must be lowercase letters, digits and underscores.")
     if prefix and name.startswith(prefix):
-        raise RequestError(f"A custom schema can't start with {prefix}: that is how personal schemas are named.")
+        raise RequestError(f"A permanent schema can't start with {prefix}: that is how personal schemas are named.")
 
 
 def check_reason(reason):
@@ -327,7 +337,7 @@ class Portal:
     def available(self, kind):
         """The workspaces that offer this kind of job: with its job in the hub, or every one for
         a request made by hand (manual)."""
-        by_hand = any(job == kind for k, job in BY_HAND.items() if k in self.manual())
+        by_hand = kind in ALWAYS_BY_HAND or any(job == kind for k, job in BY_HAND.items() if k in self.manual())
         return [w for w in self.workspaces() if (by_hand and not w.error) or kind in w.jobs]
 
     def manual(self):
@@ -336,7 +346,7 @@ class Portal:
         found = [w for w in self.workspaces() if not w.error]
         if not found:
             return set()
-        return {k for k, job in BY_HAND.items() if not any(job in w.jobs for w in found)}
+        return {k for k, job in BY_HAND.items() if not any(job in w.jobs for w in found)} | ALWAYS_BY_HAND
 
     def folder_path(self, w, folder):
         return folder_path(w, folder, self.config.get("folder_root") or "/Workspace")
@@ -662,6 +672,7 @@ class Portal:
         job = w.jobs["personal_schema"]
         prefix = job["tags"].get("cd_prefix", "cd_")
         if temporary:
+            self.check_temporary_account(user)
             if not schema or owner_group:
                 raise RequestError("A temporary schema needs a name, and is yours alone.")
             check_schema(schema, prefix)
@@ -692,13 +703,28 @@ class Portal:
 
     def request_more_time(self, ws_name, user, days, reason="", schema=""):
         """More time for one of the user's temporary schemas (EXTENSION_DAYS; schema: its name, or
-        their only one): recorded, and run once an approver approves it; the job adds the days to
-        its cd_expires. Returns the request's ID."""
+        their only one): recorded and run straight away (the run's ID), or, when app.yaml
+        human_approval lists temporary_extension, run once an approver approves it (the request's
+        ID); the job adds the days to its cd_expires."""
         if days not in EXTENSION_DAYS:
             raise RequestError(f"More time is {' or '.join(map(str, EXTENSION_DAYS))} days.")
         return self._about_temporary(ws_name, user, "extend", reason, schema, days)
 
+    def temporary_account(self, user):
+        """Whether this account may create a temporary schema: its email starts with app.yaml
+        jobs.temporary_schema.account_prefix (for example an admin account), or no prefix is set.
+        Extending one is for its owner, with the account that made it. The job checks again."""
+        prefix = (self.config.get("temporary_account_prefix") or "").lower()
+        return not prefix or (user or "").lower().startswith(prefix)
+
+    def check_temporary_account(self, user):
+        if not self.temporary_account(user):
+            prefix = self.config["temporary_account_prefix"]
+            raise RequestError(f"Temporary schemas are made with your {prefix} account: sign in with the account whose email "
+                               f"starts with {prefix} (for example {prefix}{user.split('@', 1)[0]}@...) and ask again.")
+
     def _about_temporary(self, ws_name, user, action, reason, schema="", days=None):
+        # Any account its owner made it with: one made before account_prefix keeps its owner's account.
         check_reason(reason)
         w = self.workspace(ws_name, "personal_schema")
         self._check_bu(user, w, "personal_schema")
@@ -713,7 +739,10 @@ class Portal:
         self._personal.pop((ws_name, user, "temporary"), None)
         params = {"user": user, "catalog": catalog, "schema": schema, "owner_group": "", "reason": reason,
                   "temporary": "true", "action": action, "days": str(days or "")}
-        request_id = self._start(w, "personal_schema", user, schema, "", reason, params)
+        started = self._start(w, "personal_schema", user, schema, "", reason, params)
+        if not isinstance(started, str):   # no approver (app.yaml human_approval): it ran straight away
+            return started
+        request_id = started
         # While it waits for an approver, the schema is held: tagged with this request, which the
         # daily cleanup never deletes (the job writes the tag: the app writes nothing in a catalog).
         try:
@@ -730,7 +759,7 @@ class Portal:
         """An approver rejected more time, or keeping it: the hold goes (the job), so the schema
         expires as before, and the next daily cleanup deletes it if its date has passed. Never
         stops the rejection: if it cannot run, the hold stays and the schema is kept (say so)."""
-        if row["kind"] not in ALWAYS_APPROVED:
+        if row["kind"] not in ("temporary_extension", "temporary_conversion"):
             return
         try:
             w = self.workspace(row["workspace"], "personal_schema")
@@ -738,6 +767,66 @@ class Portal:
                 **record_params(row, w), **self.settings_for("personal_schema"), "action": "release"})
         except Exception as e:
             warn(f"releasing the hold of {row['id']} on {row['name']} (it is kept until someone does)", e)
+
+    def request_domain(self, ws_name, user, name, parent="", parent_label="", reason=""):
+        """A domain (or a subdomain of parent: a Databricks domain's ID): recorded for an admin, who
+        asks for anything else it needs (its application ID, its groups), sets it up and approves
+        it. Nothing runs. Returns the request's ID."""
+        name = (name or "").strip().lower()
+        if not re.fullmatch(r"[a-z][a-z0-9_]{0,40}", name):
+            raise RequestError("Give the domain a name: lowercase letters, numbers and underscores, starting with a letter.")
+        check_reason(reason)
+        w = self.workspace(ws_name, "domain")
+        self._check_bu(user, w, "domain")
+        return self._start(w, "domain", user, name, "", reason, {}, kind="domain",
+                           details={"parent": parent or "", "parent_label": parent_label or ""})
+
+    def request_group(self, ws_name, user, group, reason=""):
+        """An Entra ID group added to the workspace so people can share folders with it (the
+        workspace file's sharing_groups: no entitlements, no access by itself): recorded for the
+        admin team, who add it in a pull request and approve it. Nothing runs. Returns the request's ID."""
+        group = (group or "").strip()
+        if not re.fullmatch(GROUP, group):
+            raise RequestError("Give the Entra ID group's exact name: letters, digits, spaces and . _ -.")
+        if group in WORKSPACE_GROUPS:
+            raise RequestError(f"{group} is every user of a workspace: give your team's own Entra ID group.")
+        check_reason(reason)
+        w = self.workspace(ws_name, "workspace_group")
+        self._check_bu(user, w, "workspace_group")
+        return self._start(w, "workspace_group", user, group, "", reason, {}, kind="workspace_group")
+
+    def domains(self):
+        """The account's Databricks domains (the Domains API), each followed by its subdomains:
+        [{"key": its ID, "label": "PARENT / CHILD", "depth"}]. None when the API cannot be read
+        (the form then offers the workspace file's domains). Kept five minutes."""
+        cached = self._personal.get(("domains",))
+        if cached and time.time() - cached[0] < 300:
+            return cached[1]
+        try:
+            found, token = [], None
+            while True:
+                page = self.hub().api_client.do("GET", "/api/2.0/domains", query={"page_size": 100, **({"page_token": token} if token else {})})
+                found += [d for d in page.get("domains") or [] if not d.get("effective_draft")]
+                token = page.get("next_page_token")
+                if not token or len(found) > 2000:
+                    break
+        except Exception as e:
+            warn("reading the account's domains", e)
+            return None
+        by_parent = {}
+        for d in found:
+            by_parent.setdefault(d.get("parent_domain_id") or "", []).append(d)
+        out = []
+
+        def walk(parent, depth, path):
+            for d in sorted(by_parent.get(parent, []), key=lambda d: d.get("tag_key", "").lower()):
+                name = d.get("tag_key", "").rsplit("/", 1)[-1] or d["domain_id"]
+                out.append({"key": d["domain_id"], "label": " / ".join([*path, name]), "depth": depth})
+                if depth < 5:
+                    walk(d["domain_id"], depth + 1, [*path, name])
+        walk("", 0, [])
+        keep(self._personal, ("domains",), out)
+        return out
 
     def request_folder(self, ws_name, user, folder, reason=""):
         """Run the team folder job for the user's folder: they and the workspace's platform admins
@@ -759,14 +848,14 @@ class Portal:
         job runs (app.yaml human_approval), or before an admin makes it by hand (manual)."""
         return kind in self.config.get("human_approval", ()) or kind in self.manual() or kind in ALWAYS_APPROVED
 
-    def _start(self, w, job_kind, user, name, owner_group, reason, params):
+    def _start(self, w, job_kind, user, name, owner_group, reason, params, kind=None, details=None):
         """Record the request, then run its job, then link the run to it. Recording comes first,
         so every request that runs has a record: if the database cannot take it, nothing runs.
         Returns the run's ID; for a request an approver must approve first, nothing runs: it
         returns the request's ID (a string), and the approvals app runs the job once approved."""
         if not self.store:
             raise RequestError("The app's requests database is not set up, so nothing was sent. Tell a platform admin.")
-        kind = store_module.db_kind(job_kind, params)
+        kind = kind or store_module.db_kind(job_kind, params)
         if self.needs_approval(kind):
             waiting = next((r for r in self._requests_of(user) if (r["workspace"], r["kind"], r["name"]) == (w.name, kind, name)
                             and r["state"] in WAITING and not r["run_id"]), None)
@@ -776,7 +865,7 @@ class Portal:
         try:
             self.store.record_request({"id": request_id, "kind": kind, "workspace": w.name,
                                        "bu": w.bu, "requested_by": user, "name": name, "owner_group": owner_group,
-                                       "reason": reason, "days": int(params["days"]) if params.get("days") else None})
+                                       "reason": reason, "days": int(params["days"]) if params.get("days") else None, "details": details})
         except Exception as e:
             warn(f"recording request {request_id}", e)
             raise RequestError("Your request could not be recorded just now, so it was not sent. Try again in a minute.") from e
@@ -1118,10 +1207,16 @@ class Portal:
         kind = "team_folder" if row["kind"] == "folder" else "personal_schema"
         task = {"personal_schema": TASKS["personal_schema"], "project_schema": PROJECT_SCHEMA,
                 "team_schema": TEAM_SCHEMA, "temporary_schema": TEMPORARY_SCHEMA, "temporary_extension": TEMPORARY_EXTENSION,
-                "temporary_conversion": TEMPORARY_CONVERSION, "folder": TASKS["team_folder"]}[row["kind"]]
+                "temporary_conversion": TEMPORARY_CONVERSION, "folder": TASKS["team_folder"],
+                "domain": DOMAIN, "workspace_group": WORKSPACE_GROUP}[row["kind"]]
         params = record_params(row, w)
         if kind == "team_folder":
             resource = self.folder_path(w, row["name"]) if w else row["name"]
+        elif row["kind"] == "domain":   # its place among the domains, as the requester chose it
+            parent = (row.get("details") or {}).get("parent_label") or ""
+            resource = f"{parent} / {row['name'].upper()}" if parent else row["name"].upper()
+        elif row["kind"] == "workspace_group":
+            resource = row["name"]
         else:
             resource = f"{params['catalog']}.{row['name']}" if params["catalog"] else row["name"]
         started = row["created_at"]
