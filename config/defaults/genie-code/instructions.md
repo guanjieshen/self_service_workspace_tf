@@ -32,7 +32,12 @@ This is a **self-service** workspace. Many people here are business users, and s
 
 ## Guardrails
 
-These apply to anything you build or change here. When one applies, mention it in a sentence and help the person meet it. Don't refuse their request because of it.
+These apply to anything you build or change here. They're how this workspace is designed: governed centrally, self-service within the rules. When one applies, **tell the person the rule and why, in a sentence, then the way to get what they need** (the skill **ask-tis**; TIS is the platform team). Don't refuse their request because of it, and never work around one.
+
+- **What someone can do comes from their persona.** Explorer: SQL, dashboards and Genie spaces. Builder and Publisher: also notebooks, jobs, pipelines and apps. If the work needs more than they have, say which persona would let them and how to ask for it.
+- **Schemas come from the self-service app,** so each one has an owner, an approver and, if temporary, an end date. Nobody can create one by hand.
+- **Access is managed centrally.** Don't grant on the catalog or change workspace settings: the platform sets them, and its next update removes anything changed by hand. Who may read a schema's tables is its owner's decision.
+- **Share with groups, never one person at a time,** so access follows people as they join and leave a team (a workspace folder: with a group added to the workspace).
 
 - **Serverless first, with a usage policy.** Run notebooks, jobs and pipelines on serverless compute, and select a serverless usage policy: `{PREFIX}-0-SELF-SERVICE` for general work in this workspace, or the person's project policy if they have one. The policy adds this workspace's tags for them.
 - **Every job and pipeline carries tags.** This workspace's default tags are {WORKSPACE_TAGS}. The usage policy sets them on serverless work. Anywhere else (a classic cluster, a job's own tags), set them yourself, along with every chargeback tag ({TAGS}). Also add tags that say what the work is for, in a few words, for example `PURPOSE: WEEKLY_SALES_REPORT`. Suggest values from what the person told you, and confirm them before you set them. Never make up an owner, a team or a project: ask. Keep the tags when you change an existing job or pipeline.
@@ -40,7 +45,7 @@ These apply to anything you build or change here. When one applies, mention it i
 ## Data
 
 - **Work with data in Unity Catalog.** This workspace's catalog is `{CATALOG}`.
-- **Trying things: their temporary schema.** Each person may have one, in `{CATALOG}`, named `cd_tmp_` followed by a short name (they create it in the self-service app). It is **deleted with everything in it** on the date in its `cd_expires` tag, unless they extend it. Treat an older `cd_<name>` schema the same way: it is temporary too. If they don't have one, suggest they create it.
+- **New tables go in their temporary schema while they try things.** One per person by default, in `{CATALOG}`, named `cd_tmp_` and a short name, created in the self-service app with the account its page asks for (for example their Azure PIM account, `azure-...`). It is **deleted with everything in it** on the date in its `cd_expires` tag, unless they extend it. An older `cd_<name>` schema has been made temporary the same way: move what they keep before its date.
 - **Keeping work: a permanent schema** (a project's or a team's), requested in the self-service app. Move tables there before anything is scheduled or shared. Don't create schemas yourself.
 - **Use three-part names** (`catalog.schema.table`). The Hive metastore, DBFS paths and DBFS mounts are switched off or being retired, so don't use them.
 - **Read data where it is.** Don't copy it out of Unity Catalog into files, notebooks or personal storage.
@@ -59,6 +64,5 @@ These apply to anything you build or change here. When one applies, mention it i
 
 ## Sharing work
 
-- **Keep work in progress** in their own folder.
-- **Put finished work** their team should use in the team's folder (`/Workspace/<team>`), if they have one.
-- **Name notebooks, jobs and dashboards after what they do,** and add a short description of their purpose and owner.
+- **Keep a project's work in its folder** (`/Workspace/Users/<their email>/projects/`, the skill **start-a-project**), and share it with the team's group when it's ready.
+- **Name things with this workspace's pattern,** `<prefix>-<kind>-<name>` (the skill **start-a-project**), and add a short description of their purpose and owner.

@@ -4,7 +4,7 @@ made in this workspace, and removes a project cleanly.
 -->
 ---
 name: my-projects
-description: Use when someone asks what they have built or own in this workspace, what is still running or costing money, which of their apps are left on, or wants to clean up, remove or retire a project, an app, a pipeline, a job, a dashboard, a Genie space or a schema.
+description: "Use when someone asks what they have built or own in this workspace, what is still running or costing money, which of their apps are left on, or wants to clean up, remove or retire a project, an app, a pipeline, a job, a dashboard, a Genie space or a schema."
 ---
 
 # My projects: what I made, and cleaning up
@@ -25,7 +25,7 @@ Say what is running all the time (an app with `LEAVE_ON` true), and what hasn't 
 
 ## 2. Leave on, or turn off
 
-Every app carries a `LEAVE_ON` tag: `false` means the platform team may turn it off when it isn't needed (a job will do it); `true` keeps it running, and costing money, all the time. Change it when they ask (for example when others rely on it every day), and say what it means for cost: with the entity tags API, delete the old value (`DELETE /api/2.0/entity-tag-assignments/apps/<app name>/tags/LEAVE_ON`), then add the new one (`POST /api/2.0/entity-tag-assignments`).
+Every app carries a `LEAVE_ON` tag: `false` means the platform team may turn it off when it isn't needed (a job will do it); `true` keeps it running, and costing money, all the time. Change it when they ask (for example when others rely on it every day): say what it means for cost and get their yes. With the entity tags API, delete the old value (`DELETE /api/2.0/entity-tag-assignments/apps/<app name>/tags/LEAVE_ON`), add the new one (`POST /api/2.0/entity-tag-assignments`), then read it back (`GET` the same path) and add it again if it's missing: an app must never be left without it.
 
 ## 3. Remove a project
 

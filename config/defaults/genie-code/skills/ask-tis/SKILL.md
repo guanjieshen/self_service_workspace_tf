@@ -4,7 +4,7 @@ needs from TIS, sends them to the right place for it, and records it in the proj
 -->
 ---
 name: ask-tis
-description: Use when someone needs something they can't or shouldn't make themselves in this workspace: a schema to keep their work, more time for a temporary schema, a workspace folder, a group to share with, workspace access, a domain, access to a table, a production dataset, a connection to another system, network access to an outside service or API, a service principal, classic compute, or anything a check refused for lack of permission. Works out what they need, sends them to the right place (the self-service app, the table's owner, their platform team, or a request to TIS), and records it in the project's AGENTS.md.
+description: "Use when someone needs something they can't or shouldn't make themselves in this workspace: a schema to keep their work, more time for a temporary schema, a workspace folder, a group to share with, workspace access, a domain, access to a table, a production dataset, a connection to another system, network access to an outside service or API, a service principal, classic compute, or anything a check refused for lack of permission. Works out what they need, sends them to the right place (the self-service app, the table's owner, their platform team, or a request to TIS), and records it in the project's AGENTS.md."
 ---
 
 # Ask TIS
@@ -26,13 +26,15 @@ If they don't need TIS after all (the table is there and they can read it, the e
 | They need | Where | What happens |
 | --- | --- | --- |
 | A schema to **keep** a project's or team's work | Self-service app: **Request a permanent schema** (add the team's Entra ID group for a team schema) | A person approves it |
-| A place to **try things** | Self-service app: **Create a temporary schema**, signed in with their Azure PIM account (`azure-...`, their admin account for Azure). One per person at a time | Made straight away; deleted with its contents on its `cd_expires` date |
-| **More time** for their temporary schema | Self-service app: **Extend temporary schema** | Straight away |
+| A place to **try things** | Self-service app: **Create a temporary schema**, signed in with the account its page asks for (for example their Azure PIM account, `azure-...`). One per person at a time by default | Made straight away; deleted with its contents on its `cd_expires` date |
+| Their temporary schema **was deleted** | Self-service app: **Create a temporary schema** again | Its old tables can't be recovered: say so plainly |
+| **More time** for their temporary schema | Self-service app: **Extend** on the temporary schema's card (or the banner warning it's about to be deleted) | Straight away |
 | A **workspace folder** for a team | Self-service app: **Request a workspace folder** | A person approves it; an admin makes it |
-| A group in the workspace, **to share folders with** | Self-service app: **Add a group to your workspace** | The admin team approves it |
-| **Workspace access**, or a different persona (Explorer, Builder, Publisher) | Self-service app: **Request workspace access** (Explorer with their regular account; Builder and Publisher with their Azure PIM account) | A person approves it |
-| **A domain** | Self-service app: **Request a domain** | While its tile says Coming soon: a request to TIS |
-| **Read access to a table** that exists | Its owner: Catalog Explorer > the table > **Request access** | The owner decides. Not TIS |
+| A group in the workspace, **to share folders with** | Self-service app: **Add a group to your workspace** | An admin sets it up, then approves it |
+| **Workspace access**, or a different persona (Explorer, Builder, Publisher) | Self-service app: **Request workspace access** (the note under each persona says which account to ask with) | A person approves it |
+| **A domain** | A request to TIS (section 3): the app's **Request a domain** form is a preview for now and sends nothing | TIS decides |
+| **Read access to a table** that exists | Its owner: Catalog Explorer > the table > **Request access** | The owner decides. If there's no owner to ask, or no answer: a request to TIS |
+| A **project usage policy** (to charge work to its own budget) | A request to TIS (section 3) | TIS decides |
 | A production dataset, a connection to another system, network access, a service principal, classic compute | **A request to TIS** (section 3) | TIS decides and tells them |
 
 In the self-service app, help them fill in the form: the name, the reason in a sentence, the group. If its tile says **Coming soon**, or the app refuses, write a request to TIS instead.
@@ -53,4 +55,4 @@ Never put a password or a key in it: TIS tells them how to hand a secret over. A
 
 ## 4. Record it
 
-Add a row to the project's `AGENTS.md`, under **Asked of TIS**: the date, what was asked, where (the app, the owner, or a request), and its status. Update it when it's answered, so the next session knows what is waiting.
+Add a row to the project's `AGENTS.md`, under **Asked of TIS**: the date, what was asked, where (the app, the owner, or a request), and its status. Update it when it's answered, so the next session knows what is waiting. No project yet? Tell them what was asked and where, so they can keep it.

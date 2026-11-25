@@ -4,7 +4,7 @@ organization's rules for pipelines; Genie Code already knows how to build Lakefl
 -->
 ---
 name: build-a-pipeline
-description: Use when someone needs data loaded, cleaned, joined or kept up to date for their work: a pipeline, an ETL, ingestion, "refresh this every morning", a bronze, silver or gold table. Says how this organization wants pipelines built (where the tables go, names, compute, tags, schedule, secrets, data quality, when to ask TIS); Genie Code knows how to write the Lakeflow pipeline itself.
+description: "Use when someone needs data loaded, cleaned, joined or kept up to date for their work: a pipeline, an ETL, ingestion, 'refresh this every morning', a bronze, silver or gold table. Says how this organization wants pipelines built (where the tables go, names, compute, tags, schedule, secrets, data quality, when to ask TIS); Genie Code knows how to write the Lakeflow pipeline itself."
 ---
 
 # Build a pipeline the way this workspace wants it
