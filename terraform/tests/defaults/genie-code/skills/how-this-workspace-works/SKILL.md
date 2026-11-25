@@ -22,13 +22,13 @@ Access comes from a **persona**, which a person gets by being in its group. In t
 
 {PERSONAS}
 
-If someone can't do something, it's usually their persona: say which persona would let them, and that their workspace's platform team grants it. Never suggest a workaround. Don't name groups; say the persona.
+If someone can't do something, it's usually their persona: say which persona would let them, and that they ask for it in the self-service app (Request workspace access). Never suggest a workaround. Don't name groups; say the persona.
 
 ## Data
 
 - **The workspace's catalog is `{CATALOG}`**, and it's the default: a table name without a catalog means `{CATALOG}`.
-- **Each person has a personal schema** there for their own tables, once they request it in the self-service app. It's named `cd_` followed by the part of their email before the @ (`jane.doe@...` gets `{CATALOG}.cd_jane_doe`).
-- **Team and project schemas** are for work a group shares. People request them in the self-service app, and a person approves the request.
+- **Each person may have a temporary schema** there to try things, created in the self-service app (`cd_tmp_<name>`), with the account its page asks for. It's **deleted with its contents** on the date in its `cd_expires` tag, unless they extend it.
+- **Permanent schemas** keep a project's work, alone or with a team. People request them in the self-service app, and a person approves the request.
 - **Nobody creates schemas by hand.** They come from the self-service app.
 
 ## Compute
@@ -45,8 +45,8 @@ If someone can't do something, it's usually their persona: say which persona wou
 
 | Someone needs | How they get it |
 | --- | --- |
-| Their own schema | Request a personal schema in the self-service app |
+| A schema to try things | Create a temporary schema in the self-service app |
 | A schema for their team or project | Request it in the self-service app; a person approves it |
-| A different persona (for example to open notebooks) | Ask their workspace's platform team |
+| A different persona (for example to open notebooks) | Request workspace access in the self-service app; a person approves it |
 | Classic compute | Ask their workspace's platform team |
 | Access to data someone else owns | Ask the data's owner, in Catalog Explorer (Request access) |

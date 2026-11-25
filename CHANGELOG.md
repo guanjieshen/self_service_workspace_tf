@@ -10,6 +10,32 @@ is left alone.
 
 ## Unreleased
 
+- **Five new Genie Code skills with this organization's rules for building**, and the workspace's
+  design rules in the default instructions. They don't repeat what Genie Code already knows
+  (finding tables, writing pipelines, building dashboards):
+  - **start-a-project**: the front door for anything bigger than a quick question. It finds the
+    data, checks the person's persona allows each part, splits the work into parts and sets up the
+    project: its name `<prefix>-<project>`, its folder, its APPID, its README.md and AGENTS.md.
+  - **build-a-pipeline**: serverless with the usage policy, triggered on a schedule they choose,
+    the temporary schema then the permanent one, Unity Catalog secrets.
+  - **build-a-dashboard-or-genie-space**: the shared warehouse, each viewer's own credentials,
+    shared with groups, tagged.
+  - **ask-tis**: works out what someone needs, then sends them to the right place: the
+    self-service app, a table's owner, or a request to TIS ready to send. Records it in the project.
+  - **my-projects**: what someone made, an app's `LEAVE_ON` tag, removing a project cleanly.
+
+  Also: **build-tagged-assets** uses a project's own APPID and tags apps, dashboards and Genie
+  spaces themselves. The default instructions state the workspace's design rules (personas,
+  schemas from the self-service app, access managed centrally, share with groups), and with
+  **how-this-workspace-works** and **onboard-me** describe temporary and permanent schemas instead
+  of personal ones (no longer offered).
+  **The first plan after an upgrade:** in every workspace, five new skill files and four changed
+  files under `/Workspace/.assistant/`.
+  **Baseline edits:** copy the new folders under `config/defaults/genie-code/skills/` (ask-tis,
+  build-a-dashboard-or-genie-space, build-a-pipeline, my-projects, start-a-project), and the
+  framework's `instructions.md`, `build-tagged-assets`, `how-this-workspace-works` and
+  `onboard-me` skills if you haven't changed yours.
+
 - **Genie Code skills to build web apps** (default skills, in every workspace), for people who know
   their business but aren't software engineers:
   - **`plan-a-databricks-app`** interviews them in plain words (the work today, the people, the
