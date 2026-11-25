@@ -194,7 +194,7 @@ run "genie_code_defaults" {
     error_message = "Comments are removed and placeholders filled."
   }
   assert {
-    condition     = tolist(keys(local.genie_skills)) == tolist(["build-tagged-assets/SKILL.md", "how-this-workspace-works/SKILL.md", "onboard-me/SKILL.md"])
+    condition     = tolist(keys(local.genie_skills)) == tolist(["ask-tis/SKILL.md", "build-a-dashboard-or-genie-space/SKILL.md", "build-a-databricks-app/SKILL.md", "build-a-databricks-app/deploy_app.py", "build-a-databricks-app/template/AGENTS.md", "build-a-databricks-app/template/README.md", "build-a-databricks-app/template/index.html", "build-a-databricks-app/template/package.json", "build-a-databricks-app/template/server/databricks.mjs", "build-a-databricks-app/template/server/index.mjs", "build-a-databricks-app/template/src/App.jsx", "build-a-databricks-app/template/src/api.js", "build-a-databricks-app/template/src/components/ui.jsx", "build-a-databricks-app/template/src/main.jsx", "build-a-databricks-app/template/src/styles.css", "build-a-databricks-app/template/vite.config.js", "build-a-pipeline/SKILL.md", "build-tagged-assets/SKILL.md", "how-this-workspace-works/SKILL.md", "my-projects/SKILL.md", "onboard-me/SKILL.md", "plan-a-databricks-app/SKILL.md", "start-a-project/SKILL.md", "take-an-app-to-production/SKILL.md", "take-an-app-to-production/ci/github-actions-deploy.yml"])
     error_message = "Every workspace inherits the default skills (and only skill folders, not the README). Got: ${jsonencode(keys(local.genie_skills))}"
   }
   assert {
@@ -203,6 +203,19 @@ run "genie_code_defaults" {
       strcontains(base64decode(local.genie_skills["build-tagged-assets/SKILL.md"]), "TST Default Warehouse")
     )
     error_message = "Placeholders in skills are filled ({WAREHOUSE} = the default warehouse's name)."
+  }
+  assert {
+    condition = (
+      strcontains(local.genie_skill_text["build-a-databricks-app/SKILL.md"], "deploy(prefix=\"tst\"") &&
+      strcontains(local.genie_skill_text["build-a-databricks-app/SKILL.md"], "tags=${jsonencode(local.chargeback_tags)}") &&
+      strcontains(local.genie_skill_text["build-a-databricks-app/SKILL.md"], "`tst-app-<name>`") &&
+      length(regexall("\\{(PREFIX|prefix|WAREHOUSE|WORKSPACE_TAGS_JSON)\\}", local.genie_skill_text["build-a-databricks-app/SKILL.md"])) == 0
+    )
+    error_message = "The app skill gets this workspace's lower-case prefix ({prefix}) and its tags as JSON ({WORKSPACE_TAGS_JSON})."
+  }
+  assert {
+    condition     = local.genie_skills["build-a-databricks-app/template/server/databricks.mjs"] == filebase64("${var.defaults_dir}/genie-code/skills/build-a-databricks-app/template/server/databricks.mjs")
+    error_message = "The starter's code is deployed as it is: only Markdown gets its placeholders filled."
   }
   assert {
     condition = (

@@ -151,28 +151,49 @@ class PersonalSchema(unittest.TestCase):
     def test_more_time_moves_its_expiry_out_by_the_days_asked(self):
         import datetime as dt
         mine = {"cd_tmp_x": {"cd_user": "a@contoso.com", "cd_schema_kind": "temporary", "cd_expires": (dt.date.today() + dt.timedelta(days=2)).isoformat()}}
-        sql, result = run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "extend", "days": "7"}, mine)
-        until = (dt.date.today() + dt.timedelta(days=9)).isoformat()
+        sql, result = run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "extend", "days": "30"}, mine)
+        until = (dt.date.today() + dt.timedelta(days=32)).isoformat()
         self.assertEqual(sql, [f"ALTER SCHEMA `fin_citizen_dev`.`cd_tmp_x` SET TAGS ('cd_expires' = '{until}')"], "from its current date; nothing else")
         self.assertEqual((result["action"], result["expires"]), ("extend", until))
 
+    def test_an_extension_asked_for_before_it_was_30_days_still_runs(self):
+        import datetime as dt
+        mine = {"cd_tmp_x": {"cd_user": "a@contoso.com", "cd_schema_kind": "temporary", "cd_expires": (dt.date.today() + dt.timedelta(days=2)).isoformat()}}
+        _, result = run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "extend", "days": "7"}, mine)
+        self.assertEqual(result["expires"], (dt.date.today() + dt.timedelta(days=9)).isoformat(), "a 7-day request waiting at the upgrade, approved after it")
+
     def test_more_time_is_only_for_a_temporary_schema_of_theirs(self):
         for params, schemas, message in (
-                ({"days": "7", "action": "extend"}, {}, "not a temporary schema of"),
-                ({"days": "7", "action": "extend"}, {"cd_tmp_x": {"cd_user": "bo@contoso.com", "cd_schema_kind": "temporary"}}, "not a@contoso.com's"),
-                ({"action": "extend", "days": "7"}, {"cd_tmp_x": {"cd_user": "a@contoso.com", "cd_schema_kind": "project"}}, "already a project schema"),
-                ({"days": "3", "action": "extend"}, {}, "days is 7"),
+                ({"days": "30", "action": "extend"}, {}, "not a temporary schema of"),
+                ({"days": "30", "action": "extend"}, {"cd_tmp_x": {"cd_user": "bo@contoso.com", "cd_schema_kind": "temporary"}}, "not a@contoso.com's"),
+                ({"action": "extend", "days": "30"}, {"cd_tmp_x": {"cd_user": "a@contoso.com", "cd_schema_kind": "project"}}, "already a project schema"),
+                ({"days": "14", "action": "extend"}, {}, "days is 30"),
                 ({"action": "convert"}, {}, "action is extend, hold, release or empty"),   # keeping it: not offered for now
                 ({"action": "hold"}, {}, "names the request it is for")):
             with self.subTest(params=params), self.assertRaisesRegex(ValueError, message):
                 run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", **params}, schemas)
         with self.assertRaisesRegex(ValueError, "is for a temporary schema"):
-            run({"user": "a@contoso.com", "schema": "sales", "action": "extend", "days": "7"})
+            run({"user": "a@contoso.com", "schema": "sales", "action": "extend", "days": "30"})
 
     def test_an_old_personal_schema_made_temporary_gets_more_time_by_its_name(self):
         mine = {"cd_a": {"cd_user": "a@contoso.com", "cd_schema_kind": "temporary", "cd_expires": "2099-01-01", "cd_converted_from": "personal"}}
-        sql, _ = run({"user": "a@contoso.com", "schema": "cd_a", "temporary": "true", "action": "extend", "days": "7"}, mine)
-        self.assertTrue(sql[0].startswith("ALTER SCHEMA `fin_citizen_dev`.`cd_a` SET TAGS ('cd_expires' = '2099-01-08')"))
+        sql, _ = run({"user": "a@contoso.com", "schema": "cd_a", "temporary": "true", "action": "extend", "days": "30"}, mine)
+        self.assertTrue(sql[0].startswith("ALTER SCHEMA `fin_citizen_dev`.`cd_a` SET TAGS ('cd_expires' = '2099-01-31')"))
+
+    def test_only_the_named_accounts_make_temporary_schemas_their_owner_extends_them(self):
+        prefix = {"temporary_account_prefix": "azure-"}
+        with self.assertRaisesRegex(ValueError, "an account whose email starts with azure-, not a@contoso.com"):
+            run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true"}, config=prefix)
+        mine = {"cd_tmp_x": {"cd_user": "a@contoso.com", "cd_schema_kind": "temporary", "cd_expires": "2099-01-01"}}
+        _, result = run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "extend", "days": "30"}, mine, config=prefix)
+        self.assertEqual(result["action"], "extend", "made before the check with a regular account: its owner extends it")
+        with self.assertRaisesRegex(ValueError, "not a@contoso.com's"):
+            run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "extend", "days": "30"},
+                {"cd_tmp_x": {**mine["cd_tmp_x"], "cd_user": "azure-a@contoso.com"}}, config=prefix)
+        _, result = run({"user": "Azure-A@contoso.com", "schema": "cd_tmp_x", "temporary": "true"}, config=prefix)
+        self.assertTrue(result["created"], "its own account (any case)")
+        _, result = run({"user": "a@contoso.com", "schema": "sales", "reason": "Monthly sales reporting."}, config=prefix)
+        self.assertEqual(result["kind"], "project", "other schemas: any account")
 
     def test_a_temporary_schema_can_never_be_given_sharing_rights(self):
         for rights in (["SELECT", "MANAGE"], ["ALL_PRIVILEGES"]):

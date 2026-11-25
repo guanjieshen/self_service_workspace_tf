@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 # Every kind of request, as approvers read it (the database's kinds).
 TYPES = {"personal_schema": "Personal schema", "project_schema": "Project schema", "team_schema": "Team schema", "temporary_schema": "Temporary schema",
          "temporary_extension": "More time for a temporary schema", "temporary_conversion": "Temporary schema to keep as a project schema",
-         "folder": "Workspace folder"}
+         "folder": "Workspace folder", "domain": "Domain", "workspace_group": "Group added to the workspace"}
 WAITING = ("submitted", "replied", "needs_info")   # states in which a request that needs a person waits
 
 
@@ -42,9 +42,9 @@ class LakebaseStore:
     def _record(self, row, events=None):
         status = self._status(row)
         d = row.get("decision")
-        return {"id": row["id"], "kind": "folder" if row["kind"] == "folder" else "schema", "type": TYPES[row["kind"]],
+        return {"id": row["id"], "kind": row["kind"] if row["kind"] in ("folder", "domain", "workspace_group") else "schema", "type": TYPES[row["kind"]],
                 "name": row["name"], "workspace": row["workspace"], "bu": row["bu"], "requested_by": row["requested_by"],
-                "owner_group": row["owner_group"], "reason": row["reason"] or "", "days": row.get("days"),
+                "owner_group": row["owner_group"], "reason": row["reason"] or "", "days": row.get("days"), "details": row.get("details") or {},
                 "submitted": row["created_at"].replace(tzinfo=None),
                 "status": status,
                 "run": row["run"], "run_url": self.run_link(row["workspace"], row["kind"], (row["run"] or {}).get("run_id")),

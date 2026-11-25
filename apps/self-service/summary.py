@@ -11,7 +11,8 @@ import json
 
 API = "/ai-gateway/mlflow/v1/chat/completions"
 KINDS = {"personal_schema": "personal schema", "project_schema": "project schema", "team_schema": "team schema",
-         "temporary_schema": "temporary schema", "temporary_extension": "more time for a temporary schema", "folder": "workspace folder"}
+         "temporary_schema": "temporary schema", "temporary_extension": "more time for a temporary schema", "folder": "workspace folder",
+         "domain": "domain (a team with its own warehouse, budget policy and folder)", "workspace_group": "group to share folders with (no access of its own)"}
 
 PROMPT = """You help a data platform approver at a large company decide a self-service request
 for a Databricks schema or workspace folder. Approvers check that the request is real work,

@@ -72,8 +72,8 @@ class Builds(unittest.TestCase):
         config, approvals = self.read(out / "self-service/config.json"), self.read(out / "approvals/config.json")
         self.assertEqual(approvals, {**config, "mode": "approvals"})
         self.assertEqual(config["workspaces"], [
-            {"name": "fin-citizen-dev", "bu": "FIN", "host": "https://adb-2000000000000002.2.azuredatabricks.net", "id": "2000000000000002", "catalog": "fin_citizen_dev"},
-            {"name": "ops-citizen-dev", "bu": "OPS", "host": "https://adb-3000000000000003.3.azuredatabricks.net", "id": "3000000000000003", "catalog": "ops_citizen_dev"}])
+            {"name": "fin-citizen-dev", "bu": "FIN", "host": "https://adb-2000000000000002.2.azuredatabricks.net", "id": "2000000000000002", "catalog": "fin_citizen_dev", "domains": []},
+            {"name": "ops-citizen-dev", "bu": "OPS", "host": "https://adb-3000000000000003.3.azuredatabricks.net", "id": "3000000000000003", "catalog": "ops_citizen_dev", "domains": []}])
         self.assertEqual(config["database"]["host"], "ep-example-1.database.canadacentral.azuredatabricks.net")
         self.assertTrue(config["links"]["discover"].startswith("{host}/"), "the app fills in each person's own workspace, not the hub's")
         self.assertEqual(config["ai"], {"model": app_build.ai_model(self.s["app"])}, "one model for every AI feature (an older app.yaml: ai_summary)")
@@ -156,13 +156,33 @@ class Builds(unittest.TestCase):
                 (lambda s: s["database"].update(readers=["x; DROP TABLE y"]), "database.readers"),
                 (lambda s: s["app_ids"].update(self_service="not-an-id"), "app_ids"),
                 (lambda s: s["app"].update(bu_lookup={"function": "a.b.c"}), "warehouse_id"),
-                (lambda s: s["adopt"].update(database="cd-self-service"), "adopt.database")):
+                (lambda s: s["adopt"].update(database="cd-self-service"), "adopt.database"),
+                (lambda s: s["jobs"].update(temporary_schema={"account_prefix": "azure- ; drop"}), "temporary_schema.account_prefix"),
+                (lambda s: s["app"].update(persona_notes={"admin": "x"}), "persona_notes"),
+                (lambda s: s["app"].update(persona_notes={"builder": "x" * 301}), "persona_notes")):
             with self.subTest(setting=setting):
                 bad = json.loads(json.dumps(self.s))
                 change(bad)
                 with self.assertRaises(SystemExit) as e:
                     app_build.check(bad)
                 self.assertIn(setting, str(e.exception))
+
+    def test_domains_nest_in_file_order_for_the_domain_form(self):
+        tree = app_build.domain_tree({"irm": {"subdomains": {"asset_integrity": {"subdomains": {"pipelines": None}}}}, "eam": {}})
+        self.assertEqual(tree, [
+            {"key": "irm", "label": "IRM", "depth": 0},
+            {"key": "irm.asset_integrity", "label": "IRM / ASSET INTEGRITY", "depth": 1},
+            {"key": "irm.asset_integrity.pipelines", "label": "IRM / ASSET INTEGRITY / PIPELINES", "depth": 2},
+            {"key": "eam", "label": "EAM", "depth": 0}])
+        self.assertEqual(app_build.domain_tree(None), [])
+
+    def test_the_account_prefix_and_persona_notes_reach_the_app_and_the_job(self):
+        self.s["jobs"]["temporary_schema"] = {**(self.s["jobs"].get("temporary_schema") or {}), "account_prefix": "azure-"}
+        self.s["app"]["persona_notes"] = {"explorer": "Your regular account.", "builder": None}
+        config = app_build.app_config(self.s, self.spokes)
+        self.assertEqual((config["temporary_account_prefix"], config["persona_notes"]), ("azure-", {"explorer": "Your regular account."}))
+        out = app_build.build_jobs(self.s, self.spokes[0], [], root=self.tmp)
+        self.assertIn('temporary_account_prefix = "azure-"', (out / "personal_schema.py").read_text())
 
     def test_the_repositorys_own_settings_load_or_say_what_to_fill_in(self):
         """This repository's hub.yaml is filled in; a release's is blank until set up."""

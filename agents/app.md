@@ -43,14 +43,31 @@ browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py
   has passed: only schemas tagged `cd_managed_by=self_service` and `cd_schema_kind=temporary`
   and named `<prefix>tmp_<name>`, and it reports every one in its run. A run again never changes
   a schema's kind or extends its date.
+- **Requests an admin makes by hand, always** (`portal.ALWAYS_BY_HAND`): **a domain** (`/domain`,
+  kind `domain`) and **a group for sharing folders** (`/group`, kind `workspace_group`). Recorded
+  with their details (migration 009's `details`: a domain's parent) and
+  sent to the approvals app, whose steps say what to change in the workspace's file; approving
+  marks them done. Nothing runs. The domain form's places come from the Databricks Domains API
+  (`Portal.domains`: `/api/2.0/domains`, subdomains under their `parent_domain_id`, drafts left
+  out), or from the workspace file's `domains:` (`app_build.domain_tree`) when it cannot be read.
+  **The app's identity needs the `MANAGE DISCOVER` permission** to read the account's domains (the
+  API's rule for callers outside the UI); without it the form offers the workspace file's domains.
+- **Request a domain is a preview for now** (`Card(..., preview=True)`: Coming soon, its form opens
+  with the submit disabled, and `POST /domain` is refused). Remove `preview=True` to take it live:
+  the request, its details and the approver's steps are ready.
+- **Persona notes** (`self_service_app.persona_notes`): a line under each access level on the
+  workspace access page, for example which account to ask with.
 - **Temporary schemas replace personal ones** (the card and `/schema` are gone; `/schema`
-  redirects). On their temporary schema a person may **extend it** (7 days,
-  `portal.EXTENSION_DAYS`): kind `temporary_extension` (migration 008, with the request's `days`),
-  always for an approver (`portal.ALWAYS_APPROVED`). Approved, the schema job runs with
-  `action=extend` (adds the days to `cd_expires`). **Keeping one as a project schema is not offered
+  redirects). On their temporary schema a person may **extend it** (30 days,
+  `portal.EXTENSION_DAYS`, as often as they like): kind `temporary_extension` (migration 008, with the
+  request's `days`), straight away unless `app.yaml human_approval` lists it. The schema job runs
+  with `action=extend` (adds the days to `cd_expires`), at once or once approved. **Keeping one as a project schema is not offered
   for now** (it may need a rename): migration 008's `temporary_conversion` kind stays, unused. The app reads the schema's tags from Unity Catalog (`Portal.temporary_schema`,
   the entity tag assignments API), so the card, the form and the reminder (every page, 3 days or
-  fewer: `main.expiring`) follow an extension. **A request waiting for an approver holds its
+  fewer: `main.expiring`) follow an extension. **Which accounts may make one:**
+  `jobs.temporary_schema.account_prefix` (for example `azure-`): the form says which account to sign in
+  with (`Portal.check_temporary_account`), and the job refuses others. **Extending one is for its owner**
+  (the job checks `cd_user`), with the account that made it, so one made before the check keeps working. **A request waiting for an approver holds its
   schema:** sent, the job tags it `cd_pending_request` (`action=hold`); the cleanup never deletes a
   held schema; approved, the tag goes with the change; rejected, `Portal.release_hold` runs the job
   with `action=release`. How many temporary schemas a person may have is Settings > Schemas

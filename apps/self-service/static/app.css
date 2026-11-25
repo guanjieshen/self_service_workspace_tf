@@ -347,6 +347,10 @@ main > .callout { margin-bottom: var(--s4); }
 .option.is-soon .meta, .option.is-soon .checks { color: var(--text-3); }
 .option-head { display: flex; flex-direction: column; }
 .option-head .soon { align-self: flex-start; margin-top: var(--s2); }
+.option-note { display: flex; gap: var(--s2); align-items: flex-start; margin-top: var(--s3); padding: var(--s2) var(--s3);
+  background: var(--hover); border: 1px solid var(--border); border-radius: var(--r-sm); color: var(--text-2); font-size: var(--text-sm); }
+.option-note .icon { flex: none; margin-top: 3px; color: var(--text-3); }
+.nowrap { white-space: nowrap; }
 @media (max-width: 760px) { .options { grid-template-columns: 1fr; } }
 
 /* ---- Page loading: a thin bar at the top while the next page loads (app.js) ---- */

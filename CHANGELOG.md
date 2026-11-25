@@ -10,6 +10,55 @@ is left alone.
 
 ## Unreleased
 
+- **Five new Genie Code skills with this organization's rules for building**, and the workspace's
+  design rules in the default instructions. They don't repeat what Genie Code already knows
+  (finding tables, writing pipelines, building dashboards):
+  - **start-a-project**: the front door for anything bigger than a quick question. It finds the
+    data, checks the person's persona allows each part, splits the work into parts and sets up the
+    project: its name `<prefix>-<project>`, its folder, its APPID, its README.md and AGENTS.md.
+  - **build-a-pipeline**: serverless with the usage policy, triggered on a schedule they choose,
+    the temporary schema then the permanent one, Unity Catalog secrets.
+  - **build-a-dashboard-or-genie-space**: the shared warehouse, each viewer's own credentials,
+    shared with groups, tagged.
+  - **ask-tis**: works out what someone needs, then sends them to the right place: the
+    self-service app, a table's owner, or a request to TIS ready to send. Records it in the project.
+  - **my-projects**: what someone made, an app's `LEAVE_ON` tag, removing a project cleanly.
+
+  Also: **build-tagged-assets** uses a project's own APPID and tags apps, dashboards and Genie
+  spaces themselves. The default instructions state the workspace's design rules (personas,
+  schemas from the self-service app, access managed centrally, share with groups), and with
+  **how-this-workspace-works** and **onboard-me** describe temporary and permanent schemas instead
+  of personal ones (no longer offered).
+  **The first plan after an upgrade:** in every workspace, five new skill files and four changed
+  files under `/Workspace/.assistant/`.
+  **Baseline edits:** copy the new folders under `config/defaults/genie-code/skills/` (ask-tis,
+  build-a-dashboard-or-genie-space, build-a-pipeline, my-projects, start-a-project), and the
+  framework's `instructions.md`, `build-tagged-assets`, `how-this-workspace-works` and
+  `onboard-me` skills if you haven't changed yours.
+
+- **Genie Code skills to build web apps** (default skills, in every workspace), for people who know
+  their business but aren't software engineers:
+  - **`plan-a-databricks-app`** interviews them in plain words (the work today, the people, the
+    decision the app helps with, the data) and suggests a dashboard or a Genie space when that
+    serves them better; its brief goes to:
+  - **`build-a-databricks-app`**: a tested React starter (a Node server for the SQL warehouse and
+    Lakebase, shared components, design tokens, an `AGENTS.md` and a `README.md` it fills in) and
+    `deploy_app.py` (`new_app`, `deploy`, `remove`) run from a notebook. The standards it applies:
+    the name `<prefix>-app-<name>` for the app and its database; the person's default usage policy
+    on both; the default warehouse; queries run as the signed-in person; Lakebase at its smallest
+    size, suspended after 5 idle minutes; the app and its database tagged with the workspace's tags
+    and `APP`, `OWNER`, `CREATED_WITH`, and the app with `LEAVE_ON` (`true` or `false`, asked each
+    time: `false` lets it be turned off when it isn't needed). Every app also gets its
+    `databricks.yml`: the app and its database as a Databricks Asset Bundle.
+  - **`take-an-app-to-production`** binds the app and its database to that bundle (nothing
+    recreated, no data lost), sets production tags and permissions, and, with a repository, adds a
+    GitHub Actions workflow (`ci/github-actions-deploy.yml`) that checks pull requests and deploys
+    on merge.
+  New Genie Code placeholders: `{prefix}` (the prefix, lower case) and `{WORKSPACE_TAGS_JSON}`.
+  **The first plan after an upgrade:** in every workspace, the three skills' files and the
+  instructions' one new line. **Baseline edits:** copy the three skill folders from the
+  framework's `config/defaults/genie-code/skills/` (an upgrade never copies baseline files), and
+  the line in `config/defaults/genie-code/instructions.md` that names them.
 - **Each workspace's catalog is tagged with its business unit, as a governed tag:**
   `business_unit` = the workspace's prefix (for example `gtm`, `gds`). The tag is account-wide,
   so the self-service hub's workspace creates it, with every workspace's prefix as its allowed
@@ -24,6 +73,37 @@ is left alone.
   admins can, unless an account admin turned it off).
   **Baseline edits:** add the new file `config/defaults/governed-tags.yaml` (copy the
   framework's): an upgrade never copies new baseline files, and without it nothing is tagged.
+- **More time for a temporary schema runs straight away, and adds 30 days.** It no longer waits for
+  an approver, and a person may extend as often as they need. To put an approver back, add
+  `temporary_extension` to `human_approval` in `config/self-service/app.yaml`. A 7-day request still
+  waiting for an approver at the upgrade keeps working: approved, it adds its 7 days.
+- **Who may make temporary schemas** (`jobs.temporary_schema.account_prefix` in `app.yaml`, for
+  example `azure-` for admin accounts): the form tells someone signed in with another account which
+  one to use, the catalog's tile is greyed out for them, and the schema job refuses it. `null` (the default) = any account. Extending one is for
+  its owner, with the account that made it: a temporary schema made before the check, with a regular
+  account, is still extended by its owner.
+- **A note under each access level** on the Request workspace access page
+  (`self_service_app.persona_notes` in `app.yaml`), for example which account to ask with; an access
+  level that is Coming soon shows an Unavailable button.
+- **Add a group to your workspace** (was a Coming soon link): a form in the app, approval required,
+  for sharing workspace folders with the group. It asks for the workspace, the Entra ID group and why; a platform admin adds it to the workspace file's
+  `sharing_groups` (no entitlements: only something to share folders with) and approves it.
+  `links.group_request` in `app.yaml` is no longer used: remove it.
+- **Request a domain (Coming soon),** in the catalog's Data section: a new card whose short form opens as a preview and sends
+  nothing yet (`preview=True` in `cards.py`; removing it takes the form live, approval required): its name, where it goes (a
+  new domain, or a subdomain under any of the account's Databricks domains, from the Domains API;
+  the workspace file's `domains:` when it cannot be read: the self-service app's identity needs
+  `MANAGE DISCOVER` to read them), and why. A platform admin asks for anything else (its
+  application ID, its groups), declares it in the workspace's file and approves it: nothing runs
+  from the app.
+- **One card and form for project and team schemas: Request a permanent schema** (`/schema/permanent`).
+  The team's Entra group is optional: without it, a project schema; with it, a team schema the
+  group manages too. Both kinds, their approval (`human_approval`) and the job are unchanged; the
+  old `/schema/project` and `/schema/team` links open the new form. Settings > Help links has one
+  SOP for it (the project schema's, now labelled Permanent schema); the team schema's SOP setting is gone.
+- **Upgrading:** add `persona_notes` and `jobs.temporary_schema.account_prefix` to your `app.yaml`
+  (both off as `null`; see the framework's). The next deploy changes the apps and the schema jobs,
+  and runs database migration `009` (two new kinds of request, and a `details` column).
 
 ## 1.1.4
 

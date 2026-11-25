@@ -104,3 +104,9 @@
   {% endfor %}
 </ol>
 {%- endmacro -%}
+
+{#- A temporary schema needs an account whose email starts with app.yaml jobs.temporary_schema.account_prefix: which one to use. -#}
+{%- macro wrong_account(account, user, what) -%}
+{% call callout("warning", role="alert") %}{{ what }} with your <span class="strong">{{ account.prefix }}</span> account. You're signed in as
+  <span class="mono">{{ user }}</span>: sign in with the account whose email starts with <span class="mono">{{ account.prefix }}</span>, then come back.{% endcall %}
+{%- endmacro -%}
