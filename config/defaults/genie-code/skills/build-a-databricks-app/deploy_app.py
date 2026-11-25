@@ -5,17 +5,16 @@ In a notebook (serverless), as the person building the app:
     import sys; sys.path.append("/Workspace/.assistant/skills/build-a-databricks-app")
     from deploy_app import new_app, deploy, remove
     new_app("/Workspace/Users/me@example.com/apps/gtm-app-well-tracker")   # a new app: the starter, once
-    deploy(prefix="gtm", name="well-tracker", folder=..., description=..., warehouse=..., tags={...})
+    deploy(prefix="gtm", name="well-tracker", folder=..., description=..., warehouse=..., leave_on=False, tags={...})
     remove(prefix="gtm", name="well-tracker")                               # the app, its database and its data
 
 Safe to run again: what exists is updated, never made twice. The standards it applies: the name
 <prefix>-app-<name> for the app and its database; the creator's default usage policy on both;
-Lakebase at its smallest size, suspended after 5 idle minutes, tagged with the workspace's tags
-and APP, OWNER, CREATED_WITH and EXPIRES (30 days after the last deploy); queries run as the
-signed-in person.
+Lakebase at its smallest size, suspended after 5 idle minutes; both tagged with the workspace's tags
+and APP, OWNER, CREATED_WITH, and the app with LEAVE_ON (false: it may be turned off when it isn't
+needed); queries run as the signed-in person.
 """
 import base64
-import datetime
 import json
 import os
 import re
@@ -124,10 +123,37 @@ def _warehouse(wanted):
 
 
 def _tags(name, tags):
-    """The workspace's tags, then the app's own: who it belongs to, and until when it is needed."""
+    """The workspace's tags, then the app's own: what it is, who it belongs to, how it was made."""
     return {**{k: str(v) for k, v in (tags or {}).items() if v not in (None, "")},
-            "APP": name, "OWNER": _client().current_user.me().user_name, "CREATED_WITH": "genie-code",
-            "EXPIRES": (datetime.date.today() + datetime.timedelta(days=30)).isoformat()}
+            "APP": name, "OWNER": _client().current_user.me().user_name, "CREATED_WITH": "genie-code"}
+
+
+def _tag_app(name, tags):
+    """The app's own tags (workspace entity tags), each set to its value: added, or replaced when it
+    changed. Reads lag a few seconds behind writes, so an add that finds the tag still there waits and
+    tries again, as does one that collides with a change still in progress. A tag the workspace refuses (for example a governed one) is a warning, not a failure."""
+    base = f"/api/2.0/entity-tag-assignments/apps/{name}/tags"
+    have = {a["tag_key"]: a.get("tag_value") for a in (_get(base) or {}).get("tag_assignments", [])}
+    for key, value in tags.items():
+        if have.get(key) == value:
+            continue
+        try:
+            for attempt in range(8):
+                try:
+                    if key in have or attempt:
+                        try:
+                            _do("DELETE", f"{base}/{urllib.parse.quote(key)}")
+                        except NotFound:
+                            pass
+                    _do("POST", "/api/2.0/entity-tag-assignments",
+                        body={"entity_type": "apps", "entity_id": name, "tag_key": key, "tag_value": value})
+                    break
+                except Exception as e:   # the last write not visible yet, or one still in progress
+                    if not re.search(r"already exists|[Cc]oncurrent|retry", str(e)) or attempt == 7:
+                        raise
+                    time.sleep(5)
+        except Exception as e:
+            print(f"Warning: could not tag the app {key}={value}: {e}")
 
 
 def _ensure_database(name, description, tags):
@@ -250,9 +276,13 @@ def _deployment_done(name, deployment_id):
 
 # ---- What the skill calls ----
 
-def deploy(prefix, name, folder, description, warehouse, tags=None, lakebase=True):
-    """Make or update the app (and its Lakebase database), then deploy folder. Returns what was made."""
+def deploy(prefix, name, folder, description, warehouse, leave_on, tags=None, lakebase=True):
+    """Make or update the app (and its Lakebase database), then deploy folder. Returns what was made.
+    leave_on: ask the person each time. True keeps it running; False lets it be turned off when unused."""
     full = app_name(prefix, name)
+    if not isinstance(leave_on, bool):
+        raise ValueError("leave_on: True (keep it running all the time) or False (it may be turned off when it "
+                         "isn't needed). Ask the person which.")
     folder = folder.rstrip("/")
     if not os.path.exists(os.path.join(folder, "package.json")):
         raise FileNotFoundError(f"{folder} has no package.json: run new_app() first")
@@ -268,6 +298,7 @@ def deploy(prefix, name, folder, description, warehouse, tags=None, lakebase=Tru
         endpoint, database = _ensure_database(full, description, all_tags)
         resources.append(database)
     app = _ensure_app(full, description, resources)
+    _tag_app(full, {**all_tags, "LEAVE_ON": str(leave_on).lower()})
     policy = app.get("effective_usage_policy_id") or app.get("effective_budget_policy_id")
     if not policy:
         print("Warning: no usage policy applies to you, so this app's costs are not charged to your business unit. "
@@ -283,7 +314,7 @@ def deploy(prefix, name, folder, description, warehouse, tags=None, lakebase=Tru
     done = _wait("the deployment", lambda: _deployment_done(full, dep["deployment_id"]), 20)
     app = _do("GET", f"/api/2.0/apps/{full}")
     out = {"app": full, "url": app.get("url"), "deployment": done["status"]["state"], "message": done["status"].get("message", ""),
-           "logs": f"{app.get('url')}/logz", "database": endpoint, "usage_policy": policy,
+           "logs": f"{app.get('url')}/logz", "leave_on": leave_on, "database": endpoint, "usage_policy": policy,
            "queries_run_as": "the signed-in person" if app.get("effective_user_api_scopes") else "the app"}
     print(json.dumps(out, indent=1))
     if done["status"]["state"] != "SUCCEEDED":

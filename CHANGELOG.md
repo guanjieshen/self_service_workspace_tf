@@ -20,8 +20,9 @@ is left alone.
     `deploy_app.py` (`new_app`, `deploy`, `remove`) run from a notebook. The standards it applies:
     the name `<prefix>-app-<name>` for the app and its database; the person's default usage policy
     on both; the default warehouse; queries run as the signed-in person; Lakebase at its smallest
-    size, suspended after 5 idle minutes, tagged with the workspace's tags and `APP`, `OWNER`,
-    `CREATED_WITH` and `EXPIRES` (30 days after the last deploy). Every app also gets its
+    size, suspended after 5 idle minutes; the app and its database tagged with the workspace's tags
+    and `APP`, `OWNER`, `CREATED_WITH`, and the app with `LEAVE_ON` (`true` or `false`, asked each
+    time: `false` lets it be turned off when it isn't needed). Every app also gets its
     `databricks.yml`: the app and its database as a Databricks Asset Bundle.
   - **`take-an-app-to-production`** binds the app and its database to that bundle (nothing
     recreated, no data lost), sets production tags and permissions, and, with a repository, adds a

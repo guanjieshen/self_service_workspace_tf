@@ -62,7 +62,7 @@ In a notebook (serverless):
 import sys; sys.path.append("/Workspace/.assistant/skills/build-a-databricks-app")
 from deploy_app import deploy, remove
 deploy(prefix="<prefix>", name="<name>", folder="<the folder>", description="<the description>",
-       warehouse="<the warehouse>", tags=<the tags>, lakebase=<True or False>)
+       warehouse="<the warehouse>", leave_on=<True or False: ask>, tags=<the tags>, lakebase=<True or False>)
 remove(prefix="<prefix>", name="<name>")   # deletes the app and its data
 ```
 

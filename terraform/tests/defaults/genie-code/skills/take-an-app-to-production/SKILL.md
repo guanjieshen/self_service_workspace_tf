@@ -44,7 +44,7 @@ The plan must say **0 to add, 0 to change**: the bundle describes what exists. A
 
 Edit `databricks.yml` (it's the app's definition now), then show them the diff:
 
-- **Tags:** remove `EXPIRES` (a production app is kept) and set `OWNER` to the team's group or mailbox, not one person.
+- **Tags:** set `OWNER` to the team's group or mailbox, not one person. Ask whether it should be left on (people rely on it every day: usually yes) and set the app's `LEAVE_ON` tag to it: run `deploy()` once more with `leave_on=True` **before** this step (it is the last time `deploy()` runs), or change the tag with the entity tags API.
 - **Who can use it:** under the app, add `permissions:` with the group of its users (`level: CAN_USE`) and its owners (`level: CAN_MANAGE`), as Entra ID groups.
 - **AGENTS.md:** add "In production since <date>: change it through its bundle (and Git), never with deploy()" and a line in Changes.
 

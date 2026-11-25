@@ -27,6 +27,7 @@ If they describe a problem rather than an app ("our inspections live in spreadsh
 | **Its screens and actions** | Two to four screens to start, as tabs |
 | **Its name** | It becomes **`{prefix}-app-<name>`** (lowercase letters, digits and dashes; 30 characters in all): write the full name |
 | **Where its code goes** | `/Workspace/Users/<their email>/apps/{prefix}-app-<name>` |
+| **Leave it on?** No (suggested), or yes | **No:** it may be turned off when it isn't needed, and costs less. **Yes:** it runs all the time, for an app people rely on every day. Ask each time: it's the app's `LEAVE_ON` tag |
 
 ## 2. Start: a new app, or the one that exists
 
@@ -56,10 +57,11 @@ Change `server/index.mjs` and `src/`, following the rules in the starter's `AGEN
 ```python
 deploy(prefix="{prefix}", name="<name>", folder="<the folder>",
        description="<what it's for, one sentence>", warehouse="{WAREHOUSE}",
+       leave_on=False,   # their answer: True keeps it running all the time
        tags={WORKSPACE_TAGS_JSON}, lakebase=True)   # lakebase=False when it keeps nothing
 ```
 
-Tell them it takes **5 to 10 minutes** the first time (it prints what it is doing). It applies this workspace's standards for them: the name `{prefix}-app-<name>` for the app and its database; their **default usage policy** on both (so the costs go to their business unit); the default SQL warehouse; the database at its smallest size, paused after 5 minutes unused, tagged with the workspace's tags and `APP`, `OWNER`, `CREATED_WITH: genie-code` and `EXPIRES`. Run it again after every change: it updates, never duplicates, and moves `EXPIRES` 30 days on.
+Tell them it takes **5 to 10 minutes** the first time (it prints what it is doing). It applies this workspace's standards for them: the name `{prefix}-app-<name>` for the app and its database; their **default usage policy** on both (so the costs go to their business unit); the default SQL warehouse; the database at its smallest size, paused after 5 minutes unused; the app and its database tagged with the workspace's tags and `APP`, `OWNER`, `CREATED_WITH: genie-code`, and the app with `LEAVE_ON` (their answer). Run it again after every change: it updates, never duplicates.
 
 It also writes `databricks.yml`: the app and its database as a Databricks Asset Bundle, so it can move into Git and CI/CD when it's ready (the skill **take-an-app-to-production**).
 
@@ -83,7 +85,7 @@ Ask them for the logs: the app's URL + `/logz` (its first line says which settin
 
 ## 6. Remove it
 
-When it's no longer needed (admins may remove it after its `EXPIRES` date), and with their yes, because it deletes the app's data:
+When it's no longer needed, and with their yes, because it deletes the app's data:
 
 ```python
 remove(prefix="{prefix}", name="<name>")

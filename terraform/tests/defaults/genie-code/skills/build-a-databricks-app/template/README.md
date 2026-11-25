@@ -12,7 +12,7 @@ reads only what you already have access to.
 | **Where its data comes from** | <the tables it reads> |
 | **What it keeps** | <what it saves, or "nothing"> |
 | **Owner** | <who to ask, and who can change it> |
-| **Kept until** | <its EXPIRES date>: after that, admins may remove it. Deploying it again keeps it 30 more days. |
+| **Left on** | <yes: it runs all the time / no: it may be turned off when it isn't needed> (its `LEAVE_ON` tag) |
 
 **To change it:** open this folder in Databricks and ask Genie Code (it uses the skill
 **build-a-databricks-app** and this folder's `AGENTS.md`).
