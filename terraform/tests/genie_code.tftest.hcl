@@ -38,7 +38,7 @@ run "default_plus_workspace" {
     error_message = "A workspace's genie_code_instructions are appended after the default instructions."
   }
   assert {
-    condition     = tolist(keys(local.genie_skills)) == tolist(["build-tagged-assets/SKILL.md", "how-this-workspace-works/SKILL.md", "onboard-me/SKILL.md"])
+    condition     = tolist(keys(local.genie_skills)) == tolist(["ask-tis/SKILL.md", "build-a-dashboard-or-genie-space/SKILL.md", "build-a-pipeline/SKILL.md", "build-tagged-assets/SKILL.md", "how-this-workspace-works/SKILL.md", "my-projects/SKILL.md", "onboard-me/SKILL.md", "start-a-project/SKILL.md"])
     error_message = "Every workspace gets the baseline's skills, and only those."
   }
 }

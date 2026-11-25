@@ -10,6 +10,24 @@ is left alone.
 
 ## Unreleased
 
+- **Five new Genie Code skills, with this organization's rules for building** (how a project is
+  named, where its tables and folder go, what it is tagged with, when to ask the platform team).
+  They don't repeat what Genie Code already knows (finding tables, writing pipelines, building
+  dashboards): **start-a-project** (the front door for anything bigger than a quick question: it
+  finds the data, splits the work into parts and sets up the project, its name
+  `<prefix>-<project>`, its folder and its APPID), **build-a-pipeline** (serverless, triggered on a
+  schedule, layered tables, Unity Catalog secrets), **build-a-dashboard-or-genie-space** (the
+  shared warehouse, each viewer's own credentials, shared with groups), **ask-tis** (the
+  self-service app first; otherwise a request ready to send, recorded in the project) and
+  **my-projects** (what someone made, an app's `LEAVE_ON` tag, removing a project cleanly).
+  **build-tagged-assets** now uses a project's own APPID and tags apps, dashboards and Genie
+  spaces themselves; the default instructions point to start-a-project.
+  **The first plan after an upgrade:** in every workspace, five new skill files and two changed
+  ones under `/Workspace/.assistant/`.
+  **Baseline edits:** copy the new folders under `config/defaults/genie-code/skills/` (ask-tis,
+  build-a-dashboard-or-genie-space, build-a-pipeline, my-projects, start-a-project), and the
+  framework's `build-tagged-assets/SKILL.md` and `instructions.md` if you haven't changed yours.
+
 - **Each workspace's catalog is tagged with its business unit, as a governed tag:**
   `business_unit` = the workspace's prefix (for example `gtm`, `gds`). The tag is account-wide,
   so the self-service hub's workspace creates it, with every workspace's prefix as its allowed

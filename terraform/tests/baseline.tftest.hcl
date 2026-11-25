@@ -194,7 +194,7 @@ run "genie_code_defaults" {
     error_message = "Comments are removed and placeholders filled."
   }
   assert {
-    condition     = tolist(keys(local.genie_skills)) == tolist(["build-tagged-assets/SKILL.md", "how-this-workspace-works/SKILL.md", "onboard-me/SKILL.md"])
+    condition     = tolist(keys(local.genie_skills)) == tolist(["ask-tis/SKILL.md", "build-a-dashboard-or-genie-space/SKILL.md", "build-a-pipeline/SKILL.md", "build-tagged-assets/SKILL.md", "how-this-workspace-works/SKILL.md", "my-projects/SKILL.md", "onboard-me/SKILL.md", "start-a-project/SKILL.md"])
     error_message = "Every workspace inherits the default skills (and only skill folders, not the README). Got: ${jsonencode(keys(local.genie_skills))}"
   }
   assert {
