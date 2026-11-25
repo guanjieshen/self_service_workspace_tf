@@ -21,9 +21,6 @@ self_service_app:
   links:
     wiki: null                           # header link to the platform's wiki
     go_link: null                        # a short link to the app, shown on each page (for example go/cd-self-service)
-    # Where people ask for an Entra group to be added to their workspace with a persona (for
-    # example a ServiceNow form): the Add a group card. null = the card shows as Coming soon.
-    group_request: null
     # Where people review data access requests in Databricks: the ones they made, and the ones
     # others made for their data (Catalog Explorer's requests view). {host} and {workspace_id}
     # are the person's own workspace's (their business unit's), not the hub's; or a full URL
@@ -62,8 +59,15 @@ self_service_app:
   approvals:
     name: cd-approvals                 # the app's name (lowercase letters, digits and dashes)
   # The kinds of request a person must approve, in the approvals app, before their job runs
-  # (any of personal_schema, project_schema, team_schema, folder). The others run when asked.
+  # (any of personal_schema, project_schema, team_schema, temporary_extension, folder). The
+  # others run when asked: more time for a temporary schema (temporary_extension) runs straight away.
   human_approval: [project_schema, team_schema]
+  # A short note under each access level on the Request workspace access page, for example which
+  # account to ask with. Text in `backticks` (an address) stays on one line. null = no note.
+  persona_notes:
+    explorer: null                    # for example: Request with your regular account.
+    builder: null                     # for example: Request with your Azure PIM account.
+    publisher: null
   # The AI check of the name and the reason, on the project schema, team schema and folder
   # forms: the app's rules, then the AI model (ai_model, below). Validate shows the requester what is
   # unclear. Advice for the requester only: it never approves, refuses or routes a request
@@ -116,6 +120,9 @@ jobs:
   temporary_schema:                   # a person's short-term schema: <prefix>tmp_<name>, one at a time
     days: 30                          # its cd_expires tag, this many days ahead; the daily cleanup job drops it after
     limit: 1                          # how many each person may have at a time (1 to 10): the default; admins change it in Settings > Schemas
+    # Only accounts whose email starts with this may create one (the form and the job check), for
+    # example azure- for admin accounts; its owner extends it. null = any account.
+    account_prefix: null
     # What the requester may do in it: use it fully, but not share it (never MANAGE or
     # ALL_PRIVILEGES, which let them grant it to others; the build refuses them).
     privileges: [USE_SCHEMA, SELECT, MODIFY, CREATE_TABLE, CREATE_VOLUME, READ_VOLUME, WRITE_VOLUME,

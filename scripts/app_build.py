@@ -51,9 +51,26 @@ def load(config_dir=None, workspaces_dir=None):
                     if not f.stem.startswith("_") and _yaml(f).get("self_service", True) is not False)
     s = {"app": app_file.get("self_service_app") or {}, "jobs": app_file.get("jobs") or {},
          "hub": hub_file.get("hub") or {}, "database": hub_file.get("database") or {},
-         "app_ids": hub_file.get("app_ids") or {}, "adopt": hub_file.get("adopt") or {}, "spokes": spokes}
+         "app_ids": hub_file.get("app_ids") or {}, "adopt": hub_file.get("adopt") or {}, "spokes": spokes,
+         # Each served workspace's domains (its file's domains:, with their subdomains:), for the
+         # Request a domain form's choice of where a new one goes.
+         "domains": {name: domain_tree(_yaml(workspaces_dir / f"{name}.yaml").get("domains")) for name in spokes}}
     check(s)
     return s
+
+
+def domain_tree(domains, parent=()):
+    """[{"key": "irm.integrity", "label": "IRM / INTEGRITY", "depth": 1}, ...]: a workspace file's
+    domains, each followed by its subdomains (subdomains:, nested the same way), in file order."""
+    out = []
+    for name, value in (domains or {}).items() if isinstance(domains, dict) else ():
+        path = (*parent, str(name))
+        out.append({"key": ".".join(path), "label": " / ".join(p.replace("_", " ").upper() for p in path), "depth": len(parent)})
+        out += domain_tree((value or {}).get("subdomains") if isinstance(value, dict) else None, path)
+    return out
+
+
+PERSONAS = ("explorer", "builder", "publisher")
 
 
 def ai_model(app):
@@ -89,6 +106,11 @@ def check(s):
     need(all(isinstance(p, str) and re.fullmatch(r"[A-Z_]+", p) for p in rights) and not {"MANAGE", "ALL_PRIVILEGES"} & set(rights),
          "app.yaml jobs.temporary_schema.privileges: privileges such as SELECT or CREATE_TABLE; never MANAGE or ALL_PRIVILEGES, which let the requester share it.")
     need(re.fullmatch(r"[\w.-]{0,100}", ai_model(app)), "app.yaml self_service_app.ai_model: a model's name (for example system.ai.claude-sonnet-5-5), or null.")
+    need(re.fullmatch(r"[A-Za-z0-9._+-]{0,64}", str((jobs.get("temporary_schema") or {}).get("account_prefix") or "")),
+         "app.yaml jobs.temporary_schema.account_prefix: the start of the email of the accounts that may make temporary schemas (for example azure-), or null.")
+    notes = app.get("persona_notes") or {}
+    need(isinstance(notes, dict) and set(notes) <= set(PERSONAS) and all(v is None or (isinstance(v, str) and len(v) <= 300) for v in notes.values()),
+         f"app.yaml self_service_app.persona_notes: a short note (under 300 characters) for any of {', '.join(PERSONAS)}, or null.")
     need(set(app.get("human_approval") or []) <= set(KINDS), f"app.yaml self_service_app.human_approval lists kinds of request: {', '.join(KINDS)}.")
     need(all(u is None or re.match(r"https?://", u) for u in (app.get("faq") or {}).values()),
          "app.yaml self_service_app.faq: each link starts with https://, or is null for no link.")
@@ -135,7 +157,9 @@ def app_config(s, spokes, mode=None):
         "hub_host": host,   # where the jobs run: an admin's link to a request's run opens there
         "folder_root": s["jobs"].get("folder_root") or "/Workspace",
         "temporary_days": int((s["jobs"].get("temporary_schema") or {}).get("days") or 30),   # what the temporary schema form says
-        "temporary_limit": int((s["jobs"].get("temporary_schema") or {}).get("limit") or 1),   # the default: Settings > Schemas changes it   # where folders go (made by hand for now)
+        "temporary_limit": int((s["jobs"].get("temporary_schema") or {}).get("limit") or 1),
+        "temporary_account_prefix": str((s["jobs"].get("temporary_schema") or {}).get("account_prefix") or ""),   # who may make temporary schemas
+        "persona_notes": {p: v for p, v in (app.get("persona_notes") or {}).items() if v},   # on the workspace access page   # the default: Settings > Schemas changes it   # where folders go (made by hand for now)
         "faq": dict(app.get("faq") or {}),
         "ai_check": str(app.get("ai_check") or "off"),
         "human_approval": list(app.get("human_approval") or []),
@@ -145,7 +169,8 @@ def app_config(s, spokes, mode=None):
         "links": dict(app.get("links") or {}),   # {host}, {workspace_id}, {catalog}: the person's workspace's, filled in by the app
         "onboarding": {"prompt": (app.get("onboarding") or {}).get("prompt") or ""},
         # The workspaces it serves: the business unit is each one's prefix.
-        "workspaces": [{"name": w["name"], "bu": w["bu"], "host": w["host"], "id": w["id"], "catalog": w["catalog"]} for w in spokes],
+        "workspaces": [{"name": w["name"], "bu": w["bu"], "host": w["host"], "id": w["id"], "catalog": w["catalog"],
+                        "domains": (s.get("domains") or {}).get(w["name"], [])} for w in spokes],
         "database": {"host": db.get("host"), "name": "self_service",
                      "endpoint": f"projects/{app['database']['project_id']}/branches/production/endpoints/primary"},
     }
@@ -155,7 +180,7 @@ def app_config(s, spokes, mode=None):
 def render(text, values):
     """A job notebook's text with its settings written in: ${jsonencode(x)}, and the shared
     request record check (off unless requests_catalog is set)."""
-    values = {"requests_catalog": "", "workspace_name": "", "human_approval": [], **values}
+    values = {"requests_catalog": "", "workspace_name": "", "human_approval": [], "temporary_account_prefix": "", **values}
     text = text.replace("${request_record_check}", (NOTEBOOKS / "request_record_check.py").read_text())
     return re.sub(r"\$\{jsonencode\((\w+)\)\}", lambda m: json.dumps(values[m.group(1)]), text)
 
@@ -250,6 +275,7 @@ def build_jobs(s, w, app_ids, root=None):
         "prefix": jobs["personal_schema"]["prefix"], "privileges": jobs["personal_schema"]["privileges"],
         "temporary_days": int((jobs.get("temporary_schema") or {}).get("days") or 30),
         "temporary_privileges": temporary_privileges(jobs),
+        "temporary_account_prefix": str((jobs.get("temporary_schema") or {}).get("account_prefix") or ""),
         "owner": jobs.get("catalog_owner") or "", "allowed_catalogs": [w["catalog"]], **record}))
     (out / "target.yml").write_text(json.dumps(jobs_target(s, w, app_ids), indent=1))
     return out

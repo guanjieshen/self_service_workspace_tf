@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon %}
 {% from "_components.html" import callout %}
+{% set notes = config.persona_notes or {} %}
 {% block content %}
 {% set task_icon, task_name, task_text, task_category = "persona", "Request workspace access", "Choose the access level you need.", "Access" %}
 {% include "_task_header.html" %}
@@ -23,12 +24,18 @@
         {% if not ready %}<span class="access-label">Coming soon</span>{% endif %}
       </div>
       <p class="meta">{{ summary }}</p>
+      {#- app.yaml persona_notes: a short note in a light box, with `code` (an address) kept on one line. -#}
+      {% if notes[key] %}<p class="option-note">{{ icon("info", "icon icon-xs") }}<span>{% for part in notes[key].split("`") %}{% if loop.index is even %}<span class="mono nowrap">{{ part }}</span>{% else %}{{ part }}{% endif %}{% endfor %}</span></p>{% endif %}
     </div>
     <ul class="checks">{% for c in can %}<li>{{ icon("check", "icon icon-xs") }}{{ c }}</li>{% endfor %}</ul>
     {% if ready and href %}
     <div class="option-foot">
-      {% if href %}<a class="button primary" href="{{ href }}" target="_blank" rel="noopener" aria-label="Request {{ name }} access">Request access {{ icon("external", "icon icon-xs") }}</a>
-{% endif %}
+      <a class="button primary" href="{{ href }}" target="_blank" rel="noopener" aria-label="Request {{ name }} access">Request access {{ icon("external", "icon icon-xs") }}</a>
+    </div>
+    {% elif not ready %}
+    {#- Coming soon: the card's foot keeps its place, so every card has the same shape. -#}
+    <div class="option-foot">
+      <button type="button" disabled title="Not offered yet">Unavailable {{ icon("info", "icon icon-xs") }}</button>
     </div>
     {% endif %}
   </div>

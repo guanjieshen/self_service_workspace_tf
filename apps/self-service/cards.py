@@ -7,6 +7,8 @@ To add a card, add one Card to CARDS: its section, title and text, and where it 
   adds: "workspace", "tour"); the card is left out while that link is not set;
 - neither: Coming soon.
 
+A card with href and preview=True shows as Coming soon but opens its page, a form that sends nothing yet.
+
 A link card with soon=True shows as Coming soon until its link is set, instead of being left out.
 A link card's more=(text, link name) is a second, smaller link in its foot, shown when that link is set.
 
@@ -35,6 +37,7 @@ class Card:
     soon: bool = False  # a link card: Coming soon (not left out) while its link is not set
     opens: str = "Opens in Databricks"   # a link card's foot: where it goes, and what it needs
     more: tuple = ()  # a link card's second link: (its text, links.<name>)
+    preview: bool = False  # an href card: Coming soon, but its page opens (a form that sends nothing yet)
 
 
 CARDS = [
@@ -53,19 +56,25 @@ CARDS = [
          "See the requests you made and the ones made for data you manage.", link="review_requests", icon="requests",
          opens="Opens in Databricks · Workspace access required"),
 
+    # The domain card is a preview for now: Coming soon, its form opens but sends nothing. To take it
+    # live, remove preview=True: the form, the request and the approver's steps are ready.
+    Card("domain", "data", "Request a domain",
+         "Give a team its own SQL warehouse, budget policy and folder: a new domain, or a subdomain of one.",
+         href="/domain", preview=True),
+
     Card("temporary_schema", "workspace", "Create a temporary schema",
          "A short-term schema for experiments, tagged with the date it expires.", href="/schema/temporary", icon="schema"),
-    Card("project_schema", "workspace", "Request a project schema",
-         "Create a dedicated schema for your project.", href="/schema/project", icon="schema"),
-    Card("team_schema", "workspace", "Request a team schema",
-         "Create a shared schema your team can manage together.", href="/schema/team", icon="schema"),
+    # One form for a project schema (theirs) and a team schema (theirs and an Entra group's): the group is optional.
+    Card("permanent_schema", "workspace", "Request a permanent schema",
+         "Create a schema for your project, on your own or managed together with your team.", href="/schema/permanent", icon="schema"),
     # Made by hand while its job is not deployed (portal.BY_HAND): a folder is workspace specific, and the hub does not
     # call other workspaces. The request is tracked in the approvals app like any other.
     Card("folder", "workspace", "Request a workspace folder",
          "Create a shared workspace folder and control who can access it.", href="/folder"),
+    # Both made by hand (portal.ALWAYS_BY_HAND): an admin does it in a pull request, then approves it.
     Card("group_request", "workspace", "Add a group to your workspace",
-         "Add an Entra ID group and assign its workspace access level.",
-         link="group_request", icon="group", soon=True, opens="Opens your organization's request form"),
+         "Add an Entra ID group to your workspace so you can share folders with it. It gives no access by itself.",
+         href="/group", icon="group"),
 
     Card("warehouses", "compute", "Manage SQL warehouses", "Create and manage SQL warehouses for your workloads."),
     Card("classic_compute", "compute", "Request classic compute access",
@@ -97,7 +106,7 @@ def groups(links):
                 more = c.more and links.get(c.more[1]) and (c.more[0], links[c.more[1]])
                 shown.append({"card": c, "href": href, "external": True, "ready": True, "more": more or None})
             else:
-                shown.append({"card": c, "href": c.href, "external": False, "ready": bool(c.href), "more": None})
+                shown.append({"card": c, "href": c.href, "external": False, "ready": bool(c.href), "more": None, "preview": c.preview})
         if shown:
             out.append((key, title, shown))
     return out

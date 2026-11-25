@@ -229,7 +229,7 @@ def catalog(request: Request):
     links = {**PORTAL.links_for(user, shown.get("links")), "workspace": "/open" if mine else None,
              "tour": "/open?tour=1" if mine and shown["onboarding"]["prompt"] else None}
     return page(request, "catalog.html", nav="catalog", groups=cards.groups(links),
-                quotas={"temporary_schema": temporary_schema(user)})
+                quotas={"temporary_schema": temporary_schema(user)}, temporary_account=temporary_account(user))
 
 
 @app.get("/schema", include_in_schema=False)
@@ -277,10 +277,16 @@ def schema_submit(request: Request):
     return RedirectResponse("/schema/temporary", status_code=303)   # never a personal schema now
 
 
+def temporary_account(user):
+    """Whether this account may make temporary schemas (app.yaml jobs.temporary_schema.account_prefix),
+    and the prefix, for the form to say which to use."""
+    return {"ok": PORTAL.temporary_account(user), "prefix": CONFIG.get("temporary_account_prefix") or ""}
+
+
 @app.get("/schema/temporary/{action}", response_class=HTMLResponse)
 def temporary_action_form(request: Request, action: str, schema: str = "", days: str = "", reason: str = "", error: str = ""):
-    """More time for one of the person's temporary schemas (portal.EXTENSION_DAYS): a request an
-    approver always decides."""
+    """More time for one of the person's temporary schemas (portal.EXTENSION_DAYS): added straight
+    away, or once an approver approves it (app.yaml human_approval lists temporary_extension)."""
     if action != "extend":   # keeping one as a project schema: not offered for now
         raise HTTPException(404)
     workspaces, why = offered(user_of(request), "personal_schema")
@@ -288,7 +294,8 @@ def temporary_action_form(request: Request, action: str, schema: str = "", days:
     names = [t["name"] for t in have.get("schemas") or []]
     chosen = schema if schema in names else (names[0] if len(names) == 1 else "")
     return page(request, "temporary_action.html", nav="catalog", action=action, have=have, chosen=chosen,
-                workspaces=workspaces, days=days, reason=reason, choices=portal.EXTENSION_DAYS, error=error or why)
+                workspaces=workspaces, days=days, reason=reason, choices=portal.EXTENSION_DAYS, error=error or why,
+                needs_approval=PORTAL.needs_approval("temporary_extension"))
 
 
 @app.post("/schema/temporary/{action}")
@@ -304,24 +311,29 @@ def temporary_action_submit(request: Request, action: str, workspace: str = Form
     return sent(workspace, started)
 
 
-@app.get("/schema/custom", include_in_schema=False)
-def custom_schema(request: Request):
-    """Custom schemas are project schemas now; old links and bookmarks still work."""
-    return RedirectResponse("/schema/project" + (f"?{request.url.query}" if request.url.query else ""), status_code=301)
+@app.get("/schema/permanent", response_class=HTMLResponse)
+def permanent_schema(request: Request, workspace: str = "", name: str = "", owner_group: str = "", reason: str = "", error: str = ""):
+    """A permanent schema: a project schema (the requester's), or with a team's Entra group, a team
+    schema (theirs and the group's). One form; the group is optional."""
+    return named_schema_form(request, "permanent", workspace=workspace, name=name, owner_group=owner_group, reason=reason, error=error)
 
 
 @app.get("/schema/{kind}", response_class=HTMLResponse)
 def named_schema_form(request: Request, kind: str, workspace: str = "", name: str = "", owner_group: str = "", reason: str = "", error: str = ""):
     """A project schema (the requester's), a team schema (theirs and an Entra group's, typed in:
     the hub cannot see a person's groups in their workspace, so membership is not checked), or a
-    temporary schema (theirs, for a while: one at a time)."""
-    if kind not in ("project", "team", "temporary"):
+    temporary schema (theirs, for a while: one at a time). Project and team schemas share one form,
+    the permanent schema's: their old addresses open it."""
+    if kind in ("project", "team", "custom"):
+        return RedirectResponse("/schema/permanent" + (f"?{request.url.query}" if request.url.query else ""), status_code=301)
+    if kind not in ("permanent", "temporary"):
         raise HTTPException(404)
     workspaces, why = offered(user_of(request), "personal_schema")
     chosen = workspace if workspace in {w.name for w in workspaces} else (workspaces[0].name if workspaces else "")
     error = error or why
-    return page(request, "schema_named.html", nav="catalog", team=kind == "team", temporary=kind == "temporary",
+    return page(request, "schema_named.html", nav="catalog", temporary=kind == "temporary",
                 have=temporary_schema(user_of(request)) if kind == "temporary" else None,
+                account=temporary_account(user_of(request)) if kind == "temporary" else None,
                 workspaces=workspaces, chosen=chosen,
                 name=name, owner_group=owner_group,
                 reason=reason, error=error)
@@ -330,9 +342,12 @@ def named_schema_form(request: Request, kind: str, workspace: str = "", name: st
 @app.post("/schema/{kind}")
 def named_schema_submit(request: Request, kind: str, workspace: str = Form(""), name: str = Form(""), owner_group: str = Form(""),
                         reason: str = Form("")):
-    if kind not in ("project", "team", "temporary"):
+    if kind not in ("project", "team", "custom", "permanent", "temporary"):
         raise HTTPException(404)
-    name, owner_group, reason = name.strip().lower(), owner_group.strip() if kind == "team" else "", reason.strip()
+    form_kind = "permanent" if kind in ("project", "team", "custom") else kind   # the form it came from, to show again
+    name, owner_group, reason = name.strip().lower(), owner_group.strip() if kind in ("team", "custom", "permanent") else "", reason.strip()
+    if kind in ("custom", "permanent"):   # with a group, a team schema; without, a project schema
+        kind = "team" if owner_group else "project"
     try:
         if not name:
             raise portal.RequestError("Give the schema a name.")
@@ -343,7 +358,58 @@ def named_schema_submit(request: Request, kind: str, workspace: str = Form(""), 
         started = PORTAL.request_schema(workspace, user_of(request), schema=name, owner_group=owner_group, reason=reason,
                                         temporary=kind == "temporary")
     except portal.RequestError as e:
-        return named_schema_form(request, kind, workspace=workspace, name=name, owner_group=owner_group, reason=reason, error=str(e))
+        return named_schema_form(request, form_kind, workspace=workspace, name=name, owner_group=owner_group, reason=reason, error=str(e))
+    return sent(workspace, started)
+
+
+@app.get("/domain", response_class=HTMLResponse)
+def domain_form(request: Request, workspace: str = "", error: str = "", form: dict = None):
+    """Request a domain: a new one, or a subdomain under any of the account's domains (the Domains
+    API; the workspace file's domains: when it cannot be read). An admin makes it, then approves it."""
+    form = form or {}
+    workspaces, why = offered(user_of(request), "domain")
+    chosen = workspace if workspace in {w.name for w in workspaces} else (workspaces[0].name if workspaces else "")
+    domains = PORTAL.domains()
+    if domains is None:
+        domains = next((w.get("domains") or [] for w in CONFIG.get("workspaces", []) if w["name"] == chosen), [])
+    preview = next(c.preview for c in cards.CARDS if c.key == "domain")   # Coming soon: the form sends nothing
+    return page(request, "domain.html", nav="catalog", workspaces=workspaces, chosen=chosen, domains=domains, error=error or why, form=form,
+                preview=preview)
+
+
+@app.post("/domain")
+async def domain_submit(request: Request):
+    if next(c.preview for c in cards.CARDS if c.key == "domain"):   # Coming soon: nothing is recorded
+        raise HTTPException(404)
+    form = {k: v for k, v in (await request.form()).items() if isinstance(v, str)}
+    workspace = form.get("workspace", "")
+    try:
+        labels = {d["key"]: d["label"] for d in (PORTAL.domains() or [])}
+        started = PORTAL.request_domain(workspace, user_of(request), form.get("name", ""), parent=form.get("parent", ""),
+                                        parent_label=labels.get(form.get("parent", ""), form.get("parent", "")),
+                                        reason=form.get("reason", "").strip())
+    except portal.RequestError as e:
+        return domain_form(request, workspace=workspace, error=str(e), form=form)
+    return sent(workspace, started)
+
+
+@app.get("/group", response_class=HTMLResponse)
+def group_form(request: Request, workspace: str = "", error: str = "", form: dict = None):
+    """Add a group to your workspace (for sharing folders): an Entra ID group assigned to the workspace with no access of
+    its own, so people can share folders with it. An admin adds it, then approves it."""
+    workspaces, why = offered(user_of(request), "workspace_group")
+    chosen = workspace if workspace in {w.name for w in workspaces} else (workspaces[0].name if workspaces else "")
+    return page(request, "group.html", nav="catalog", workspaces=workspaces, chosen=chosen, error=error or why, form=form or {})
+
+
+@app.post("/group")
+async def group_submit(request: Request):
+    form = {k: v for k, v in (await request.form()).items() if isinstance(v, str)}
+    workspace = form.get("workspace", "")
+    try:
+        started = PORTAL.request_group(workspace, user_of(request), form.get("group", ""), reason=form.get("reason", "").strip())
+    except portal.RequestError as e:
+        return group_form(request, workspace=workspace, error=str(e), form=form)
     return sent(workspace, started)
 
 
@@ -439,6 +505,8 @@ async def ai_check(request: Request):
         raise HTTPException(404)
     f = dict(await request.form())
     kind = f.get("kind", "")
+    if kind == "permanent_schema":   # the permanent schema form: a team schema with a group, else a project schema
+        kind = "team_schema" if (f.get("owner_group") or "").strip() else "project_schema"
     if kind not in ("project_schema", "team_schema", "temporary_schema", "folder"):
         raise HTTPException(400)
     name = ((f.get("folder") if kind == "folder" else f.get("name")) or "").strip().lower()
@@ -462,11 +530,11 @@ def retry_link(r):
         name = r.params.get("schema", "").split("tmp_", 1)[-1]
         return "/schema/temporary?" + urlencode({"workspace": r.workspace, "name": name, "reason": r.params.get("reason", "")})
     if r.params.get("owner_group"):
-        return "/schema/team?" + urlencode({"workspace": r.workspace, "name": r.params.get("schema", ""),
-                                            "owner_group": r.params["owner_group"], "reason": r.params.get("reason", "")})
+        return "/schema/permanent?" + urlencode({"workspace": r.workspace, "name": r.params.get("schema", ""),
+                                              "owner_group": r.params["owner_group"], "reason": r.params.get("reason", "")})
     if r.params.get("schema"):
-        return "/schema/project?" + urlencode({"workspace": r.workspace, "name": r.params["schema"],
-                                               "reason": r.params.get("reason", "")})
+        return "/schema/permanent?" + urlencode({"workspace": r.workspace, "name": r.params["schema"],
+                                              "reason": r.params.get("reason", "")})
     return "/schema"
 
 

@@ -71,8 +71,9 @@ class FakeClient:
         self.api_client = ns(do=self.api)
         # The BU lookup (SQL statements): person -> business unit; None = the warehouse cannot answer.
         self.bus_, self.statements = {ANA: "FIN"}, []
+        self.domains_ = []             # the account's domains (the Domains API); None = it cannot be read
 
-    def api(self, method, path, body=None):
+    def api(self, method, path, body=None, query=None):
         if path.startswith("/api/2.1/unity-catalog/entity-tag-assignments/schemas/"):   # a schema's tags
             name = path.split("/schemas/", 1)[1].rsplit("/tags", 1)[0]
             if self.schemas_ is None:
@@ -80,6 +81,10 @@ class FakeClient:
             if name not in self.schemas_:
                 raise NotFound(f"Schema '{name}' does not exist.")
             return {"tag_assignments": [{"tag_key": k, "tag_value": v} for k, v in self.tags_.get(name, {}).items()]}
+        if path == "/api/2.0/domains":
+            if self.domains_ is None:
+                raise PermissionError("not allowed to list domains")
+            return {"domains": self.domains_}
         if path == "/api/2.0/sql/statements":
             self.statements.append(body)
             if self.bus_ is None:
@@ -895,20 +900,17 @@ class Cards(unittest.TestCase):
         self.assertEqual([c["more"] for _, _, cs in toured for c in cs if c["card"].key == "open_workspace"],
                          [("Restart guided tour", "/open?tour=1")])
         only_data = [(k, t, [c for c in cs if c["card"].section == "data"]) for k, t, cs in cards.groups({})]
-        self.assertEqual([k for k, _, cs in cards.groups({}) if k == "data"], [], "Data has only link cards: hidden without links")
+        self.assertEqual([[c["card"].key for c in cs] for k, _, cs in cards.groups({}) if k == "data"], [["domain"]],
+                         "without links, Data shows only Request a domain (a page of the app)")
 
-    def test_adding_a_group_is_a_link_coming_soon_until_it_is_set(self):
+    def test_adding_a_group_is_the_apps_own_form_for_sharing_folders(self):
         import cards
-        import settings
-        card = lambda groups: next(c for _, _, cs in groups for c in cs if c["card"].key == "group_request")
-        self.assertEqual((card(cards.groups({}))["ready"], card(cards.groups({}))["href"]), (False, ""), "no link yet: Coming soon")
-        set_ = card(cards.groups({"group_request": "https://servicenow.example.com/add-group"}))
-        self.assertEqual((set_["ready"], set_["external"], set_["href"]), (True, True, "https://servicenow.example.com/add-group"))
-        self.assertEqual(set_["card"].opens, "Opens your organization's request form", "not Databricks")
+        card = next(c for _, _, cs in cards.groups({}) for c in cs if c["card"].key == "group_request")
+        self.assertEqual((card["ready"], card["external"], card["href"]), (True, False, "/group"), "a form in this app, not a link")
+        self.assertIn("share folders", card["card"].text)
         opens = {c.key: c.opens for c in cards.CARDS}
         self.assertEqual(opens["discover"], "Opens in Databricks · Workspace access required")
         self.assertEqual(opens["open_workspace"], "Opens in Databricks · Workspace access required")
-        self.assertNotIn("group_request", settings.KINDS, "set in app.yaml (links.group_request), not in Settings, for now")
 
     def test_every_section_has_an_faq_setting(self):
         import cards
@@ -984,8 +986,8 @@ class Pages(unittest.TestCase):
     def test_tasks_say_how_they_are_approved(self):
         page = self.http.get("/", headers=self.as_ana).text
         self.assertIn("<h1>Citizen Development Tasks</h1>", page, "the catalog's heading: title case, the app's name")
-        self.assertEqual(page.count("Auto-approved"), 4, "project, team and temporary schemas, and folders (their job is in this hub)")
-        self.assertEqual(page.count(">Approval required"), 1, "workspace access (approved in Entra)")
+        self.assertEqual(page.count("Auto-approved"), 3, "custom and temporary schemas, and folders (their job is in this hub)")
+        self.assertEqual(page.count(">Approval required"), 2, "workspace access (approved in Entra), and a group (made by an admin)")
         self.assertIn("Approval required", self.http.get("/persona", headers=self.as_ana).text)
         self.assertIn("Auto-approved", self.http.get("/folder", headers=self.as_ana).text)
 
@@ -1026,7 +1028,10 @@ class Pages(unittest.TestCase):
     def test_validate_on_the_forms(self):
         self.main.CONFIG["ai_check"] = "on"
         try:
-            self.assertIn('data-ai-check="team_schema"', self.http.get("/schema/team", headers=self.as_ana).text)
+            self.assertIn('data-ai-check="permanent_schema"', self.http.get("/schema/permanent", headers=self.as_ana).text)
+            team = self.http.post("/api/check", data={"kind": "permanent_schema", "workspace": "fin", "name": "sales_forecast", "reason": WHY,
+                                                      "owner_group": "fin-data-eng"}, headers=self.as_ana)
+            self.assertEqual(team.status_code, 200, "a permanent schema is checked as a team schema with a group, a project one without")
             self.assertIn('data-ai-check="folder"', self.http.get("/folder", headers=self.as_ana).text)
             r = self.http.post("/api/check", data={"kind": "project_schema", "workspace": "fin", "name": "sales_forecast", "reason": WHY}, headers=self.as_ana)
             self.assertNotIn("verdict", r.json(), "the checks only: no verdict")
@@ -1120,9 +1125,25 @@ class Pages(unittest.TestCase):
         self.assertEqual(r.status_code, 503)
         self.assertEqual(r.json()["database"], "AttributeError: no postgres", "the reason a deploy is broken, as the app sees it")
 
-    def test_old_custom_schema_links_still_work(self):
-        r = self.http.get("/schema/custom?name=sales_bookings", headers=self.as_ana, follow_redirects=False)
-        self.assertEqual((r.status_code, r.headers["location"]), (301, "/schema/project?name=sales_bookings"))
+    def test_project_and_team_schemas_are_one_permanent_schema_form(self):
+        page = self.http.get("/", headers=self.as_ana).text
+        self.assertIn('href="/schema/permanent"', page)
+        self.assertNotIn('href="/schema/project"', page)
+        self.assertNotIn('href="/schema/team"', page)
+        for old in ("project", "team", "custom"):   # old links and bookmarks still open it
+            r = self.http.get(f"/schema/{old}?name=sales_bookings", headers=self.as_ana, follow_redirects=False)
+            self.assertEqual((r.status_code, r.headers["location"]), (301, "/schema/permanent?name=sales_bookings"))
+        form = self.http.get("/schema/permanent", headers=self.as_ana).text
+        self.assertIn("Team&#39;s Entra ID group (optional)", form)
+        self.assertNotIn('name="owner_group" class="mono" required', form, "the group is optional")
+        self.assertIn('action="/schema/permanent"', form)
+        r = self.http.post("/schema/permanent", data={"workspace": "fin", "name": "sales_forecast", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
+        self.assertEqual(r.status_code, 303)
+        self.assertEqual(self.fake.started[-1][1]["owner_group"], "", "no group: a project schema")
+        r = self.http.post("/schema/permanent", data={"workspace": "fin", "name": "sales_shared", "reason": WHY, "owner_group": "fin-data-eng"},
+                           headers=self.as_ana, follow_redirects=False)
+        self.assertEqual(r.status_code, 303)
+        self.assertEqual(self.fake.started[-1][1]["owner_group"], "fin-data-eng", "a group: a team schema")
 
     def test_the_review_requests_tile_opens_catalog_explorer(self):
         self.assertNotIn("View data access requests", self.http.get("/", headers=self.as_ana).text)
@@ -1152,7 +1173,7 @@ class Pages(unittest.TestCase):
 
     def test_the_business_unit_comes_first(self):
         as_bo = {"X-Forwarded-Email": BO}   # Bo has not chosen yet (Ana chose FIN in setUp)
-        for path in ("/", "/folder", "/schema/project", "/persona"):
+        for path in ("/", "/folder", "/schema/permanent", "/persona"):
             with self.subTest(path=path):
                 r = self.http.get(path, headers=as_bo, follow_redirects=False)
                 self.assertEqual((r.status_code, r.headers["location"]), (303, f"/business-unit?next={path}"))
@@ -1422,12 +1443,12 @@ class TemporarySchemas(unittest.TestCase):
         self.assertEqual(self.quota(), "2 of 2 used")
         form = self.http.get("/schema/temporary/extend", headers=self.as_ana).text
         self.assertIn("Which temporary schema?", form, "two of them: they choose")
-        bad = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "7", "reason": WHY}, headers=self.as_ana)
+        bad = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "30", "reason": WHY}, headers=self.as_ana)
         self.assertIn("Choose which of your temporary schemas this is for", bad.text)
-        r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "7", "reason": WHY, "schema": "fin_citizen_dev.cd_tmp_second"},
+        r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "30", "reason": WHY, "schema": "fin_citizen_dev.cd_tmp_second"},
                            headers=self.as_ana, follow_redirects=False)
-        self.assertRegex(r.headers["location"], r"^/request/ss-")
-        self.assertEqual(self.fake.started[-1][1]["schema"], "cd_tmp_second", "the hold is on the one chosen")
+        self.assertRegex(r.headers["location"], r"^/requests/fin/\d+$", "no approver: it runs straight away")
+        self.assertEqual((self.fake.started[-1][1]["schema"], self.fake.started[-1][1]["action"]), ("cd_tmp_second", "extend"), "on the one chosen")
 
     def test_a_rejection_lifts_the_hold_so_the_schema_expires_as_before(self):
         row = {"id": "ss-9", "kind": "temporary_extension", "workspace": "fin", "requested_by": ANA, "name": "cd_tmp_x", "reason": WHY, "days": 7}
@@ -1451,8 +1472,32 @@ class TemporarySchemas(unittest.TestCase):
         self.main.PORTAL._personal.clear()
         self.assertNotIn("will be deleted on", self.http.get("/", headers=self.as_ana).text, "not yet")
 
-    def test_more_time_waits_for_an_approver_then_runs_the_schema_job(self):
+    def test_more_time_runs_straight_away_by_default(self):
         import datetime as dt
+        self.http.post("/schema/temporary", data={"workspace": "fin", "name": "x", "reason": WHY}, headers=self.as_ana)
+        self.fake.runs_[max(self.fake.runs_)].state = state("TERMINATED", "SUCCESS")
+        self.fake.schemas_.add("fin_citizen_dev.cd_tmp_x")
+        self.fake.tags_["fin_citizen_dev.cd_tmp_x"] = {"cd_schema_kind": "temporary", "cd_user": ANA,
+                                                       "cd_expires": (dt.date.today() + dt.timedelta(days=5)).isoformat()}
+        made = len(self.fake.started)
+        form = self.http.get("/schema/temporary/extend", headers=self.as_ana).text
+        self.assertIn('<input type="hidden" name="days" value="30">', form, "one choice: 30 days")
+        self.assertIn("30 more days are added to its date straight away", form)
+        self.assertIn("Auto-approved", form)
+        self.assertIn(">Add 30 days</button>", form)
+        r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "30", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
+        self.assertRegex(r.headers["location"], r"^/requests/fin/\d+$", "its run's status page")
+        self.assertEqual(len(self.fake.started), made + 1, "one run, no hold: nothing waits")
+        params = self.fake.started[-1][1]
+        self.assertEqual((params["schema"], params["action"], params["days"]), ("cd_tmp_x", "extend", "30"))
+        row = next(x for x in self.db.requests.values() if x["kind"] == "temporary_extension")
+        self.assertEqual(row["days"], 30, "recorded like any request, for My requests")
+
+    def test_more_time_waits_for_an_approver_when_app_yaml_says_so(self):
+        import datetime as dt
+        approval = self.main.PORTAL.config.get("human_approval")
+        self.main.PORTAL.config["human_approval"] = [*(approval or ()), "temporary_extension"]
+        self.addCleanup(self.main.PORTAL.config.__setitem__, "human_approval", approval)
         self.http.post("/schema/temporary", data={"workspace": "fin", "name": "x", "reason": WHY}, headers=self.as_ana)
         self.fake.runs_[max(self.fake.runs_)].state = state("TERMINATED", "SUCCESS")
         self.fake.schemas_.add("fin_citizen_dev.cd_tmp_x")
@@ -1460,35 +1505,35 @@ class TemporarySchemas(unittest.TestCase):
                                                        "cd_expires": (dt.date.today() + dt.timedelta(days=5)).isoformat()}
         made = len(self.fake.started)   # the temporary schema's own run
         form = self.http.get("/schema/temporary/extend", headers=self.as_ana).text
-        self.assertIn('<input type="hidden" name="days" value="7">', form, "one choice: 7 days")
-        self.assertIn("You're asking for 7 more days", form)
+        self.assertIn('<input type="hidden" name="days" value="30">', form, "one choice: 30 days")
+        self.assertIn("You're asking for 30 more days", form)
         self.assertIn("Approval required", form)
-        r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "7", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
+        r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "30", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
         self.assertRegex(r.headers["location"], r"^/request/ss-", "waits for an approver")
         self.assertEqual(len(self.fake.started), made + 1, "only the hold runs until it is approved")
         hold = self.fake.started[-1][1]
         self.assertEqual((hold["action"], hold["schema"], hold["request_id"]), ("hold", "cd_tmp_x", r.headers["location"].rsplit("/", 1)[1]),
                          "tagged with the request: the cleanup never deletes it while it waits")
         rid, row = next((i, x) for i, x in self.db.requests.items() if x["kind"] == "temporary_extension")
-        self.assertEqual((row["name"], row["days"]), ("cd_tmp_x", 7))
+        self.assertEqual((row["name"], row["days"]), ("cd_tmp_x", 30))
         self.main.PORTAL.run_recorded({**row, "id": rid})
         params = self.fake.started[-1][1]
-        self.assertEqual((params["schema"], params["temporary"], params["action"], params["days"]), ("cd_tmp_x", "true", "extend", "7"))
+        self.assertEqual((params["schema"], params["temporary"], params["action"], params["days"]), ("cd_tmp_x", "true", "extend", "30"))
         page = self.http.get(f"/request/{rid}", headers=self.as_ana).text   # its run, once the approver approved it
         self.assertIn("Extend temporary schema", page)
-        r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "7", "reason": WHY + " Again."}, headers=self.as_ana, follow_redirects=False)
+        r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "30", "reason": WHY + " Again."}, headers=self.as_ana, follow_redirects=False)
         waiting = r.headers["location"].rsplit("/", 1)[1]
         self.db.event(waiting, "approved", actor="dana@contoso.com")   # approved, its run not started yet
-        self.assertIn("Approved: 7 more days are being added", self.http.get(f"/request/{waiting}", headers=self.as_ana).text)
+        self.assertIn("Approved: 30 more days are being added", self.http.get(f"/request/{waiting}", headers=self.as_ana).text)
         bad = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "3", "reason": WHY}, headers=self.as_ana)
-        self.assertIn("More time is 7 days", bad.text)
+        self.assertIn("More time is 30 days", bad.text)
         self.assertEqual(self.http.get("/schema/temporary/other", headers=self.as_ana).status_code, 404)
         self.assertEqual(self.http.get("/schema/temporary/keep", headers=self.as_ana).status_code, 404, "keeping it: not offered for now")
 
     def test_without_a_temporary_schema_there_is_nothing_to_extend(self):
         form = self.http.get("/schema/temporary/extend", headers=self.as_ana).text
         self.assertIn("You have no temporary schema to ask about", form)
-        r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "7", "reason": WHY}, headers=self.as_ana)
+        r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "30", "reason": WHY}, headers=self.as_ana)
         self.assertIn("You have no temporary schema to ask about", r.text)
         self.assertEqual(self.db.requests, {})
 
@@ -1571,10 +1616,10 @@ class ManualFolders(unittest.TestCase):
 
     def test_folders_are_made_by_hand_only_while_their_job_is_not_deployed(self):
         p = self.main.PORTAL
-        self.assertEqual(p.manual(), {"folder"})
+        self.assertEqual(p.manual(), {"folder", "domain", "workspace_group"}, "folders while their job is not deployed; domains and groups always")
         self.assertEqual([w.name for w in p.available("team_folder")], ["fin"], "offered without its job")
         with_job, _ = make()
-        self.assertEqual(with_job.manual(), set(), "the job is deployed again: folders run it")
+        self.assertEqual(with_job.manual(), {"domain", "workspace_group"}, "the job is deployed again: folders run it")
         unread = [portal.Workspace("fin", "FIN", HOST), portal.Workspace("down", "OPS", "https://down")]
         for w in unread:
             w.error = "the hub's jobs cannot be read"
@@ -1657,8 +1702,8 @@ class ApprovalRequests(unittest.TestCase):
         self.assertIn(f'href="{r.headers["location"]}"', self.http.get("/requests", headers=self.as_ana).text)
 
     def test_the_catalog_and_the_form_say_an_approver_decides(self):
-        self.assertEqual(self.http.get("/", headers=self.as_ana).text.count(">Approval required"), 3, "project and team schemas, and personas")
-        form = self.http.get("/schema/project", headers=self.as_ana).text
+        self.assertEqual(self.http.get("/", headers=self.as_ana).text.count(">Approval required"), 3, "permanent schemas, personas and groups")
+        form = self.http.get("/schema/permanent", headers=self.as_ana).text
         self.assertIn(">Submit request</button>", form)
         self.assertIn("Your schema will be created once approved.", form)
 
@@ -1742,3 +1787,146 @@ class ApprovalRequests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AccountsNotesAndDomains(unittest.TestCase):
+    """app.yaml jobs.temporary_schema.account_prefix (who may make and extend temporary schemas),
+    persona_notes (the workspace access page) and the Request a domain preview."""
+    AZ = "azure-ana@contoso.com"
+
+    def setUp(self):
+        import importlib
+        import os
+        import tempfile
+        domains = [{"key": "irm", "label": "IRM", "depth": 0}, {"key": "irm.asset_integrity", "label": "IRM / ASSET INTEGRITY", "depth": 1}]
+        cfg = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+        json.dump({**CONFIG, "temporary_account_prefix": "azure-", "persona_notes": {"explorer": "Request with your regular account.",
+                                                                                     "builder": "Request with your Azure PIM account, `azure-`."},
+                   "workspaces": [{**CONFIG["workspaces"][0], "domains": domains}, *CONFIG["workspaces"][1:]]}, cfg)
+        cfg.close()
+        os.environ["PORTAL_CONFIG"] = cfg.name
+        sys.modules.pop("main", None)
+        self.main = importlib.import_module("main")
+        self.db = FakeStore()
+        self.main.PORTAL, self.fake = make(self.db)
+        self.main.PORTAL.config = self.main.CONFIG
+        for who in (ANA, self.AZ):
+            self.main.PORTAL.choose_bu(who, "FIN")
+        self.http = TestClient(self.main.app)
+
+    def test_a_temporary_schema_needs_the_named_account(self):
+        form = self.http.get("/schema/temporary", headers={"X-Forwarded-Email": ANA}).text
+        self.assertIn("Temporary schemas are made with your <span class=\"strong\">azure-</span> account", form)
+        self.assertNotIn('name="name"', form, "no form to fill in with the wrong account")
+        r = self.http.post("/schema/temporary", data={"workspace": "fin", "name": "x", "reason": WHY}, headers={"X-Forwarded-Email": ANA})
+        self.assertIn("sign in with the account whose email starts with azure-", r.text)
+        self.assertEqual(self.fake.started, [], "nothing runs")
+        form = self.http.get("/schema/temporary", headers={"X-Forwarded-Email": self.AZ}).text
+        self.assertIn('name="name"', form)
+        r = self.http.post("/schema/temporary", data={"workspace": "fin", "name": "x", "reason": WHY}, headers={"X-Forwarded-Email": self.AZ},
+                           follow_redirects=False)
+        self.assertEqual(r.status_code, 303)
+        self.assertEqual(self.fake.started[-1][1]["user"], self.AZ)
+
+    def test_the_temporary_schema_tile_is_greyed_out_for_another_account(self):
+        import datetime as dt
+        tile = lambda page: page.split("Create a temporary schema", 1)[0].rsplit('<div class="card task', 1)[1] + page.split("Create a temporary schema", 1)[1].split('<div class="card task', 1)[0]
+        mine = tile(self.http.get("/", headers={"X-Forwarded-Email": ANA}).text)
+        self.assertIn("is-soon", mine.split(">", 1)[0], "greyed out")
+        self.assertNotIn('href="/schema/temporary"', mine, "not a link")
+        self.assertIn("Sign in with your azure- account to create one", mine)
+        self.assertNotIn("Extend temporary schema", mine, "nothing of theirs to extend")
+        theirs = tile(self.http.get("/", headers={"X-Forwarded-Email": self.AZ}).text)
+        self.assertIn('href="/schema/temporary"', theirs, "the azure- account: a normal tile")
+        self.assertNotIn("Sign in with your azure- account", theirs)
+        self.fake.schemas_.add("fin_citizen_dev.cd_tmp_old")
+        self.fake.tags_["fin_citizen_dev.cd_tmp_old"] = {"cd_schema_kind": "temporary", "cd_user": ANA,
+                                                         "cd_expires": (dt.date.today() + dt.timedelta(days=5)).isoformat()}
+        self.db.record_request({"id": "ss-old", "kind": "temporary_schema", "workspace": "fin", "bu": "FIN", "requested_by": ANA,
+                                "name": "cd_tmp_old", "reason": WHY})
+        self.main.PORTAL._personal.clear()
+        old = tile(self.http.get("/", headers={"X-Forwarded-Email": ANA}).text)
+        self.assertIn('href="/schema/temporary/extend">Extend temporary schema', old, "one made before the check: its owner still extends it")
+        self.assertIn("cd_tmp_old", old)
+
+    def test_its_owner_extends_one_made_before_the_check_with_their_regular_account(self):
+        import datetime as dt
+        self.fake.schemas_.add("fin_citizen_dev.cd_tmp_old")
+        self.fake.tags_["fin_citizen_dev.cd_tmp_old"] = {"cd_schema_kind": "temporary", "cd_user": ANA,
+                                                         "cd_expires": (dt.date.today() + dt.timedelta(days=5)).isoformat()}
+        self.db.record_request({"id": "ss-old", "kind": "temporary_schema", "workspace": "fin", "bu": "FIN", "requested_by": ANA,
+                                "name": "cd_tmp_old", "reason": WHY})
+        self.main.PORTAL._personal.clear()
+        form = self.http.get("/schema/temporary/extend", headers={"X-Forwarded-Email": ANA}).text
+        self.assertNotIn("sign in with the account", form, "no account message to extend: it is theirs")
+        self.assertIn(">Add 30 days</button>", form)
+        r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "30", "reason": WHY}, headers={"X-Forwarded-Email": ANA},
+                           follow_redirects=False)
+        self.assertEqual(r.status_code, 303)
+        self.assertEqual((self.fake.started[-1][1]["user"], self.fake.started[-1][1]["action"]), (ANA, "extend"), "the job checks it is theirs")
+
+    def test_each_access_level_shows_its_note(self):
+        page = self.http.get("/persona", headers={"X-Forwarded-Email": ANA}).text
+        self.assertIn("Request with your regular account.", page)
+        self.assertIn('Request with your Azure PIM account, <span class="mono nowrap">azure-</span>.', page,
+                      "text in backticks stays on one line")
+        self.assertIn(">Unavailable", page, "a Coming soon persona (publisher) keeps a disabled button")
+        self.assertNotIn('class="callout', page.split('<div class="options">', 1)[1], "a light line, not a box")
+
+    def test_request_a_domain_is_coming_soon_its_form_a_preview(self):
+        catalog = self.http.get("/", headers={"X-Forwarded-Email": ANA}).text
+        card = catalog.split(">Request a domain</a>", 1)[1].split('class="card task', 1)[0]
+        self.assertIn('href="/domain"', catalog.split(">Request a domain</a>", 1)[0][-200:], "it opens")
+        self.assertIn("Coming soon", card)
+        self.assertIn("Preview: see the form; nothing is sent yet", card)
+        form = self.http.get("/domain", headers={"X-Forwarded-Email": ANA}).text
+        self.assertIn('<button type="submit" class="primary" disabled>Coming soon</button>', form)
+        self.assertIn("This is a preview of the form: nothing is sent yet", form)
+        r = self.http.post("/domain", data={"workspace": "fin", "name": "integrity", "reason": WHY}, headers={"X-Forwarded-Email": ANA})
+        self.assertEqual(r.status_code, 404, "nothing is recorded while it is a preview")
+        self.assertEqual(self.db.requests, {})
+
+    def test_request_a_domain_once_live_is_sent_to_an_admin_who_sets_it_up(self):
+        import cards
+        import dataclasses
+        live = [dataclasses.replace(c, preview=False) if c.key == "domain" else c for c in cards.CARDS]
+        patcher = mock.patch.object(cards, "CARDS", live)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.fake.domains_ = [{"domain_id": "d1", "tag_key": "Upstream"}, {"domain_id": "d2", "tag_key": "Upstream/Oil Sands", "parent_domain_id": "d1"},
+                              {"domain_id": "d3", "tag_key": "Draft", "effective_draft": True}]
+        form = self.http.get("/domain", headers={"X-Forwarded-Email": ANA}).text
+        self.assertIn("At the top (a new domain)", form)
+        self.assertIn('value="d1" >&nbsp;&nbsp;&nbsp;Under Upstream</option>', form, "the account's domains, from the Domains API")
+        self.assertIn('value="d2" >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Under Upstream / Oil Sands</option>', form, "a subdomain sits under its domain")
+        self.assertNotIn("Draft", form, "drafts are not offered")
+        self.assertNotIn('name="appid"', form, "kept simple: a name, where it goes, and why")
+        bad = self.http.post("/domain", data={"workspace": "fin", "name": "integrity", "parent": "d2", "reason": "short"},
+                             headers={"X-Forwarded-Email": ANA})
+        self.assertIn('value="integrity"', bad.text, "what they typed is kept")
+        r = self.http.post("/domain", data={"workspace": "fin", "name": "integrity", "parent": "d2", "reason": WHY},
+                           headers={"X-Forwarded-Email": ANA}, follow_redirects=False)
+        self.assertRegex(r.headers["location"], r"^/request/ss-", "waits for an admin")
+        self.assertEqual(self.fake.started, [], "nothing runs")
+        row = next(x for x in self.db.requests.values() if x["kind"] == "domain")
+        self.assertEqual((row["name"], row["details"]), ("integrity", {"parent": "d2", "parent_label": "Upstream / Oil Sands"}))
+
+    def test_the_domain_form_falls_back_to_the_workspace_files_domains(self):
+        self.fake.domains_ = None   # the Domains API cannot be read
+        form = self.http.get("/domain", headers={"X-Forwarded-Email": ANA}).text
+        self.assertIn("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Under IRM / ASSET INTEGRITY</option>", form)
+
+    def test_a_group_for_sharing_folders_is_sent_to_an_admin(self):
+        form = self.http.get("/group", headers={"X-Forwarded-Email": ANA}).text
+        self.assertIn("sharing folders", form)
+        self.assertIn("<h1>Add a group to your workspace</h1>", form)
+        self.assertIn("Why do you need this group added?", form)
+        self.assertIn("no access of its own", form)
+        bad = self.http.post("/group", data={"workspace": "fin", "group": "users", "reason": WHY}, headers={"X-Forwarded-Email": ANA})
+        self.assertIn("is every user of a workspace", bad.text)
+        r = self.http.post("/group", data={"workspace": "fin", "group": "fin-analysts", "reason": WHY}, headers={"X-Forwarded-Email": ANA},
+                           follow_redirects=False)
+        self.assertRegex(r.headers["location"], r"^/request/ss-")
+        self.assertEqual(self.fake.started, [], "nothing runs")
+        row = next(x for x in self.db.requests.values() if x["kind"] == "workspace_group")
+        self.assertEqual(row["name"], "fin-analysts")

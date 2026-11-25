@@ -28,18 +28,20 @@ What people may do, and how the app behaves. Read the key's comment in the file 
 
 | They want to... | Key (under `self_service_app:` unless said) |
 | --- | --- |
-| Which requests wait for an approver | `human_approval` (from `project_schema`, `team_schema`, `temporary_schema`; the others are created straight away). Workspace folders always wait: an admin makes them by hand for now |
+| Which requests wait for an approver | `human_approval` (from `project_schema`, `team_schema`, `temporary_schema`, `temporary_extension`; the others are created straight away: more time for a temporary schema adds 30 days at once). Workspace folders always wait: an admin makes them by hand for now |
+| A note under an access level on the Request workspace access page (for example which account to ask with) | `persona_notes.explorer`, `.builder`, `.publisher` (under 300 characters; `null` = none) |
 | The Validate check on forms (AI advice on the name and reason) | `ai_check`: `"on"` or `"off"` |
 | Route people to their own business unit from a directory, instead of them choosing it once | `bu_lookup.function`: a SQL function, email in, business unit out (`catalog.schema.function`), run on `hub.warehouse_id` in `hub.yaml`. Its owner grants the self-service app EXECUTE, outside this repository. `null` = they choose |
 | The default AI model, for every AI feature (Validate, the approvers' summary, new schemas' comments) | `ai_model` (`null` = no AI; admins change it in Settings > AI). An `app.yaml` from 1.0.x names it `ai_summary` (`model:` under it): still read; replacing it with `ai_model` is optional |
 | A wiki link in the header, a short link to the app | `links.wiki`, `links.go_link` |
-| The **Add a group to your workspace** card (otherwise Coming soon) | `links.group_request`: their request form's URL |
+| `links.group_request` (an older key) | No longer used: the **Add a group to your workspace** card opens the app's own form, which an admin approves. Remove it from `app.yaml` |
 | The guided tour's default prompt (Settings > Onboarding overrides it; Reset comes back to it) | `onboarding.prompt` |
 | FAQ, SOP and persona request links in an `app.yaml` from before 1.1.2 (`faq`, `links.sop`, `links.persona_request`) | Still read, as Settings' defaults; set them in Settings instead (Help links, Onboarding) and leave these as they are, or remove them |
 | The header's title (Settings > Branding changes only its first word) | `title` |
 | The name prefix of every schema the app makes (`cd_`), or the rights of project and team schemas (and of a temporary schema kept as one) | `personal_schema.prefix`, `personal_schema.privileges` (under `jobs:`) |
 | How long a temporary schema lasts (its `cd_expires` tag; the daily cleanup job drops it after) | `temporary_schema.days` (under `jobs:`, 1 to 365) |
 | What a temporary schema's requester may do in it (they can never share it) | `temporary_schema.privileges` (under `jobs:`): never `MANAGE` or `ALL_PRIVILEGES`, the build refuses them |
+| Which accounts may create a temporary schema | `temporary_schema.account_prefix` (under `jobs:`): the start of their email, for example `azure-`; `null` = any account. The form says which account to use, and the job refuses others. Its owner extends it, with the account that made it |
 | Who owns new schemas | `catalog_owner` (under `jobs:`). Workspace folders are made by hand for now: `folder_root` is where the approvals app tells admins to create them |
 
 Never change `name`, `approvals.name` or `database.project_id` (they name the apps and the database: changing them makes new ones). Stop and say a maintainer should plan it.

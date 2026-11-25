@@ -101,6 +101,7 @@ class AgainstPostgres(unittest.TestCase):
     def test_migrations_run_once(self):
         self.assertEqual(self.first, [f.name for f in migrate.migrations()], "every migration, in order, on an empty database")
         self.assertIn("008_temporary_extensions_and_conversions.sql", self.first)
+        self.assertIn("009_details_domains_and_groups.sql", self.first)
         self.assertEqual(self.second, [], "running again changes nothing")
 
     def test_the_app_adds_and_reads_but_never_rewrites_history(self):
@@ -166,6 +167,14 @@ class AgainstPostgres(unittest.TestCase):
         db.record_request({"id": "ss-s3", "kind": "temporary_extension", "workspace": "fin", "bu": "FIN", "requested_by": "ana@contoso.com",
                            "name": "cd_tmp_x", "reason": "Still testing the join for the team.", "days": 7})
         self.assertEqual(next(r for r in db.requests_of("ana@contoso.com") if r["id"] == "ss-s3")["days"], 7, "more time: its days")
+        details = {"parent": "d1", "parent_label": "UPSTREAM", "appid": "APP-1", "groups": {"builder": "fin-builders"}}
+        db.record_request({"id": "ss-s4", "kind": "domain", "workspace": "fin", "bu": "FIN", "requested_by": "ana@contoso.com",
+                           "name": "integrity", "reason": "Pipeline integrity analytics team.", "details": details})
+        db.record_request({"id": "ss-s5", "kind": "workspace_group", "workspace": "fin", "bu": "FIN", "requested_by": "ana@contoso.com",
+                           "name": "fin-analysts", "reason": "Sharing the month-end folders."})
+        mine = {r["id"]: r for r in db.requests_of("ana@contoso.com")}
+        self.assertEqual((mine["ss-s4"]["details"], mine["ss-s5"]["details"]), (details, {}), "a domain's details come back; none is {}")
+        self.assertEqual(next(r for r in db.requests_in(["FIN"]) if r["id"] == "ss-s4")["details"], details, "the approvals app reads them too")
         self.assertFalse(db.toured("Ana@contoso.com"))
         db.record_tour("Ana@contoso.com")
         self.assertEqual((db.toured("ana@contoso.com"), db.toured("bo@contoso.com")), (True, False))
