@@ -98,6 +98,8 @@ locals {
   # {TAGS}: every chargeback tag; {WORKSPACE_TAGS}: the ones set for you, with their values.
   genie_tags           = join(", ", [for t in local.all_tag_keys : "`${t}`"])
   genie_workspace_tags = length(local.chargeback_tags) == 0 ? "none" : join(", ", [for k, v in local.chargeback_tags : "`${k}` = `${v}`"])
+  # {WORKSPACE_TAGS_JSON}: the same tags as a JSON object, for code a skill runs (deploy_app.py's tags=).
+  genie_workspace_tags_json = jsonencode(local.chargeback_tags)
   # {PERSONAS}: the personas this workspace has (a group named for them), and what each can do.
   genie_tier_text = {
     consumer  = "Databricks One: dashboards, Genie spaces and apps others share",
@@ -139,8 +141,10 @@ locals {
     { for f, src in local.genie_skill_sources : f => trimspace(replace(file(src), "/(?s)<!--.*?-->/", "")) if endswith(f, ".md") },
   )
   genie_rendered = {
-    for k, t in local.genie_raw : k => replace(replace(replace(replace(replace(replace(replace(replace(t,
+    for k, t in local.genie_raw : k => replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(t,
       "{PREFIX}", local.prefix_upper),
+      "{prefix}", local.prefix),
+      "{WORKSPACE_TAGS_JSON}", local.genie_workspace_tags_json),
       "{CATALOG}", local.genie_catalog),
       "{WAREHOUSE_DETAILS}", local.genie_warehouse_details),
       "{WAREHOUSE}", local.genie_warehouse),
