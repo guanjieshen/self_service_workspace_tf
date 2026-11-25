@@ -14,13 +14,13 @@ Build it as a **Lakeflow Spark Declarative Pipeline** (SQL unless they need Pyth
 | | The standard |
 | --- | --- |
 | **Layers** | Bronze (as it arrived), silver (cleaned, typed, deduplicated), gold (what the dashboard, Genie space or app reads). Small projects may skip bronze |
-| **Where the tables go** | Their **temporary schema** while they try it (30 days; their Azure PIM account), then the project's **permanent schema** (requested in the self-service app) to keep it. Never another person's schema, never a production schema |
+| **Where the tables go** | Their **temporary schema** while they try it, then the project's **permanent schema** (the skill **ask-tis**). A temporary schema is **deleted with its tables** on its `cd_expires` date: schedule the pipeline only once it writes to the permanent schema. Never another person's schema, never a production schema |
 | **Names** | The pipeline `<prefix>-pipeline-<name>`, its job `<prefix>-job-<name>` (`<prefix>` = {PREFIX} in lower case); tables `bronze_<thing>`, `silver_<thing>`, `gold_<thing>`, each with a one-line comment |
 | **Compute** | **Serverless**, with the usage policy `{PREFIX}-0-SELF-SERVICE` (or the project's): it charges the work to the right business unit. Never classic compute unless TIS has given them access |
 | **Tags** | The policy adds this workspace's ({WORKSPACE_TAGS}). The project's own APPID, if it has one, on the pipeline and its job as well (the skill **build-tagged-assets**) |
 | **Schedule** | **Triggered** (never continuous unless TIS agrees), run by its job on a schedule they choose: daily by default. Ask when the data should be fresh by |
-| **Data quality** | An expectation for each rule the data must meet (not null, valid values, in range): drop bad rows in silver, fail the update for what must never happen. Tell them what each one checks |
-| **Secrets** (an API key, a password) | A **Unity Catalog secret** in the project's permanent schema (Catalog Explorer > the schema > Create > Secret), read with `dbutils.secrets.get(catalog=..., schema=..., key=...)`. Never in code, a notebook or a table |
+| **Data quality** | An expectation for each rule they tell you the data must meet; tell them in plain words what each one checks |
+| **Secrets** (an API key, a password) | A **Unity Catalog secret** in the project's permanent schema, which **they** create (`CREATE SECRET`; you never see or type its value), read in code with `dbutils.secrets.get(catalog=..., schema=..., key=...)` on serverless. Never in code, a notebook or a table |
 
 **Ask TIS (the skill ask-tis) for:** a connection to another system (a database, SharePoint, an outside API), network access, a service principal, or a production source. Don't work around a missing connection by copying files by hand.
 

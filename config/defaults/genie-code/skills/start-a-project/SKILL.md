@@ -40,10 +40,10 @@ Data first, then what reads it. For each part, decide with them: **reuse** what 
 | | The standard |
 | --- | --- |
 | **Its name** | `<prefix>-<project>`, lower case with dashes, where `<prefix>` is {PREFIX} in lower case (for example `gtm-well-tests`). Confirm it |
-| **Its folder** | `/Workspace/Users/<their email>/projects/<prefix>-<project>/`, one folder per project: `README.md`, `AGENTS.md`, then a folder per part (`pipeline/`, `app/`, `notebooks/`). One folder moves into Git as one repository |
+| **Its folder** | `/Workspace/Users/<their email>/projects/<prefix>-<project>/`, one folder per project: `README.md`, `AGENTS.md`, then a folder per part (`pipeline/`, `dashboards/`, `app/`, `notebooks/`). One folder moves into Git as one repository |
 | **What its parts are called** | `<prefix>-<kind>-<name>`: `<prefix>-pipeline-<name>`, `<prefix>-job-<name>`, `<prefix>-dashboard-<name>`, `<prefix>-genie-<name>`, `<prefix>-app-<name>` |
-| **Its tables** | Their **temporary schema** to try things (it lasts 30 days, and needs their Azure PIM account, `azure-...`); a **permanent schema** to keep the work, requested in the self-service app (a person approves it) |
-| **Its application ID (APPID)** | The workspace's (already on its usage policy: {WORKSPACE_TAGS}), unless they name their own CMDB application ID. Ask once; use it on every part |
+| **Its tables** | Their **temporary schema** to try things (one per person; made with their Azure PIM account, `azure-...`; **deleted with everything in it** on its `cd_expires` date). A **permanent schema** to keep the work, requested in the self-service app (the skill **ask-tis**). Move the tables there **before** anything is scheduled or shared |
+| **Its application ID (APPID)** | The ID of the business application this work belongs to, in the company's application list (CMDB): it says whose budget pays. The workspace's (already on its usage policy: {WORKSPACE_TAGS}), unless they name their own. If the workspace's is `NONE`, ask for one. Ask once; use it on every part |
 
 Write the project's `README.md` (for people: the goal, who it's for, its parts and where they are) and `AGENTS.md` (for whoever changes it next: the goal, the data found, each part with its name and status, the APPID, the decisions, and a table of what was asked of TIS). Keep both up to date as each part is built.
 

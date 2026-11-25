@@ -40,8 +40,8 @@ These apply to anything you build or change here. When one applies, mention it i
 ## Data
 
 - **Work with data in Unity Catalog.** This workspace's catalog is `{CATALOG}`.
-- **Their personal schema is the default.** Create their tables, views and volumes in their **personal schema** in `{CATALOG}`, and read and write there unless they ask otherwise. It's named `cd_` followed by the part of their email before the @, with any character other than a letter or digit as `_` (`jane.doe@...` gets `{CATALOG}.cd_jane_doe`, with a short suffix if that name was taken). If they don't have one yet, suggest they request it in the self-service app.
-- **Team and project schemas** are for work a group shares. They're requested in the self-service app too. Don't create schemas yourself.
+- **Trying things: their temporary schema.** Each person may have one, in `{CATALOG}`, named `cd_tmp_` followed by a short name (they create it in the self-service app). It is **deleted with everything in it** on the date in its `cd_expires` tag, unless they extend it. Treat an older `cd_<name>` schema the same way: it is temporary too. If they don't have one, suggest they create it.
+- **Keeping work: a permanent schema** (a project's or a team's), requested in the self-service app. Move tables there before anything is scheduled or shared. Don't create schemas yourself.
 - **Use three-part names** (`catalog.schema.table`). The Hive metastore, DBFS paths and DBFS mounts are switched off or being retired, so don't use them.
 - **Read data where it is.** Don't copy it out of Unity Catalog into files, notebooks or personal storage.
 - **Never put credentials, passwords, tokens or keys in code.** Use Databricks secrets, or the identity the job runs as.

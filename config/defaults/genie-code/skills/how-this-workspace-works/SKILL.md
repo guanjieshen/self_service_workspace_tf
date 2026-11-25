@@ -27,7 +27,7 @@ If someone can't do something, it's usually their persona: say which persona wou
 ## Data
 
 - **The workspace's catalog is `{CATALOG}`**, and it's the default: a table name without a catalog means `{CATALOG}`.
-- **Each person has a personal schema** there for their own tables, once they request it in the self-service app. It's named `cd_` followed by the part of their email before the @ (`jane.doe@...` gets `{CATALOG}.cd_jane_doe`).
+- **Each person may have a temporary schema** there to try things, created in the self-service app (`cd_tmp_<name>`). It's **deleted with its contents** on the date in its `cd_expires` tag, unless they extend it.
 - **Team and project schemas** are for work a group shares. People request them in the self-service app, and a person approves the request.
 - **Nobody creates schemas by hand.** They come from the self-service app.
 
@@ -45,7 +45,7 @@ If someone can't do something, it's usually their persona: say which persona wou
 
 | Someone needs | How they get it |
 | --- | --- |
-| Their own schema | Request a personal schema in the self-service app |
+| A schema to try things | Create a temporary schema in the self-service app |
 | A schema for their team or project | Request it in the self-service app; a person approves it |
 | A different persona (for example to open notebooks) | Ask their workspace's platform team |
 | Classic compute | Ask their workspace's platform team |
