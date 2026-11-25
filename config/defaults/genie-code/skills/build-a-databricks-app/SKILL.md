@@ -26,7 +26,7 @@ If they describe a problem rather than an app ("our inspections live in spreadsh
 | **The data it keeps** (notes, statuses, requests...), or none | Kept in the app's own database. None: no database (`lakebase=False`) |
 | **Its screens and actions** | Two to four screens to start, as tabs |
 | **Its name** | It becomes **`{prefix}-app-<name>`** (lowercase letters, digits and dashes; 30 characters in all): write the full name |
-| **Where its code goes** | `/Workspace/Users/<their email>/apps/{prefix}-app-<name>` |
+| **Where its code goes** | Part of a project (the skill **start-a-project**): the project's `app/` folder, `/Workspace/Users/<their email>/projects/{prefix}-<project>/app`, so the project moves into Git as one repository. On its own: `/Workspace/Users/<their email>/apps/{prefix}-app-<name>` |
 | **Leave it on?** No (suggested), or yes | **No:** it may be turned off when it isn't needed, and costs less. **Yes:** it runs all the time, for an app people rely on every day. Ask each time: it's the app's `LEAVE_ON` tag |
 
 ## 2. Start: a new app, or the one that exists
