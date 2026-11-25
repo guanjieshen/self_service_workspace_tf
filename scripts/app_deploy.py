@@ -19,7 +19,8 @@ grants, workspace assignment, the usage policy) Terraform grants (terraform/self
    c. the database and its readers' roles if missing, then the migrations and grants, as the
       deploying identity: it must own the database or be a Lakebase superuser there (a first
       install makes it the owner; run every deploy as the same one);
-   d. deploy the bundle, then each app's new code, so new code never meets an old database.
+   d. deploy the bundle, then each app's new code, so new code never meets an old database
+      (a standard app that should run several copies, app.yaml instances, is converted first).
 3. Each served workspace: its schema job, in the hub, which only the hub's two apps may run
    (app_ids in hub.yaml). A first install has none yet: the
    deploy prints them; set them in a pull request, whose deploy then grants them.
@@ -32,6 +33,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -125,6 +127,26 @@ def project_exists(host, project):
     return True
 
 
+def convert_to_scaled(host, name, instances):
+    """An existing standard app, made horizontally scaled (app.yaml self_service_app.instances):
+    Databricks converts one only at 1 copy, with no outage; the bundle deploy then sets the number.
+    A new app is made with it, and one already scaled is left to the bundle."""
+    if not instances:
+        return
+    found = cli(host, "apps", "get", name, missing_ok=True)
+    if not found or found.get("compute_min_instances"):
+        return
+    print(f"Converting {name} to horizontal scaling (1 copy first; it keeps serving meanwhile)...", flush=True)
+    for _ in range(60):   # an app's compute takes an update only once it is running or stopped
+        if (found.get("compute_status") or {}).get("state") in ("ACTIVE", "STOPPED"):
+            break
+        time.sleep(10)
+        found = cli(host, "apps", "get", name)
+    cli(host, "apps", "create-update", name, "--json", json.dumps({   # waits until the update is done
+        "update_mask": "compute_min_instances,compute_max_instances",
+        "app": {"name": name, "compute_min_instances": 1, "compute_max_instances": 1}}))
+
+
 def deploy_hub(s, spokes, plan):
     """The hub; returns the apps' service principals' application IDs."""
     host, app = s["hub"]["host"], s["app"]
@@ -144,6 +166,7 @@ def deploy_hub(s, spokes, plan):
     # The endpoint, looked up every time (never stored): a new database gets a new one.
     db_host = cli(host, "postgres", "get-endpoint", f"{branch}/endpoints/primary")["status"]["hosts"]["host"]
     app_build.build_hub(s, spokes, database_host=db_host)
+    convert_to_scaled(host, app["name"], app.get("instances"))
     run(host, HUB, "databricks", "bundle", "deploy", "-t", "hub", "--auto-approve")
 
     ids = {key: cli(host, "apps", "get", name)["service_principal_client_id"]

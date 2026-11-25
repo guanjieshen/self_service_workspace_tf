@@ -10,6 +10,19 @@ is left alone.
 
 ## Unreleased
 
+- **The self-service app can run several copies, so a deploy never takes it down**
+  (`self_service_app.instances` in `app.yaml`, 1 to 5; `null`, the default, keeps one). With 2, a
+  deploy updates one copy at a time and the app keeps serving; one copy failing doesn't take it
+  offline. Each copy is charged. An existing app is converted to horizontal scaling at 1 copy first
+  (the only way Databricks allows, with no outage), then set to the number. Only the self-service
+  app: the approvals app stays as it is.
+- **Open the self-service app to the whole organization:** set `hub.users_group` in `hub.yaml` to
+  `account users` (the app's "Anyone in my organization can use": everyone in the Databricks
+  account, in a workspace or not). Set it there, not in the app's Share dialog: a deploy replaces
+  the app's permissions with the bundle's.
+  **The first deploy after an upgrade:** nothing changes until you set them. With `instances: 2`,
+  the hub's deploy converts the self-service app, then runs it on 2 copies.
+
 - **An app that is part of a project goes in the project's `app/` folder** (the skill
   build-a-databricks-app), so a project's pipeline, dashboards and app move into Git as one
   repository. An app on its own still goes in `apps/<prefix>-app-<name>`.

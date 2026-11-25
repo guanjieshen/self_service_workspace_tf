@@ -57,6 +57,16 @@ browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py
   the request, its details and the approver's steps are ready.
 - **Persona notes** (`self_service_app.persona_notes`): a line under each access level on the
   workspace access page, for example which account to ask with.
+- **Who may open the self-service app** is `hub.users_group`, the bundle's only `CAN_USE` grant on it
+  (authoritative: a deploy removes anything shared by hand). **`account users` is the app's "Anyone
+  in my organization can use"**: every user and service principal in the account, in a workspace or
+  not (tested; the docs' name `All account users` is accepted by the API but grants nothing).
+- **Several copies of the self-service app** (`self_service_app.instances`, 1 to 5; horizontal
+  scaling): the bundle's `compute_min_instances` and `compute_max_instances`. A deploy then updates
+  one copy at a time (no outage: tested, a redeploy with 2 served every request). Databricks
+  converts an existing standard app only at 1 copy, so `app_deploy.convert_to_scaled` does that
+  first (`databricks apps create-update`, waiting for the app to be running or stopped), then the
+  bundle sets the number. Only the self-service app; the approvals app stays standard.
 - **Temporary schemas replace personal ones** (the card and `/schema` are gone; `/schema`
   redirects). On their temporary schema a person may **extend it** (30 days,
   `portal.EXTENSION_DAYS`, as often as they like): kind `temporary_extension` (migration 008, with the
