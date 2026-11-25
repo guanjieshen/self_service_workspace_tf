@@ -102,7 +102,10 @@ class Builds(unittest.TestCase):
         self.assertEqual([r["name"] for r in apps["self_service"]["resources"]], ["database"], "no jobs: they are in other workspaces")
         first = app_build.hub_target(self.s, database=False)["targets"]["hub"]["resources"]["apps"]
         self.assertEqual(first["self_service"]["resources"], [], "a first install's first pass: no database yet")
-        self.assertNotIn("compute_min_instances", apps["self_service"], "instances null: a standard app")
+        standard = json.loads(json.dumps(self.s))
+        standard["app"]["instances"] = None   # this repository's app.yaml may set it
+        self.assertNotIn("compute_min_instances", app_build.hub_target(standard)["targets"]["hub"]["resources"]["apps"]["self_service"],
+                         "instances null: a standard app")
 
     def test_instances_scale_only_the_self_service_app(self):
         s = json.loads(json.dumps(self.s))
