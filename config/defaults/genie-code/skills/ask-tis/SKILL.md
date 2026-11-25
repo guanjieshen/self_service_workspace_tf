@@ -1,31 +1,47 @@
 <!--
-DEFAULT GENIE CODE SKILL: deployed to /Workspace/.assistant/skills/ask-tis/. Writes the request
-when someone needs something the platform team (TIS) provides, and records it in the project.
+DEFAULT GENIE CODE SKILL: deployed to /Workspace/.assistant/skills/ask-tis/. Works out what someone
+needs from TIS, sends them to the right place for it, and records it in the project.
 -->
 ---
 name: ask-tis
-description: Use when someone needs something they can't or shouldn't do themselves in this workspace: a permanent schema, access to a workspace or a folder group, a production dataset, a connection to another system, network access to an outside service or API, a service principal, classic compute, or anything a check refused for lack of permission. Says where to ask (the self-service app first) and writes the request, ready to send, then records it in the project's AGENTS.md.
+description: "Use when someone needs something they can't or shouldn't make themselves in this workspace: a schema to keep their work, more time for a temporary schema, a workspace folder, a group to share with, workspace access, a domain, access to a table, a production dataset, a connection to another system, network access to an outside service or API, a service principal, classic compute, or anything a check refused for lack of permission. Works out what they need, sends them to the right place (the self-service app, the table's owner, their platform team, or a request to TIS), and records it in the project's AGENTS.md."
 ---
 
 # Ask TIS
 
-TIS (the platform team) provides what citizen developers don't make themselves. Help them ask once, clearly, in the right place, and keep a record.
+TIS (the platform team) provides what people don't make themselves. Each thing has one right place to ask: find out what they need, then send them there.
 
-## 1. Where to ask
+## 1. What do they need?
 
-| They need | Ask in |
-| --- | --- |
-| A **permanent schema** (project or team) | The self-service app: **Request a permanent schema** |
-| More time for a **temporary schema** | The self-service app: **Extend temporary schema** (no approval) |
-| A **workspace folder** | The self-service app: **Request a workspace folder** |
-| A group added to the workspace, **to share folders with** | The self-service app: **Add a group to your workspace** |
-| **Workspace access** (Explorer, Builder, Publisher) | The self-service app: **Request workspace access** (Builder and Publisher with their Azure PIM account) |
-| **A domain** | The self-service app: **Request a domain** (coming soon: until then, as below) |
-| Anything else: a production dataset, a connection, network access, a service principal, classic compute | The request below, sent to TIS (a request form for these is being set up) |
+Often they say what they're stuck on ("it says permission denied", "I need the SAP data"), not what to ask for. Work it out with them, in plain words:
 
-## 2. Write the request
+- **What they're trying to do,** and what stopped them (the error, if there is one).
+- **The exact thing:** which table, system, schema, folder or group; read only, or changing it too.
+- **For what:** the project (`<prefix>-<project>`), its APPID, who else will use it.
 
-For anything not in the self-service app, write it for them to send, short and complete:
+If they don't need TIS after all (the table is there and they can read it, the error was a typo), say so and carry on.
+
+## 2. Send them to the right place
+
+| They need | Where | What happens |
+| --- | --- | --- |
+| A schema to **keep** a project's or team's work | Self-service app: **Request a permanent schema** (add the team's Entra ID group for a team schema) | A person approves it |
+| A place to **try things** | Self-service app: **Create a temporary schema**, signed in with the account its page asks for (for example their Azure PIM account, `azure-...`). One per person at a time by default | Made straight away; deleted with its contents on its `cd_expires` date |
+| Their temporary schema **was deleted** | Self-service app: **Create a temporary schema** again | Its old tables can't be recovered: say so plainly |
+| **More time** for their temporary schema | Self-service app: **Extend** on the temporary schema's card (or the banner warning it's about to be deleted) | Straight away |
+| A **workspace folder** for a team | Self-service app: **Request a workspace folder** | A person approves it; an admin makes it |
+| A group in the workspace, **to share folders with** | Self-service app: **Add a group to your workspace** | An admin sets it up, then approves it |
+| **Workspace access**, or a different persona (Explorer, Builder, Publisher) | Self-service app: **Request workspace access** (the note under each persona says which account to ask with) | A person approves it |
+| **A domain** | A request to TIS (section 3): the app's **Request a domain** form is a preview for now and sends nothing | TIS decides |
+| **Read access to a table** that exists | Its owner: Catalog Explorer > the table > **Request access** | The owner decides. If there's no owner to ask, or no answer: a request to TIS |
+| A **project usage policy** (to charge work to its own budget) | A request to TIS (section 3) | TIS decides |
+| A production dataset, a connection to another system, network access, a service principal, classic compute | **A request to TIS** (section 3) | TIS decides and tells them |
+
+In the self-service app, help them fill in the form: the name, the reason in a sentence, the group. If its tile says **Coming soon**, or the app refuses, write a request to TIS instead.
+
+## 3. A request to TIS
+
+Write it for them to send, short and complete:
 
 ```
 What: <the thing, exactly: the table, the system and its address, the access level>
@@ -35,8 +51,8 @@ When: <when they need it, and what waits on it>
 Details: <anything TIS will ask: the data's sensitivity, how often, who owns the other system>
 ```
 
-Never put a password or a key in it: TIS tells them how to hand a secret over.
+Never put a password or a key in it: TIS tells them how to hand a secret over. Ask how their team reaches TIS if you don't know.
 
-## 3. Record it
+## 4. Record it
 
-Add a row to the project's `AGENTS.md`, under **Asked of TIS**: the date, what was asked, where (the app, or the request), and its status. Update it when TIS answers, so the next session knows what is waiting.
+Add a row to the project's `AGENTS.md`, under **Asked of TIS**: the date, what was asked, where (the app, the owner, or a request), and its status. Update it when it's answered, so the next session knows what is waiting. No project yet? Tell them what was asked and where, so they can keep it.

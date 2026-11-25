@@ -10,7 +10,7 @@ in every workspace.
 -->
 ---
 name: build-tagged-assets
-description: Use when creating or changing anything that runs on compute or that people use, such as a job, pipeline, cluster, serverless notebook, model serving endpoint, SQL warehouse, app, dashboard or Genie space, so that it carries the tags used for chargeback. Also use when asked why an asset is missing tags or which tags or usage policy to use.
+description: "Use when creating or changing anything that runs on compute or that people use, such as a job, pipeline, cluster, serverless notebook, model serving endpoint, SQL warehouse, app, dashboard or Genie space, so that it carries the tags used for chargeback. Also use when asked why an asset is missing tags or which tags or usage policy to use."
 ---
 
 # Build assets that carry the chargeback tags
