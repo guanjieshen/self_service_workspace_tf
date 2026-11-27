@@ -12,7 +12,7 @@
 ] %}
 {% set request = persona_links %}
 
-{% call callout() %}{% if workspace %}This is access to <span class="strong">{{ workspace.bu }} · {{ workspace.name }}</span>, your business unit's workspace. {% endif %}Everyone starts with Consumer access to shared dashboards, Genie and apps. Additional access requires approval and typically takes effect within an hour.{% endcall %}
+{% call callout() %}{% if workspace %}Access to <span class="strong">{{ workspace.bu }} · {{ workspace.name }}</span>, your business unit's workspace. {% endif %}Everyone starts with Consumer access to shared dashboards, Genie and apps. Additional access needs approval and usually takes effect within an hour.{% endcall %}
 
 <div class="options">
   {% for key, name, summary, can, ready in personas %}
@@ -35,7 +35,7 @@
     {% elif not ready %}
     {#- Coming soon: the card's foot keeps its place, so every card has the same shape. -#}
     <div class="option-foot">
-      <button type="button" disabled title="Not offered yet">Unavailable {{ icon("info", "icon icon-xs") }}</button>
+      <button type="button" disabled title="Not offered yet">Coming soon {{ icon("info", "icon icon-xs") }}</button>
     </div>
     {% endif %}
   </div>

@@ -33,6 +33,7 @@ resources:
         - {name: days, default: ""}
         - {name: comment_model, default: ""}
         - {name: temporary_limit, default: ""}
+        - {name: by, default: ""}   # an approver acting for the schema's owner (user), from the approvals app
       tasks:
         - task_key: create
           max_retries: 0

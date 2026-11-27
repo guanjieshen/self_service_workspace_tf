@@ -43,20 +43,20 @@ WORKSPACE_GROUPS = ("admins", "users")
 TASKS = {"personal_schema": "Create a personal schema", "team_folder": "Request a workspace folder"}
 # The personal schema job also makes named schemas: a project schema (the requester's) and a
 # team schema (the requester's and one of their groups').
-PROJECT_SCHEMA, TEAM_SCHEMA = "Request a project schema", "Request a team schema"
+PROJECT_SCHEMA, TEAM_SCHEMA = "Request a permanent schema", "Request a team schema"
 # ... and a temporary schema: the requester's alone, <prefix>tmp_<name>, tagged to expire (one at a time),
 # with more time for it: straight away, unless app.yaml human_approval lists temporary_extension. (Keeping
 # one as a project schema, temporary_conversion, is not offered for now: it may need a rename. Its label
 # stays, for any sent.)
 TEMPORARY_SCHEMA = "Create a temporary schema"
-TEMPORARY_EXTENSION, TEMPORARY_CONVERSION = "Extend temporary schema", "Keep as a project schema"
+TEMPORARY_EXTENSION, TEMPORARY_CONVERSION = "Extend schema", "Keep as a permanent schema"
 ALWAYS_APPROVED = {"temporary_conversion"}   # whatever app.yaml human_approval says
 EXTENSION_DAYS = (30,)   # the more time someone may ask for at once (one choice for now)
 # How each task is approved, as the catalog and task pages label it. The app's own tasks run
 # straight away (the jobs check every request); a persona is approved in Entra ID.
 APPROVAL = {"schema": "auto", "project_schema": "auto", "team_schema": "auto", "temporary_schema": "auto", "folder": "auto",
             "persona": "required", "temporary_extension": "auto", "temporary_conversion": "required",
-            "domain": "required", "group_request": "required"}   # both made by hand by an approver (ALWAYS_BY_HAND)
+            "domain": "required", "group_request": "required", "schema_delete": "auto", "schema_restore": "auto"}   # both made by hand by an approver (ALWAYS_BY_HAND)
 # A request whose job is not deployed in the hub is made by hand (Portal.manual): recorded and
 # tracked like the others, always for an approver, who makes it (the approvals app says what) and
 # then approves it, which marks it done. The database's kind -> its job. Today the folder job is
@@ -66,7 +66,7 @@ BY_HAND = {"folder": "team_folder"}
 # Always made by hand: an approver does it in a pull request (a domain, or a group for sharing folders,
 # in its workspace's file), then approves it, which marks it done.
 ALWAYS_BY_HAND = {"domain", "workspace_group"}
-DOMAIN, WORKSPACE_GROUP = "Request a domain", "Add a group to your workspace"
+DOMAIN, WORKSPACE_GROUP = "Request a domain", "Add a workspace group"
 APPROVAL_LABELS = {"auto": "Auto-approved", "required": "Approval required"}
 
 
@@ -103,7 +103,7 @@ class BusinessUnitUnavailable(RequestError):
     Never read as "none chosen": that would send them to choose one they cannot save."""
 
     def __init__(self):
-        super().__init__("Your business unit can't be read just now. Try again in a minute.")
+        super().__init__("Your business unit cannot be read right now. Try again in a minute.")
 
 
 @dataclass
@@ -143,10 +143,13 @@ def load_config(path):
 
 
 # Each kind of request, as the requester reads it.
-APPROVAL_TYPES = {"personal_schema": "Personal schema", "project_schema": "Project schema", "team_schema": "Team schema",
+APPROVAL_TYPES = {"personal_schema": "Personal schema", "project_schema": "Permanent schema", "team_schema": "Team schema",
                   "temporary_schema": "Temporary schema", "temporary_extension": "More time for a temporary schema",
-                  "temporary_conversion": "Temporary schema to keep as a project schema", "folder": "Workspace folder",
-                  "domain": "Domain", "workspace_group": "Group added to the workspace"}
+                  "temporary_conversion": "Temporary schema to keep as a permanent schema", "folder": "Workspace folder",
+                  "domain": "Domain", "workspace_group": "Group added to the workspace",
+                  "schema_delete": "Schema deleted", "schema_restore": "Schema permissions restored"}
+# personas_of: an account that does not exist (an empty set too, so it has no persona).
+MISSING = frozenset()
 # The states in which a request waits for a person (the database's request_status).
 WAITING = ("submitted", "replied", "needs_info")
 
@@ -160,8 +163,10 @@ def record_params(row, w):
         catalog = w.jobs["personal_schema"]["tags"].get("cd_catalog", "") if w and "personal_schema" in w.jobs else ""
         params = {"user": row["requested_by"], "catalog": catalog,
                   "schema": "" if row["kind"] == "personal_schema" else row["name"],
-                  "temporary": "true" if row["kind"] in ("temporary_schema", "temporary_extension", "temporary_conversion") else "",
-                  "action": {"temporary_extension": "extend", "temporary_conversion": "convert"}.get(row["kind"], ""),
+                  "temporary": "true" if row["kind"] in ("temporary_schema", "temporary_extension", "temporary_conversion")
+                               or (row["kind"] in ("schema_delete", "schema_restore") and (row.get("details") or {}).get("temporary")) else "",
+                  "action": {"temporary_extension": "extend", "temporary_conversion": "convert", "schema_delete": "purge",
+                             "schema_restore": "restore"}.get(row["kind"], ""),
                   "days": str(row.get("days") or "")}
     return {**params, "owner_group": row.get("owner_group") or "", "reason": row.get("reason") or "", "request_id": row["id"]}
 
@@ -187,6 +192,17 @@ def fill(text, w):
     host = w["host"].rstrip("/")
     return (text.replace("{host}", host).replace("{workspace_id}", workspace_id_of(host, w.get("id")))
                 .replace("{catalog}", w.get("catalog") or "").replace("{business_unit}", (w.get("bu") or "").upper()))
+
+
+def deletes_at(expires, cleanup):
+    """When a temporary schema is really deleted: the daily cleanup keeps it through its cd_expires
+    date and drops it at its first run after (config.json cleanup_at, from the job's schedule). The
+    moment in UTC, ISO, and as text ("30 Nov 2026, 06:00 UTC"); the page shows it in local time."""
+    import zoneinfo
+    c = cleanup or {"hour": 6, "minute": 0, "timezone": "UTC"}
+    day = datetime.date.fromisoformat(expires) + datetime.timedelta(days=1)
+    at = datetime.datetime.combine(day, datetime.time(c["hour"], c["minute"]), zoneinfo.ZoneInfo(c["timezone"])).astimezone(datetime.timezone.utc)
+    return at.isoformat().replace("+00:00", "Z"), at.strftime("%-d %b %Y, %H:%M UTC")
 
 
 def new_request_id():
@@ -231,7 +247,7 @@ def check_reason(reason):
 
 def check_folder(folder):
     if not re.fullmatch(FOLDER, folder or "") or folder in RESERVED_FOLDERS:
-        raise RequestError("The folder name must be lowercase letters, digits and dashes "
+        raise RequestError("The folder name must be lowercase letters, numbers and dashes "
                            f"(and not {', '.join(RESERVED_FOLDERS)}).")
 
 
@@ -303,6 +319,7 @@ class Portal:
         self._bus = {}        # person -> (time read, their business unit or None), for the BU lookup
         self._chosen = {}     # person -> (time read, the business unit they chose or None), without it
         self._toured = {}     # person -> (time read, True): had the guided tour, which stays so
+        self._personas = {}   # (account, workspace) -> (time read, the personas it has there)
 
     # ---- Workspaces and their jobs ----
 
@@ -353,7 +370,7 @@ class Portal:
 
     # ---- The person's business unit: the lookup function (bu_lookup), or the one they chose ----
 
-    NO_BU = "We couldn't find your business unit, so this request can't be sent. Contact your platform admin."
+    NO_BU = "Your business unit was not found, so this request cannot be sent. Contact your platform admin."
 
     def business_units(self):
         """The business units the app serves: each served workspace's prefix, upper case."""
@@ -414,7 +431,7 @@ class Portal:
             bu = (rows[0][0] or "").strip().upper() or None
         except Exception as e:
             warn(f"looking up the business unit of {user}", e)
-            raise RequestError("Your business unit can't be checked just now. Try again in a minute.") from e
+            raise RequestError("Your business unit cannot be checked right now. Try again in a minute.") from e
         keep(self._bus, user, bu)
         return bu
 
@@ -479,6 +496,84 @@ class Portal:
         if bu or self.config.get("bu_lookup"):
             mine = [w for w in mine if w["bu"].upper() == bu]
         return mine[0] if mine else None
+
+    # ---- A person's two accounts, and what each may do in a workspace ----
+
+    def account_pair(self, user):
+        """(regular, privileged) for a person, from either account they sign in with: the privileged
+        (Azure PIM) one is the prefix and the regular email (app.yaml jobs.privileged_account_prefix,
+        for example azure- for azure-jane.doe@enbridge.com). None when it is not set: one account."""
+        prefix, user = (self.config.get("privileged_account_prefix") or "").lower(), user.lower()
+        if not prefix:
+            return None
+        return (user[len(prefix):], user) if user.startswith(prefix) else (user, prefix + user)
+
+    def personas_of(self, account, w):
+        """The personas an account has in a workspace ({"explorer", "builder", "publisher"}): its persona
+        groups (config.json workspaces[].groups, from Terraform) through which it reaches the workspace's
+        catalog, as Unity Catalog's effective permissions say (Terraform owns the catalog's grants, so
+        those are the persona groups). Group membership counts. MISSING when there is no such account;
+        None when it cannot be checked."""
+        key = (account, w["name"])
+        cached = self._personas.get(key)
+        if cached and time.time() - cached[0] < 600:
+            return cached[1]
+        groups = w.get("groups") or {}
+        if not groups or not w.get("catalog"):
+            return None
+        try:
+            out = self.hub().api_client.do("GET", f"/api/2.1/unity-catalog/effective-permissions/catalog/{w['catalog']}",
+                                           query={"principal": account})
+        except Exception as e:
+            if "could not find principal" in str(e).lower():
+                found = MISSING   # no such account
+            else:
+                warn(f"reading the personas of {account} in {w['name']}", e)
+                return None
+        else:
+            via = {a.get("principal") for a in out.get("privilege_assignments") or []}
+            found = {p for p, names in groups.items() if via & set(names or [])}
+        keep(self._personas, key, found)
+        return found
+
+    def access_for(self, user):
+        """The catalog's workspace access card, for each of the person's workspaces: Explore with Genie
+        (Genie One, their regular account: any persona) and Build in Databricks (the workspace, their
+        privileged account: builder or publisher), each shown only when that account has it. The
+        hint to open the other in a private window shows under the one they are not signed in for.
+        When a persona cannot be checked: Explore only (Databricks still decides)."""
+        pair = self.account_pair(user)
+        regular, privileged = pair or (user, user)
+        signed_in_privileged = bool(pair) and user.lower() == privileged
+        try:
+            mine = self.workspaces_for(user, "personal_schema")
+        except RequestError:
+            w = self.my_workspace(user)
+            mine = [w] if w else []
+        out = []
+        for w in mine:
+            w = w if isinstance(w, dict) else next((x for x in self.config["workspaces"] if x["name"] == w.name), None)
+            if not w:
+                continue
+            explore_p, build_p = self.personas_of(regular, w), self.personas_of(privileged, w)
+            explore = explore_p is None or bool(explore_p)
+            build = bool(build_p) and bool({"builder", "publisher"} & build_p)
+            # Without builder or publisher, Build in Databricks is shown greyed out, saying why (not when
+            # it cannot be checked: then only Explore, as before).
+            blocked = None if build or build_p is None else \
+                "Privileged (PIM) account not available" if build_p is MISSING else "Builder access required"
+            host = w["host"].rstrip("/")
+            wid = workspace_id_of(host, w.get("id"))
+            switch = "Switching accounts? Right-click to open in a private window."
+            out.append({"name": w["name"], "title": w.get("title") or f"{w['bu'].upper()} workspace",
+                        "explore": {"href": f"{host}/one" + (f"?o={wid}" if wid else ""),
+                                    "account": "Regular account", "email": regular if pair else "",
+                                    "hint": switch if signed_in_privileged else ""} if explore else None,
+                        "build": {"href": f"{host}/" + (f"?o={wid}" if wid else ""),
+                                  "account": "Privileged (PIM) account", "email": privileged if pair else "",
+                                  "hint": switch if pair and not signed_in_privileged and build else "",
+                                  "blocked": blocked} if build or blocked else None})
+        return out
 
     def genie_one(self, user, prompt=""):
         """Genie One in the person's own workspace, with a first question if one is given (its
@@ -559,14 +654,15 @@ class Portal:
         tags = w.jobs["personal_schema"]["tags"]
         catalog, prefix = tags.get("cd_catalog", ""), tags.get("cd_prefix", "cd_")
         try:
-            asked = [r for r in self.store.requests_of(user) if r["kind"] == "temporary_schema" and r["workspace"] == ws_name
+            accounts = self.account_pair(user) or (user,)
+            asked = [r for a in accounts for r in self.store.requests_of(a) if r["kind"] == "temporary_schema" and r["workspace"] == ws_name
                      and r["state"] not in ("rejected", "start_failed")]
         except Exception as e:
             warn(f"reading {user}'s temporary schemas", e)
             return none
         today = datetime.date.today().isoformat()
         live, pending = [], None
-        for schema in dict.fromkeys([r["name"] for r in asked] + [schema_name(user, prefix)]):   # newest first, no repeats
+        for schema in dict.fromkeys([r["name"] for r in asked] + [schema_name(a, prefix) for a in accounts]):   # newest first, no repeats
             try:
                 out = self.hub().api_client.do("GET", f"/api/2.1/unity-catalog/entity-tag-assignments/schemas/{catalog}.{schema}/tags")
             except Exception as e:
@@ -577,10 +673,11 @@ class Portal:
                     pending = f"{catalog}.{schema}"   # being made
                 continue   # never made, dropped by the cleanup, or by an admin
             t = {a["tag_key"]: a.get("tag_value", "") for a in out.get("tag_assignments") or []}
-            if t.get("cd_schema_kind") == "temporary" and t.get("cd_user") == user and t.get("cd_expires", "") >= today:
+            if t.get("cd_schema_kind") == "temporary" and t.get("cd_user", "").lower() in accounts and t.get("cd_expires", "") >= today:
                 expires = datetime.date.fromisoformat(t["cd_expires"])
                 left = (expires - datetime.date.today()).days
-                live.append({"name": f"{catalog}.{schema}", "expires": t["cd_expires"], "days_left": left,
+                iso, text = deletes_at(t["cd_expires"], self.config.get("cleanup_at"))
+                live.append({"name": f"{catalog}.{schema}", "expires": t["cd_expires"], "days_left": left, "deletes_at": iso, "deletes_text": text,
                              "days_total": max(lifetime(t, expires, int(self.config.get("temporary_days") or 30)), left),
                              "link": f"{w.host}/explore/data/{catalog}/{schema}"})   # opens in their own workspace
         live.sort(key=lambda x: x["expires"])
@@ -672,9 +769,8 @@ class Portal:
         job = w.jobs["personal_schema"]
         prefix = job["tags"].get("cd_prefix", "cd_")
         if temporary:
-            self.check_temporary_account(user)
             if not schema or owner_group:
-                raise RequestError("A temporary schema needs a name, and is yours alone.")
+                raise RequestError("A temporary schema needs a name and belongs to you alone.")
             check_schema(schema, prefix)
             schema = temporary_prefix(prefix) + schema
             have = self.temporary_schema(ws_name, user)
@@ -690,7 +786,7 @@ class Portal:
         if owner_group and not schema:
             raise RequestError("A team schema needs a name.")
         if owner_group and not re.fullmatch(GROUP, owner_group):
-            raise RequestError("The team's group must be an Entra ID group's name: letters, digits, spaces and . _ -.")
+            raise RequestError("The team's group must be the exact name of an Entra ID group: letters, numbers, spaces and . _ -.")
         catalog = job["tags"].get("cd_catalog", "")
         resource = f"{catalog}.{schema or schema_name(user, job['tags'].get('cd_prefix', 'cd_'))}"
         pending = self._one_at_a_time(ws_name, user, "personal_schema", resource)
@@ -707,21 +803,120 @@ class Portal:
         human_approval lists temporary_extension, run once an approver approves it (the request's
         ID); the job adds the days to its cd_expires."""
         if days not in EXTENSION_DAYS:
-            raise RequestError(f"More time is {' or '.join(map(str, EXTENSION_DAYS))} days.")
+            raise RequestError(f"Choose {' or '.join(map(str, EXTENSION_DAYS))} more days.")
         return self._about_temporary(ws_name, user, "extend", reason, schema, days)
 
-    def temporary_account(self, user):
-        """Whether this account may create a temporary schema: its email starts with app.yaml
-        jobs.temporary_schema.account_prefix (for example an admin account), or no prefix is set.
-        Extending one is for its owner, with the account that made it. The job checks again."""
-        prefix = (self.config.get("temporary_account_prefix") or "").lower()
-        return not prefix or (user or "").lower().startswith(prefix)
+    def delete_schema(self, ws_name, user, schema, confirm):
+        """Delete one of the person's schemas now, with everything in it (the job: DROP SCHEMA ...
+        CASCADE): one of their temporary schemas (my_schemas: either of their accounts made it).
+        confirm: its name, typed by them, as the page asks. Runs straight away."""
+        if (confirm or "").strip().lower() != (schema or "").split(".")[-1].lower() or not schema:
+            raise RequestError("Type the schema's name exactly to delete it.")
+        w = self.workspace(ws_name, "personal_schema")
+        self._check_bu(user, w, "personal_schema")
+        found = next((s for s in self.my_schemas(ws_name, user) if schema in (s["name"], s["name"].split(".", 1)[1])), None)
+        if not found:
+            raise RequestError("Choose one of your temporary schemas.")
+        catalog, name = found["name"].split(".", 1)
+        temporary = found["kind"] == "temporary"
+        reason = "Deleted by its requester in the self-service app."
+        params = {"user": user, "catalog": catalog, "schema": name, "owner_group": "", "reason": reason,
+                  "temporary": "true" if temporary else "", "action": "purge", "days": ""}
+        self._personal.pop((ws_name, user, "temporary"), None)
+        return self._start(w, "personal_schema", user, name, "", reason, params, kind="schema_delete",
+                           details={"temporary": temporary, "owner": user})
 
-    def check_temporary_account(self, user):
-        if not self.temporary_account(user):
-            prefix = self.config["temporary_account_prefix"]
-            raise RequestError(f"Temporary schemas are made with your {prefix} account: sign in with the account whose email "
-                               f"starts with {prefix} (for example {prefix}{user.split('@', 1)[0]}@...) and ask again.")
+    def my_schemas(self, ws_name, user):
+        """The schemas the person may delete or restore the permissions of themselves: their temporary
+        schemas (either account). Permanent schemas are not offered to people: an approver handles them.
+        [{"name": catalog.schema, "kind": "temporary"}]."""
+        return [{"name": t["name"], "kind": "temporary"} for t in self.temporary_schema(ws_name, user).get("schemas") or []]
+
+    def restore_permissions(self, ws_name, user, schema, owner=None):
+        """Give a temporary schema the grants it got when it was made (the job: the privileged account
+        read and write, the regular account read), for when someone removed their own. For the person's
+        own (my_schemas); owner: an approver doing it for the schema's owner (the approvals app). Runs
+        straight away."""
+        w = self.workspace(ws_name, "personal_schema")
+        if owner is None:
+            self._check_bu(user, w, "personal_schema")
+            found = next((s for s in self.my_schemas(ws_name, user) if schema in (s["name"], s["name"].split(".", 1)[1])), None)
+            if not found:
+                raise RequestError("Choose one of your temporary schemas.")
+        else:
+            found = next(({**s, "kind": "temporary"} for s in self.temporary_schemas_everywhere() if s["workspace"] == ws_name and s["name"] == schema), None)
+            if not found:
+                raise RequestError("That temporary schema no longer exists.")
+        catalog, name = found["name"].split(".", 1)
+        reason = "Permissions restored " + ("by its owner" if owner is None else f"for {owner} by an approver") + " in the self-service app."
+        params = {"user": owner or user, "by": user if owner else "", "catalog": catalog, "schema": name, "owner_group": "", "reason": reason,
+                  "temporary": "true" if found["kind"] == "temporary" else "", "action": "restore", "days": ""}
+        self._personal.pop((ws_name, owner or user, "temporary"), None)
+        return self._start(w, "personal_schema", user, name, "", reason, params, kind="schema_restore",
+                           details={"temporary": found["kind"] == "temporary", "owner": owner or user}, by_approver=owner is not None)
+
+    def temporary_schemas_everywhere(self):
+        """Every temporary schema the app made, in every workspace it serves, for the approvals app:
+        [{"workspace", "bu", "name", "owner", "expires", "days_left"}], soonest deleted first. The
+        app sees each catalog's schemas (BROWSE) and their tags."""
+        today, out = datetime.date.today(), []
+        for w in self.workspaces():
+            if "personal_schema" not in w.jobs:
+                continue
+            tags = w.jobs["personal_schema"]["tags"]
+            catalog, prefix = tags.get("cd_catalog", ""), tags.get("cd_prefix", "cd_")
+            try:
+                found = self.hub().api_client.do("GET", "/api/2.1/unity-catalog/schemas", query={"catalog_name": catalog})
+            except Exception as e:
+                warn(f"listing the schemas of {catalog}", e)
+                continue
+            for s in found.get("schemas") or []:
+                name = s.get("name", "")
+                if not name.startswith(prefix):
+                    continue
+                try:
+                    out_tags = self.hub().api_client.do("GET", f"/api/2.1/unity-catalog/entity-tag-assignments/schemas/{catalog}.{name}/tags")
+                except Exception:
+                    continue
+                t = {a["tag_key"]: a.get("tag_value", "") for a in out_tags.get("tag_assignments") or []}
+                if t.get("cd_schema_kind") != "temporary" or not t.get("cd_expires"):
+                    continue
+                expires = datetime.date.fromisoformat(t["cd_expires"])
+                iso, text = deletes_at(t["cd_expires"], self.config.get("cleanup_at"))
+                out.append({"workspace": w.name, "bu": w.bu, "name": f"{catalog}.{name}", "owner": t.get("cd_user", ""),
+                            "expires": t["cd_expires"], "days_left": (expires - today).days, "deletes_at": iso, "deletes_text": text})
+        return sorted(out, key=lambda x: x["expires"])
+
+    def admin_extend_temporary(self, ws_name, admin, schema):
+        """An approver gives someone's temporary schema 30 more days (EXTENSION_DAYS; the approvals app):
+        straight away, even when more time normally waits for an approver, since one asked."""
+        found = next((s for s in self.temporary_schemas_everywhere() if s["workspace"] == ws_name and s["name"] == schema), None)
+        if not found:
+            raise RequestError("That temporary schema no longer exists.")
+        w = self.workspace(ws_name, "personal_schema")
+        catalog, name = schema.split(".", 1)
+        days = EXTENSION_DAYS[0]
+        reason = f"Extended {days} days for {found['owner']} by an approver in the self-service app."
+        params = {"user": found["owner"], "by": admin, "catalog": catalog, "schema": name, "owner_group": "", "reason": reason,
+                  "temporary": "true", "action": "extend", "days": str(days)}
+        self._personal.pop((ws_name, found["owner"], "temporary"), None)
+        return self._start(w, "personal_schema", admin, name, "", reason, params, kind="temporary_extension",
+                           details={"owner": found["owner"]}, by_approver=True)
+
+    def admin_delete_temporary(self, ws_name, admin, schema, confirm):
+        """An approver deletes someone's temporary schema (the approvals app), typed name confirmed."""
+        if (confirm or "").strip().lower() != (schema or "").split(".")[-1].lower() or not schema:
+            raise RequestError("Type the schema's name exactly to delete it.")
+        found = next((s for s in self.temporary_schemas_everywhere() if s["workspace"] == ws_name and s["name"] == schema), None)
+        if not found:
+            raise RequestError("That temporary schema no longer exists.")
+        w = self.workspace(ws_name, "personal_schema")
+        catalog, name = schema.split(".", 1)
+        reason = f"Deleted for {found['owner']} by an approver in the self-service app."
+        params = {"user": found["owner"], "by": admin, "catalog": catalog, "schema": name, "owner_group": "", "reason": reason,
+                  "temporary": "true", "action": "purge", "days": ""}
+        return self._start(w, "personal_schema", admin, name, "", reason, params, kind="schema_delete",
+                           details={"temporary": True, "owner": found["owner"]}, by_approver=True)
 
     def _about_temporary(self, ws_name, user, action, reason, schema="", days=None):
         # Any account its owner made it with: one made before account_prefix keeps its owner's account.
@@ -732,7 +927,7 @@ class Portal:
         mine = [x["name"] for x in have["schemas"]]
         chosen = next((n for n in mine if n == schema or n.split(".", 1)[1] == schema), None) if schema else (mine[0] if len(mine) == 1 else None)
         if not mine:
-            raise RequestError("You have no temporary schema to ask about. Create one first.")
+            raise RequestError("You have no temporary schema to extend. Create one first.")
         if chosen is None:
             raise RequestError("Choose which of your temporary schemas this is for.")
         catalog, schema = chosen.split(".", 1)
@@ -787,9 +982,9 @@ class Portal:
         admin team, who add it in a pull request and approve it. Nothing runs. Returns the request's ID."""
         group = (group or "").strip()
         if not re.fullmatch(GROUP, group):
-            raise RequestError("Give the Entra ID group's exact name: letters, digits, spaces and . _ -.")
+            raise RequestError("Enter the Entra ID group's exact name: letters, numbers, spaces and . _ -.")
         if group in WORKSPACE_GROUPS:
-            raise RequestError(f"{group} is every user of a workspace: give your team's own Entra ID group.")
+            raise RequestError(f"{group} includes every user of a workspace. Enter your team's own Entra ID group.")
         check_reason(reason)
         w = self.workspace(ws_name, "workspace_group")
         self._check_bu(user, w, "workspace_group")
@@ -848,15 +1043,17 @@ class Portal:
         job runs (app.yaml human_approval), or before an admin makes it by hand (manual)."""
         return kind in self.config.get("human_approval", ()) or kind in self.manual() or kind in ALWAYS_APPROVED
 
-    def _start(self, w, job_kind, user, name, owner_group, reason, params, kind=None, details=None):
+    def _start(self, w, job_kind, user, name, owner_group, reason, params, kind=None, details=None, by_approver=False):
         """Record the request, then run its job, then link the run to it. Recording comes first,
         so every request that runs has a record: if the database cannot take it, nothing runs.
         Returns the run's ID; for a request an approver must approve first, nothing runs: it
-        returns the request's ID (a string), and the approvals app runs the job once approved."""
+        returns the request's ID (a string), and the approvals app runs the job once approved.
+        by_approver: an approver asked for it (the approvals app), so it runs straight away."""
         if not self.store:
-            raise RequestError("The app's requests database is not set up, so nothing was sent. Tell a platform admin.")
+            raise RequestError("The app's requests database is not set up, so nothing was sent. Contact a platform admin.")
         kind = kind or store_module.db_kind(job_kind, params)
-        if self.needs_approval(kind):
+        approve_first = self.needs_approval(kind) and not by_approver
+        if approve_first:
             waiting = next((r for r in self._requests_of(user) if (r["workspace"], r["kind"], r["name"]) == (w.name, kind, name)
                             and r["state"] in WAITING and not r["run_id"]), None)
             if waiting:   # already asked for: show the one waiting
@@ -868,18 +1065,20 @@ class Portal:
                                        "reason": reason, "days": int(params["days"]) if params.get("days") else None, "details": details})
         except Exception as e:
             warn(f"recording request {request_id}", e)
-            raise RequestError("Your request could not be recorded just now, so it was not sent. Try again in a minute.") from e
-        if self.needs_approval(kind):
+            raise RequestError("Your request could not be recorded right now, so it was not sent. Try again in a minute.") from e
+        if approve_first:
             self._summarize_later({"id": request_id, "kind": kind, "workspace": w.name, "bu": w.bu, "requested_by": user,
                                       "name": name, "owner_group": owner_group, "reason": reason})
             return request_id
         try:
-            run_id = self.hub().jobs.run_now(w.jobs[job_kind]["id"], job_parameters={**params, **self.settings_for(job_kind), "request_id": request_id}).run_id
+            run_id = self.hub().jobs.run_now(w.jobs[job_kind]["id"], job_parameters={
+                **params, **self.settings_for(job_kind), "request_id": request_id,
+                **({"by": params.get("by", "")} if job_kind == "personal_schema" else {})}).run_id
         except Exception as e:   # recorded as failed, and the person told so (not an error page)
             warn(f"starting the {job_kind} job for {request_id} in {w.name}", e)
             self._quietly(self.store.start_failed, request_id, "The job could not be started.")
             raise RequestError("Your request was recorded, but its job could not be started. Try again in a minute; "
-                               "if it keeps failing, tell your platform admin.") from e
+                               "if it keeps failing, contact your platform admin.") from e
         self._quietly(self.store.run_started, request_id, w.name, run_id)
         return run_id
 
@@ -949,7 +1148,7 @@ class Portal:
         try:
             return self.store.requests_of(user)
         except Exception as e:
-            raise RequestError("Your requests cannot be read just now. Try again in a minute.") from e
+            raise RequestError("Your requests cannot be read right now. Try again in a minute.") from e
 
     def replies_needed(self, user):
         """How many of the user's requests wait for their answer to an approver (the My requests
@@ -1164,12 +1363,12 @@ class Portal:
         """The user's requests in every workspace, newest first, from the database: the only
         record of them. RequestError when it cannot be read: there is no other list to show."""
         if not self.store:
-            raise RequestError("The app's requests database is not set up. Tell a platform admin.")
+            raise RequestError("The app's requests database is not set up. Contact a platform admin.")
         try:
             return self._requests_from_store(user)
         except Exception as e:
             warn("reading requests from the database", e)
-            raise RequestError("Your requests cannot be read just now. Try again in a minute.") from e
+            raise RequestError("Your requests cannot be read right now. Try again in a minute.") from e
 
     def _requests_from_store(self, user):
         """Requests from the database; each one's status from its job run (the Jobs API, the

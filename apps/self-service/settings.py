@@ -26,13 +26,13 @@ FAQS = {"getting_started": "How it works", **dict(cards.SECTIONS)}
 
 # Every setting, by section: (key, label, kind). kind: url, text, prompt, date, model, color or count.
 SECTIONS = [
-    ("Header", "The word at the start of both apps' header, and its colour. Empty: the first word of the title in app.yaml, in the default colour.", [
+    ("Header", "The first word of both headers, and its colour. Empty uses the first word of the title in app.yaml and the default colour.", [
         ("brand.name", "Name", "text"),
         ("brand.color", "Colour", "color")]),
     ("Announcement banner", "Show a message at the top of every page, such as planned maintenance.", [
         ("banner.text", "Message", "text"),
         ("banner.until", "Show until", "date")]),
-    ("Guided tour", "The question Genie One is asked the first time someone opens their workspace (the Open Databricks Genie One card), and when they restart the guided tour. {business_unit} and {catalog} are their business unit and its catalog. Empty: Genie One opens with no question.", [
+    ("Guided tour", "The question Genie One is asked when someone first opens their workspace, and when they restart the guided tour. {business_unit} and {catalog} are their business unit and its catalog. Empty: Genie One opens with no question.", [
         ("onboarding.prompt", "Prompt", "prompt")]),
     ("Persona request links", "Links to request each access level, such as a ServiceNow catalog item, for every business unit without links of its own.", [
         (f"persona_request.{p}", p.title(), "url") for p in PERSONAS]),
@@ -40,9 +40,9 @@ SECTIONS = [
         (f"faq.{k}", label, "url") for k, label in FAQS.items()]),
     ("Standard operating procedures", "SOP links shown on each catalog item.", [
         (f"sop.{k}", label, "url") for k, label in SOPS.items()]),
-    ("Temporary schemas", "How many temporary schemas each person may have at a time, 1 to 10. Empty: app.yaml's (1 by default).", [
+    ("Temporary schemas", "How many temporary schemas each person can have at a time, from 1 to 10. Empty uses app.yaml's value (1 by default).", [
         ("temporary.limit", "Per person", "count")]),
-    ("AI model", "The model every AI feature uses, through the hub's AI gateway: the Validate check on forms, the approvers' summary, and new project and team schemas' comments. Empty: no AI (Validate checks the rules only, no summaries, plain comments).", [
+    ("AI model", "The model for every AI feature, through the hub's AI gateway: the Validate check on forms, the approvers' summaries, and new permanent and team schemas' comments. Empty turns AI off: Validate checks the rules only, with no summaries and plain comments.", [
         ("ai.model", "Model", "model")]),
 ]
 # The Settings page's tabs: (key, label, the SECTIONS shown). Onboarding holds what the catalog's

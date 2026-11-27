@@ -41,7 +41,7 @@
         {% if kind == "color" %}<span class="color-swatch" style="background: {{ values[key] or '#ff3621' }}" aria-hidden="true"></span>{% endif %}
         {% if changed %}<p class="hint settings-hint">Last updated {{ changed.at | local }} by {{ changed.by }}
           <button type="submit" class="link-button" form="settings-reset" name="reset" value="{{ key }}">Reset</button></p>
-        {% elif kind == "date" %}<p class="hint">Optional. The banner will automatically disappear after this date.</p>
+        {% elif kind == "date" %}<p class="hint">Optional. The banner hides after this date.</p>
         {% elif defaults[key] %}<p class="hint">Default</p>{% endif %}
       {% endcall %}
       {% endfor %}

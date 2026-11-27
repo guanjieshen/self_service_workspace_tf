@@ -10,6 +10,36 @@ is left alone.
 
 ## Unreleased
 
+- **Each person's two accounts get their schemas** (`jobs.privileged_account_prefix` in `app.yaml`, for
+  example `azure-`; `null`, the default, keeps one account). People ask from either account. A new
+  schema goes to both: the privileged (Azure PIM) account reads and writes it (a permanent schema: all
+  privileges and MANAGE), the regular account reads it (`jobs.regular_account_privileges`, read only).
+  The privileged account must be a **builder or publisher** in the workspace, or the request is
+  refused ("Your Azure PIM account ... is not in the Builder role"). **Removed:**
+  `jobs.temporary_schema.account_prefix` (only those accounts could make temporary schemas): the build
+  refuses an `app.yaml` that still has it.
+- **Workspace access tiles:** **Explore with Genie** (Genie One, the regular account) in Get started,
+  and **Build in Databricks** (the workspace, the privileged account) first in Build, each for the
+  account that has the persona; Build is greyed out, saying why, without one. A hint says to
+  right-click into a private window to switch accounts. They replace the Open Databricks Genie One card.
+- **Delete a temporary schema now** (with everything in it, after typing its name) and **Restore
+  permissions** (its original grants, for someone who removed their own), from the temporary schema's
+  card. Permanent schemas are not offered either.
+- **The admin app's Temporary schemas page:** every temporary schema in the approver's business units,
+  with Extend 30 days, Restore permissions and Delete, on behalf of its owner; they run straight away.
+- **Exact deletion times:** a temporary schema shows when the daily cleanup really deletes it (the
+  morning after its date, from the job's schedule), in each person's time zone. It showed a day early.
+- **Clearer copy across both apps:** the catalog (Citizen Development; Request a domain and Add a
+  workspace group in Get started), the forms, and the admin app's **Approval requests** (Awaiting
+  requester, Requester, Age, no Status column on Pending) with **Review considerations** (Sensitive
+  data, Access scope, Naming convention, Operational impact, Purpose: what to validate, as guidance).
+  **The first plan after an upgrade:** each workspace's Terraform output `self_service` gains
+  `persona_groups` (an output change only). **The first deploy:** runs database migration `010` (two
+  new kinds of request: `schema_delete`, `schema_restore`) and updates both apps and the schema jobs.
+  **Upgrading:** remove `jobs.temporary_schema.account_prefix` from `app.yaml` and set
+  `jobs.privileged_account_prefix` instead (for example `azure-`), and apply each workspace's baseline
+  before the app's deploy (the job needs its `persona_groups`).
+
 - **An app that is part of a project goes in the project's `app/` folder** (the skill
   build-a-databricks-app), so a project's pipeline, dashboards and app move into Git as one
   repository. An app on its own still goes in `apps/<prefix>-app-<name>`.

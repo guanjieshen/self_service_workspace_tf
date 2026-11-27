@@ -57,6 +57,35 @@ browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py
   the request, its details and the approver's steps are ready.
 - **Persona notes** (`self_service_app.persona_notes`): a line under each access level on the
   workspace access page, for example which account to ask with.
+- **Each person's two accounts** (`jobs.privileged_account_prefix`, for example `azure-`): their
+  regular account (their email) and their privileged (Azure PIM) one, the prefix and the email
+  (`Portal.account_pair`, the job's `privileged, regular`). People ask from either. A new schema goes
+  to both: the privileged account gets the schema's privileges (temporary: `temporary_schema.privileges`;
+  permanent: `personal_schema.privileges`), the regular one `jobs.regular_account_privileges` (read
+  only; the build refuses more). The job first checks the privileged account is a **builder or
+  publisher** in that workspace: Unity Catalog's effective permissions on the catalog
+  (`/api/2.1/unity-catalog/effective-permissions/catalog/<catalog>?principal=`, which counts group
+  membership and works for accounts outside the hub), against the workspace's builder and publisher
+  groups (its Terraform output `persona_groups`, written into the notebook as `builder_groups`).
+  Otherwise it refuses: "Your Azure PIM account ... is not in the Builder role". The old
+  `temporary_schema.account_prefix` (only those accounts could make temporary schemas) is gone: the
+  build refuses an `app.yaml` that still has it.
+- **Workspace access tiles** (`Portal.access_for`, catalog.html `access_tile`): **Explore with Genie**
+  (Genie One, the regular account; end of Get started) and **Build in Databricks** (the workspace, the
+  privileged account; first in Build), from the same effective-permissions check (`Portal.personas_of`,
+  cached 10 minutes, the app's own identity). Build is greyed out with why (no PIM account, or no
+  builder access) and hidden only when the check cannot answer (then Explore alone). Plain links, so
+  people right-click to open the other account's in a private window (a page cannot open one).
+- **Delete, restore, extend on behalf** (job actions `purge`, `restore`; kinds `schema_delete`,
+  `schema_restore`, migration 010): people delete (typed name, `DROP SCHEMA ... CASCADE`) or restore the
+  original grants of **their temporary schemas** (`/schema/delete`, `/schema/restore`; not permanent
+  ones). The approvals app's **Temporary schemas** page (`Portal.temporary_schemas_everywhere`) lists
+  every one in the approver's BUs, with Extend 30 days, Restore permissions and Delete: they run
+  straight away (`_start(by_approver=True)`), with job parameters `user` = the owner and `by` = the
+  approver (the request record has the approver).
+- **When a temporary schema is deleted** (`portal.deletes_at`): the cleanup keeps it through
+  `cd_expires` and drops it at its first run after, so the app shows that moment (the schedule from
+  `bundle/hub/resources/cleanup.yml`, `app_build.cleanup_at`), in each person's time zone (app.js).
 - **Temporary schemas replace personal ones** (the card and `/schema` are gone; `/schema`
   redirects). On their temporary schema a person may **extend it** (30 days,
   `portal.EXTENSION_DAYS`, as often as they like): kind `temporary_extension` (migration 008, with the
@@ -64,10 +93,8 @@ browser ──► main.py (FastAPI pages, Jinja templates)  ──►  portal.py
   with `action=extend` (adds the days to `cd_expires`), at once or once approved. **Keeping one as a project schema is not offered
   for now** (it may need a rename): migration 008's `temporary_conversion` kind stays, unused. The app reads the schema's tags from Unity Catalog (`Portal.temporary_schema`,
   the entity tag assignments API), so the card, the form and the reminder (every page, 3 days or
-  fewer: `main.expiring`) follow an extension. **Which accounts may make one:**
-  `jobs.temporary_schema.account_prefix` (for example `azure-`): the form says which account to sign in
-  with (`Portal.check_temporary_account`), and the job refuses others. **Extending one is for its owner**
-  (the job checks `cd_user`), with the account that made it, so one made before the check keeps working. **A request waiting for an approver holds its
+  fewer: `main.expiring`) follow an extension. **Extending, deleting or
+  restoring one is for its owner** (the job checks `cd_user`): either of their two accounts (below). **A request waiting for an approver holds its
   schema:** sent, the job tags it `cd_pending_request` (`action=hold`); the cleanup never deletes a
   held schema; approved, the tag goes with the change; rejected, `Portal.release_hold` runs the job
   with `action=release`. How many temporary schemas a person may have is Settings > Schemas

@@ -36,6 +36,23 @@
 </div>
 {%- endmacro -%}
 
+{#- When a temporary schema is really deleted (portal.deletes_at): UTC in the page, the person's local
+    time once app.js reads it (data-local="full": app.js timeFormats, as every time in the app). -#}
+{%- macro deletion(t) -%}<time datetime="{{ t.deletes_at }}" data-local="full">{{ t.deletes_text }}</time>{%- endmacro -%}
+
+{#- Who gets what on a schema (app.yaml jobs.privileged_account_prefix): each account and its access, in
+    a quiet box. pair: (regular, privileged); levels: (privileged's, regular's). note: a line below. -#}
+{%- macro account_permissions(pair, levels, note="") -%}
+<div class="perm-box">
+  <p class="perm-title">{{ icon("shield", "icon icon-sm") }}Account permissions</p>
+  <dl class="perm-rows">
+    <div><dt><span class="strong">Privileged account</span><span class="meta">{{ pair[1] }}</span></dt><dd>{{ levels[0] }}</dd></div>
+    <div><dt><span class="strong">Regular account</span><span class="meta">{{ pair[0] }}</span></dt><dd>{{ levels[1] }}</dd></div>
+  </dl>
+  {% if note %}<p class="meta">{{ note }}</p>{% endif %}
+</div>
+{%- endmacro -%}
+
 {#- Label and value rows in a card: (label, value) or (label, value, class); empty values are left out. -#}
 {%- macro kv(items) -%}
 <dl class="kv">{% for item in items if item[1] %}<div><dt>{{ item[0] }}</dt><dd{% if item | length > 2 and item[2] %} class="{{ item[2] }}"{% endif %}>{{ item[1] }}</dd></div>{% endfor %}</dl>
@@ -105,8 +122,3 @@
 </ol>
 {%- endmacro -%}
 
-{#- A temporary schema needs an account whose email starts with app.yaml jobs.temporary_schema.account_prefix: which one to use. -#}
-{%- macro wrong_account(account, user, what) -%}
-{% call callout("warning", role="alert") %}{{ what }} with your <span class="strong">{{ account.prefix }}</span> account. You're signed in as
-  <span class="mono">{{ user }}</span>: sign in with the account whose email starts with <span class="mono">{{ account.prefix }}</span>, then come back.{% endcall %}
-{%- endmacro -%}

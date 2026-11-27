@@ -456,7 +456,7 @@ body.is-loading main { opacity: 0.5; pointer-events: none; transition: opacity v
 .text-link { color: var(--text-2); text-decoration: underline; text-underline-offset: 3px; }
 .text-link:hover { color: var(--text); }
 .inbox-row { display: grid; grid-template-columns: minmax(0, 1fr) 160px 84px 96px 112px; gap: var(--s4); align-items: start;
-  padding: var(--s3) var(--s4); transition: background var(--fast); }
+  padding: 10px var(--s4); transition: background var(--fast); }
 a.inbox-row + a.inbox-row, .inbox-day + a.inbox-row { border-top: 1px solid var(--border); }
 a.inbox-row:hover { background: var(--hover); }
 a.inbox-row:focus-visible { box-shadow: inset var(--ring); border-radius: 0; }
@@ -644,10 +644,9 @@ aside .kv dd { text-align: right; }
 /* ---- AI summary: concerns ranked by level, the most important first ---- */
 .concern { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s1) var(--s2); }
 .concern-level { flex: none; padding: 0 6px; border-radius: var(--r-xs); font-size: var(--text-xs); font-weight: var(--semibold); background: var(--subtle); color: var(--text-2); }
-.concern.high { border-left-color: var(--bad); }
-.concern.high .concern-level { background: var(--bad-soft); color: var(--bad); }
-.concern.medium .concern-level { background: var(--warn-soft); color: var(--accent-ink); }
-.concern.low { border-left-color: var(--border-strong); }
+.concern { flex-direction: column; gap: 2px; }   /* label, what to validate, what was noticed: guidance, not a violation */
+.concern-guidance { color: var(--text-2); }
+.concern-detail { color: var(--text-2); font-size: var(--text-sm); }
 .concerns-more { margin-top: var(--s2); }
 .concerns-more summary { cursor: pointer; color: var(--text-2); font-size: var(--text-sm); }
 .concerns-more[open] summary { margin-bottom: var(--s2); }
@@ -662,7 +661,7 @@ aside .kv dd { text-align: right; }
 /* ---- Consistency pass (2026-10-23) ---- */
 /* Figure labels (Overview) and Settings' section names are card labels too. */
 .stat-label, .settings-about h2 { font-size: var(--text-xs); font-weight: var(--semibold); color: var(--text-2); text-transform: uppercase; letter-spacing: 0.06em; }
-/* A label inside a card (Worth checking, Suggested questions): one sub-label style. */
+/* A label inside a card (Review considerations, Suggested questions): one sub-label style. */
 .summary-label { font-size: var(--text-sm); font-weight: var(--semibold); color: var(--text); }
 /* Segmented tabs are as tall as the controls beside them. */
 .tabs a, .tabs button { height: calc(var(--control-h) - 4px); }
@@ -703,3 +702,49 @@ aside .kv dd { text-align: right; }
 .lifebar-fill { height: 100%; background: #16a34a; }
 .life-soon .lifebar-fill { background: #d97706; } .life-soon .lifebar-top span:last-child { color: #92400e; }
 .life-urgent .lifebar-fill { background: #dc2626; } .life-urgent .lifebar-top span:last-child { color: var(--bad); }
+
+/* The workspace access tiles (catalog.html): the account each needs, as a structured foot below a
+   subtle divider, right under the description (which has a fixed height), so the dividers and the
+   account lines line up across the tiles; a switching hint only adds a line below. */
+.access-foot { display: flex; flex-direction: column; gap: var(--s2); margin: 0 0 0 44px; padding-top: var(--s3); border-top: 1px solid var(--subtle); }
+.access-line { display: flex; align-items: flex-start; gap: var(--s2); font-size: var(--text-sm); color: var(--text-2); }
+.access-line .icon { flex: none; width: 14px; height: 14px; margin-top: 2px; color: var(--text-3); }
+.access-kind { display: block; color: var(--text); font-weight: var(--medium); }
+.access-email { display: block; color: var(--text-2); }
+.access-hint { color: var(--text-3); }
+
+/* A temporary schema's actions under its lifebar; Delete in the danger colour. */
+.lifebar-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+.lifebar-actions { display: inline-flex; gap: var(--s3); }
+.task-sop.danger-link { color: var(--bad); }
+/* The approvals app's Temporary schemas table: name over its BU, the owner in full, the date over
+   the days left, and two compact actions on one line. */
+.schemas-list { overflow-x: auto; }
+.schemas-table th { padding-top: var(--s3); }
+.schemas-table th:first-child, .schemas-table td:first-child { padding-left: var(--s4); }
+.schemas-table td { vertical-align: middle; }
+.schemas-table .schema-name { display: block; color: var(--text); }
+.schemas-table .meta { display: block; }
+.schemas-table .owner { color: var(--text); }
+.nowrap { white-space: nowrap; }
+.actions-col { text-align: right; white-space: nowrap; padding-right: var(--s4) !important; }
+.actions-col form { display: inline; }
+.button-sm { height: 28px; padding: 0 var(--s3); font-size: var(--text-sm); display: inline-flex; align-items: center; }
+
+/* Account permissions (_components.account_permissions): each account and its access, in a quiet box. */
+.perm-box { background: var(--subtle); border-radius: var(--r); padding: var(--s4); display: flex; flex-direction: column; gap: var(--s3); }
+.perm-title { display: flex; align-items: center; gap: var(--s2); font-weight: var(--medium); }
+.perm-title .icon { color: var(--text-2); }
+.perm-rows { margin: 0; }
+.perm-rows > div { display: flex; justify-content: space-between; align-items: center; gap: var(--s4); padding: var(--s3) 0 var(--s3) 24px; }
+.perm-rows > div + div { border-top: 1px solid var(--border); }
+.perm-rows dt { display: flex; flex-direction: column; }
+.perm-rows dd { margin: 0; color: var(--text-2); white-space: nowrap; }
+.perm-box > .meta { padding-left: 24px; }
+.done-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s3); }
+.chip-code { background: var(--subtle); border-radius: var(--r-xs); padding: 2px 6px; }
+.callout-body p + p { margin-top: 2px; }
+
+/* Approval requests: the Pending tab has no Status column; denser rows, a clearer hover. */
+.inbox.no-status .inbox-row { grid-template-columns: minmax(0, 1fr) 160px 84px 96px; }
+a.inbox-row:hover { background: var(--hover); box-shadow: inset 2px 0 0 var(--border-strong); }

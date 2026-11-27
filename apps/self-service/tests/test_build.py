@@ -31,7 +31,8 @@ WORKSPACES = {
 }
 OUTPUTS = {
     "fin-citizen-dev": {"enabled": True, "prefix": "fin", "id": "2000000000000002", "host": "https://adb-2000000000000002.2.azuredatabricks.net",
-                        "catalog": "fin_citizen_dev", "usage_policy_id": "policy-fin", "platform_admins": ["fin_platform_admins"]},
+                        "catalog": "fin_citizen_dev", "usage_policy_id": "policy-fin", "platform_admins": ["fin_platform_admins"],
+                        "persona_groups": {"explorer": ["fin-explorers"], "builder": ["fin-builders"], "publisher": ["fin-publishers"]}},
     "ops-citizen-dev": {"enabled": True, "prefix": "ops", "id": "3000000000000003", "host": "https://adb-3000000000000003.3.azuredatabricks.net",
                         "catalog": "ops_citizen_dev", "usage_policy_id": None},
 }
@@ -72,8 +73,10 @@ class Builds(unittest.TestCase):
         config, approvals = self.read(out / "self-service/config.json"), self.read(out / "approvals/config.json")
         self.assertEqual(approvals, {**config, "mode": "approvals"})
         self.assertEqual(config["workspaces"], [
-            {"name": "fin-citizen-dev", "bu": "FIN", "host": "https://adb-2000000000000002.2.azuredatabricks.net", "id": "2000000000000002", "catalog": "fin_citizen_dev", "domains": []},
-            {"name": "ops-citizen-dev", "bu": "OPS", "host": "https://adb-3000000000000003.3.azuredatabricks.net", "id": "3000000000000003", "catalog": "ops_citizen_dev", "domains": []}])
+            {"name": "fin-citizen-dev", "bu": "FIN", "host": "https://adb-2000000000000002.2.azuredatabricks.net", "id": "2000000000000002", "catalog": "fin_citizen_dev", "domains": [],
+             "groups": {"explorer": ["fin-explorers"], "builder": ["fin-builders"], "publisher": ["fin-publishers"]}},
+            {"name": "ops-citizen-dev", "bu": "OPS", "host": "https://adb-3000000000000003.3.azuredatabricks.net", "id": "3000000000000003", "catalog": "ops_citizen_dev", "domains": [],
+             "groups": {}}], "each workspace's persona groups (Terraform's output), for the access tiles")
         self.assertEqual(config["database"]["host"], "ep-example-1.database.canadacentral.azuredatabricks.net")
         self.assertTrue(config["links"]["discover"].startswith("{host}/"), "the app fills in each person's own workspace, not the hub's")
         self.assertEqual(config["ai"], {"model": app_build.ai_model(self.s["app"])}, "one model for every AI feature (an older app.yaml: ai_summary)")
@@ -158,6 +161,8 @@ class Builds(unittest.TestCase):
                 (lambda s: s["app"].update(bu_lookup={"function": "a.b.c"}), "warehouse_id"),
                 (lambda s: s["adopt"].update(database="cd-self-service"), "adopt.database"),
                 (lambda s: s["jobs"].update(temporary_schema={"account_prefix": "azure- ; drop"}), "temporary_schema.account_prefix"),
+                (lambda s: s["jobs"].update(privileged_account_prefix="Azure PIM!"), "privileged_account_prefix"),
+                (lambda s: s["jobs"].update(regular_account_privileges=["SELECT", "MODIFY"]), "regular_account_privileges"),
                 (lambda s: s["app"].update(persona_notes={"admin": "x"}), "persona_notes"),
                 (lambda s: s["app"].update(persona_notes={"builder": "x" * 301}), "persona_notes")):
             with self.subTest(setting=setting):
@@ -176,13 +181,49 @@ class Builds(unittest.TestCase):
             {"key": "eam", "label": "EAM", "depth": 0}])
         self.assertEqual(app_build.domain_tree(None), [])
 
-    def test_the_account_prefix_and_persona_notes_reach_the_app_and_the_job(self):
-        self.s["jobs"]["temporary_schema"] = {**(self.s["jobs"].get("temporary_schema") or {}), "account_prefix": "azure-"}
+    def test_the_privileged_prefix_and_persona_notes_reach_the_app_and_the_job(self):
+        self.s["jobs"]["privileged_account_prefix"] = "azure-"
         self.s["app"]["persona_notes"] = {"explorer": "Your regular account.", "builder": None}
         config = app_build.app_config(self.s, self.spokes)
-        self.assertEqual((config["temporary_account_prefix"], config["persona_notes"]), ("azure-", {"explorer": "Your regular account."}))
+        self.assertEqual((config["privileged_account_prefix"], config["persona_notes"]), ("azure-", {"explorer": "Your regular account."}))
+        self.assertNotIn("temporary_account_prefix", config, "the old key is gone")
         out = app_build.build_jobs(self.s, self.spokes[0], [], root=self.tmp)
-        self.assertIn('temporary_account_prefix = "azure-"', (out / "personal_schema.py").read_text())
+        job = (out / "personal_schema.py").read_text()
+        self.assertIn('privileged_account_prefix = "azure-"', job)
+        self.assertNotIn("temporary_account_prefix", job)
+
+    def test_the_job_gets_the_builder_and_publisher_groups_and_the_read_only_privileges(self):
+        self.s["jobs"]["privileged_account_prefix"] = "azure-"
+        out = app_build.build_jobs(self.s, self.spokes[0], [], root=self.tmp)
+        job = (out / "personal_schema.py").read_text()
+        self.assertIn('builder_groups = ["fin-builders", "fin-publishers"]', job, "only builder and publisher, not explorers")
+        self.assertIn('regular_privileges = ["USE_SCHEMA", "SELECT", "READ_VOLUME", "EXECUTE"]', job, "app.yaml's default: read only")
+        out = app_build.build_jobs(self.s, self.spokes[1], [], root=self.tmp)
+        self.assertIn("builder_groups = []", (out / "personal_schema.py").read_text(), "a workspace without groups: none")
+
+    def test_the_regular_account_privileges_are_read_only_and_say_so(self):
+        self.s["jobs"]["regular_account_privileges"] = ["USE_SCHEMA", "MODIFY"]
+        with self.assertRaises(SystemExit) as e:
+            app_build.check(self.s)
+        self.assertIn("read-only privileges", str(e.exception))
+        self.assertIn("the privileged account writes", str(e.exception))
+        self.s["jobs"]["regular_account_privileges"] = ["USE_SCHEMA", "SELECT", "READ_VOLUME"]
+        app_build.check(self.s)
+
+    def test_the_account_prefix_refusal_names_the_new_setting(self):
+        self.s["jobs"]["temporary_schema"] = {**(self.s["jobs"].get("temporary_schema") or {}), "account_prefix": "azure-"}
+        with self.assertRaises(SystemExit) as e:
+            app_build.check(self.s)
+        self.assertIn("jobs.temporary_schema.account_prefix is replaced by jobs.privileged_account_prefix", str(e.exception))
+
+    def test_the_daily_cleanup_time_goes_to_the_app(self):
+        """config.json's cleanup_at: from bundle/hub/resources/cleanup.yml, so the app says when a temporary schema is really deleted."""
+        self.assertEqual(app_build.cleanup_at(), {"hour": 6, "minute": 0, "timezone": "UTC"})
+        config = app_build.app_config(self.s, self.spokes)
+        self.assertEqual(config["cleanup_at"], {"hour": 6, "minute": 0, "timezone": "UTC"})
+        custom = self.tmp / "cleanup.yml"
+        custom.write_text('resources:\n  jobs:\n    temporary_cleanup:\n      schedule:\n        quartz_cron_expression: "0 30 23 * * ?"\n        timezone_id: Europe/Paris\n')
+        self.assertEqual(app_build.cleanup_at(custom), {"hour": 23, "minute": 30, "timezone": "Europe/Paris"})
 
     def test_the_repositorys_own_settings_load_or_say_what_to_fill_in(self):
         """This repository's hub.yaml is filled in; a release's is blank until set up."""

@@ -27,7 +27,7 @@
         {% if decision and decision.type == "approved" %}<span class="approval-outcome ok">{{ icon("check", "icon icon-xs") }}Approved by {{ decision.actor }}</span>
         {% elif decision %}<span class="approval-outcome bad">Rejected by {{ decision.actor }}</span>
         {% elif r.state == "needs_info" %}<span class="strong">An approver asked you a question</span>
-        {% else %}<span class="strong">Waiting for an approver</span> <span class="hint">({{ label | lower }} requests need approval)</span>{% endif %}
+        {% else %}<span class="strong">Waiting for an approver</span>{% endif %}
       {%- endset -%}
       {{ kv([("Why", r.reason), ("Approval", approval)]) }}
     </section>
@@ -47,24 +47,24 @@
       <div class="card-pad">
         <div class="live-message" role="status">
           {% if decision and decision.type == "rejected" %}
-            <div><p class="strong">It was not approved</p>
+            <div><p class="strong">Not approved</p>
             {% if decision.body %}<p>{{ decision.body }}</p>{% endif %}
-            <p>You can ask again with the changes the approver asked for.</p></div>
+            <p>Send a new request with the changes the approver asked for.</p></div>
           {% elif decision and r.manual %}
             <div><p class="strong">Your {{ noun }} is ready</p>
-            <p>A platform admin created it{% if r.path %} at <span class="mono">{{ r.path }}</span>{% endif %} in <span class="mono">{{ r.workspace }}</span>. You can manage it and share it with others in Databricks.</p></div>
+            <p>A platform admin created it{% if r.path %} at <span class="mono">{{ r.path }}</span>{% endif %} in <span class="mono">{{ r.workspace }}</span>. You can manage it and share it in Databricks.</p></div>
           {% elif decision and r.kind == "temporary_extension" %}
             <div><p class="strong">Approved: {{ r.days }} more days are being added</p>
-            <p>Your temporary schema's new date shows under <a href="/schema/temporary">Create a temporary schema</a> in under a minute.</p></div>
+            <p>The new expiry date shows on <a href="/schema/temporary">your temporary schema</a> within a minute.</p></div>
           {% elif decision and r.kind == "temporary_conversion" %}
-            <div><p class="strong">Approved: your temporary schema is being kept as a project schema</p>
-            <p>In under a minute it is no longer deleted, and you can share it like any project schema. It keeps its name.</p></div>
+            <div><p class="strong">Approved: your temporary schema is becoming a permanent schema</p>
+            <p>Within a minute it no longer expires, and you can share it like any permanent schema. It keeps its name.</p></div>
           {% elif decision %}
             <div><p class="strong">Approved: your {{ noun }} is being created</p>
             <p>Its status shows under <a href="/requests">My requests</a> in under a minute.</p></div>
           {% elif r.state == "needs_info" %}
             <div><p class="strong">An approver needs more information</p>
-            <p>Answer below; your request goes back to the approvers with your reply.</p></div>
+            <p>Answer below. Your request then goes back to the approvers.</p></div>
             <div class="live-actions"><a class="button primary" href="#reply">Answer</a></div>
           {% else %}
             <div><p class="strong">With the approvers</p>

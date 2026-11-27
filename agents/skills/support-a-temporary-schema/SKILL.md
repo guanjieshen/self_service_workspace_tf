@@ -22,9 +22,11 @@ Find them: Catalog Explorer in the person's workspace > the catalog > the schema
 
 | They ask | Do |
 | --- | --- |
-| "When is it deleted?" | Its `cd_expires`; also on the app's card (a bar: N of M days left) and the form |
-| "Extend it" | The owner: in the app, the temporary schema > **Extend temporary schema** (30 days, with a reason), signed in with the account that made it. It is added straight away, as often as they ask. Only if `human_approval` lists `temporary_extension` does it wait for an approver (the schema is held meanwhile): the admin app > Pending Approvals > approve or reject |
-| "Why was it deleted?" | The cleanup's run of that day (the hub > Jobs > Temporary schema cleanup > the run's output): it lists each deleted schema, whose, and how many tables. Nothing deletes one early |
+| "When is it deleted?" | At the daily cleanup after its `cd_expires` date (06:00 UTC the next morning); the app's card shows that time ("Expires", in their time zone) and the days remaining |
+| "Extend it" | The owner: in the app, the temporary schema > **Extend schema** (30 days, with a reason), from either of their accounts. Or an approver for them: the admin app > **Temporary schemas** > **Extend 30 days**. It is added straight away, as often as they ask. Only if `human_approval` lists `temporary_extension` does it wait for an approver (the schema is held meanwhile): the admin app > Pending Approvals > approve or reject |
+| "Why was it deleted?" | The cleanup's run of that day (the hub > Jobs > Temporary schema cleanup > the run's output): it lists each deleted schema, whose, and how many tables. Or its owner or an approver deleted it early in the app (a **Schema deleted** request in My requests or the admin app's All requests) |
+| "I lost access to it" (they removed their own permissions) | The owner: the temporary schema > **Restore permissions**; or an approver: the admin app > **Temporary schemas** > **Restore permissions**. It gives back the grants it had when it was made |
+| "Delete it now" | The owner: the temporary schema > **Delete** (type its name); or an approver: the admin app > **Temporary schemas** > **Delete**. Everything in it is gone for good |
 | "Can I get it back?" | Not from the app. Within 7 days of the deletion a platform admin may recover managed tables (Unity Catalog `UNDROP`); after that, no |
 | "I can't create another" | They are at the limit (the card: N of N used). Wait for one to expire, or extend or drop one |
 | "Allow 2 per person" / "make them last 60 days" | The limit: the admin app > Settings > **Schemas** (no pull request). The days: `jobs.temporary_schema.days` in `config/self-service/app.yaml` (the skill **update-self-service-app**, then **pull-request-from-databricks**) |

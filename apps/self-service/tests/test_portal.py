@@ -23,6 +23,7 @@ HUB = "https://adb-9.azuredatabricks.net"
 CONFIG = {"title": "Citizen Development", "hub_host": HUB, "links": {}, "ai": {"model": "system.ai.claude-sonnet-5-5"}, "workspaces": [
     {"name": "fin", "bu": "FIN", "host": HOST}, {"name": "down", "bu": "OPS", "host": "https://down"}]}
 ANA, BO = "ana@contoso.com", "bo@contoso.com"
+AZ = "azure-ana@contoso.com"   # ANA's privileged account (app.yaml jobs.privileged_account_prefix: azure-)
 WHY = "Monthly reconciliation reports for the team."   # every named schema and folder needs a reason
 
 
@@ -60,6 +61,7 @@ class FakeClient:
         self.groups = ns(list=lambda filter, attributes, count=None: [ns(display_name="fin-data-eng")])
         self.schemas_ = set()          # schemas the app can see (BROWSE); None = it cannot see any
         self.tags_ = {}                # schema -> its tags (cd_schema_kind, cd_user, cd_expires...)
+        self.members_ = {}             # account -> the groups through which it reaches a catalog (effective permissions)
         self.tables_ = {}              # schema -> its tables (Unity Catalog's metadata: names, types, comments, columns)
         self.tables = ns(list=lambda catalog_name, schema_name: iter(self.tables_.get(f"{catalog_name}.{schema_name}", [])))
         self.schemas = ns(get=self.get_schema)
@@ -81,6 +83,16 @@ class FakeClient:
             if name not in self.schemas_:
                 raise NotFound(f"Schema '{name}' does not exist.")
             return {"tag_assignments": [{"tag_key": k, "tag_value": v} for k, v in self.tags_.get(name, {}).items()]}
+        if path.startswith("/api/2.1/unity-catalog/effective-permissions/catalog/"):   # an account's access, through its groups
+            if self.members_ is None:
+                raise PermissionError("not allowed to read effective permissions")
+            account = (query or {}).get("principal", "")
+            if account not in self.members_:
+                raise NotFound(f"Could not find principal with name {account}.")
+            return {"privilege_assignments": [{"principal": g, "privileges": [{"privilege": "USE_CATALOG"}]} for g in self.members_[account]]}
+        if path == "/api/2.1/unity-catalog/schemas":   # a catalog's schemas (BROWSE)
+            catalog = (query or {}).get("catalog_name", "")
+            return {"schemas": [{"name": s.split(".", 1)[1]} for s in sorted(self.schemas_ or ()) if s.split(".", 1)[0] == catalog]}
         if path == "/api/2.0/domains":
             if self.domains_ is None:
                 raise PermissionError("not allowed to list domains")
@@ -304,7 +316,7 @@ class Schemas(unittest.TestCase):
         p, fake = make()
         run_id = p.request_schema("fin", ANA, schema="sales_bookings", reason=WHY)
         self.assertEqual((fake.started[0][1]["schema"], fake.started[0][1]["owner_group"]), ("sales_bookings", ""))
-        self.assertEqual(p.run("fin", run_id, ANA).task, "Request a project schema")
+        self.assertEqual(p.run("fin", run_id, ANA).task, "Request a permanent schema")
         self.assertEqual(p.run("fin", run_id, ANA).resource, "fin_citizen_dev.sales_bookings")
 
     def test_a_team_schema_is_also_its_groups(self):
@@ -313,7 +325,7 @@ class Schemas(unittest.TestCase):
         run_id = p.request_schema("fin", ANA, schema="fin_reporting", owner_group="fin-finance", reason=WHY)
         self.assertEqual(fake.started[0][1]["owner_group"], "fin-finance", "a group they may not be in")
         self.assertEqual(p.run("fin", run_id, ANA).task, "Request a team schema")
-        with self.assertRaisesRegex(portal.RequestError, "must be an Entra ID group's name"):
+        with self.assertRaisesRegex(portal.RequestError, "must be the exact name of an Entra ID group"):
             p.request_schema("fin", ANA, schema="fin_other", owner_group="fin`; DROP", reason=WHY)
         with self.assertRaisesRegex(portal.RequestError, "needs a name"):
             p.request_schema("fin", ANA, owner_group="fin-data-eng")
@@ -572,7 +584,7 @@ class RequestsInTheDatabase(unittest.TestCase):
         p._runs.clear()
         calls = fake.get_runs
         items = p.requests(ANA)
-        self.assertEqual([r.task for r in items], ["Request a project schema", "Request a workspace folder"])
+        self.assertEqual([r.task for r in items], ["Request a permanent schema", "Request a workspace folder"])
         self.assertEqual(items[1].status, "Completed")
         self.assertEqual(fake.get_runs - calls, 2, "each request's status comes from its run")
         self.assertEqual(p.requests(BO), [], "only the person's own")
@@ -582,7 +594,7 @@ class RequestsInTheDatabase(unittest.TestCase):
         p, fake = make(db)
         p.request_folder("fin", ANA, "fin-docs", reason=WHY)
         db.fail = "read"
-        with self.assertRaisesRegex(portal.RequestError, "cannot be read just now"):
+        with self.assertRaisesRegex(portal.RequestError, "cannot be read right now"):
             p.requests(ANA)   # no second path: the job runs are not read instead
         p.store = None
         with self.assertRaisesRegex(portal.RequestError, "not set up"):
@@ -743,9 +755,9 @@ class BusinessUnitRouting(unittest.TestCase):
 
     def test_someone_the_lookup_does_not_know_is_sent_to_their_admin(self):
         p, fake = self.make()
-        with self.assertRaisesRegex(portal.RequestError, "couldn't find your business unit.*platform admin"):
+        with self.assertRaisesRegex(portal.RequestError, "was not found, so this request cannot be sent.*platform admin"):
             p.workspaces_for(BO, "team_folder")
-        with self.assertRaisesRegex(portal.RequestError, "couldn't find your business unit"):
+        with self.assertRaisesRegex(portal.RequestError, "business unit was not found"):
             p.request_folder("fin", BO, "fin-docs", reason=WHY)
         self.assertEqual(fake.started, [])
 
@@ -769,7 +781,7 @@ class BusinessUnitRouting(unittest.TestCase):
     def test_a_lookup_that_cannot_answer_says_so(self):
         p, fake = self.make()
         fake.bus_ = None
-        with self.assertRaisesRegex(portal.RequestError, "can't be checked just now"):
+        with self.assertRaisesRegex(portal.RequestError, "cannot be checked right now"):
             p.workspaces_for(ANA, "team_folder")
 
 
@@ -891,32 +903,124 @@ class Cards(unittest.TestCase):
         shown = lambda groups: [c["card"].key for _, _, cs in groups for c in cs]
         bare = shown(cards.groups({}))
         self.assertNotIn("discover", bare)
-        self.assertNotIn("open_workspace", bare)
-        full = cards.groups({"discover": "https://d", "review_requests": "https://r", "workspace": "/open"})
+        self.assertNotIn("open_workspace", shown(cards.groups({"discover": "https://d"})), "Explore with Genie is an access tile, not a card")
+        full = cards.groups({"discover": "https://d", "review_requests": "https://r"})
         self.assertIn("discover", shown(full))
-        opened = [c for _, _, cs in full for c in cs if c["card"].key == "open_workspace"]
-        self.assertEqual([(c["href"], c["more"]) for c in opened], [("/open", None)], "no tour link without its link")
-        toured = cards.groups({"workspace": "/open", "tour": "/open?tour=1"})
-        self.assertEqual([c["more"] for _, _, cs in toured for c in cs if c["card"].key == "open_workspace"],
-                         [("Restart guided tour", "/open?tour=1")])
-        only_data = [(k, t, [c for c in cs if c["card"].section == "data"]) for k, t, cs in cards.groups({})]
-        self.assertEqual([[c["card"].key for c in cs] for k, _, cs in cards.groups({}) if k == "data"], [["domain"]],
-                         "without links, Data shows only Request a domain (a page of the app)")
+        self.assertIn("review_requests", shown(full))
+        self.assertEqual([(c["href"], c["more"]) for _, _, cs in full for c in cs if c["card"].key == "discover"], [("https://d", None)])
+        self.assertEqual([[c["card"].key for c in cs] for k, _, cs in cards.groups({}) if k == "data"], [],
+                         "without links, Data has nothing to show: the section is left out")
+        self.assertEqual([[c["card"].key for c in cs] for k, _, cs in cards.groups({"discover": "https://d"}) if k == "data"], [["discover"]])
 
     def test_adding_a_group_is_the_apps_own_form_for_sharing_folders(self):
         import cards
         card = next(c for _, _, cs in cards.groups({}) for c in cs if c["card"].key == "group_request")
         self.assertEqual((card["ready"], card["external"], card["href"]), (True, False, "/group"), "a form in this app, not a link")
-        self.assertIn("share folders", card["card"].text)
+        self.assertIn("workspace folder permissions", card["card"].text)
         opens = {c.key: c.opens for c in cards.CARDS}
-        self.assertEqual(opens["discover"], "Opens in Databricks · Workspace access required")
-        self.assertEqual(opens["open_workspace"], "Opens in Databricks · Workspace access required")
+        self.assertEqual(opens["discover"], "Workspace access required", "a link card's foot: no 'Opens in Databricks' any more")
 
     def test_every_section_has_an_faq_setting(self):
         import cards
         import settings
         for key, title in cards.SECTIONS:
             self.assertEqual(settings.FAQS[key], title)
+
+
+class PairsAndDeadlines(unittest.TestCase):
+    """Portal.account_pair (a person's regular and privileged accounts, from either) and portal.deletes_at
+    (when the daily cleanup really deletes a temporary schema: the first run after its cd_expires date)."""
+
+    def test_the_pair_is_the_same_from_either_account(self):
+        p, _ = make()
+        p.config = {**p.config, "privileged_account_prefix": "azure-"}
+        self.assertEqual(p.account_pair(ANA), (ANA, AZ), "from the regular account")
+        self.assertEqual(p.account_pair(AZ), (ANA, AZ), "from the privileged account")
+        self.assertEqual(p.account_pair("Azure-Ana@contoso.com"), (ANA, AZ), "case does not matter")
+
+    def test_no_prefix_means_one_account(self):
+        p, _ = make()
+        self.assertIsNone(p.account_pair(ANA))
+        p.config = {**p.config, "privileged_account_prefix": None}
+        self.assertIsNone(p.account_pair(ANA))
+
+    def test_deletes_at_is_the_cleanup_run_after_the_expiry_date(self):
+        self.assertEqual(portal.deletes_at("2026-12-09", {"hour": 6, "minute": 0, "timezone": "UTC"}),
+                         ("2026-12-10T06:00:00Z", "10 Dec 2026, 06:00 UTC"))
+        self.assertEqual(portal.deletes_at("2026-12-09", None), ("2026-12-10T06:00:00Z", "10 Dec 2026, 06:00 UTC"), "the default schedule")
+        self.assertEqual(portal.deletes_at("2026-12-31", {"hour": 23, "minute": 30, "timezone": "Europe/Paris"}),
+                         ("2027-01-01T22:30:00Z", "1 Jan 2027, 22:30 UTC"), "in the schedule's own zone, shown in UTC")
+
+
+class AccessTiles(unittest.TestCase):
+    """Portal.access_for: the Explore with Genie and Build in Databricks tiles, from each account's personas
+    in the workspace's catalog (Unity Catalog's effective permissions through the persona groups)."""
+
+    def setUp(self):
+        config = {**CONFIG, "privileged_account_prefix": "azure-", "workspaces": [
+            {"name": "fin", "bu": "FIN", "host": HOST, "catalog": "fin_citizen_dev",
+             "groups": {"explorer": ["fin-explorers"], "builder": ["fin-builders"], "publisher": []}}]}
+        self.fake = FakeClient()
+
+        def client(host):
+            if host not in (HOST, None):
+                raise ConnectionError("no route to host")
+            return self.fake
+        self.p = portal.Portal(config, client, store=FakeStore())
+        self.p.store.choose_business_unit(ANA, "FIN")
+        self.p.store.choose_business_unit(AZ, "FIN")
+
+    def tiles(self, user):
+        (a,) = self.p.access_for(user)
+        return a["explore"], a["build"]
+
+    def test_build_is_live_for_a_builder_on_the_privileged_account(self):
+        self.fake.members_ = {"ana@contoso.com": ["fin-explorers"], AZ: ["fin-builders"]}
+        explore, build = self.tiles(ANA)
+        self.assertEqual(build, {"href": "https://adb-1.azuredatabricks.net/?o=1", "account": "Privileged (PIM) account", "email": AZ,
+                                 "hint": "Switching accounts? Right-click to open in a private window.", "blocked": None})
+        self.assertEqual((explore["account"], explore["email"], explore["hint"]), ("Regular account", ANA, ""),
+                         "signed in with the regular account: the hint goes under the other tile")
+
+    def test_the_hint_goes_under_explore_when_signed_in_with_the_privileged_account(self):
+        self.fake.members_ = {"ana@contoso.com": ["fin-explorers"], AZ: ["fin-builders"]}
+        explore, build = self.tiles(AZ)
+        self.assertTrue(explore["hint"].startswith("Switching accounts?"))
+        self.assertEqual(build["hint"], "", "the tile for the account they are signed in with has no hint")
+
+    def test_a_missing_privileged_account_is_greyed_out(self):
+        self.fake.members_ = {"ana@contoso.com": ["fin-explorers"]}   # no azure- account at all
+        _, build = self.tiles(ANA)
+        self.assertEqual(build["blocked"], "Privileged (PIM) account not available")
+
+    def test_a_privileged_account_without_builder_or_publisher_is_greyed_out(self):
+        self.fake.members_ = {"ana@contoso.com": ["fin-explorers"], AZ: ["fin-explorers"]}
+        _, build = self.tiles(ANA)
+        self.assertEqual(build["blocked"], "Builder access required")
+
+    def test_publisher_counts_as_builder(self):
+        self.fake.members_ = {"ana@contoso.com": ["fin-explorers"], AZ: ["fin-builders"]}
+        self.assertIsNotNone(self.tiles(ANA)[1]["href"])
+
+    def test_explore_needs_a_persona_on_the_regular_account(self):
+        self.fake.members_ = {"ana@contoso.com": [], AZ: []}
+        explore, _ = self.tiles(ANA)
+        self.assertIsNone(explore, "no persona: no tile")
+        self.p._personas.clear()   # answers are kept ten minutes
+        self.fake.members_ = {"ana@contoso.com": ["fin-explorers"]}
+        self.assertIsNotNone(self.tiles(ANA)[0])
+
+    def test_a_missing_regular_account_hides_explore(self):
+        self.fake.members_ = {AZ: ["fin-builders"]}
+        explore, build = self.tiles(AZ)
+        self.assertIsNone(explore)
+        self.assertIsNotNone(build)
+
+    def test_when_the_check_fails_only_explore_is_shown_and_build_is_hidden(self):
+        self.fake.members_ = None   # the app may not read effective permissions
+        explore, build = self.tiles(ANA)
+        self.assertIsNotNone(explore, "Databricks still decides: Explore shown")
+        self.assertIsNone(build, "no greyed-out build tile on a check that could not be made")
 
 
 class Pages(unittest.TestCase):
@@ -985,7 +1089,7 @@ class Pages(unittest.TestCase):
 
     def test_tasks_say_how_they_are_approved(self):
         page = self.http.get("/", headers=self.as_ana).text
-        self.assertIn("<h1>Citizen Development Tasks</h1>", page, "the catalog's heading: title case, the app's name")
+        self.assertIn("<h1>Citizen Development</h1>", page, "the catalog's heading: the app's name")
         self.assertEqual(page.count("Auto-approved"), 3, "custom and temporary schemas, and folders (their job is in this hub)")
         self.assertEqual(page.count(">Approval required"), 2, "workspace access (approved in Entra), and a group (made by an admin)")
         self.assertIn("Approval required", self.http.get("/persona", headers=self.as_ana).text)
@@ -1039,7 +1143,7 @@ class Pages(unittest.TestCase):
             self.assertEqual(self.fake.started, [], "a check runs nothing")
             r = self.http.post("/schema/project", data={"workspace": "fin", "name": "sales_forecast", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
             status = self.http.get(r.headers["location"], headers=self.as_ana).text
-            self.assertIn('Not needed', status, "without human_approval a project schema runs when asked")
+            self.assertIn('Not required', status, "without human_approval a project schema runs when asked")
             self.assertNotIn('Name and reason: ', status, "the check is for the form, not the status page")
         finally:
             self.main.CONFIG.pop("ai_check")
@@ -1094,16 +1198,16 @@ class Pages(unittest.TestCase):
         finally:
             self.main.CONFIG["links"].pop("sop")
         self.assertIn('href="https://wiki.example.com/sop/access"', page.split('class="options"')[0], "in the page's heading, not only on the catalog card")
-        self.assertIn("View the standard operating procedure", page)
+        self.assertIn("Open SOP", page)
 
     def test_forms_route_by_business_unit_and_healthz_checks_the_lookup(self):
         lookup = {"function": "dir.people.business_unit_of", "warehouse_id": "wh1", "host": HOST}
         self.main.PORTAL.config = {**self.main.PORTAL.config, "bu_lookup": lookup}
         self.main.CONFIG["bu_lookup"] = lookup
         try:
-            self.assertNotIn("find your business unit", self.http.get("/folder", headers=self.as_ana).text)
+            self.assertNotIn("business unit was not found", self.http.get("/folder", headers=self.as_ana).text)
             page = self.http.get("/folder", headers={"X-Forwarded-Email": BO}).text
-            self.assertIn("find your business unit", page)
+            self.assertIn("business unit was not found", page)
             self.assertNotIn("No workspace offers folders yet", page, "one reason, not two")
             self.assertEqual(self.http.get("/healthz").json()["bu_lookup"], "ok")
             self.fake.bus_ = None
@@ -1146,14 +1250,14 @@ class Pages(unittest.TestCase):
         self.assertEqual(self.fake.started[-1][1]["owner_group"], "fin-data-eng", "a group: a team schema")
 
     def test_the_review_requests_tile_opens_catalog_explorer(self):
-        self.assertNotIn("View data access requests", self.http.get("/", headers=self.as_ana).text)
+        self.assertNotIn("Manage data access requests", self.http.get("/", headers=self.as_ana).text)
         link = "https://adb-1.azuredatabricks.net/explore/data?o=1&requestsView=audit"
         self.main.CONFIG["links"]["review_requests"] = link
         try:
             page = self.http.get("/", headers=self.as_ana).text
         finally:
             self.main.CONFIG["links"].pop("review_requests")
-        self.assertIn(f'href="{link.replace("&", "&amp;")}" target="_blank" rel="noopener">View data access requests</a>', page)
+        self.assertIn(f'href="{link.replace("&", "&amp;")}" target="_blank" rel="noopener">Manage data access requests</a>', page)
 
     def test_ask_a_question_opens_genie_one_in_the_persons_workspace(self):
         r = self.http.get("/ask", headers=self.as_ana, follow_redirects=False)
@@ -1219,7 +1323,7 @@ class Pages(unittest.TestCase):
                 with self.subTest(path=path):
                     r = self.http.get(path, headers=as_bo, follow_redirects=False)
                     self.assertEqual(r.status_code, 503, "not a redirect to the choice: it could not be saved either")
-                    self.assertIn("Your business unit can&#39;t be read just now", r.text)
+                    self.assertIn("Your business unit cannot be read right now", r.text)
             r = self.http.post("/folder", data={"workspace": "fin", "folder": "fin-docs", "reason": WHY}, headers=as_bo, follow_redirects=False)
             self.assertEqual(r.status_code, 503)
             self.assertEqual(self.fake.started, [], "nothing was sent")
@@ -1253,7 +1357,8 @@ class Pages(unittest.TestCase):
 
     def test_open_your_workspace_gives_the_tour_once_and_again_on_request(self):
         page = self.http.get("/", headers=self.as_ana).text
-        self.assertIn('href="/open" target="_blank" rel="noopener">Open Databricks Genie One</a>', page)
+        self.assertIn('href="https://adb-1.azuredatabricks.net/one?o=1" target="_blank" rel="noopener"', page, "Explore with Genie, in their workspace")
+        self.assertIn(">Explore with Genie", page)
         self.assertNotIn("Restart guided tour", page, "no prompt: no tour")
         r = self.http.get("/open", headers=self.as_ana, follow_redirects=False)
         self.assertEqual((r.status_code, r.headers["location"]), (303, "https://adb-1.azuredatabricks.net/one/chat?o=1"))
@@ -1269,8 +1374,9 @@ class Pages(unittest.TestCase):
         self.assertEqual((first, then, again), ("https://adb-1.azuredatabricks.net/one/chat?o=1&q=Onboard%20me",
                                                 "https://adb-1.azuredatabricks.net/one/chat?o=1",
                                                 "https://adb-1.azuredatabricks.net/one/chat?o=1&q=Onboard%20me"))
-        with mock.patch.object(self.main.PORTAL, "my_workspace", return_value=None):
-            self.assertNotIn("Open Databricks Genie One", self.http.get("/", headers=self.as_ana).text, "no workspace for them: no card")
+        with mock.patch.object(self.main.PORTAL, "workspaces_for", side_effect=portal.RequestError("no workspace")), \
+                mock.patch.object(self.main.PORTAL, "my_workspace", return_value=None):
+            self.assertNotIn("Explore with Genie", self.http.get("/", headers=self.as_ana).text, "no workspace for them: no tile")
             page = self.http.get("/open", headers=self.as_ana)
         self.assertEqual(page.status_code, 200)
         self.assertIn("Contact your platform admin", page.text, "where to go instead")
@@ -1297,7 +1403,7 @@ class Pages(unittest.TestCase):
 
     def test_a_form_error_is_shown_on_the_form(self):
         r = self.http.post("/folder", data={"reason": WHY, "workspace": "fin", "folder": "Fin Docs"}, headers=self.as_ana)
-        self.assertIn("The folder name must be lowercase letters, digits and dashes", r.text)
+        self.assertIn("The folder name must be lowercase letters, numbers and dashes", r.text)
         self.assertEqual(self.fake.started, [])
 
     def test_in_databricks_apps_only_its_sign_in_counts(self):
@@ -1347,16 +1453,22 @@ class TemporarySchemas(unittest.TestCase):
         self.assertIn(">Create a temporary schema</a>", page)
         form = self.http.get("/schema/temporary", headers=self.as_ana).text
         self.assertIn("fin_citizen_dev.cd_tmp_</span>", form, "they type what follows cd_tmp_")
-        self.assertIn('<span class="danger-text">Your temporary schema will be deleted after 14 days.</span>', form, "in red; app.yaml jobs.temporary_schema.days")
-        self.assertIn("but you can't share it with others", form)
-        self.assertIn("copy it to another schema before it expires. You can have one temporary schema at a time.", form)
+        self.assertIn("<p class=\"strong\">Temporary schemas expire after 14 days.</p>", form, "app.yaml jobs.temporary_schema.days")
+        self.assertIn("cannot share it with other users", form)
+        self.assertIn("To retain your data, copy it to a permanent schema before expiry.", form)
         self.assertIn('data-ai-check="temporary_schema"', form)
 
-    def quota(self):
+    def card(self):
+        """The temporary schema card on the catalog (from its own opening tag to the next card)."""
         self.main.PORTAL._personal.clear()
         page = self.http.get("/", headers=self.as_ana).text
-        card = page[page.index("Create a temporary schema</a>") - 600:page.index("Create a temporary schema</a>") + 600]
-        found = re.search(r">(\d+ of \d+ used|Requested)<", card)
+        at = page.index('href="/schema/temporary"')
+        start = page.rindex('<div class="card task', 0, at)
+        return page[start:page.find('<div class="card task', at)]
+
+    def quota(self):
+        """The card's badge: "N of M used" (no temporary schema of theirs yet), "Requested" (one is being made), or None."""
+        found = re.search(r">(\d+ of \d+ used|Requested)<", self.card())
         return found.group(1) if found else None
 
     def test_one_temporary_schema_per_person_like_the_personal_one(self):
@@ -1371,11 +1483,16 @@ class TemporarySchemas(unittest.TestCase):
         until = (dt.date.today() + dt.timedelta(days=14)).isoformat()
         self.fake.schemas_.add("fin_citizen_dev.cd_tmp_try_join")   # as the job made it, tagged
         self.fake.tags_["fin_citizen_dev.cd_tmp_try_join"] = {"cd_schema_kind": "temporary", "cd_user": ANA, "cd_expires": until}
-        self.assertEqual(self.quota(), "1 of 1 used")
-        page = self.http.get("/", headers=self.as_ana).text
-        self.assertIn('<span class="mono">cd_tmp_try_join</span><span>14 of 14 days left</span>', page, "the card's bar: no cd_created, so app.yaml's days")
-        self.assertIn(f"Deleted on {until}", page)
-        self.assertIn('class="lifebar life-calm"', page)
+        self.assertIsNone(self.quota(), "with a schema shown, no badge: the card says Manage instead")
+        card = self.card()
+        self.assertIn("Manage temporary schema", card)
+        self.assertIn('<span class="mono">cd_tmp_try_join</span><span>14 days remaining</span>', card, "the card's bar: no cd_created, so app.yaml's days")
+        after = (dt.date.today() + dt.timedelta(days=15)).isoformat()   # the cleanup run after cd_expires
+        self.assertIn(f'Expires <time datetime="{after}T06:00:00Z"', card, "the cleanup run after its date")
+        self.assertIn('class="lifebar life-calm"', card, "always calm: the bar never turns red")
+        self.assertIn(">Extend schema</a>", card)
+        self.assertIn(">Restore permissions</a>", card)
+        self.assertIn(">Delete</a>", card)
         have = self.main.PORTAL.temporary_schema("fin", ANA)
         self.assertEqual((have["name"], have["expires"], have["days_left"]), ("fin_citizen_dev.cd_tmp_try_join", until, 14), "its own cd_expires tag")
         r = self.http.post("/schema/temporary", data={"workspace": "fin", "name": "another", "reason": WHY}, headers=self.as_ana)
@@ -1383,13 +1500,12 @@ class TemporarySchemas(unittest.TestCase):
         self.assertEqual(len(self.fake.started), 1, "refused before any run")
         form = self.http.get("/schema/temporary", headers=self.as_ana).text
         self.assertIn("Your temporary schema", form)
-        self.assertIn('<span class="quota full">1 of 1 used</span>', form)
-        self.assertIn('<p class="mono">fin_citizen_dev.cd_tmp_try_join</p>', form)
+        self.assertIn('<span class="meta">1 of 1 used</span>', form)
+        self.assertIn('<span class="mono chip-code">fin_citizen_dev.cd_tmp_try_join</span>', form)
         self.assertIn('href="https://adb-1.azuredatabricks.net/explore/data/fin_citizen_dev/cd_tmp_try_join" target="_blank" rel="noopener">Open schema',
                       form, "opens it in their own workspace")
-        self.assertIn('href="/schema/temporary/extend?schema=fin_citizen_dev.cd_tmp_try_join">Extend temporary schema</a>', form)
-        self.assertNotIn("Keep as a project schema", form, "not offered for now")
-        self.assertIn("That is the most you may have", form)
+        self.assertIn('href="/schema/temporary/extend?schema=fin_citizen_dev.cd_tmp_try_join">Extend schema</a>', form)
+        self.assertNotIn("Keep as a permanent schema", form, "not offered for now")
         self.assertNotIn('type="submit"', form, "nothing to send until one expires")
         self.fake.tags_["fin_citizen_dev.cd_tmp_try_join"]["cd_expires"] = (dt.date.today() + dt.timedelta(days=30)).isoformat()
         self.main.PORTAL._personal.clear()
@@ -1416,10 +1532,11 @@ class TemporarySchemas(unittest.TestCase):
         self.fake.tags_["fin_citizen_dev.cd_tmp_late"] = {"cd_schema_kind": "temporary", "cd_user": ANA, "cd_created": (today - dt.timedelta(days=28)).isoformat(),
                                                           "cd_expires": (today + dt.timedelta(days=2)).isoformat()}
         self.main.PORTAL._personal.clear()
-        page = self.http.get("/", headers=self.as_ana).text
-        self.assertIn('class="lifebar life-urgent"', page)
-        self.assertIn("<span>2 of 30 days left</span>", page)
-        self.assertIn('style="width: 93%"', page, "28 of its 30 days gone")
+        card = self.card()
+        self.assertIn('class="lifebar life-calm"', card, "never red: the bar is neutral")
+        self.assertNotIn("life-urgent", card)
+        self.assertIn("<span>2 days remaining</span>", card)
+        self.assertIn('style="width: 93%"', card, "28 of its 30 days gone")
 
     def test_the_limit_per_person_comes_from_the_settings(self):
         import datetime as dt
@@ -1429,10 +1546,10 @@ class TemporarySchemas(unittest.TestCase):
         self.fake.tags_["fin_citizen_dev.cd_tmp_first"] = {"cd_schema_kind": "temporary", "cd_user": ANA,
                                                            "cd_expires": (dt.date.today() + dt.timedelta(days=9)).isoformat()}
         self.main.PORTAL.shown = lambda: {"temporary": {"limit": 2}}   # Settings > Schemas
-        self.assertEqual(self.quota(), "1 of 2 used")
+        self.assertIsNone(self.quota(), "one shown: the card says Manage, not 1 of 2")
         form = self.http.get("/schema/temporary", headers=self.as_ana).text
         self.assertIn('type="submit"', form, "room for another")
-        self.assertIn("You can have 2 temporary schemas at a time", form)
+        self.assertIn("You can have 2 active temporary schemas at a time", form)
         r = self.http.post("/schema/temporary", data={"workspace": "fin", "name": "second", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
         self.assertEqual(r.status_code, 303)
         self.assertEqual(self.fake.started[-1][1]["temporary_limit"], "2", "the job checks it again")
@@ -1440,7 +1557,10 @@ class TemporarySchemas(unittest.TestCase):
         self.fake.schemas_.add("fin_citizen_dev.cd_tmp_second")
         self.fake.tags_["fin_citizen_dev.cd_tmp_second"] = {"cd_schema_kind": "temporary", "cd_user": ANA,
                                                             "cd_expires": (dt.date.today() + dt.timedelta(days=30)).isoformat()}
-        self.assertEqual(self.quota(), "2 of 2 used")
+        self.assertIsNone(self.quota())
+        form = self.http.get("/schema/temporary", headers=self.as_ana).text
+        self.assertIn("2 of 2 used", form, "the form says how many")
+        self.assertIn("You can have 2 active temporary schemas at a time", form)
         form = self.http.get("/schema/temporary/extend", headers=self.as_ana).text
         self.assertIn("Which temporary schema?", form, "two of them: they choose")
         bad = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "30", "reason": WHY}, headers=self.as_ana)
@@ -1464,13 +1584,13 @@ class TemporarySchemas(unittest.TestCase):
         self.fake.schemas_.add("fin_citizen_dev.cd_ana")
         self.fake.tags_["fin_citizen_dev.cd_ana"] = {"cd_schema_kind": "temporary", "cd_user": ANA, "cd_converted_from": "personal",
                                                      "cd_expires": (dt.date.today() + dt.timedelta(days=2)).isoformat()}
-        self.assertEqual(self.quota(), "1 of 1 used")
+        self.assertIn("Manage temporary schema", self.card(), "made before the check, the cleanup made it theirs")
         page = self.http.get("/", headers=self.as_ana).text
-        self.assertIn('Your temporary schema <span class="mono">fin_citizen_dev.cd_ana</span> will be deleted on', page, "the reminder: 3 days or fewer")
-        self.assertIn('href="/schema/temporary/extend">extend it</a>', page)
+        self.assertIn('Your temporary schema <span class="mono">fin_citizen_dev.cd_ana</span> expires <time', page, "the reminder: 3 days or fewer")
+        self.assertIn('href="/schema/temporary/extend">extend the schema</a>', page)
         self.fake.tags_["fin_citizen_dev.cd_ana"]["cd_expires"] = (dt.date.today() + dt.timedelta(days=4)).isoformat()
         self.main.PORTAL._personal.clear()
-        self.assertNotIn("will be deleted on", self.http.get("/", headers=self.as_ana).text, "not yet")
+        self.assertNotIn("expires on", self.http.get("/", headers=self.as_ana).text, "not yet")
 
     def test_more_time_runs_straight_away_by_default(self):
         import datetime as dt
@@ -1482,7 +1602,7 @@ class TemporarySchemas(unittest.TestCase):
         made = len(self.fake.started)
         form = self.http.get("/schema/temporary/extend", headers=self.as_ana).text
         self.assertIn('<input type="hidden" name="days" value="30">', form, "one choice: 30 days")
-        self.assertIn("30 more days are added to its date straight away", form)
+        self.assertIn("30 more days are added to its expiry date straight away", form)
         self.assertIn("Auto-approved", form)
         self.assertIn(">Add 30 days</button>", form)
         r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "30", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
@@ -1506,7 +1626,7 @@ class TemporarySchemas(unittest.TestCase):
         made = len(self.fake.started)   # the temporary schema's own run
         form = self.http.get("/schema/temporary/extend", headers=self.as_ana).text
         self.assertIn('<input type="hidden" name="days" value="30">', form, "one choice: 30 days")
-        self.assertIn("You're asking for 30 more days", form)
+        self.assertIn("Once approved, 30 more days are added", form)
         self.assertIn("Approval required", form)
         r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "30", "reason": WHY}, headers=self.as_ana, follow_redirects=False)
         self.assertRegex(r.headers["location"], r"^/request/ss-", "waits for an approver")
@@ -1520,21 +1640,21 @@ class TemporarySchemas(unittest.TestCase):
         params = self.fake.started[-1][1]
         self.assertEqual((params["schema"], params["temporary"], params["action"], params["days"]), ("cd_tmp_x", "true", "extend", "30"))
         page = self.http.get(f"/request/{rid}", headers=self.as_ana).text   # its run, once the approver approved it
-        self.assertIn("Extend temporary schema", page)
+        self.assertIn("Extend schema", page)
         r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "30", "reason": WHY + " Again."}, headers=self.as_ana, follow_redirects=False)
         waiting = r.headers["location"].rsplit("/", 1)[1]
         self.db.event(waiting, "approved", actor="dana@contoso.com")   # approved, its run not started yet
         self.assertIn("Approved: 30 more days are being added", self.http.get(f"/request/{waiting}", headers=self.as_ana).text)
         bad = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "3", "reason": WHY}, headers=self.as_ana)
-        self.assertIn("More time is 30 days", bad.text)
+        self.assertIn("Choose 30 more days", bad.text)
         self.assertEqual(self.http.get("/schema/temporary/other", headers=self.as_ana).status_code, 404)
         self.assertEqual(self.http.get("/schema/temporary/keep", headers=self.as_ana).status_code, 404, "keeping it: not offered for now")
 
     def test_without_a_temporary_schema_there_is_nothing_to_extend(self):
         form = self.http.get("/schema/temporary/extend", headers=self.as_ana).text
-        self.assertIn("You have no temporary schema to ask about", form)
+        self.assertIn("You have no temporary schema to extend", form)
         r = self.http.post("/schema/temporary/extend", data={"workspace": "fin", "days": "30", "reason": WHY}, headers=self.as_ana)
-        self.assertIn("You have no temporary schema to ask about", r.text)
+        self.assertIn("You have no temporary schema to extend", r.text)
         self.assertEqual(self.db.requests, {})
 
     def test_when_the_database_cannot_answer_the_quota_is_unknown_and_the_job_decides(self):
@@ -1567,7 +1687,7 @@ class TemporarySchemas(unittest.TestCase):
         self.assertEqual((asked["request_type"], asked["name"]), ("temporary schema", "cd_tmp_taken"), "the model reads it as a temporary schema")
 
     def test_a_temporary_schema_is_the_requesters_alone(self):
-        with self.assertRaisesRegex(portal.RequestError, "yours alone"):
+        with self.assertRaisesRegex(portal.RequestError, "belongs to you alone"):
             self.main.PORTAL.request_schema("fin", ANA, schema="x", owner_group="fin-data-eng", reason=WHY, temporary=True)
         with self.assertRaisesRegex(portal.RequestError, "needs a name"):
             self.main.PORTAL.request_schema("fin", ANA, reason=WHY, temporary=True)
@@ -1587,6 +1707,116 @@ class TemporarySchemas(unittest.TestCase):
                            params={"schema": "cd_tmp_try", "temporary": "true", "reason": WHY})
         self.assertEqual(self.main.retry_link(r), "/schema/temporary?" + __import__("urllib.parse").parse.urlencode({"workspace": "fin", "name": "try", "reason": WHY}))
         self.assertEqual(self.main.check_kind(r), "temporary_schema")
+
+
+class SchemaDeletionAndRestore(unittest.TestCase):
+    """Delete (purge) and restore permissions: a person's own temporary schemas (/schema/delete, /schema/restore),
+    and an approver's for an owner (Portal.admin_*, the approvals app). Each runs the schema job at once."""
+
+    def setUp(self):
+        import importlib
+        import os
+        import tempfile
+        cfg = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+        json.dump(CONFIG, cfg)
+        cfg.close()
+        os.environ["PORTAL_CONFIG"] = cfg.name
+        sys.modules.pop("main", None)
+        self.main = importlib.import_module("main")
+        self.db = FakeStore()
+        self.main.PORTAL, self.fake = make(self.db)
+        self.main.PORTAL.config = self.main.CONFIG
+        self.main.PORTAL.choose_bu(ANA, "FIN")
+        self.http = TestClient(self.main.app)
+        self.portal = self.main.PORTAL
+        self.fake.schemas_.update({"fin_citizen_dev.cd_tmp_mine", "fin_citizen_dev.sales_x"})
+        self.fake.tags_["fin_citizen_dev.cd_tmp_mine"] = {"cd_schema_kind": "temporary", "cd_user": ANA,
+                                                          "cd_expires": (__import__("datetime").date.today() + __import__("datetime").timedelta(days=9)).isoformat()}
+        self.fake.tags_["fin_citizen_dev.sales_x"] = {"cd_schema_kind": "project", "cd_user": ANA}
+        # The schema was asked for (its request is the database's record: the app finds temporary schemas through it).
+        self.db.record_request({"id": "ss-mine", "kind": "temporary_schema", "workspace": "fin", "bu": "FIN", "requested_by": ANA,
+                                "name": "cd_tmp_mine", "reason": WHY})
+        self.portal.choose_bu(BO, "FIN")
+
+    def kinds(self):
+        return [r["kind"] for r in self.db.requests.values() if r["kind"] in ("schema_delete", "schema_restore")]
+
+    def last(self):
+        return self.fake.started[-1][1]
+
+    def test_delete_lists_only_their_temporary_schemas(self):
+        self.assertEqual(self.portal.my_schemas("fin", ANA), [{"name": "fin_citizen_dev.cd_tmp_mine", "kind": "temporary"}],
+                         "a permanent schema is an approver's, not offered")
+        page = self.http.get("/schema/delete", headers={"X-Forwarded-Email": ANA}).text
+        self.assertIn("fin_citizen_dev.cd_tmp_mine", page)
+        self.assertNotIn("sales_x", page)
+
+    def test_delete_refuses_a_wrong_name_and_purges_on_the_right_one(self):
+        wrong = self.http.post("/schema/delete", data={"workspace": "fin", "schema": "fin_citizen_dev.cd_tmp_mine", "confirm": "cd_tmp_min"},
+                               headers={"X-Forwarded-Email": ANA})
+        self.assertIn("Type the schema&#39;s name exactly to delete it.", wrong.text)
+        self.assertEqual(self.fake.started, [], "nothing runs")
+        r = self.http.post("/schema/delete", data={"workspace": "fin", "schema": "fin_citizen_dev.cd_tmp_mine", "confirm": "CD_TMP_MINE"},
+                           headers={"X-Forwarded-Email": ANA}, follow_redirects=False)
+        self.assertRegex(r.headers["location"], r"^/requests/fin/\d+$", "its run's status page")
+        self.assertEqual((self.last()["action"], self.last()["schema"], self.last()["temporary"], self.last()["user"]),
+                         ("purge", "cd_tmp_mine", "true", ANA))
+        self.assertEqual(self.kinds(), ["schema_delete"])
+
+    def test_delete_refuses_someone_elses_schema(self):
+        r = self.http.post("/schema/delete", data={"workspace": "fin", "schema": "fin_citizen_dev.cd_tmp_mine", "confirm": "cd_tmp_mine"},
+                           headers={"X-Forwarded-Email": BO})
+        self.assertIn("Choose one of your temporary schemas.", r.text)
+        self.assertEqual(self.fake.started, [])
+
+    def test_the_old_temporary_delete_link_goes_to_delete(self):
+        r = self.http.get("/schema/temporary/delete?schema=fin_citizen_dev.cd_tmp_mine", headers={"X-Forwarded-Email": ANA}, follow_redirects=False)
+        self.assertEqual((r.status_code, r.headers["location"]), (301, "/schema/delete?schema=fin_citizen_dev.cd_tmp_mine"))
+
+    def test_restore_form_and_run(self):
+        page = self.http.get("/schema/restore", headers={"X-Forwarded-Email": ANA}).text
+        self.assertIn("fin_citizen_dev.cd_tmp_mine", page)
+        self.assertNotIn("sales_x", page)
+        r = self.http.post("/schema/restore", data={"workspace": "fin", "schema": "fin_citizen_dev.cd_tmp_mine"},
+                           headers={"X-Forwarded-Email": ANA}, follow_redirects=False)
+        self.assertEqual(r.status_code, 303)
+        self.assertEqual((self.last()["action"], self.last()["user"], self.last()["by"]), ("restore", ANA, ""))
+        self.assertEqual(self.kinds(), ["schema_restore"])
+        self.assertIn("Choose one of your temporary schemas.", self.http.post("/schema/restore", data={"workspace": "fin", "schema": "fin_citizen_dev.sales_x"},
+                                                                          headers={"X-Forwarded-Email": ANA}).text, "a permanent schema: not theirs to restore here")
+
+    def test_an_approver_deletes_an_owners_temporary_schema_with_the_owners_name_typed(self):
+        with self.assertRaisesRegex(portal.RequestError, "Type the schema's name exactly"):
+            self.portal.admin_delete_temporary("fin", BO, "fin_citizen_dev.cd_tmp_mine", "nope")
+        self.assertEqual(self.fake.started, [])
+        rid = self.portal.admin_delete_temporary("fin", BO, "fin_citizen_dev.cd_tmp_mine", "cd_tmp_mine")
+        self.assertEqual(self.last()["action"], "purge")
+        self.assertEqual((self.last()["user"], self.last()["by"]), (ANA, BO), "the owner's schema, the approver's name")
+        self.assertEqual(self.db.requests[self.last()["request_id"]]["requested_by"], BO)
+        self.assertIsInstance(rid, int)
+
+    def test_an_approver_restores_an_owners_permissions_straight_away(self):
+        run = self.portal.restore_permissions("fin", BO, "fin_citizen_dev.cd_tmp_mine", owner=ANA)
+        self.assertIsInstance(run, int, "a run, not a request waiting for an approver")
+        self.assertEqual((self.last()["user"], self.last()["by"], self.last()["action"], self.last()["schema"]),
+                         (ANA, BO, "restore", "cd_tmp_mine"))
+        row = next(r for r in self.db.requests.values() if r["kind"] == "schema_restore")
+        self.assertEqual(row["details"], {"temporary": True, "owner": ANA})
+
+    def test_an_approver_extends_straight_away_even_when_more_time_waits_for_approval(self):
+        self.portal.config["human_approval"] = ["temporary_extension"]
+        run = self.portal.admin_extend_temporary("fin", BO, "fin_citizen_dev.cd_tmp_mine")
+        self.assertIsInstance(run, int, "runs now: an approver asked for it")
+        self.assertEqual((self.last()["action"], self.last()["days"], self.last()["user"], self.last()["by"]), ("extend", "30", ANA, BO))
+        self.assertEqual(len(self.fake.started), 1, "no hold: nothing waits")
+        row = next(r for r in self.db.requests.values() if r["kind"] == "temporary_extension")
+        self.assertEqual((row["requested_by"], row["days"]), (BO, 30))
+
+    def test_the_approvers_schemas_are_the_temporary_ones_in_every_workspace(self):
+        found = self.portal.temporary_schemas_everywhere()
+        self.assertEqual([(s["name"], s["owner"], s["bu"]) for s in found], [("fin_citizen_dev.cd_tmp_mine", ANA, "FIN")],
+                         "a permanent schema is not listed")
+        self.assertEqual(found[0]["deletes_text"], (__import__("datetime").date.today() + __import__("datetime").timedelta(days=10)).strftime("%-d %b %Y, 06:00 UTC"))
 
 
 class ManualFolders(unittest.TestCase):
@@ -1633,7 +1863,7 @@ class ManualFolders(unittest.TestCase):
         self.assertIn("Approval required", card)
         self.assertIn("An approver decides it in the admin app", card)
         form = self.http.get("/folder", headers=self.as_ana).text
-        self.assertIn("A platform admin creates this folder for you once they approve it", form)
+        self.assertIn("A platform admin creates the folder once it is approved", form)
         self.assertIn(">Submit request</button>", form)
 
     def test_a_folder_request_is_recorded_and_waits_nothing_runs(self):
@@ -1711,7 +1941,7 @@ class ApprovalRequests(unittest.TestCase):
         form = self.http.get("/folder", headers=self.as_ana).text
         self.assertIn(">Create folder</button>", form)
         self.assertIn("Your folder will be ready in under a minute.", form)
-        self.assertIn("Your workspace's platform admins can manage it too", form)
+        self.assertIn("The workspace's platform admins can manage it too", form)
 
     def test_the_requester_answers_a_question_and_sees_the_decision(self):
         location = self.send().headers["location"]
@@ -1790,8 +2020,8 @@ if __name__ == "__main__":
 
 
 class AccountsNotesAndDomains(unittest.TestCase):
-    """app.yaml jobs.temporary_schema.account_prefix (who may make and extend temporary schemas),
-    persona_notes (the workspace access page) and the Request a domain preview."""
+    """app.yaml jobs.privileged_account_prefix (a person's two accounts: either may make and extend a temporary
+    schema, and both see it), persona_notes (the workspace access page) and the Request a domain preview."""
     AZ = "azure-ana@contoso.com"
 
     def setUp(self):
@@ -1800,7 +2030,7 @@ class AccountsNotesAndDomains(unittest.TestCase):
         import tempfile
         domains = [{"key": "irm", "label": "IRM", "depth": 0}, {"key": "irm.asset_integrity", "label": "IRM / ASSET INTEGRITY", "depth": 1}]
         cfg = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
-        json.dump({**CONFIG, "temporary_account_prefix": "azure-", "persona_notes": {"explorer": "Request with your regular account.",
+        json.dump({**CONFIG, "privileged_account_prefix": "azure-", "persona_notes": {"explorer": "Request with your regular account.",
                                                                                      "builder": "Request with your Azure PIM account, `azure-`."},
                    "workspaces": [{**CONFIG["workspaces"][0], "domains": domains}, *CONFIG["workspaces"][1:]]}, cfg)
         cfg.close()
@@ -1814,40 +2044,35 @@ class AccountsNotesAndDomains(unittest.TestCase):
             self.main.PORTAL.choose_bu(who, "FIN")
         self.http = TestClient(self.main.app)
 
-    def test_a_temporary_schema_needs_the_named_account(self):
+    def test_either_account_may_make_a_temporary_schema(self):
         form = self.http.get("/schema/temporary", headers={"X-Forwarded-Email": ANA}).text
-        self.assertIn("Temporary schemas are made with your <span class=\"strong\">azure-</span> account", form)
-        self.assertNotIn('name="name"', form, "no form to fill in with the wrong account")
-        r = self.http.post("/schema/temporary", data={"workspace": "fin", "name": "x", "reason": WHY}, headers={"X-Forwarded-Email": ANA})
-        self.assertIn("sign in with the account whose email starts with azure-", r.text)
-        self.assertEqual(self.fake.started, [], "nothing runs")
-        form = self.http.get("/schema/temporary", headers={"X-Forwarded-Email": self.AZ}).text
-        self.assertIn('name="name"', form)
+        self.assertIn('name="name"', form, "the regular account asks too")
+        self.assertIn(self.AZ, form, "the account permissions box names both accounts")
+        self.assertIn("Privileged account", form)
+        r = self.http.post("/schema/temporary", data={"workspace": "fin", "name": "x", "reason": WHY}, headers={"X-Forwarded-Email": ANA},
+                           follow_redirects=False)
+        self.assertEqual(r.status_code, 303)
+        self.assertEqual(self.fake.started[-1][1]["user"], ANA)
+
+    def test_the_privileged_account_makes_one_too(self):
         r = self.http.post("/schema/temporary", data={"workspace": "fin", "name": "x", "reason": WHY}, headers={"X-Forwarded-Email": self.AZ},
                            follow_redirects=False)
         self.assertEqual(r.status_code, 303)
-        self.assertEqual(self.fake.started[-1][1]["user"], self.AZ)
+        self.assertEqual(self.fake.started[-1][1]["user"], self.AZ, "the job gets the account it was asked from")
 
-    def test_the_temporary_schema_tile_is_greyed_out_for_another_account(self):
+    def test_a_schema_made_with_the_other_account_is_theirs_and_shown_on_the_card(self):
         import datetime as dt
-        tile = lambda page: page.split("Create a temporary schema", 1)[0].rsplit('<div class="card task', 1)[1] + page.split("Create a temporary schema", 1)[1].split('<div class="card task', 1)[0]
-        mine = tile(self.http.get("/", headers={"X-Forwarded-Email": ANA}).text)
-        self.assertIn("is-soon", mine.split(">", 1)[0], "greyed out")
-        self.assertNotIn('href="/schema/temporary"', mine, "not a link")
-        self.assertIn("Sign in with your azure- account to create one", mine)
-        self.assertNotIn("Extend temporary schema", mine, "nothing of theirs to extend")
-        theirs = tile(self.http.get("/", headers={"X-Forwarded-Email": self.AZ}).text)
-        self.assertIn('href="/schema/temporary"', theirs, "the azure- account: a normal tile")
-        self.assertNotIn("Sign in with your azure- account", theirs)
-        self.fake.schemas_.add("fin_citizen_dev.cd_tmp_old")
-        self.fake.tags_["fin_citizen_dev.cd_tmp_old"] = {"cd_schema_kind": "temporary", "cd_user": ANA,
-                                                         "cd_expires": (dt.date.today() + dt.timedelta(days=5)).isoformat()}
-        self.db.record_request({"id": "ss-old", "kind": "temporary_schema", "workspace": "fin", "bu": "FIN", "requested_by": ANA,
-                                "name": "cd_tmp_old", "reason": WHY})
+        self.fake.schemas_.add("fin_citizen_dev.cd_tmp_az")
+        self.fake.tags_["fin_citizen_dev.cd_tmp_az"] = {"cd_schema_kind": "temporary", "cd_user": self.AZ,
+                                                        "cd_expires": (dt.date.today() + dt.timedelta(days=9)).isoformat()}
+        self.db.record_request({"id": "ss-az", "kind": "temporary_schema", "workspace": "fin", "bu": "FIN", "requested_by": self.AZ,
+                                "name": "cd_tmp_az", "reason": WHY})
         self.main.PORTAL._personal.clear()
-        old = tile(self.http.get("/", headers={"X-Forwarded-Email": ANA}).text)
-        self.assertIn('href="/schema/temporary/extend">Extend temporary schema', old, "one made before the check: its owner still extends it")
-        self.assertIn("cd_tmp_old", old)
+        have = self.main.PORTAL.temporary_schema("fin", ANA)
+        self.assertEqual([s["name"] for s in have["schemas"]], ["fin_citizen_dev.cd_tmp_az"], "the other account's schema counts")
+        card = self.http.get("/", headers={"X-Forwarded-Email": ANA}).text
+        self.assertIn("Manage temporary schema", card)
+        self.assertIn("cd_tmp_az", card)
 
     def test_its_owner_extends_one_made_before_the_check_with_their_regular_account(self):
         import datetime as dt
@@ -1870,7 +2095,7 @@ class AccountsNotesAndDomains(unittest.TestCase):
         self.assertIn("Request with your regular account.", page)
         self.assertIn('Request with your Azure PIM account, <span class="mono nowrap">azure-</span>.', page,
                       "text in backticks stays on one line")
-        self.assertIn(">Unavailable", page, "a Coming soon persona (publisher) keeps a disabled button")
+        self.assertIn(">Coming soon", page, "a Coming soon persona (publisher) keeps a disabled button")
         self.assertNotIn('class="callout', page.split('<div class="options">', 1)[1], "a light line, not a box")
 
     def test_request_a_domain_is_coming_soon_its_form_a_preview(self):
@@ -1878,10 +2103,10 @@ class AccountsNotesAndDomains(unittest.TestCase):
         card = catalog.split(">Request a domain</a>", 1)[1].split('class="card task', 1)[0]
         self.assertIn('href="/domain"', catalog.split(">Request a domain</a>", 1)[0][-200:], "it opens")
         self.assertIn("Coming soon", card)
-        self.assertIn("Preview: see the form; nothing is sent yet", card)
+        self.assertIn("Preview only · Requests not enabled", card)
         form = self.http.get("/domain", headers={"X-Forwarded-Email": ANA}).text
         self.assertIn('<button type="submit" class="primary" disabled>Coming soon</button>', form)
-        self.assertIn("This is a preview of the form: nothing is sent yet", form)
+        self.assertIn("Preview only: nothing is sent yet.", form)
         r = self.http.post("/domain", data={"workspace": "fin", "name": "integrity", "reason": WHY}, headers={"X-Forwarded-Email": ANA})
         self.assertEqual(r.status_code, 404, "nothing is recorded while it is a preview")
         self.assertEqual(self.db.requests, {})
@@ -1896,7 +2121,7 @@ class AccountsNotesAndDomains(unittest.TestCase):
         self.fake.domains_ = [{"domain_id": "d1", "tag_key": "Upstream"}, {"domain_id": "d2", "tag_key": "Upstream/Oil Sands", "parent_domain_id": "d1"},
                               {"domain_id": "d3", "tag_key": "Draft", "effective_draft": True}]
         form = self.http.get("/domain", headers={"X-Forwarded-Email": ANA}).text
-        self.assertIn("At the top (a new domain)", form)
+        self.assertIn("Top level (a new domain)", form)
         self.assertIn('value="d1" >&nbsp;&nbsp;&nbsp;Under Upstream</option>', form, "the account's domains, from the Domains API")
         self.assertIn('value="d2" >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Under Upstream / Oil Sands</option>', form, "a subdomain sits under its domain")
         self.assertNotIn("Draft", form, "drafts are not offered")
@@ -1919,11 +2144,11 @@ class AccountsNotesAndDomains(unittest.TestCase):
     def test_a_group_for_sharing_folders_is_sent_to_an_admin(self):
         form = self.http.get("/group", headers={"X-Forwarded-Email": ANA}).text
         self.assertIn("sharing folders", form)
-        self.assertIn("<h1>Add a group to your workspace</h1>", form)
-        self.assertIn("Why do you need this group added?", form)
+        self.assertIn("<h1>Add a workspace group</h1>", form)
+        self.assertIn("Why do you need this group?", form)
         self.assertIn("no access of its own", form)
         bad = self.http.post("/group", data={"workspace": "fin", "group": "users", "reason": WHY}, headers={"X-Forwarded-Email": ANA})
-        self.assertIn("is every user of a workspace", bad.text)
+        self.assertIn("includes every user of a workspace", bad.text)
         r = self.http.post("/group", data={"workspace": "fin", "group": "fin-analysts", "reason": WHY}, headers={"X-Forwarded-Email": ANA},
                            follow_redirects=False)
         self.assertRegex(r.headers["location"], r"^/request/ss-")

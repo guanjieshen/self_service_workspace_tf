@@ -6,7 +6,7 @@
 {% block title %}Change history · Settings · Admin{% endblock %}
 {% block content %}
 {% include "approvals/_settings_head.html" %}
-<p class="meta settings-source">Every change to the settings, with who made it. Changes are kept; none is ever edited or removed.</p>
+<p class="meta settings-source">Every settings change, and who made it. Changes are kept and never edited or removed.</p>
 
 <form class="inbox-filters" method="get" action="/approvals/settings/history" role="search">
   <label class="search search-sm">
@@ -21,7 +21,7 @@
 
 {% if not history %}
   {% if filters %}{{ empty_state("search", "No changes match", "Try other words, or clear the filters.", "/approvals/settings/history", "Clear filters") }}
-  {% else %}{{ empty_state("check", "No changes yet", "Changes made in the other tabs show up here.") }}{% endif %}
+  {% else %}{{ empty_state("check", "No changes yet", "Changes made on the other tabs appear here.") }}{% endif %}
 {% else %}
 <div class="list settings-history">
   {% for h in history %}{{ setting_change(h, labels, defaults) }}{% endfor %}

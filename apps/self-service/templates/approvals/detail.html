@@ -23,8 +23,8 @@
   </div>
   {{ status(r.status, pill=True) }}
 </div>
-{{ facts([("Type", r.type), ("Requested by", r.requested_by), ("Business unit", r.bu), ("Workspace", r.workspace, "mono"), ("Team", r.owner_group),
-          ("Waiting", age(now, r.waiting_since or r.submitted), "age " ~ sla(now, r.waiting_since or r.submitted)) if open else ("", "")]) }}
+{{ facts([("Type", r.type), ("Requester", r.requested_by), ("Business unit", r.bu), ("Workspace", r.workspace, "mono"), ("Team", r.owner_group),
+          ("Age", age(now, r.waiting_since or r.submitted), "age " ~ sla(now, r.waiting_since or r.submitted)) if open else ("", "")]) }}
 
 <div class="page-grid">
   <div class="stack">
@@ -36,9 +36,10 @@
         <p class="summary-headline">{{ r.summary.headline }}</p>
         <p class="summary-text">{{ r.summary.summary | mention(r.name) }}</p>
         {% if r.summary.concerns %}
-        <h3 class="summary-label">Worth checking</h3>
-        {#- Most important first, each with its level; with three or more, the rest fold away. -#}
-        {%- macro concern(c) -%}<li class="concern {{ c.level or 'medium' }}"><span class="concern-level">{{ (c.level or "medium") | capitalize }}</span><span class="strong">{{ c.label }}</span> {{ c.detail | mention(r.name) }}</li>{%- endmacro -%}
+        <h3 class="summary-label">Review considerations</h3>
+        {#- Guidance for the approver, not violations: each one's label, what to validate (summary.GUIDANCE),
+            and what the AI noticed in this request. Most important first; with three or more, the rest fold away. -#}
+        {%- macro concern(c) -%}<li class="concern"><span class="strong">{{ c.label | consideration }}</span>{% if c.label | guidance %}<span class="concern-guidance">{{ c.label | guidance }}</span>{% endif %}<span class="concern-detail">{{ c.detail | mention(r.name) }}</span></li>{%- endmacro -%}
         {%- set shown = 1 if r.summary.concerns | length >= 3 else 2 -%}
         <ul class="summary-concerns">{% for c in r.summary.concerns[:shown] %}{{ concern(c) }}{% endfor %}</ul>
         {% if r.summary.concerns | length > shown %}
@@ -116,7 +117,7 @@
           </div>
           <p class="meta">{% if r.manual %}Approve once you have created it: the requester sees it as created.
             {% elif r.type == "More time for a temporary schema" %}Approve adds {{ r.days }} days to its expiry date, in under a minute.
-            {% elif r.type == "Temporary schema to keep as a project schema" %}Approve keeps it as a project schema, in place: it is no longer deleted, and its requester gets the project rights.
+            {% elif r.type == "Temporary schema to keep as a permanent schema" %}Approve keeps it as a project schema, in place: it is no longer deleted, and its requester gets the project rights.
             {% else %}Approve creates the {{ "folder" if r.kind == "folder" else "schema" }} in under a minute.{% endif %}</p>
         </form>
         {% if r.summary and r.summary.questions %}

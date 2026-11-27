@@ -36,6 +36,10 @@ run "served_workspace" {
     error_message = "The output gives the app's deploy what this workspace's configuration already has."
   }
   assert {
+    condition     = output.self_service.persona_groups == local.persona_groups && length(output.self_service.persona_groups) > 0
+    error_message = "The output names each persona's group: the app and the schema job check builder and publisher membership."
+  }
+  assert {
     condition     = length(databricks_workspace_binding.self_service_hub) == 1 && databricks_workspace_binding.self_service_hub[0].workspace_id == 9999999999999999 && databricks_workspace_binding.self_service_hub[0].binding_type == "BINDING_TYPE_READ_WRITE" && databricks_workspace_binding.self_service_hub[0].securable_type == "catalog"
     error_message = "The catalog is bound to the hub too, read and write: this workspace's schema job runs there."
   }

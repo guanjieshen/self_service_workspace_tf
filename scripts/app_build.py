@@ -88,6 +88,17 @@ def temporary_privileges(jobs):
     return list((jobs.get("temporary_schema") or {}).get("privileges") or TEMPORARY_PRIVILEGES)
 
 
+# A person's regular account's rights on their schemas when app.yaml names none: read only.
+REGULAR_PRIVILEGES = ['USE_SCHEMA', 'SELECT', 'READ_VOLUME', 'EXECUTE']
+READ_ONLY = {'USE_SCHEMA', 'SELECT', 'READ_VOLUME', 'EXECUTE', 'BROWSE'}
+
+
+def regular_privileges(jobs):
+    """What a person's regular account gets on their schemas (app.yaml jobs.regular_account_privileges),
+    with jobs.privileged_account_prefix set: read only."""
+    return list(jobs.get("regular_account_privileges") or REGULAR_PRIVILEGES)
+
+
 def check(s):
     """Settings that would fail later (in a deploy, or in the app), refused now, naming the setting."""
     app, hub, db, jobs = s["app"], s["hub"], s["database"], s["jobs"]
@@ -106,8 +117,13 @@ def check(s):
     need(all(isinstance(p, str) and re.fullmatch(r"[A-Z_]+", p) for p in rights) and not {"MANAGE", "ALL_PRIVILEGES"} & set(rights),
          "app.yaml jobs.temporary_schema.privileges: privileges such as SELECT or CREATE_TABLE; never MANAGE or ALL_PRIVILEGES, which let the requester share it.")
     need(re.fullmatch(r"[\w.-]{0,100}", ai_model(app)), "app.yaml self_service_app.ai_model: a model's name (for example system.ai.claude-sonnet-5-5), or null.")
-    need(re.fullmatch(r"[A-Za-z0-9._+-]{0,64}", str((jobs.get("temporary_schema") or {}).get("account_prefix") or "")),
-         "app.yaml jobs.temporary_schema.account_prefix: the start of the email of the accounts that may make temporary schemas (for example azure-), or null.")
+    need("account_prefix" not in (jobs.get("temporary_schema") or {}),
+         "app.yaml jobs.temporary_schema.account_prefix is replaced by jobs.privileged_account_prefix: people request schemas from "
+         "either account, and both get it. Remove account_prefix and set privileged_account_prefix (for example azure-).")
+    need(re.fullmatch(r"[a-z0-9._+-]{0,64}", str(jobs.get("privileged_account_prefix") or "")),
+         "app.yaml jobs.privileged_account_prefix: the start of each person's privileged account, before their regular email (for example azure-), lower case, or null.")
+    need(set(regular_privileges(jobs)) <= READ_ONLY,
+         f"app.yaml jobs.regular_account_privileges: read-only privileges ({', '.join(sorted(READ_ONLY))}); the privileged account writes.")
     notes = app.get("persona_notes") or {}
     need(isinstance(notes, dict) and set(notes) <= set(PERSONAS) and all(v is None or (isinstance(v, str) and len(v) <= 300) for v in notes.values()),
          f"app.yaml self_service_app.persona_notes: a short note (under 300 characters) for any of {', '.join(PERSONAS)}, or null.")
@@ -143,8 +159,19 @@ def served(s, outputs):
             raise SystemExit(f"{name} has no catalog (catalog: null), so its schema job has nowhere to create schemas: set self_service: false, or give it a catalog.")
         out.append({"name": name, "bu": o["prefix"].upper(), "host": o["host"].rstrip("/"), "id": str(o.get("id") or ""),
                     "catalog": o["catalog"], "usage_policy_id": o.get("usage_policy_id"),
-                    "platform_admins": list(o.get("platform_admins") or [])})
+                    "platform_admins": list(o.get("platform_admins") or []),
+                    "groups": {p: list(g or []) for p, g in (o.get("persona_groups") or {}).items()}})
     return out
+
+
+def cleanup_at(path=None):
+    """When the daily cleanup runs (bundle/hub/resources/cleanup.yml, its Quartz schedule): {"hour",
+    "minute", "timezone"}, so the app can say exactly when a temporary schema is deleted: at the first
+    run after its cd_expires date."""
+    import yaml   # here, as in read(): the notebook tests need only the standard library
+    job = yaml.safe_load((path or ROOT / "bundle/hub/resources/cleanup.yml").read_text())["resources"]["jobs"]["temporary_cleanup"]
+    _sec, minute, hour, *_ = job["schedule"]["quartz_cron_expression"].split()
+    return {"hour": int(hour), "minute": int(minute), "timezone": job["schedule"].get("timezone_id") or "UTC"}
 
 
 def app_config(s, spokes, mode=None):
@@ -158,8 +185,9 @@ def app_config(s, spokes, mode=None):
         "folder_root": s["jobs"].get("folder_root") or "/Workspace",
         "temporary_days": int((s["jobs"].get("temporary_schema") or {}).get("days") or 30),   # what the temporary schema form says
         "temporary_limit": int((s["jobs"].get("temporary_schema") or {}).get("limit") or 1),
-        "temporary_account_prefix": str((s["jobs"].get("temporary_schema") or {}).get("account_prefix") or ""),   # who may make temporary schemas
-        "persona_notes": {p: v for p, v in (app.get("persona_notes") or {}).items() if v},   # on the workspace access page   # the default: Settings > Schemas changes it   # where folders go (made by hand for now)
+        "cleanup_at": cleanup_at(),   # when a temporary schema is really deleted
+        "privileged_account_prefix": str(s["jobs"].get("privileged_account_prefix") or ""),   # each person's privileged account: this and their email
+        "persona_notes": {p: v for p, v in (app.get("persona_notes") or {}).items() if v},   # on the workspace access page
         "faq": dict(app.get("faq") or {}),
         "ai_check": str(app.get("ai_check") or "off"),
         "human_approval": list(app.get("human_approval") or []),
@@ -170,7 +198,8 @@ def app_config(s, spokes, mode=None):
         "onboarding": {"prompt": (app.get("onboarding") or {}).get("prompt") or ""},
         # The workspaces it serves: the business unit is each one's prefix.
         "workspaces": [{"name": w["name"], "bu": w["bu"], "host": w["host"], "id": w["id"], "catalog": w["catalog"],
-                        "domains": (s.get("domains") or {}).get(w["name"], [])} for w in spokes],
+                        "domains": (s.get("domains") or {}).get(w["name"], []),
+                        "groups": w.get("groups") or {}} for w in spokes],   # its persona groups: the access tiles
         "database": {"host": db.get("host"), "name": "self_service",
                      "endpoint": f"projects/{app['database']['project_id']}/branches/production/endpoints/primary"},
     }
@@ -180,7 +209,8 @@ def app_config(s, spokes, mode=None):
 def render(text, values):
     """A job notebook's text with its settings written in: ${jsonencode(x)}, and the shared
     request record check (off unless requests_catalog is set)."""
-    values = {"requests_catalog": "", "workspace_name": "", "human_approval": [], "temporary_account_prefix": "", **values}
+    values = {"requests_catalog": "", "workspace_name": "", "human_approval": [], "privileged_account_prefix": "",
+              "regular_privileges": REGULAR_PRIVILEGES, "builder_groups": [], **values}
     text = text.replace("${request_record_check}", (NOTEBOOKS / "request_record_check.py").read_text())
     return re.sub(r"\$\{jsonencode\((\w+)\)\}", lambda m: json.dumps(values[m.group(1)]), text)
 
@@ -275,7 +305,10 @@ def build_jobs(s, w, app_ids, root=None):
         "prefix": jobs["personal_schema"]["prefix"], "privileges": jobs["personal_schema"]["privileges"],
         "temporary_days": int((jobs.get("temporary_schema") or {}).get("days") or 30),
         "temporary_privileges": temporary_privileges(jobs),
-        "temporary_account_prefix": str((jobs.get("temporary_schema") or {}).get("account_prefix") or ""),
+        "privileged_account_prefix": str(jobs.get("privileged_account_prefix") or ""),
+        "regular_privileges": regular_privileges(jobs),
+        # Who counts as a builder there (the privileged account must be one): its builder and publisher groups.
+        "builder_groups": sorted({g for p in ("builder", "publisher") for g in (w.get("groups") or {}).get(p) or []}),
         "owner": jobs.get("catalog_owner") or "", "allowed_catalogs": [w["catalog"]], **record}))
     (out / "target.yml").write_text(json.dumps(jobs_target(s, w, app_ids), indent=1))
     return out

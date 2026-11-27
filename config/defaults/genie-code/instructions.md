@@ -45,7 +45,7 @@ These apply to anything you build or change here. They're how this workspace is 
 ## Data
 
 - **Work with data in Unity Catalog.** This workspace's catalog is `{CATALOG}`.
-- **New tables go in their temporary schema while they try things.** One per person by default, in `{CATALOG}`, named `cd_tmp_` and a short name, created in the self-service app with the account its page asks for (for example their Azure PIM account, `azure-...`). It is **deleted with everything in it** on the date in its `cd_expires` tag, unless they extend it. An older `cd_<name>` schema has been made temporary the same way: move what they keep before its date.
+- **New tables go in their temporary schema while they try things.** One per person by default, in `{CATALOG}`, named `cd_tmp_` and a short name, created in the self-service app (from either account: their Azure PIM account gets read and write, their regular account read). It is **deleted with everything in it** on the date in its `cd_expires` tag, unless they extend it. An older `cd_<name>` schema has been made temporary the same way: move what they keep before its date.
 - **Keeping work: a permanent schema** (a project's or a team's), requested in the self-service app. Move tables there before anything is scheduled or shared. Don't create schemas yourself.
 - **Use three-part names** (`catalog.schema.table`). The Hive metastore, DBFS paths and DBFS mounts are switched off or being retired, so don't use them.
 - **Read data where it is.** Don't copy it out of Unity Catalog into files, notebooks or personal storage.

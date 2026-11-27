@@ -1,5 +1,5 @@
 {#- Small pieces the approvals pages share. -#}
-{#- How long ago: "3h ago", or with short=True "3h" (a column headed Waiting). -#}
+{#- How long ago: "3h ago", or with short=True "3h" (a column headed Age). -#}
 {%- macro age(now, t, short=False) -%}
 {%- set h = ((now - t).total_seconds() / 3600) | int -%}
 {%- if h < 1 %}{{ "<1h" if short else "just now" }}{% elif h < 48 %}{{ h }}h{{ "" if short else " ago" }}{% else %}{{ (h / 24) | int }}d{{ "" if short else " ago" }}{% endif -%}
@@ -8,13 +8,13 @@
 {%- from "_components.html" import status_badge, chip -%}
 {#- An approval's status, shown with the shared status badge (the self-service app's colours). -#}
 {%- macro status(s, pill=False) -%}
-{%- set labels = {"waiting": "Pending approval", "needs_info": "Waiting on requester", "approved": "Approved", "rejected": "Rejected",
+{%- set labels = {"waiting": "Pending", "needs_info": "Awaiting requester", "approved": "Approved", "rejected": "Rejected",
                    "running": "In progress", "completed": "Completed", "failed": "Failed", "finished": "Finished", "unknown": "Unknown"} -%}
 {{ status_badge(labels[s], pill=pill) }}
 {%- endmacro -%}
-{#- What an approver should look at: the AI summary's concerns, two at most, then "+N". -#}
+{#- Its review considerations (the AI summary's), as compact labels: two at most, then "+N". -#}
 {%- macro notes(r) -%}
-{%- set items = r.summary.concerns | map(attribute="label") | list if r.summary else [] -%}
+{%- set items = r.summary.concerns | map(attribute="label") | map("consideration") | list if r.summary else [] -%}
 {%- if items %}<span class="flags">{% for x in items[:2] %}{{ chip(x, "note") }}{% endfor %}{% if items | length > 2 %}<span class="more">+{{ items | length - 2 }}</span>{% endif %}</span>{% endif -%}
 {%- endmacro -%}
 

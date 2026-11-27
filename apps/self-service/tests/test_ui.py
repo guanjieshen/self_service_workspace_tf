@@ -184,6 +184,86 @@ class ApprovalsMode(unittest.TestCase):
 
 
 
+@unittest.skipIf(TestClient is None, "FastAPI is not installed")
+class ApprovalsSchemas(unittest.TestCase):
+    """The approvals app's Temporary schemas page and its actions (Portal.admin_*, restore_permissions): the
+    approver's business units only; the job runs are checked in test_portal.py (SchemaDeletionAndRestore)."""
+
+    ROWS = [
+        {"workspace": "fin", "bu": "FIN", "name": "fin_citizen_dev.cd_tmp_a", "owner": "ana@contoso.com", "expires": "2026-12-10",
+         "days_left": 13, "deletes_at": "2026-12-11T06:00:00Z", "deletes_text": "11 Dec 2026, 06:00 UTC"},
+        {"workspace": "sales", "bu": "SALES", "name": "sales_citizen_dev.cd_tmp_b", "owner": "mo@contoso.com", "expires": "2026-12-03",
+         "days_left": 6, "deletes_at": "2026-12-04T06:00:00Z", "deletes_text": "4 Dec 2026, 06:00 UTC"},
+        {"workspace": "ops", "bu": "OPS", "name": "ops_citizen_dev.cd_tmp_c", "owner": "ops@contoso.com", "expires": "2026-12-03",
+         "days_left": 6, "deletes_at": "2026-12-04T06:00:00Z", "deletes_text": "4 Dec 2026, 06:00 UTC"},
+    ]
+
+    def setUp(self):
+        self.main = load_main("approvals", {"faq": {}, "workspaces": [{"name": "fin", "bu": "FIN", "host": "https://adb-1.1.azuredatabricks.net"}]})
+        self.http = TestClient(self.main.app)
+        self.patch = mock.patch.object(self.main.PORTAL, "temporary_schemas_everywhere", return_value=self.ROWS)
+        self.patch.start()
+        self.addCleanup(self.patch.stop)
+
+    def test_schemas_lists_the_temporary_schemas_in_the_approvers_business_units(self):
+        page = self.http.get("/approvals/schemas").text
+        self.assertIn("2 in all business units", page, "the approver's BUs only: FIN and SALES, not OPS")
+        self.assertIn("cd_tmp_a", page)
+        self.assertIn("cd_tmp_b", page)
+        self.assertNotIn("cd_tmp_c", page, "OPS is not one of the approver's business units")
+        self.assertIn("ana@contoso.com", page)
+        self.assertIn("Extend 30 days", page)
+
+    def test_the_business_unit_and_search_filters(self):
+        page = self.http.get("/approvals/schemas?bu=FIN").text
+        self.assertIn("1 in FIN", page)
+        self.assertIn("cd_tmp_a", page)
+        self.assertNotIn("cd_tmp_b", page)
+        self.assertIn("mo@contoso.com", self.http.get("/approvals/schemas?q=MO%40").text, "search by owner")
+        self.assertIn("No temporary schemas match.", self.http.get("/approvals/schemas?q=zzz").text)
+
+    def test_delete_asks_for_the_typed_name_then_runs_the_purge(self):
+        form = self.http.get("/approvals/schemas/delete?workspace=fin&schema=fin_citizen_dev.cd_tmp_a").text
+        self.assertIn("Delete temporary schema", form)
+        self.assertIn("Type the schema&#39;s name to confirm", form)
+        with mock.patch.object(self.main.PORTAL, "admin_delete_temporary", side_effect=self.main.portal.RequestError(
+                "Type the schema's name exactly to delete it.")) as delete:
+            bad = self.http.post("/approvals/schemas/delete", data={"workspace": "fin", "schema": "fin_citizen_dev.cd_tmp_a", "confirm": "nope"})
+        self.assertIn("Type the schema&#39;s name exactly to delete it.", bad.text, "shown on the form")
+        delete.assert_called_once()
+        with mock.patch.object(self.main.PORTAL, "admin_delete_temporary") as delete:
+            r = self.http.post("/approvals/schemas/delete", data={"workspace": "fin", "schema": "fin_citizen_dev.cd_tmp_a", "confirm": "cd_tmp_a"},
+                               follow_redirects=False)
+        self.assertEqual(r.status_code, 303)
+        self.assertEqual(delete.call_args.args[1:], ("dana.owner@contoso.com", "fin_citizen_dev.cd_tmp_a", "cd_tmp_a"), "the approver, the schema, the name typed")
+        self.assertIn("Deleting fin_citizen_dev.cd_tmp_a: the job is running.", self.http.get(r.headers["location"]).text)
+
+    def test_delete_of_a_schema_that_is_gone_goes_back_to_the_list(self):
+        r = self.http.get("/approvals/schemas/delete?workspace=fin&schema=fin_citizen_dev.cd_gone", follow_redirects=False)
+        self.assertEqual(r.status_code, 303)
+        self.assertTrue(r.headers["location"].startswith("/approvals/schemas?"))
+
+    def test_extend_runs_thirty_days_straight_away(self):
+        with mock.patch.object(self.main.PORTAL, "admin_extend_temporary") as extend:
+            r = self.http.post("/approvals/schemas/extend", data={"workspace": "fin", "schema": "fin_citizen_dev.cd_tmp_a"}, follow_redirects=False)
+        extend.assert_called_once_with("fin", "dana.owner@contoso.com", "fin_citizen_dev.cd_tmp_a")
+        self.assertEqual(r.status_code, 303)
+        self.assertIn("Adding 30 days to fin_citizen_dev.cd_tmp_a: the job is running.", self.http.get(r.headers["location"]).text)
+
+    def test_restore_runs_for_the_owner_as_the_approver(self):
+        with mock.patch.object(self.main.PORTAL, "restore_permissions") as restore:
+            r = self.http.post("/approvals/schemas/restore", data={"workspace": "fin", "schema": "fin_citizen_dev.cd_tmp_a",
+                                                                   "owner": "ana@contoso.com"}, follow_redirects=False)
+        restore.assert_called_once_with("fin", "dana.owner@contoso.com", "fin_citizen_dev.cd_tmp_a", owner="ana@contoso.com")
+        self.assertEqual(r.status_code, 303)
+        self.assertIn("Restoring permissions on fin_citizen_dev.cd_tmp_a for ana@contoso.com", self.http.get(r.headers["location"]).text)
+
+    def test_a_failed_restore_says_why_on_the_list(self):
+        with mock.patch.object(self.main.PORTAL, "restore_permissions", side_effect=self.main.portal.RequestError("That temporary schema no longer exists.")):
+            r = self.http.post("/approvals/schemas/restore", data={"workspace": "fin", "schema": "x", "owner": "ana@contoso.com"}, follow_redirects=True)
+        self.assertIn("That temporary schema no longer exists.", r.text)
+
+
 class LakebaseApprovals(unittest.TestCase):
     """approvals_store.LakebaseStore over the requests database (a stand-in here)."""
 
@@ -327,7 +407,7 @@ class InboxPages(unittest.TestCase):
         page = self.http.get(r.headers["location"]).text
         self.assertIn("Approved: its job is running.", page)
         self.assertIn('class="callout-action"', page)
-        self.assertNotIn(">hr_pay_equity<", page.split('class="inbox"')[1], "the approved request is no longer pending")
+        self.assertNotIn(">hr_pay_equity<", page.split('class="inbox ')[1], "the approved request is no longer pending")
 
     def test_the_inbox_and_the_request_show_the_summary(self):
         page = self.http.get("/approvals").text
@@ -335,7 +415,7 @@ class InboxPages(unittest.TestCase):
         self.assertIn(">Operational impact<", page, "its concerns, in a few words")
         self.assertNotIn("Kind of data: about people", page, "not the check's long sentences")
         page = self.http.get("/approvals/ss-0004").text
-        self.assertIn("Worth checking", page)
+        self.assertIn("Review considerations", page)
         self.assertIn('name="comment" value="Will anything write to SCADA directly', page, "a suggested question, one click away")
 
     def test_a_suggested_question_asks_the_requester_in_one_click(self):
@@ -445,7 +525,7 @@ class SummaryLevels(unittest.TestCase):
         got = summary.parse(j.dumps({"headline": "h", "summary": "s", "questions": [], "concerns": [
             {"label": "Naming", "level": "low", "detail": "d"}, {"label": "Pay", "level": "HIGH", "detail": "d"},
             {"label": "Scope", "level": "urgent", "detail": "d"}]}))
-        self.assertEqual([(c["label"], c["level"]) for c in got["concerns"]], [("Pay", "high"), ("Scope", "medium"), ("Naming", "low")])
+        self.assertEqual([(c["label"], c["level"]) for c in got["concerns"]], [("Pay", "high"), ("Scope", "medium"), ("Naming convention", "low")], "a label is named as the approvals app names it")
 
 
 class LakebaseDecisions(unittest.TestCase):

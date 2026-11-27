@@ -35,12 +35,32 @@ them. Say only what the approver cannot see at a glance.
 Reply with JSON only, no other text, in exactly this shape:
 {"headline": "at most 8 words: what it is for (not its name, kind or workspace)",
  "summary": "one sentence: what the reason makes clear, and what it leaves out",
- "concerns": [{"label": "a professional category of one to three words, such as Data sensitivity, Naming, Access scope, Operational impact or Purpose not specified",
+ "concerns": [{"label": "exactly one of: Sensitive data, Access scope, Naming convention, Operational impact, Purpose",
                "level": "high, medium or low: high for personal, customer, pay or health data and for changes to live systems; low for naming",
                "detail": "one sentence of at most 15 words"}],
  "questions": ["a short question the approver could ask the requester"]}
 At most three concerns, most important first, and two questions; empty lists when there is nothing to check.
 Write as a colleague in a governance team would: neutral and specific, no exclamation marks."""
+
+
+# The review considerations an approver sees: each label, and what to validate (guidance, never a
+# violation or a reason to reject by itself). The model picks the label; older answers' labels map in.
+GUIDANCE = {
+    "Sensitive data": "Verify that appropriate controls are in place for sensitive or personal information.",
+    "Access scope": "Confirm that the requested access is appropriate for the intended audience.",
+    "Naming convention": "Verify that the requested name follows enterprise naming standards.",
+    "Operational impact": "Consider potential impacts on operational systems and processes.",
+    "Purpose": "Confirm that the reason explains what the request is for and who will use it.",
+}
+ALIASES = {"data sensitivity": "Sensitive data", "sensitive data": "Sensitive data", "naming": "Naming convention",
+           "naming convention": "Naming convention", "access scope": "Access scope", "operational impact": "Operational impact",
+           "purpose": "Purpose", "purpose not specified": "Purpose"}
+
+
+def consideration(label):
+    """A model's label as the approvals app names it (GUIDANCE), or as it is when it names another."""
+    label = str(label or "").strip()[:40]
+    return ALIASES.get(label.lower(), label)
 
 
 def request_facts(r):
@@ -57,7 +77,7 @@ def parse(text):
     data = json.loads(text[start:end + 1])
     clip = lambda v, n: str(v or "").strip()[:n]
     order = {"high": 0, "medium": 1, "low": 2}
-    concerns = [{"label": clip(c.get("label"), 40), "detail": clip(c.get("detail"), 160),
+    concerns = [{"label": consideration(c.get("label")), "detail": clip(c.get("detail"), 160),
                  "level": str(c.get("level") or "").strip().lower() if str(c.get("level") or "").strip().lower() in order else "medium"}
                 for c in (data.get("concerns") or []) if isinstance(c, dict) and c.get("label")]
     concerns.sort(key=lambda c: order[c["level"]])   # most important first, whatever order the model used

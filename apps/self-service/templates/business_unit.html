@@ -8,7 +8,7 @@
 <div class="page-head bu-head">
   <h1>{{ "Which business unit are you in?" if first else "Your business unit" }}</h1>
   <p class="lead">Your requests go to its workspace: folders are created there, schemas in its catalog, and Genie One opens there.
-    {{ "You can change it later from your name, top right." if first else "" }}</p>
+    {{ "Change it later from your account at the top right." if first else "" }}</p>
 </div>
 {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
 <form class="bu-choice" method="post" action="/business-unit">
@@ -22,8 +22,8 @@
       <span class="bu-code">{{ bu }}</span>
       {% for w in workspaces %}
       <dl class="bu-facts">
-        <div><dt>Workspace:</dt><dd class="mono">{{ w.name }}</dd></div>
-        {% if w.catalog %}<div><dt>Catalog:</dt><dd class="mono">{{ w.catalog }}</dd></div>{% endif %}
+        <div><dt>Workspace</dt><dd class="mono">{{ w.name }}</dd></div>
+        {% if w.catalog %}<div><dt>Catalog</dt><dd class="mono">{{ w.catalog }}</dd></div>{% endif %}
       </dl>
       {% endfor %}
     </label>

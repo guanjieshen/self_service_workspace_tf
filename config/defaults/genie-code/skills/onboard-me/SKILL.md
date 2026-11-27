@@ -36,7 +36,7 @@ Check your memory for this person's role and goals (the instructions ask you to 
 3. **The data they can see.** Look before you describe:
    - List the catalogs and schemas they can use (`SHOW CATALOGS`, then `information_schema.schemata`, on the `{WAREHOUSE}` warehouse), starting with this workspace's catalog, `{CATALOG}`.
    - For the three to five schemas that look most useful, name the main tables and, in one line each, what they seem to hold (from table comments and column names; say when you're inferring).
-   - Mention their **temporary schema** in `{CATALOG}`, where they try things, if they have one (and that it's deleted on its `cd_expires` date), and that the self-service app creates one if not (with the account its page asks for).
+   - Mention their **temporary schema** in `{CATALOG}`, where they try things, if they have one (and that it's deleted on its `cd_expires` date), and that the self-service app creates one if not (both their accounts get it).
    - If they can see nothing yet, say so plainly, and that access comes from their workspace's platform team (through a group, not one by one).
 4. **Three good first questions**, built from the data you found: specific, answerable from those tables, and each one a single sentence the user could ask right away. Offer to answer one now.
 5. **Get to know them**, two questions at a time:

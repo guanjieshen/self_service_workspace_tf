@@ -35,35 +35,35 @@ class Card:
     link: str = ""  # a page in Databricks: links.<link>
     icon: str = ""  # _icons.html name; the key when empty
     soon: bool = False  # a link card: Coming soon (not left out) while its link is not set
-    opens: str = "Opens in Databricks"   # a link card's foot: where it goes, and what it needs
+    opens: str = "Workspace access required"   # a link card's foot: what it needs (its icon says it opens in Databricks)
     more: tuple = ()  # a link card's second link: (its text, links.<name>)
     preview: bool = False  # an href card: Coming soon, but its page opens (a form that sends nothing yet)
 
 
 CARDS = [
-    Card("persona", "access", "Request workspace access", "Choose the access level you need.", href="/persona"),
-    # /open: Genie One in the person's workspace, with the guided tour (the onboarding prompt) the
-    # first time (portal.open_workspace).
-    Card("open_workspace", "access", "Open Databricks Genie One",
-         "Explore the data you have access to and try suggested questions to get started.",
-         link="workspace", icon="launch", opens="Opens in Databricks · Workspace access required",
-         more=("Restart guided tour", "tour")),
+    Card("persona", "access", "Request workspace access", "Request Explorer, Builder, or Publisher access.", href="/persona"),
+    # Opening a workspace is not a card: catalog.html shows each of the person's workspaces with
+    # Explore with Genie and Build in Databricks (portal.access_for), above these cards.
 
     Card("discover", "data", "Discover data",
-         "Explore curated datasets organized by business area.", link="discover", icon="search",
-         opens="Opens in Databricks · Workspace access required"),
-    Card("review_requests", "data", "View data access requests",
-         "See the requests you made and the ones made for data you manage.", link="review_requests", icon="requests",
-         opens="Opens in Databricks · Workspace access required"),
+         "Browse curated datasets across business domains.", link="discover", icon="search"),
+    Card("review_requests", "data", "Manage data access requests",
+         "Track your access requests and review requests for data you manage.", link="review_requests", icon="requests"),
 
     # The domain card is a preview for now: Coming soon, its form opens but sends nothing. To take it
-    # live, remove preview=True: the form, the request and the approver's steps are ready.
-    Card("domain", "data", "Request a domain",
-         "Give a team its own SQL warehouse, budget policy and folder: a new domain, or a subdomain of one.",
+    # live, remove preview=True: the form, the request and the approver's steps are ready. In Get
+    # started, beside Request workspace access.
+    Card("domain", "access", "Request a domain",
+         "Provision a domain or subdomain with a dedicated SQL warehouse, budget policy, and workspace folder.",
          href="/domain", preview=True),
+    # Both made by hand (portal.ALWAYS_BY_HAND): an admin does it in a pull request, then approves it.
+    Card("group_request", "access", "Add a workspace group",
+         "Add an Entra ID group to manage workspace folder permissions. No access is granted automatically.",
+         href="/group", icon="group"),
 
+    # Its title becomes "Manage temporary schema" while the person has one (catalog.html).
     Card("temporary_schema", "workspace", "Create a temporary schema",
-         "A short-term schema for experiments, tagged with the date it expires.", href="/schema/temporary", icon="schema"),
+         "A personal schema for experimentation and development, available for 30 days.", href="/schema/temporary", icon="schema"),
     # One form for a project schema (theirs) and a team schema (theirs and an Entra group's): the group is optional.
     Card("permanent_schema", "workspace", "Request a permanent schema",
          "Create a schema for your project, on your own or managed together with your team.", href="/schema/permanent", icon="schema"),
@@ -71,10 +71,6 @@ CARDS = [
     # call other workspaces. The request is tracked in the approvals app like any other.
     Card("folder", "workspace", "Request a workspace folder",
          "Create a shared workspace folder and control who can access it.", href="/folder"),
-    # Both made by hand (portal.ALWAYS_BY_HAND): an admin does it in a pull request, then approves it.
-    Card("group_request", "workspace", "Add a group to your workspace",
-         "Add an Entra ID group to your workspace so you can share folders with it. It gives no access by itself.",
-         href="/group", icon="group"),
 
     Card("warehouses", "compute", "Manage SQL warehouses", "Create and manage SQL warehouses for your workloads."),
     Card("classic_compute", "compute", "Request classic compute access",

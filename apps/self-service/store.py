@@ -15,7 +15,7 @@ import time
 
 # The kinds a request can be, as the database knows them (the portal's job kinds are coarser).
 KINDS = ("personal_schema", "project_schema", "team_schema", "temporary_schema", "temporary_extension",
-         "temporary_conversion", "folder")
+         "temporary_conversion", "folder", "domain", "workspace_group", "schema_delete", "schema_restore")
 
 
 def db_kind(job_kind, params):
@@ -26,6 +26,10 @@ def db_kind(job_kind, params):
         return "temporary_extension"
     if params.get("action") == "convert":
         return "temporary_conversion"
+    if params.get("action") == "purge":
+        return "schema_delete"
+    if params.get("action") == "restore":
+        return "schema_restore"
     if params.get("temporary") == "true":
         return "temporary_schema"
     if params.get("schema"):

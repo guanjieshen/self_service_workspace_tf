@@ -41,7 +41,7 @@ What people may do, and how the app behaves. Read the key's comment in the file 
 | The name prefix of every schema the app makes (`cd_`), or the rights of project and team schemas (and of a temporary schema kept as one) | `personal_schema.prefix`, `personal_schema.privileges` (under `jobs:`) |
 | How long a temporary schema lasts (its `cd_expires` tag; the daily cleanup job drops it after) | `temporary_schema.days` (under `jobs:`, 1 to 365) |
 | What a temporary schema's requester may do in it (they can never share it) | `temporary_schema.privileges` (under `jobs:`): never `MANAGE` or `ALL_PRIVILEGES`, the build refuses them |
-| Which accounts may create a temporary schema | `temporary_schema.account_prefix` (under `jobs:`): the start of their email, for example `azure-`; `null` = any account. The form says which account to use, and the job refuses others. Its owner extends it, with the account that made it |
+| Each person's two accounts get their schemas (privileged read and write, regular read only) | `privileged_account_prefix` (under `jobs:`): the privileged account's prefix before the regular email, for example `azure-`; `null` = one account. The privileged account must be a builder or publisher in the workspace, or the request is refused. `regular_account_privileges` (under `jobs:`): the regular account's, read only |
 | Who owns new schemas | `catalog_owner` (under `jobs:`). Workspace folders are made by hand for now: `folder_root` is where the approvals app tells admins to create them |
 
 Never change `name`, `approvals.name` or `database.project_id` (they name the apps and the database: changing them makes new ones). Stop and say a maintainer should plan it.

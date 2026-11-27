@@ -153,9 +153,9 @@ if (live) {
       document.title = (data.status === "Completed" ? "✓ Completed" : "Failed") + " · " + data.task;
       // The same layout as the server's: the words, then the action at the right.
       message.innerHTML = data.status === "Completed"
-        ? `<div><p class="strong">Done: your ${esc(live.dataset.noun)} is ready</p><p>You can manage <span class="mono">${esc(data.resource)}</span> and share it with others.</p></div>` +
+        ? `<div><p class="strong">Your ${esc(live.dataset.noun)} is ready</p><p>You can manage <span class="mono">${esc(data.resource)}</span> and share it with others.</p></div>` +
           (data.link ? `<div class="live-actions"><a class="button primary" href="${esc(data.link)}" target="_blank" rel="noopener">Open ${esc(live.dataset.noun)}</a></div>` : "")
-        : `<div><p class="strong">It did not go through</p><p class="reason">${esc(data.message || "The job failed; a platform admin can see why in its run.")}</p></div>` +
+        : `<div><p class="strong">Request failed</p><p class="reason">${esc(data.message || "The job failed; a platform admin can see why in its run.")}</p></div>` +
           `<div class="live-actions"><a class="button primary" href="${esc(data.retry)}">Try again</a></div>`;
       return "done";
     }, started);
@@ -225,3 +225,17 @@ document.addEventListener("click", e => {
 document.addEventListener("submit", e => { if (!e.defaultPrevented) loading(true); });
 // Back and forward can show a page from the browser's cache: never with the bar still on.
 window.addEventListener("pageshow", () => loading(false));
+
+// A destructive form's button (data-confirm-button) stays disabled until the typed name (data-confirm)
+// matches the chosen schema's name without its catalog (data-confirm-target: the radio or hidden input).
+document.querySelectorAll("form").forEach(form => {
+  const input = form.querySelector("[data-confirm]"), button = form.querySelector("[data-confirm-button]");
+  if (!input || !button) return;
+  const target = () => {
+    const t = form.querySelector("[data-confirm-target]:checked") || form.querySelector("input[type=hidden][data-confirm-target]");
+    return t ? t.value.split(".").pop().toLowerCase() : "";
+  };
+  const check = () => { button.disabled = !target() || input.value.trim().toLowerCase() !== target(); };
+  form.addEventListener("input", check); form.addEventListener("change", check); check();
+});
+});

@@ -1,0 +1,26 @@
+{#- An approver deletes someone's temporary schema now, with everything in it, once they type its name. -#}
+{% extends "base.html" %}
+{% from "_components.html" import back, callout, deletion, field, kv %}
+{% block title %}Delete {{ s.name }} · Admin{% endblock %}
+{% block content %}
+{{ back("/approvals/schemas", "Temporary schemas") }}
+<div class="page-head"><h1>Delete temporary schema</h1><p class="lead mono">{{ s.name }}</p></div>
+<form class="panel" method="post" action="/approvals/schemas/delete" data-submit>
+  <div class="panel-body">
+    {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
+    <input type="hidden" name="workspace" value="{{ s.workspace }}"><input type="hidden" name="schema" value="{{ s.name }}" data-confirm-target>
+    {% call callout("error") %}<strong>This can't be undone.</strong> The schema and everything in it are permanently deleted, for everyone who uses it.{% endcall %}
+    {{ kv([("Schema", s.name, "mono"), ("Owner", s.owner), ("Deletes", "Every table, view, volume and file in it"),
+           ("Expires", deletion(s))]) }}
+    {% call field("confirm", "Type the schema's name to confirm", required=True, hint="Its name without the catalog: " ~ s.name.split(".", 1)[1] ~ ".") %}
+      <input id="confirm" name="confirm" autocomplete="off" spellcheck="false" required data-confirm>
+    {% endcall %}
+  </div>
+  <div class="panel-foot form-foot">
+    <div class="form-actions">
+      <button type="submit" class="button danger" disabled data-confirm-button>Delete schema</button>
+      <a class="button" href="/approvals/schemas">Cancel</a>
+    </div>
+  </div>
+</form>
+{% endblock %}

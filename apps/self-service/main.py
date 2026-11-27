@@ -18,6 +18,7 @@ from fastapi.templating import Jinja2Templates
 
 import cards
 import portal
+import summary
 
 HERE = pathlib.Path(__file__).parent
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")   # the app's log in Databricks Apps
@@ -85,6 +86,10 @@ def mention(text, name):
 
 
 templates.env.filters["mention"] = mention
+# A review consideration's label as the approvals app names it, and what the approver validates
+# (summary.GUIDANCE): summaries saved before the standard labels read the same way.
+templates.env.filters["consideration"] = summary.consideration
+templates.env.filters["guidance"] = lambda label: summary.GUIDANCE.get(summary.consideration(label), "")
 # The static files' version (their contents' hash): in their links, so browsers load new ones after a deploy.
 templates.env.globals["asset_version"] = app.state.asset_version = hashlib.sha1(b"".join((HERE / "static" / f).read_bytes() for f in ("app.css", "app.js"))).hexdigest()[:10]
 # Databricks Apps sets DATABRICKS_APP_NAME. There, only its sign-in says who the user is.
@@ -228,8 +233,9 @@ def catalog(request: Request):
     mine = PORTAL.my_workspace(user) is not None
     links = {**PORTAL.links_for(user, shown.get("links")), "workspace": "/open" if mine else None,
              "tour": "/open?tour=1" if mine and shown["onboarding"]["prompt"] else None}
-    return page(request, "catalog.html", nav="catalog", groups=cards.groups(links),
-                quotas={"temporary_schema": temporary_schema(user)}, temporary_account=temporary_account(user))
+    # links=: the person's own (the tour link on the Explore tile, the links' SOPs); page() would pass the config's.
+    return page(request, "catalog.html", nav="catalog", groups=cards.groups(links), links=links, access=PORTAL.access_for(user),
+                quotas={"temporary_schema": temporary_schema(user)})
 
 
 @app.get("/schema", include_in_schema=False)
@@ -277,22 +283,19 @@ def schema_submit(request: Request):
     return RedirectResponse("/schema/temporary", status_code=303)   # never a personal schema now
 
 
-def temporary_account(user):
-    """Whether this account may make temporary schemas (app.yaml jobs.temporary_schema.account_prefix),
-    and the prefix, for the form to say which to use."""
-    return {"ok": PORTAL.temporary_account(user), "prefix": CONFIG.get("temporary_account_prefix") or ""}
-
-
 @app.get("/schema/temporary/{action}", response_class=HTMLResponse)
 def temporary_action_form(request: Request, action: str, schema: str = "", days: str = "", reason: str = "", error: str = ""):
     """More time for one of the person's temporary schemas (portal.EXTENSION_DAYS): added straight
-    away, or once an approver approves it (app.yaml human_approval lists temporary_extension)."""
-    if action != "extend":   # keeping one as a project schema: not offered for now
+    away, or once an approver approves it (app.yaml human_approval lists temporary_extension). Or
+    delete one now, with everything in it, once they type its name."""
+    if action not in ("extend", "delete"):   # keeping one as a project schema: not offered for now
         raise HTTPException(404)
     workspaces, why = offered(user_of(request), "personal_schema")
     have = temporary_schema(user_of(request))
     names = [t["name"] for t in have.get("schemas") or []]
     chosen = schema if schema in names else (names[0] if len(names) == 1 else "")
+    if action == "delete":   # one page deletes any of the person's schemas
+        return RedirectResponse("/schema/delete" + (f"?{urlencode({'schema': schema})}" if schema else ""), status_code=301)
     return page(request, "temporary_action.html", nav="catalog", action=action, have=have, chosen=chosen,
                 workspaces=workspaces, days=days, reason=reason, choices=portal.EXTENSION_DAYS, error=error or why,
                 needs_approval=PORTAL.needs_approval("temporary_extension"))
@@ -300,7 +303,7 @@ def temporary_action_form(request: Request, action: str, schema: str = "", days:
 
 @app.post("/schema/temporary/{action}")
 def temporary_action_submit(request: Request, action: str, workspace: str = Form(""), schema: str = Form(""), days: str = Form(""),
-                            reason: str = Form("")):
+                            reason: str = Form(""), confirm: str = Form("")):
     if action != "extend":   # keeping one as a project schema: not offered for now
         raise HTTPException(404)
     reason = reason.strip()
@@ -308,6 +311,58 @@ def temporary_action_submit(request: Request, action: str, workspace: str = Form
         started = PORTAL.request_more_time(workspace, user_of(request), int(days) if days.isdigit() else 0, reason, schema)
     except portal.RequestError as e:
         return temporary_action_form(request, action, schema=schema, days=days, reason=reason, error=str(e))
+    return sent(workspace, started)
+
+
+@app.get("/schema/delete", response_class=HTMLResponse)
+def delete_form(request: Request, schema: str = "", error: str = ""):
+    """Delete one of the person's temporary schemas now, with everything in it (portal.delete_schema).
+    The button waits for its typed name."""
+    user = user_of(request)
+    workspaces, why = offered(user, "personal_schema")
+    mine = []
+    if workspaces:
+        try:
+            mine = PORTAL.my_schemas(workspaces[0].name, user)
+        except portal.RequestError as e:
+            why = why or str(e)
+    chosen = next((s["name"] for s in mine if schema in (s["name"], s["name"].split(".", 1)[1])), mine[0]["name"] if len(mine) == 1 else "")
+    dates = {x["name"]: x for x in temporary_schema(user).get("schemas") or []}   # when each is deleted anyway
+    return page(request, "schema_delete.html", nav="catalog", mine=mine, chosen=chosen, workspaces=workspaces, have_by_name=dates, error=error or why)
+
+
+@app.post("/schema/delete")
+def delete_submit(request: Request, workspace: str = Form(""), schema: str = Form(""), confirm: str = Form("")):
+    try:
+        started = PORTAL.delete_schema(workspace, user_of(request), schema, confirm)
+    except portal.RequestError as e:
+        return delete_form(request, schema=schema, error=str(e))
+    return sent(workspace, started)
+
+
+@app.get("/schema/restore", response_class=HTMLResponse)
+def restore_form(request: Request, schema: str = "", error: str = ""):
+    """Give one of the person's schemas back the grants it got when it was made (when they removed
+    their own): their temporary schemas and the project and team schemas they asked for."""
+    user = user_of(request)
+    workspaces, why = offered(user, "personal_schema")
+    mine = []
+    if workspaces:
+        try:
+            mine = PORTAL.my_schemas(workspaces[0].name, user)
+        except portal.RequestError as e:
+            why = why or str(e)
+    chosen = next((s["name"] for s in mine if schema in (s["name"], s["name"].split(".", 1)[1])), mine[0]["name"] if len(mine) == 1 else "")
+    return page(request, "restore.html", nav="catalog", mine=mine, chosen=chosen, workspaces=workspaces,
+                pair=PORTAL.account_pair(user), error=error or why)
+
+
+@app.post("/schema/restore")
+def restore_submit(request: Request, workspace: str = Form(""), schema: str = Form("")):
+    try:
+        started = PORTAL.restore_permissions(workspace, user_of(request), schema)
+    except portal.RequestError as e:
+        return restore_form(request, schema=schema, error=str(e))
     return sent(workspace, started)
 
 
@@ -331,9 +386,8 @@ def named_schema_form(request: Request, kind: str, workspace: str = "", name: st
     workspaces, why = offered(user_of(request), "personal_schema")
     chosen = workspace if workspace in {w.name for w in workspaces} else (workspaces[0].name if workspaces else "")
     error = error or why
-    return page(request, "schema_named.html", nav="catalog", temporary=kind == "temporary",
+    return page(request, "schema_named.html", nav="catalog", temporary=kind == "temporary", pair=PORTAL.account_pair(user_of(request)),
                 have=temporary_schema(user_of(request)) if kind == "temporary" else None,
-                account=temporary_account(user_of(request)) if kind == "temporary" else None,
                 workspaces=workspaces, chosen=chosen,
                 name=name, owner_group=owner_group,
                 reason=reason, error=error)
@@ -602,7 +656,7 @@ if MODE == "approvals":
     import approvals_store
     APPROVALS = approvals.register(app, page, user_of, store=approvals_store.LakebaseStore(
         PORTAL.store, {w["bu"] for w in CONFIG.get("workspaces", [])}, PORTAL.run_status, start=PORTAL.run_recorded,
-        human_approval=[*CONFIG.get("human_approval", ()), *portal.ALWAYS_APPROVED], summarize=PORTAL.summarize, run_link=PORTAL.run_link, manual=PORTAL.manual, release=PORTAL.release_hold), config=CONFIG)
+        human_approval=[*CONFIG.get("human_approval", ()), *portal.ALWAYS_APPROVED], summarize=PORTAL.summarize, run_link=PORTAL.run_link, manual=PORTAL.manual, release=PORTAL.release_hold), config=CONFIG, portal=PORTAL)
 
 if __name__ == "__main__":
     import uvicorn

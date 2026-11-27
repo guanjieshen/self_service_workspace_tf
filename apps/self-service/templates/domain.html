@@ -11,16 +11,16 @@
 <div class="page-grid form-grid">
 <form class="panel" method="post" action="/domain" data-submit>
   <div class="panel-body">
-    {% if preview %}{% call callout("warning") %}<span class="strong">Coming soon.</span> This is a preview of the form: nothing is sent yet. Until then, ask your platform admin for a domain.{% endcall %}{% endif %}
-    {% call callout() %}A domain gives a team its own SQL warehouse, budget policy and folder. A platform admin reviews your request, asks you for anything else it needs, and sets it up.{% endcall %}
+    {% if preview %}{% call callout("warning") %}<span class="strong">Coming soon.</span> Preview only: nothing is sent yet. Until then, ask your platform admin for a domain.{% endcall %}{% endif %}
+    {% call callout() %}A platform admin reviews the request, asks for anything else it needs, and sets up the domain.{% endcall %}
     {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
     {% if workspaces %}
       {% set on_change = True %}{% include "_workspace_select.html" %}
 
       {% call field("parent", "Where does it go?", required=True,
-                    hint="A new domain, or a subdomain under one of your organization's domains." if domains else "There are no domains yet, so this is a new domain.") %}
+                    hint="A new domain, or a subdomain of an existing domain." if domains else "No domains exist yet, so this is a new domain.") %}
         <select id="parent" name="parent">
-          <option value="">At the top (a new domain)</option>
+          <option value="">Top level (a new domain)</option>
           {% for d in domains %}<option value="{{ d.key }}" {{ 'selected' if form.parent == d.key }}>{% for _ in range(d.depth + 1) %}&nbsp;&nbsp;&nbsp;{% endfor %}Under {{ d.label }}</option>{% endfor %}
         </select>
       {% endcall %}
@@ -38,7 +38,7 @@
   <div class="panel-foot form-foot">
     <div class="form-actions">
       <button type="submit" class="primary" {{ 'disabled' if preview or not workspaces }}>{{ "Coming soon" if preview else "Submit request" }}</button>
-      <a class="button" href="/">{{ "Back to the catalog" if preview else "Cancel" }}</a>
+      <a class="button" href="/">{{ "Close" if preview else "Cancel" }}</a>
     </div>
     <p class="meta">{{ "Preview only: this form sends nothing yet." if preview else "A platform admin reviews it and sets it up; you can follow it under My requests." }}</p>
   </div>

@@ -52,9 +52,11 @@ class FakeSpark:
         return types.SimpleNamespace(count=lambda: len(rows), collect=lambda: rows)
 
 
-def run(params, schemas=None, config=None, records=None, raced=(), answer=None, asked=None):
+def run(params, schemas=None, config=None, records=None, raced=(), answer=None, asked=None, members=None):
     """Run the notebook with these request parameters (catalog defaults to the allowed one);
-    returns (SQL statements, the exit value). asked, a list: gets each ai_query's parameters."""
+    returns (SQL statements, the exit value). asked, a list: gets each ai_query's parameters.
+    members: {account: [groups through which it reaches the catalog]} for the builder check (an
+    account not in it does not exist); an Exception: the check fails."""
     values = {"catalog": "fin_citizen_dev", **params}
     notebook = render_notebook(NOTEBOOK, {**CONFIG, **(config or {})})
     spark = FakeSpark(schemas or {}, raced, **({"answer": answer} if answer is not None else {}))
@@ -71,7 +73,13 @@ def run(params, schemas=None, config=None, records=None, raced=(), answer=None, 
     users = types.SimpleNamespace(list=lambda filter, attributes: [
         types.SimpleNamespace(groups=[types.SimpleNamespace(display=g) for g in GROUPS[e]]) for e in GROUPS if f'"{e}"' in filter])
     sdk = types.ModuleType("databricks.sdk")
-    sdk.WorkspaceClient = lambda: types.SimpleNamespace(users=users)
+    def effective(method, path, query=None):
+        if isinstance(members, Exception):
+            raise members
+        if query["principal"] not in (members or {}):
+            raise RuntimeError(f"Could not find principal with name {query['principal']}.")
+        return {"privilege_assignments": [{"principal": g} for g in members[query["principal"]]]}
+    sdk.WorkspaceClient = lambda: types.SimpleNamespace(users=users, api_client=types.SimpleNamespace(do=effective))
     names = ("databricks", "databricks.sdk")
     saved = {k: sys.modules.get(k) for k in names}
     sys.modules.update(dict(zip(names, (types.ModuleType("databricks"), sdk))))
@@ -94,7 +102,8 @@ class PersonalSchema(unittest.TestCase):
     def test_creates_tags_grants_and_hands_over_a_new_schema(self):
         sql, result = run({"user": "Sam.Lee@contoso.com", "request_id": "REQ-42"})
         self.assertEqual(result, {"catalog": "fin_citizen_dev", "schema": "cd_sam_lee", "kind": "personal",
-                                  "user": "sam.lee@contoso.com", "owner_group": "", "reason": "", "created": True})
+                                  "user": "sam.lee@contoso.com", "owner_group": "", "reason": "", "created": True,
+                                  "granted": ["sam.lee@contoso.com"]})
         self.assertEqual(sql[0], "CREATE SCHEMA `fin_citizen_dev`.`cd_sam_lee` "
                                  "COMMENT 'Personal schema of sam.lee@contoso.com (citizen development)'")
         self.assertIn("'cd_managed_by' = 'self_service', 'cd_user' = 'sam.lee@contoso.com', 'cd_schema_kind' = 'personal', 'cd_created' = ", sql[1])
@@ -168,7 +177,7 @@ class PersonalSchema(unittest.TestCase):
                 ({"days": "30", "action": "extend"}, {"cd_tmp_x": {"cd_user": "bo@contoso.com", "cd_schema_kind": "temporary"}}, "not a@contoso.com's"),
                 ({"action": "extend", "days": "30"}, {"cd_tmp_x": {"cd_user": "a@contoso.com", "cd_schema_kind": "project"}}, "already a project schema"),
                 ({"days": "14", "action": "extend"}, {}, "days is 30"),
-                ({"action": "convert"}, {}, "action is extend, hold, release or empty"),   # keeping it: not offered for now
+                ({"action": "convert"}, {}, "action is extend, hold, release, purge, restore or empty"),   # keeping it: not offered for now
                 ({"action": "hold"}, {}, "names the request it is for")):
             with self.subTest(params=params), self.assertRaisesRegex(ValueError, message):
                 run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", **params}, schemas)
@@ -179,21 +188,6 @@ class PersonalSchema(unittest.TestCase):
         mine = {"cd_a": {"cd_user": "a@contoso.com", "cd_schema_kind": "temporary", "cd_expires": "2099-01-01", "cd_converted_from": "personal"}}
         sql, _ = run({"user": "a@contoso.com", "schema": "cd_a", "temporary": "true", "action": "extend", "days": "30"}, mine)
         self.assertTrue(sql[0].startswith("ALTER SCHEMA `fin_citizen_dev`.`cd_a` SET TAGS ('cd_expires' = '2099-01-31')"))
-
-    def test_only_the_named_accounts_make_temporary_schemas_their_owner_extends_them(self):
-        prefix = {"temporary_account_prefix": "azure-"}
-        with self.assertRaisesRegex(ValueError, "an account whose email starts with azure-, not a@contoso.com"):
-            run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true"}, config=prefix)
-        mine = {"cd_tmp_x": {"cd_user": "a@contoso.com", "cd_schema_kind": "temporary", "cd_expires": "2099-01-01"}}
-        _, result = run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "extend", "days": "30"}, mine, config=prefix)
-        self.assertEqual(result["action"], "extend", "made before the check with a regular account: its owner extends it")
-        with self.assertRaisesRegex(ValueError, "not a@contoso.com's"):
-            run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "extend", "days": "30"},
-                {"cd_tmp_x": {**mine["cd_tmp_x"], "cd_user": "azure-a@contoso.com"}}, config=prefix)
-        _, result = run({"user": "Azure-A@contoso.com", "schema": "cd_tmp_x", "temporary": "true"}, config=prefix)
-        self.assertTrue(result["created"], "its own account (any case)")
-        _, result = run({"user": "a@contoso.com", "schema": "sales", "reason": "Monthly sales reporting."}, config=prefix)
-        self.assertEqual(result["kind"], "project", "other schemas: any account")
 
     def test_a_temporary_schema_can_never_be_given_sharing_rights(self):
         for rights in (["SELECT", "MANAGE"], ["ALL_PRIVILEGES"]):
@@ -362,6 +356,96 @@ ON = {"requests_catalog": "cd_requests", "workspace_name": "fin", "human_approva
 TEAM = {"user": "a@contoso.com", "schema": "fin_reporting", "owner_group": "fin-data-eng", "request_id": "ss-1"}
 TEAM_RECORD = {"kind": "team_schema", "workspace": "fin", "requested_by": "a@contoso.com", "name": "fin_reporting", "owner_group": "fin-data-eng"}
 MINE = {"kind": "personal_schema", "workspace": "fin", "requested_by": "a@contoso.com", "name": "cd_a", "owner_group": ""}
+
+
+PAIRED = {"privileged_account_prefix": "azure-", "builder_groups": ["fin-builders", "fin-publishers"]}
+BUILDER = {"azure-a@contoso.com": ["fin-builders"], "a@contoso.com": ["fin-explorers"]}
+READ = "USE SCHEMA, SELECT, READ VOLUME, EXECUTE"
+
+
+class PairedAccounts(unittest.TestCase):
+    """A person's two accounts (privileged_account_prefix): a new schema goes to both, read and write
+    for the privileged one (a builder or publisher there), read only for the regular one; either
+    account may ask, extend, delete or restore."""
+
+    def test_from_either_account_both_get_it(self):
+        for asker in ("a@contoso.com", "azure-a@contoso.com", "Azure-A@contoso.com"):
+            with self.subTest(asker=asker):
+                sql, result = run({"user": asker, "schema": "cd_tmp_x", "temporary": "true"}, config=PAIRED, members=BUILDER)
+                grants = [s for s in sql if s.startswith("GRANT")]
+                self.assertEqual(grants, ["GRANT USE SCHEMA, SELECT, MODIFY, CREATE TABLE ON SCHEMA `fin_citizen_dev`.`cd_tmp_x` TO `azure-a@contoso.com`",
+                                          f"GRANT {READ} ON SCHEMA `fin_citizen_dev`.`cd_tmp_x` TO `a@contoso.com`"])
+                self.assertEqual(result["granted"], ["a@contoso.com", "azure-a@contoso.com"])
+
+    def test_a_permanent_schema_gives_the_privileged_account_all_and_the_regular_one_read(self):
+        sql, _ = run({"user": "a@contoso.com", "schema": "sales", "reason": "Monthly sales reporting."}, config=PAIRED, members=BUILDER)
+        grants = [s for s in sql if s.startswith("GRANT")]
+        self.assertEqual(grants[0], "GRANT ALL PRIVILEGES, MANAGE ON SCHEMA `fin_citizen_dev`.`sales` TO `azure-a@contoso.com`")
+        self.assertEqual(grants[1], f"GRANT {READ} ON SCHEMA `fin_citizen_dev`.`sales` TO `a@contoso.com`")
+
+    def test_the_privileged_account_must_be_a_builder_or_publisher_there(self):
+        for members, why in (({"a@contoso.com": ["fin-explorers"], "azure-a@contoso.com": ["fin-explorers"]}, "an explorer only"),
+                             ({"a@contoso.com": ["fin-explorers"]}, "no PIM account at all")):
+            with self.subTest(why=why), self.assertRaisesRegex(ValueError, "Your Azure PIM account azure-a@contoso.com is not in the Builder role"):
+                run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true"}, config=PAIRED, members=members)
+        _, result = run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true"}, config=PAIRED,
+                        members={"azure-a@contoso.com": ["fin-publishers"], "a@contoso.com": []})
+        self.assertTrue(result["created"], "a publisher counts too")
+        with self.assertRaisesRegex(ValueError, "can't be checked just now"):
+            run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true"}, config=PAIRED, members=PermissionError("denied"))
+
+    def test_a_missing_regular_account_is_skipped(self):
+        sql, _ = run({"user": "azure-b@contoso.com", "schema": "cd_tmp_x", "temporary": "true"}, config=PAIRED,
+                     members={"azure-b@contoso.com": ["fin-builders"]})
+        self.assertTrue(any(s.endswith("TO `azure-b@contoso.com`") for s in sql))
+
+    def test_without_the_workspaces_groups_it_stops(self):
+        with self.assertRaisesRegex(ValueError, "builder and publisher groups are not known"):
+            run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true"}, config={**PAIRED, "builder_groups": []}, members=BUILDER)
+
+    def test_a_regular_account_reads_only(self):
+        with self.assertRaisesRegex(ValueError, "reads only"):
+            run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true"},
+                config={**PAIRED, "regular_privileges": ["SELECT", "MODIFY"]}, members=BUILDER)
+
+    def test_either_account_owns_it(self):
+        mine = {"cd_tmp_x": {"cd_user": "azure-a@contoso.com", "cd_schema_kind": "temporary", "cd_expires": "2099-01-01"}}
+        _, result = run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "extend", "days": "30"}, mine, config=PAIRED)
+        self.assertEqual(result["action"], "extend", "made with the PIM account, extended from the regular one")
+        with self.assertRaisesRegex(ValueError, "not b@contoso.com's"):
+            run({"user": "b@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "extend", "days": "30"}, mine, config=PAIRED)
+        with self.assertRaisesRegex(ValueError, "You already have 1 temporary schema"):
+            run({"user": "a@contoso.com", "schema": "cd_tmp_y", "temporary": "true"}, mine, config=PAIRED, members=BUILDER)
+
+
+class DeleteAndRestore(unittest.TestCase):
+    """Deleting a temporary schema now (purge), or giving it its grants back (restore): its owner's,
+    or an approver's for them (by)."""
+    MINE = {"cd_tmp_x": {"cd_user": "a@contoso.com", "cd_schema_kind": "temporary", "cd_expires": "2099-01-01"}}
+
+    def test_purge_drops_it_with_everything_in_it(self):
+        sql, result = run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "purge"}, self.MINE)
+        self.assertEqual(sql, ["DROP SCHEMA `fin_citizen_dev`.`cd_tmp_x` CASCADE"])
+        self.assertTrue(result["deleted"])
+        _, result = run({"user": "a@contoso.com", "by": "admin@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "purge"}, self.MINE)
+        self.assertEqual(result["by"], "admin@contoso.com", "an approver, for its owner")
+
+    def test_only_its_owner_and_only_a_temporary_one(self):
+        with self.assertRaisesRegex(ValueError, "not b@contoso.com's"):
+            run({"user": "b@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "purge"}, self.MINE)
+        with self.assertRaisesRegex(ValueError, "is for a temporary schema"):
+            run({"user": "a@contoso.com", "schema": "sales", "action": "purge"})
+        with self.assertRaisesRegex(ValueError, "not a temporary schema of"):
+            run({"user": "a@contoso.com", "schema": "cd_tmp_gone", "temporary": "true", "action": "purge"}, self.MINE)
+        with self.assertRaisesRegex(ValueError, "by must be an email"):
+            run({"user": "a@contoso.com", "by": "x; DROP", "schema": "cd_tmp_x", "temporary": "true", "action": "purge"}, self.MINE)
+
+    def test_restore_grants_what_it_got_when_made(self):
+        sql, result = run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "restore"}, self.MINE, config=PAIRED)
+        self.assertEqual(sql, ["GRANT USE SCHEMA, SELECT, MODIFY, CREATE TABLE ON SCHEMA `fin_citizen_dev`.`cd_tmp_x` TO `azure-a@contoso.com`",
+                               f"GRANT {READ} ON SCHEMA `fin_citizen_dev`.`cd_tmp_x` TO `a@contoso.com`"])
+        sql, _ = run({"user": "a@contoso.com", "schema": "cd_tmp_x", "temporary": "true", "action": "restore"}, self.MINE)
+        self.assertEqual(sql, ["GRANT USE SCHEMA, SELECT, MODIFY, CREATE TABLE ON SCHEMA `fin_citizen_dev`.`cd_tmp_x` TO `a@contoso.com`"], "one account")
 
 
 class RequestRecord(unittest.TestCase):

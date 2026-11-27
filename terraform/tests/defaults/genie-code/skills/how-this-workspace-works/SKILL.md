@@ -27,7 +27,7 @@ If someone can't do something, it's usually their persona: say which persona wou
 ## Data
 
 - **The workspace's catalog is `{CATALOG}`**, and it's the default: a table name without a catalog means `{CATALOG}`.
-- **Each person may have a temporary schema** there to try things, created in the self-service app (`cd_tmp_<name>`), with the account its page asks for. It's **deleted with its contents** on the date in its `cd_expires` tag, unless they extend it.
+- **Each person may have a temporary schema** there to try things, created in the self-service app (`cd_tmp_<name>`): their Azure PIM account reads and writes it, their regular account reads it. It's **deleted with its contents** on the date in its `cd_expires` tag, unless they extend it.
 - **Permanent schemas** keep a project's work, alone or with a team. People request them in the self-service app, and a person approves the request.
 - **Nobody creates schemas by hand.** They come from the self-service app.
 

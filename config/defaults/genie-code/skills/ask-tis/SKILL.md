@@ -26,7 +26,7 @@ If they don't need TIS after all (the table is there and they can read it, the e
 | They need | Where | What happens |
 | --- | --- | --- |
 | A schema to **keep** a project's or team's work | Self-service app: **Request a permanent schema** (add the team's Entra ID group for a team schema) | A person approves it |
-| A place to **try things** | Self-service app: **Create a temporary schema**, signed in with the account its page asks for (for example their Azure PIM account, `azure-...`). One per person at a time by default | Made straight away; deleted with its contents on its `cd_expires` date |
+| A place to **try things** | Self-service app: **Create a temporary schema** (their Azure PIM account, which must be a Builder, gets read and write; their regular account read). One per person at a time by default | Made straight away; deleted with its contents on its `cd_expires` date |
 | Their temporary schema **was deleted** | Self-service app: **Create a temporary schema** again | Its old tables can't be recovered: say so plainly |
 | **More time** for their temporary schema | Self-service app: **Extend** on the temporary schema's card (or the banner warning it's about to be deleted) | Straight away |
 | A **workspace folder** for a team | Self-service app: **Request a workspace folder** | A person approves it; an admin makes it |

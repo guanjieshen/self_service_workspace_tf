@@ -8,14 +8,14 @@
 <div class="page-grid form-grid">
 <form class="panel" method="post" action="/folder" data-submit>
   <div class="panel-body">
-    {% call callout() %}A platform admin creates this folder for you once they approve it. You can manage it, and share it with others in Databricks once it's created. Your workspace's platform admins can manage it too.{% endcall %}
+    {% call callout() %}A platform admin creates the folder once it is approved. You can manage it and share it in Databricks. The workspace's platform admins can manage it too.{% endcall %}
     {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
     {% if not workspaces %}
       {% if not error %}{% call callout("error") %}No workspace offers folders yet.{% endcall %}{% endif %}
     {% else %}
       {% set on_change = True %}{% include "_workspace_select.html" %}
 
-      {% call field("folder", "Folder name", required=True, hint="Use lowercase letters, numbers, and dashes.") %}
+      {% call field("folder", "Folder name", required=True, hint="Use lowercase letters, numbers and dashes.") %}
         <div class="prefixed"><span class="prefix mono">/Workspace/</span>
           <input id="folder" name="folder" class="mono" required pattern="[a-z0-9][a-z0-9\-]*" value="{{ form.folder or '' }}" placeholder="my-project"></div>
       {% endcall %}

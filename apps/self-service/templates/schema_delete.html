@@ -1,0 +1,46 @@
+{#- Delete one of the person's temporary schemas now, with everything in it (the job: DROP SCHEMA ...
+    CASCADE; portal.my_schemas). The button stays disabled until they type the chosen schema's name
+    (app.js: data-confirm). -#}
+{% extends "base.html" %}
+
+{% from "_components.html" import callout, deletion, field, kv %}
+{% block content %}
+{% set task_icon, task_name, task_text, task_category = "schema", "Delete temporary schema", "Delete one of your temporary schemas now, with everything in it.", "Data" %}
+{% set task_aside = True %}{% include "_task_header.html" %}
+
+<div class="page-grid form-grid">
+<form class="panel" method="post" action="/schema/delete" data-submit>
+  <div class="panel-body">
+    {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
+    {% set this = (mine | selectattr("name", "equalto", chosen) | first) if chosen else none %}
+    {% if not mine %}
+      {% if not error %}{% call callout("error") %}You have no temporary schema to delete.{% endcall %}{% endif %}
+    {% else %}
+      <input type="hidden" name="workspace" value="{{ workspaces[0].name if workspaces else '' }}">
+      {% if mine | length > 1 %}
+      {% call field("schema", "Which schema?", required=True) %}
+        <div class="choices">
+          {% for s in mine %}<label class="choice"><input type="radio" name="schema" value="{{ s.name }}" required {{ 'checked' if s.name == chosen }} data-confirm-target> <span class="mono">{{ s.name }}</span></label>{% endfor %}
+        </div>
+      {% endcall %}
+      {% else %}<input type="hidden" name="schema" value="{{ mine[0].name }}" data-confirm-target>{% endif %}
+      {% call callout("error") %}<strong>This can't be undone.</strong> The schema and everything in it are permanently deleted. Anyone you shared its data with loses access too.{% endcall %}
+      {% set t = (have_by_name or {}).get(this.name) if this else none %}
+      {{ kv([("Schema", this.name if this else "The one you choose above", "mono" if this else ""), ("Deletes", "Every table, view, volume and file in it")]
+            + ([("Expires", deletion(t))] if t else [])) }}
+      {% call field("confirm", "Type the schema's name to confirm", required=True, hint="Its name without the catalog, for example " ~ ((this or mine[0]).name.split(".", 1)[1]) ~ ".") %}
+        <input id="confirm" name="confirm" autocomplete="off" spellcheck="false" required data-confirm>
+      {% endcall %}
+    {% endif %}
+  </div>
+  <div class="panel-foot form-foot">
+    <div class="form-actions">
+      <button type="submit" class="button danger" disabled data-confirm-button>Delete schema</button>
+      <a class="button" href="/">Cancel</a>
+    </div>
+    <p class="meta">Runs straight away; you can follow it under My requests.</p>
+  </div>
+</form>
+{% include "_task_aside.html" %}
+</div>
+{% endblock %}

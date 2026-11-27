@@ -58,5 +58,8 @@ output "self_service" {
     catalog         = try(local.catalog.name, null)
     usage_policy_id = try(module.budget_policies[0].policy_ids[local.serverless_policies.self_service.name], null)
     platform_admins = local.platform_admins # the folder job gives them CAN_MANAGE on every folder it creates
+    # Each persona's group (explorer, builder, publisher): the app shows Build in Databricks, and the
+    # schema job gives a person's privileged account a schema, only for a builder or publisher.
+    persona_groups = local.persona_groups
   }
 }

@@ -1,0 +1,47 @@
+{#- Every temporary schema in the approver's business units (portal.temporary_schemas_everywhere):
+    restore its owner's permissions, or delete it now (approvals/schema_delete.html). -#}
+{% extends "base.html" %}
+{% from "_components.html" import callout, deletion, filter_select %}
+{% from "_icons.html" import icon %}
+{% block title %}Temporary schemas · Admin{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Temporary schemas</h1>
+  <p class="lead">{{ rows_ | length }} in {{ bu or ("all business units" if my_bus | length > 1 else my_bus | join("")) }} · soonest expiring first · times in your time zone</p>
+</div>
+{% if done %}{% call callout("success", role="status") %}{{ done }}{% endcall %}{% endif %}
+{% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
+<form class="inbox-filters" method="get" action="/approvals/schemas" role="search">
+  <label class="search search-sm">
+    {{ icon("search", "icon search-icon") }}
+    <input type="search" name="q" value="{{ q }}" placeholder="Search schemas or owners" aria-label="Search schemas or owners">
+  </label>
+  {{ filter_select("bu", [("", "All business units")] + (my_bus | map("pair") | list), bu, "Business unit") }}
+  <noscript><button type="submit" class="button">Apply</button></noscript>
+</form>
+<div class="list schemas-list">
+  <table class="table schemas-table">
+    <thead><tr><th>Schema</th><th>Owner</th><th>Expires</th><th class="actions-col"><span class="visually-hidden">Actions</span></th></tr></thead>
+    <tbody>
+    {% for s in rows_ %}
+    <tr>
+      <td><span class="mono schema-name">{{ s.name.split(".", 1)[1] }}</span><span class="meta">{{ s.bu }} · {{ s.name.split(".", 1)[0] }}</span></td>
+      <td class="owner">{{ s.owner }}</td>
+      <td class="nowrap">{{ deletion(s) }}<span class="meta">{{ s.days_left }} {{ "day" if s.days_left == 1 else "days" }} left</span></td>
+      <td class="actions-col">
+        <form method="post" action="/approvals/schemas/extend" data-submit>
+          <input type="hidden" name="workspace" value="{{ s.workspace }}"><input type="hidden" name="schema" value="{{ s.name }}">
+          <button type="submit" class="button button-sm">Extend 30 days</button></form>
+        <form method="post" action="/approvals/schemas/restore" data-submit>
+          <input type="hidden" name="workspace" value="{{ s.workspace }}"><input type="hidden" name="schema" value="{{ s.name }}"><input type="hidden" name="owner" value="{{ s.owner }}">
+          <button type="submit" class="button button-sm">Restore permissions</button></form>
+        <a class="button button-sm danger" href="/approvals/schemas/delete?{{ {'workspace': s.workspace, 'schema': s.name} | urlencode }}">Delete</a>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4" class="meta">No temporary schemas{% if q or bu %} match{% endif %}.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

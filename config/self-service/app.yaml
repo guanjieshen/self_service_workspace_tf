@@ -117,12 +117,17 @@ jobs:
   personal_schema:                    # a person's own schema: cd_<email name>
     prefix: cd_
     privileges: [ALL_PRIVILEGES, MANAGE]
+  # Each person's two accounts: their regular one (their email) and their privileged one, this prefix
+  # and their email (for example azure- for azure-jane.doe@enbridge.com). People ask from either; a new
+  # schema goes to both: the privileged account reads and writes (a permanent schema: all privileges
+  # and MANAGE), the regular one gets regular_account_privileges. The privileged account must be a
+  # builder or publisher in the workspace, or the request is refused. null = one account: the
+  # requester's, as before.
+  privileged_account_prefix: null
+  regular_account_privileges: [USE_SCHEMA, SELECT, READ_VOLUME, EXECUTE]   # read only
   temporary_schema:                   # a person's short-term schema: <prefix>tmp_<name>, one at a time
     days: 30                          # its cd_expires tag, this many days ahead; the daily cleanup job drops it after
     limit: 1                          # how many each person may have at a time (1 to 10): the default; admins change it in Settings > Schemas
-    # Only accounts whose email starts with this may create one (the form and the job check), for
-    # example azure- for admin accounts; its owner extends it. null = any account.
-    account_prefix: null
     # What the requester may do in it: use it fully, but not share it (never MANAGE or
     # ALL_PRIVILEGES, which let them grant it to others; the build refuses them).
     privileges: [USE_SCHEMA, SELECT, MODIFY, CREATE_TABLE, CREATE_VOLUME, READ_VOLUME, WRITE_VOLUME,

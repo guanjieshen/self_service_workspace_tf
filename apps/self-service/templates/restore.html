@@ -1,0 +1,40 @@
+{#- Give one of the person's temporary schemas back the grants it got when it was made, for when they removed
+    their own (portal.restore_permissions). -#}
+{% extends "base.html" %}
+
+{% from "_components.html" import callout, field %}
+{% block content %}
+{% set task_icon, task_name, task_text, task_category = "schema", "Restore permissions", "Get back access to your temporary schema, if your permissions on it were removed.", "Data" %}
+{% set task_aside = True %}{% include "_task_header.html" %}
+
+<div class="page-grid form-grid">
+<form class="panel" method="post" action="/schema/restore" data-submit>
+  <div class="panel-body">
+    {% if error %}{% call callout("error", role="alert") %}{{ error }}{% endcall %}{% endif %}
+    {% if not mine %}
+      {% if not error %}{% call callout("error") %}You have no temporary schema to restore.{% endcall %}{% endif %}
+    {% else %}
+      <input type="hidden" name="workspace" value="{{ workspaces[0].name if workspaces else '' }}">
+      {% call field("schema", "Which temporary schema?", required=True) %}
+        <div class="choices">
+          {% for s in mine %}<label class="choice"><input type="radio" name="schema" value="{{ s.name }}" required {{ 'checked' if s.name == chosen }}> <span class="mono">{{ s.name }}</span></label>{% endfor %}
+        </div>
+      {% endcall %}
+      {% call callout() %}
+        Restores the schema's original permissions:
+        {% if pair %}read/write access for your privileged account (<span class="mono">{{ pair[1] }}</span>), read-only access for your regular account (<span class="mono">{{ pair[0] }}</span>){% else %}read/write access for you{% endif %}.
+        All other permissions remain unchanged.
+      {% endcall %}
+    {% endif %}
+  </div>
+  <div class="panel-foot form-foot">
+    <div class="form-actions">
+      <button type="submit" class="primary" {{ 'disabled' if not mine }}>Restore permissions</button>
+      <a class="button" href="/">Cancel</a>
+    </div>
+    <p class="meta">Runs straight away; you can follow it under My requests.</p>
+  </div>
+</form>
+{% include "_task_aside.html" %}
+</div>
+{% endblock %}

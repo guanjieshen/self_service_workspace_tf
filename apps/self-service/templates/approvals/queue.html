@@ -6,8 +6,8 @@
 {% block content %}
 {%- set waiting_col = view in ("review", "info") -%}
 <div class="page-head">
-  <h1>Pending Approvals</h1>
-  <p class="lead">Requests that need approval. Any approver can respond; the first approval or rejection counts.</p>
+  <h1>Approval requests</h1>
+  <p class="lead">Review incoming requests. The first approval or rejection is final.</p>
 </div>
 
 {% if notice %}
@@ -26,7 +26,7 @@
   <input type="hidden" name="view" value="{{ view }}">
   <label class="search search-sm">
     {{ icon("search", "icon search-icon") }}
-    <input type="search" name="q" value="{{ q }}" placeholder="Search names, people, reasons or IDs" aria-label="Search requests">
+    <input type="search" name="q" value="{{ q }}" placeholder="Search requests" aria-label="Search requests">
   </label>
   {{ filter_select("kind", [("", "All request types")] + (types.items() | list), kind, "Request type") }}
   {{ filter_select("bu", [("", "All business units")] + (my_bus | map("pair") | list), bu, "Business unit") }}
@@ -43,23 +43,24 @@
   {{ empty_state("search", "No requests match", "Try other words, or clear the filters to see every request in this view.", "/approvals?view=" ~ view, "Clear filters") }}
   {% else %}
   {{ empty_state("check", {"review": "No pending approvals", "info": "No open questions", "decided": "No approvals yet", "all": "No requests yet"}[view],
-                 {"review": "Project and team schema requests show up here for an approver.",
-                  "info": "Requests you asked a question about wait here until the requester replies.",
-                  "decided": "Approved and rejected requests show up here, with their approver.",
-                  "all": "Every request in your business units shows up here, whatever happened to it."}[view]) }}
+                 {"review": "Requests that need an approver appear here.",
+                  "info": "Requests with an open question wait here until the requester replies.",
+                  "decided": "Approved and rejected requests appear here, with their approver.",
+                  "all": "Every request in your business units appears here."}[view]) }}
   {% endif %}
 {% else %}
 {%- macro sort_link(key, label) -%}
 {%- set q_ = {"view": view, "sort": key} -%}{%- for k, val in filters.items() %}{% set _ = q_.update({k: val}) %}{% endfor -%}
 <a href="/approvals?{{ q_ | urlencode }}" class="sort {{ 'is-on' if sort == key }}" {% if sort == key %}aria-sort="{{ 'descending' if key == 'newest' else 'ascending' }}"{% endif %}>{{ label }}{% if sort == key %} <span aria-hidden="true">{{ "↓" if key == "newest" else "↑" }}</span>{% endif %}</a>
 {%- endmacro -%}
-<div class="inbox" role="table" aria-label="{{ views[view][0] }}">
+{#- The Pending tab has one status, so no Status column there. -#}
+<div class="inbox {{ 'no-status' if view == 'review' }}" role="table" aria-label="{{ views[view][0] }}">
   <div class="inbox-row inbox-head" role="row">
     <span role="columnheader">Request</span>
-    <span role="columnheader">Requested by</span>
+    <span role="columnheader">Requester</span>
     <span role="columnheader">{{ sort_link("oldest" if sort == "newest" else "newest", "Submitted") }}</span>
-    <span role="columnheader">{% if waiting_col %}{{ sort_link("waiting", "Waiting") }}{% elif view == "decided" %}Approver{% else %}Approval{% endif %}</span>
-    <span role="columnheader">Status</span>
+    <span role="columnheader">{% if waiting_col %}{{ sort_link("waiting", "Age") }}{% elif view == "decided" %}Approver{% else %}Approval{% endif %}</span>
+    {% if view != "review" %}<span role="columnheader">Status</span>{% endif %}
   </div>
   {% for label, rows in groups %}
   {% if label %}<div class="inbox-day" role="row"><span role="cell">{{ label }} <span class="count">{{ rows | length }}</span></span></div>{% endif %}
@@ -69,7 +70,7 @@
       <span class="row-icon">{{ icon("folder" if r.kind == "folder" else "schema") }}</span>
       <span class="cell-stack">
         <span class="inbox-name mono">{{ r.name }}</span>
-        <span class="inbox-sub">{{ r.type }} · {{ r.bu }}{% if r.requested_by == user %} · Yours{% endif %}</span>
+        <span class="inbox-sub">{{ r.type }} · {{ r.bu }}{% if r.requested_by == user %} · Your request{% endif %}</span>
         {% if waiting_col %}
         {% if r.summary and r.summary.headline %}<span class="inbox-reason">{{ r.summary.headline }}</span>{% endif %}
         {% endif %}
@@ -88,7 +89,7 @@
       {% elif r.decision %}<span class="person" title="{{ r.decision.by }}">{{ r.decision.by.split("@")[0] }}</span><span class="meta">{{ r.decision.at | local("date") }}</span>
       {% else %}<span class="meta">{{ "Needed" if view_of(r) in ("review", "info") else "Not needed" }}</span>{% endif %}
     </span>
-    <span class="cell-status" role="cell">{{ status(r.status) }}</span>
+    {% if view != "review" %}<span class="cell-status" role="cell">{{ status(r.status) }}</span>{% endif %}
   </a>
   {% endfor %}
   {% endfor %}

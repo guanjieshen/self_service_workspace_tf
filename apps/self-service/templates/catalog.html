@@ -1,13 +1,36 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon %}
-{% from "_components.html" import approval_label, callout, empty_state %}
+{% from "_components.html" import approval_label, callout, deletion, empty_state %}
 {% block content %}
 {#- The sections and cards come from cards.py (groups): add a card there, not here. Each section
     may have an FAQ page: self_service_app.faq.<section key>. -#}
 {% set faq = config.faq or {} %}
+{#- A workspace access tile (portal.access_for): Explore with Genie in Get started, after its requests;
+    Build in Databricks first in Build. Only where that account has the persona. A plain link, so people
+    can right-click to open it in a private window. -#}
+{% macro access_tile(a, opt, label, text, ic) -%}
+    {#- blocked: the account has no builder or publisher access there: greyed out, saying why and how to get it. -#}
+    <div class="card task {{ 'is-soon' if opt.blocked }}" data-search="{{ (label ~ ' ' ~ text ~ ' ' ~ title) | lower }}">
+      <div class="task-top">
+        <span class="task-icon">{{ icon(ic) }}</span>
+        <h3>{% if opt.blocked %}{{ label }}{% else %}<a class="stretched" href="{{ opt.href }}" target="_blank" rel="noopener">{{ label }}{% if access | length > 1 %} · {{ a.title }}{% endif %}</a>{% endif %}</h3>
+        {% if not opt.blocked %}{{ icon("external", "icon task-arrow") }}{% endif %}
+      </div>
+      <p>{{ text }}</p>
+      {#- The account it needs, as the tile's foot (below a divider): who, then the switching hint. -#}
+      <div class="access-foot">
+        <div class="access-line">{{ icon("persona" if ic == "chat" else "shield", "icon icon-sm") }}
+          <span><span class="access-kind">{{ opt.account }}</span>{% if opt.email %}<span class="access-email">{{ opt.email }}</span>{% endif %}</span></div>
+        {% if opt.hint %}<div class="access-line access-hint">{{ icon("info", "icon icon-sm") }}<span>{{ opt.hint }}</span></div>{% endif %}
+        {% if opt.blocked %}<div class="access-line">{{ icon("info", "icon icon-sm") }}<span>{{ opt.blocked }} · <a class="task-sop" href="/persona">Request workspace access</a></span></div>{% endif %}
+        {% if ic == "chat" and links.tour %}<div class="access-line"><a class="task-sop" href="{{ links.tour }}" target="_blank" rel="noopener">Restart guided tour {{ icon("external", "icon icon-xs") }}</a></div>{% endif %}
+      </div>
+    </div>
+{%- endmacro %}
+
 
 <div class="page-head">
-  <h1>Citizen Development Tasks</h1>
+  <h1>Citizen Development</h1>
 </div>
 
 
@@ -28,39 +51,36 @@
     {% if faq[section] %}<a class="group-faq" href="{{ faq[section] }}" target="_blank" rel="noopener">FAQ {{ icon("external", "icon icon-xs") }}</a>{% endif %}
   </div>
   <div class="cards">
+    {% if section == "workspace" %}{% for a in access if a.build %}{{ access_tile(a, a.build, "Build in Databricks", "Develop notebooks, applications, dashboards, and data products.", "code") }}{% endfor %}{% endif %}
     {% for item in cards %}
     {% set c, href, external, ready = item.card, item.href, item.external, item.ready %}
     {% set key, name, text = c.key, c.title, c.text %}
     {#- A limit per person (temporary schemas: Settings > Schemas): the quota, from quotas[key]. -#}
     {% set q = quotas.get(key) or {} %}
     {% set have = q.exists == True %}
+    {% if key == "temporary_schema" and q.schemas %}{% set name = "Manage temporary schema" %}{% endif %}
     {% set asked = q.exists == "pending" %}
-    {#- A temporary schema needs the account app.yaml names (account_prefix): another account sees the tile greyed out. -#}
-    {% set locked = key == "temporary_schema" and temporary_account and not temporary_account.ok %}
-    {% set ready = ready and not locked %}
     <div class="card task {{ 'is-soon' if not ready }}" data-search="{{ (name ~ ' ' ~ text ~ ' ' ~ title) | lower }}">
       <div class="task-top">
         <span class="task-icon">{{ icon(c.icon or key) }}</span>
         <h3>{% if ready %}<a class="stretched" href="{{ href }}" {% if external %}target="_blank" rel="noopener"{% endif %}>{{ name }}</a>{% else %}{{ name }}{% endif %}</h3>
         {% if asked %}<span class="quota pending" title="Your request is in progress">Requested</span>
-        {% elif key in quotas and q.exists is not none %}<span class="quota {{ 'full' if have }}" title="{{ 'The most you may have at a time' if have else ('Up to ' ~ q.limit ~ ' at a time') }}">{{ q.used }} of {{ q.limit }} used</span>{% endif %}
-        {% if locked %}
-        {% elif not ready or item.preview %}<span class="soon">Coming soon</span>{% else %}{{ icon("external" if external else "arrow", "icon task-arrow") }}{% endif %}
+        {% elif key in quotas and q.exists is not none and not q.schemas %}<span class="quota {{ 'full' if have }}" title="{{ 'The most you may have at a time' if have else ('Up to ' ~ q.limit ~ ' at a time') }}">{{ q.used }} of {{ q.limit }} used</span>{% endif %}
+        {% if not ready or item.preview %}<span class="soon">Coming soon</span>{% else %}{{ icon("external" if external else "arrow", "icon task-arrow") }}{% endif %}
       </div>
       <p>{{ text }}</p>
       {#- Each temporary schema they have: how much of its time is left, and when it is deleted. -#}
       {% if key == "temporary_schema" and q.schemas %}{% for t in q.schemas %}
-      {%- set tone = "life-calm" if t.days_left > 7 else "life-soon" if t.days_left > 3 else "life-urgent" -%}
-      <div class="lifebar {{ tone }}"><div class="lifebar-top"><span class="mono">{{ t.name.split(".", 1)[1] }}</span><span>{{ t.days_left }} of {{ t.days_total }} days left</span></div>
+      <div class="lifebar life-calm"><div class="lifebar-top"><span class="mono">{{ t.name.split(".", 1)[1] }}</span><span>{{ t.days_left }} {{ "day" if t.days_left == 1 else "days" }} remaining</span></div>
         <div class="lifebar-track" role="progressbar" aria-label="Days left" aria-valuemin="0" aria-valuemax="{{ t.days_total }}" aria-valuenow="{{ t.days_left }}"><div class="lifebar-fill" style="width: {{ [100, [0, (100 * (t.days_total - t.days_left) / t.days_total) | round | int] | max] | min }}%"></div></div>
-        <div class="meta">Deleted on {{ t.expires }}</div></div>
+        <div class="lifebar-foot"><span class="meta">Expires {{ deletion(t) }}</span>
+          <span class="lifebar-actions"><a class="task-sop" href="/schema/temporary/extend?schema={{ t.name | urlencode }}">Extend schema</a>
+          <a class="task-sop" href="/schema/restore?schema={{ t.name | urlencode }}">Restore permissions</a>
+          <a class="task-sop danger-link" href="/schema/delete?schema={{ t.name | urlencode }}">Delete</a></span></div></div>
       {% endfor %}{% endif %}
       {#- Every card has a foot, so they all have the same shape: how it is approved, or where it opens. -#}
       <div class="task-foot">
-        {% if locked %}<span class="meta">Sign in with your {{ temporary_account.prefix }} account to create one</span>
-        {#- One made before the check, with this account: its owner still extends it. -#}
-        {% if q.schemas %}<a class="task-sop" href="/schema/temporary/extend">Extend temporary schema</a>{% endif %}
-        {% elif item.preview %}<span class="meta">Preview: see the form; nothing is sent yet</span>
+        {% if item.preview %}<span class="meta">Preview only · Requests not enabled</span>
         {% elif ready and external %}<span class="meta">{{ c.opens }}</span>
         {% if item.more %}<a class="task-sop" href="{{ item.more[1] }}" target="_blank" rel="noopener">{{ item.more[0] }} {{ icon("external", "icon icon-xs") }}</a>{% endif %}
         {% elif ready %}
@@ -72,6 +92,7 @@
       </div>
     </div>
     {% endfor %}
+    {% if section == "access" %}{% for a in access if a.explore %}{{ access_tile(a, a.explore, "Explore with Genie", "Ask questions and discover insights from your business data.", "chat") }}{% endfor %}{% endif %}
   </div>
 </section>
 {% endfor %}

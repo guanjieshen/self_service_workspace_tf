@@ -100,6 +100,30 @@ class SentParameters(unittest.TestCase):
                 self.assertEqual(notebook_parameters(kind), job_parameters(kind))
 
 
+class Actions(unittest.TestCase):
+    """The schema job's actions (its `action` parameter) and kinds of request: what the app sends is what the notebook takes."""
+
+    def test_the_notebook_takes_every_action_the_app_sends(self):
+        takes = re.search(r'if action not in \(([^)]*)\)', notebook("personal_schema")).group(1)
+        accepted = set(re.findall(r'"(\w*)"', takes))
+        portal_text = (APP / "portal.py").read_text()
+        for action in ("extend", "hold", "release", "purge", "restore"):
+            with self.subTest(action=action):
+                self.assertIn(action, accepted)
+                self.assertIn(f'"{action}"', portal_text, "the app sends it")
+
+    def test_purge_and_restore_are_asked_for_as_their_kinds(self):
+        asked = dict(re.findall(r'"(purge|restore)": "(schema_\w+)"', notebook("personal_schema")))
+        self.assertEqual(asked, {"purge": "schema_delete", "restore": "schema_restore"})
+        for kind in asked.values():
+            with self.subTest(kind=kind):
+                self.assertIn(kind, portal.APPROVAL_TYPES)
+
+    def test_the_by_parameter_is_declared_and_read(self):
+        self.assertIn("by", job_parameters("personal_schema"), "declared in the bundle")
+        self.assertIn('dbutils.widgets.get("by")', notebook("personal_schema"), "read by the notebook")
+
+
 class Rules(unittest.TestCase):
     """The app refuses exactly what the jobs refuse, so a request it accepts does not fail later."""
 

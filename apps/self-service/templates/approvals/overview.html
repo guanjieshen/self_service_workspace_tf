@@ -20,7 +20,7 @@
   <div class="stat"><span class="stat-label">Total requests</span><span class="stat-value">{{ o.total }}</span></div>
   <div class="stat"><span class="stat-label">Auto-approved</span><span class="stat-value">{{ o.auto }}</span><span class="stat-sub">{{ o.auto_rate }}% of total</span></div>
   <div class="stat {{ 'attention' if o.waiting }}"><span class="stat-label">Pending approval</span><span class="stat-value">{{ o.waiting }}</span>
-    {% if o.waiting %}<span class="stat-sub">oldest {{ o.oldest_hours }}h</span>{% endif %}</div>
+    {% if o.waiting %}<span class="stat-sub">Oldest waiting {{ o.oldest_hours }}h</span>{% endif %}</div>
   <div class="stat"><span class="stat-label">Reviewed</span><span class="stat-value">{{ o.decided }}</span>
     <span class="stat-sub">{{ o.approved_anyway }} approved · {{ o.decided - o.approved_anyway }} rejected</span></div>
 </div>

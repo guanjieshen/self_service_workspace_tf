@@ -22,12 +22,12 @@ OUTCOMES = {"approve": "approved", "reject": "rejected", "ask": "needs_info"}
 # The inbox's tabs, in order: what each holds, and how it sorts by default.
 VIEWS = {
     "review": ("Pending", "waiting"),          # waiting for an approver: longest waiting first
-    "info": ("Waiting on requester", "waiting"),
+    "info": ("Awaiting requester", "waiting"),
     "decided": ("Approval history", "newest"),
     "all": ("All requests", "newest"),
 }
 PERIODS = (7, 30, 90)   # the Overview's presets, in days
-SORTS = {"waiting": "Longest waiting", "newest": "Newest first", "oldest": "Oldest first"}
+SORTS = {"waiting": "Oldest first", "newest": "Newest first", "oldest": "Oldest submitted"}
 DONE = {"approved": "Approved: its job is running.", "completed": "Approved: the requester sees it as created.",
         "rejected": "Rejected: the requester sees why.",
         "needs_info": "Question sent to the requester."}
@@ -88,9 +88,9 @@ def groups(rows, sort, now):
     return out
 
 
-def register(app, page, user_of, store, config=None):
+def register(app, page, user_of, store, config=None, portal=None):
     """The approvals pages, on the app's database (approvals_store.LakebaseStore; tests pass
-    tests/sample_store.py's)."""
+    tests/sample_store.py's). portal: the self-service portal, for the Temporary schemas page."""
     config = config or {}
 
     # Only approvers can open this app, so when something fails they see what, instead of a
@@ -116,7 +116,7 @@ def register(app, page, user_of, store, config=None):
     @app.get("/approvals", response_class=HTMLResponse)
     def queue(request: Request, view: str = "review", bu: str = "", kind: str = "", q: str = "", sort: str = "",
               done: str = "", outcome: str = ""):
-        """One list of approvals: Pending (an approver's to approve or reject), Waiting on requester, Approval history, and
+        """One list of approvals: Pending (an approver's to approve or reject), Awaiting requester, Approval history, and
         All requests (monitoring and audit), each with search, filters and sorting in the URL."""
         user = user_of(request)
         view = view if view in VIEWS else "review"
@@ -141,6 +141,48 @@ def register(app, page, user_of, store, config=None):
         bu = bu if bu in store.bus_for(user) else ""
         return page(request, "approvals/overview.html", nav="overview", **ctx(
             request, o=store.overview(user, days=days, bu=bu), days=days, bu=bu, periods=PERIODS))
+
+    @app.get("/approvals/schemas", response_class=HTMLResponse)
+    def temporary_schemas(request: Request, bu: str = "", q: str = "", done: str = "", error: str = ""):
+        """Every temporary schema in the approver's BUs: whose, and when it is deleted. An approver
+        can delete one now (typed name) or restore its owner's permissions."""
+        user = user_of(request)
+        mine = store.bus_for(user)
+        rows = [s for s in (portal.temporary_schemas_everywhere() if portal else []) if s["bu"] in mine
+                and (not bu or s["bu"] == bu) and (not q.strip() or q.strip().lower() in (s["name"] + " " + s["owner"]).lower())]
+        return page(request, "approvals/schemas.html", nav="schemas", **ctx(request, rows_=rows, bu=bu, q=q, done=done, error=error))
+
+    @app.get("/approvals/schemas/delete", response_class=HTMLResponse)
+    def delete_form(request: Request, workspace: str = "", schema: str = "", error: str = ""):
+        found = next((s for s in (portal.temporary_schemas_everywhere() if portal else []) if s["workspace"] == workspace and s["name"] == schema
+                      and s["bu"] in store.bus_for(user_of(request))), None)
+        if not found:
+            return RedirectResponse("/approvals/schemas?" + urlencode({"error": "That temporary schema no longer exists."}), status_code=303)
+        return page(request, "approvals/schema_delete.html", nav="schemas", **ctx(request, s=found, error=error))
+
+    @app.post("/approvals/schemas/delete")
+    def delete_submit(request: Request, workspace: str = Form(""), schema: str = Form(""), confirm: str = Form("")):
+        try:
+            portal.admin_delete_temporary(workspace, user_of(request), schema, confirm)
+        except Exception as e:   # RequestError: what to fix
+            return delete_form(request, workspace, schema, error=str(e))
+        return RedirectResponse("/approvals/schemas?" + urlencode({"done": f"Deleting {schema}: the job is running."}), status_code=303)
+
+    @app.post("/approvals/schemas/extend")
+    def extend_submit(request: Request, workspace: str = Form(""), schema: str = Form("")):
+        try:
+            portal.admin_extend_temporary(workspace, user_of(request), schema)
+        except Exception as e:
+            return RedirectResponse("/approvals/schemas?" + urlencode({"error": str(e)}), status_code=303)
+        return RedirectResponse("/approvals/schemas?" + urlencode({"done": f"Adding 30 days to {schema}: the job is running."}), status_code=303)
+
+    @app.post("/approvals/schemas/restore")
+    def restore_submit(request: Request, workspace: str = Form(""), schema: str = Form(""), owner: str = Form("")):
+        try:
+            portal.restore_permissions(workspace, user_of(request), schema, owner=owner)
+        except Exception as e:
+            return RedirectResponse("/approvals/schemas?" + urlencode({"error": str(e)}), status_code=303)
+        return RedirectResponse("/approvals/schemas?" + urlencode({"done": f"Restoring permissions on {schema} for {owner}: the job is running."}), status_code=303)
 
     tabs = {key: (label, titles) for key, label, titles in settings.TABS}
 

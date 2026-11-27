@@ -3,8 +3,11 @@
 # MAGIC # Personal, project, team or temporary schema
 # MAGIC Creates a schema for one user, grants it to them (all privileges and MANAGE, so they can share
 # MAGIC it themselves; a temporary schema only what they need to use it, so it is never shared), and
-# MAGIC to their group for a team schema, and tags it for self-service tracking. The job's identity
-# MAGIC (or catalog_owner) owns it, never the requester.
+# MAGIC to their group for a team schema, and tags it for self-service tracking. With two accounts per
+# MAGIC person (privileged_account_prefix), the privileged one gets those rights and the regular one
+# MAGIC read only, and the privileged one must be a builder or publisher there. The job's identity
+# MAGIC (or catalog_owner) owns it, never the requester. On a temporary schema it also deletes it now
+# MAGIC (`action` purge, CASCADE) or gives it its grants back (restore), for its owner or an approver (`by`).
 # MAGIC Run by the `<BU> schema requests` job when the self-service app asks; safe to run again.
 # MAGIC Parameters: `user` (email), `catalog` (required, one of the allowed catalogs), `schema`
 # MAGIC (empty = their personal schema, `cd_<email before @>`; a name = a project or team schema,
@@ -14,7 +17,8 @@
 # MAGIC app's Settings; 1 when empty), `action` (empty: make the schema; "extend": add `days` (30) to an existing
 # MAGIC temporary schema's `cd_expires`, straight away or once an approver approved it; "hold": while it waits
 # MAGIC for an approver, tag it `cd_pending_request=<request_id>`, which the daily cleanup never deletes;
-# MAGIC "release": the approver rejected it, so the tag goes and it expires as before), `temporary` ("true": a temporary schema, named `<prefix>tmp_<name>`, tagged
+# MAGIC "release": the approver rejected it, so the tag goes and it expires as before; "purge": delete it now; "restore": its
+# MAGIC grants again), `by` (an approver acting for `user`, its owner), `temporary` ("true": a temporary schema, named `<prefix>tmp_<name>`, tagged
 # MAGIC `cd_expires` a set number of days ahead; one per person until it expires), and `comment_model` (optional: the model, from the app's Settings, that writes
 # MAGIC a new project or team schema's comment from the reason with `ai_query`; empty = the plain comment). Edit this notebook
 # MAGIC in the repository (bundle/jobs/notebooks/personal_schema.py): the next deploy replaces it.
@@ -35,9 +39,14 @@ allowed_catalogs = ${jsonencode(allowed_catalogs)}
 temporary_days = ${jsonencode(temporary_days)}   # how long a temporary schema lasts: its cd_expires tag
 # What a temporary schema's requester may do: use it, never share it (no MANAGE, no ALL_PRIVILEGES).
 temporary_privileges = ${jsonencode(temporary_privileges)}
-# Who may create a temporary schema: an email starting with this (for example an admin account's
-# prefix); empty = anyone. Extending one is for its owner (below), with the account that made it.
-temporary_account_prefix = ${jsonencode(temporary_account_prefix)}
+# Each person's two accounts (app.yaml jobs.privileged_account_prefix): their privileged one is this and
+# their regular email (for example azure-jane.doe@enbridge.com). With it set, a new schema goes to both:
+# the privileged account gets the schema's privileges, the regular one regular_privileges (read only);
+# the privileged account must be in one of builder_groups (the workspace's builder and publisher
+# groups, from its Terraform output). Empty = one account, the requester's.
+privileged_account_prefix = ${jsonencode(privileged_account_prefix)}
+regular_privileges = ${jsonencode(regular_privileges)}
+builder_groups = ${jsonencode(builder_groups)}
 # The request record check (below): the app's records, this workspace's name in them, and
 # the kinds that always need an approver. requests_catalog empty = off.
 requests_catalog = ${jsonencode(requests_catalog)}
@@ -52,7 +61,7 @@ ${request_record_check}
 
 # The request.
 for name in ("user", "schema", "catalog", "owner_group", "reason", "request_id", "temporary", "action", "days", "comment_model",
-             "temporary_limit"):
+             "temporary_limit", "by"):
     dbutils.widgets.text(name, "")
 user = dbutils.widgets.get("user").strip().lower()
 schema = dbutils.widgets.get("schema").strip().lower()
@@ -65,6 +74,11 @@ temporary = dbutils.widgets.get("temporary").strip().lower() == "true"
 action = dbutils.widgets.get("action").strip().lower()
 days = dbutils.widgets.get("days").strip()
 limit = dbutils.widgets.get("temporary_limit").strip() or "1"   # how many temporary schemas a person may have (Settings)
+by = dbutils.widgets.get("by").strip().lower()   # an approver acting for the schema's owner (user): the approvals app
+# The person's accounts: (privileged, regular) from either; one account when no prefix is set.
+pim = privileged_account_prefix.lower()
+privileged, regular = ((user, user[len(pim):]) if user.startswith(pim) else (pim + user, user)) if pim else (user, user)
+accounts = {privileged, regular}
 personal = prefix + re.sub(r"[^a-z0-9]+", "_", user.split("@")[0]).strip("_")
 kind = "temporary" if temporary else "personal" if not schema or schema == personal else "team" if owner_group else "project"
 schema = schema or personal
@@ -84,20 +98,18 @@ if kind in ("project", "team") and schema.startswith(prefix):
     raise ValueError(f"a project or team schema may not start with {prefix} (personal schemas are named {prefix}<name>)")
 if temporary and owner_group:
     raise ValueError("a temporary schema is the user's alone: owner_group is for a team schema")
-if action not in ("", "extend", "hold", "release"):   # keeping one as a project schema: not offered for now
-    raise ValueError(f"action is extend, hold, release or empty, not {action!r}")
+if action not in ("", "extend", "hold", "release", "purge", "restore"):   # keeping one as a project schema: not offered for now
+    raise ValueError(f"action is extend, hold, release, purge, restore or empty, not {action!r}")
 if action in ("hold", "release") and not request_id:
     raise ValueError("a hold names the request it is for: request_id")
 if action and not temporary:
-    raise ValueError("more time, or keeping it as a project schema, is for a temporary schema")
+    raise ValueError("more time, deleting it or restoring its permissions is for a temporary schema")
+if by and not re.fullmatch(r"[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]+", by):
+    raise ValueError(f"by must be an email address, not {by!r}")
 if not re.fullmatch(r"[1-9]|10", limit):
     raise ValueError(f"temporary_limit is 1 to 10, not {limit!r}")
 if action == "extend" and days not in ("30", "7"):   # the app's EXTENSION_DAYS; 7: one asked for before it was 30
     raise ValueError(f"days is 30, not {days!r}")
-if kind == "temporary" and not action and temporary_account_prefix \
-        and not user.lower().startswith(temporary_account_prefix.lower()):
-    raise ValueError(f"temporary schemas are made with an account whose email starts with "
-                     f"{temporary_account_prefix}, not {user}")
 if not isinstance(temporary_days, int) or not 1 <= temporary_days <= 365:
     raise ValueError(f"temporary_days is 1 to 365, not {temporary_days!r}")
 if owner_group and kind == "personal":
@@ -112,8 +124,15 @@ if not re.fullmatch(r"[A-Za-z0-9._:/-]{0,100}", request_id):
     raise ValueError(f"request_id may only contain letters, digits and . _ : / -, not {request_id!r}")
 if not re.fullmatch(r"[\w.-]{0,100}", comment_model):
     raise ValueError(f"comment_model must be a model's name, not {comment_model!r}")
-if not all(re.fullmatch(r"[A-Z_]+", p) for p in privileges + temporary_privileges):
-    raise ValueError(f"not privileges: {privileges}, {temporary_privileges}")
+if not all(re.fullmatch(r"[A-Z_]+", p) for p in privileges + temporary_privileges + regular_privileges):
+    raise ValueError(f"not privileges: {privileges}, {temporary_privileges}, {regular_privileges}")
+if set(regular_privileges) - {"USE_SCHEMA", "SELECT", "READ_VOLUME", "EXECUTE", "BROWSE"}:
+    raise ValueError(f"a regular account reads only: regular_privileges may not include {sorted(set(regular_privileges) - {'USE_SCHEMA', 'SELECT', 'READ_VOLUME', 'EXECUTE', 'BROWSE'})}")
+if pim and not re.fullmatch(r"[a-z0-9._+-]{1,64}", pim):
+    raise ValueError(f"not an account prefix: {privileged_account_prefix!r}")
+if pim and not builder_groups:
+    raise ValueError("this workspace's builder and publisher groups are not known (its Terraform output persona_groups): "
+                     "apply its baseline, then deploy the app again")
 if {"MANAGE", "ALL_PRIVILEGES"} & set(temporary_privileges):
     raise ValueError("a temporary schema is never shared: its privileges may not include MANAGE or ALL_PRIVILEGES")
 
@@ -123,16 +142,16 @@ if {"MANAGE", "ALL_PRIVILEGES"} & set(temporary_privileges):
 
 # Only a request the app recorded, for these parameters (off unless jobs.require_request_record).
 # A hold, and its release, are for a request for more time.
-asked_for = "temporary_extension" if action else f"{kind}_schema"
+asked_for = {"purge": "schema_delete", "restore": "schema_restore"}.get(action, "temporary_extension") if action else f"{kind}_schema"
 check_request_record(request_id, {"kind": asked_for,
-                                  "workspace": workspace_name, "requested_by": user,
+                                  "workspace": workspace_name, "requested_by": by or user,
                                   "name": schema, "owner_group": owner_group})
 
 # An existing schema must already be this user's: never hand over another person's or a shared one.
 exists = spark.sql(f"SELECT 1 FROM `{catalog}`.information_schema.schemata WHERE schema_name = '{schema}'").count() > 0
 tagged = spark.sql(f"SELECT tag_value FROM `{catalog}`.information_schema.schema_tags "
                    f"WHERE schema_name = '{schema}' AND tag_name = 'cd_user'").collect()
-if exists and [r.tag_value for r in tagged] != [user]:
+if exists and not (len(tagged) == 1 and tagged[0].tag_value.lower() in accounts):   # either of their accounts made it
     raise ValueError(f"{catalog}.{schema} already exists and is not {user}'s")
 # ... and of the same kind: a run again never turns one kind of schema into another.
 was = spark.sql(f"SELECT tag_value FROM `{catalog}`.information_schema.schema_tags "
@@ -140,13 +159,37 @@ was = spark.sql(f"SELECT tag_value FROM `{catalog}`.information_schema.schema_ta
 if exists and was and was[0].tag_value != kind:
     raise ValueError(f"{catalog}.{schema} is already a {was[0].tag_value} schema, not a {kind} one")
 
-# More time (and its hold): only for a temporary schema of theirs that still exists. Then nothing else runs.
+def grant_to_owners(grant_full):
+    """The schema's own grants, as when it was made: with two accounts, the privileged one grant_full and
+    the regular one regular_privileges (read only; skipped if that account does not exist); else the
+    requester grant_full."""
+    as_sql = lambda ps: ", ".join(p.replace("_", " ") for p in ps)
+    spark.sql(f"GRANT {as_sql(grant_full)} ON SCHEMA {name} TO `{privileged}`")
+    if regular != privileged:
+        try:
+            spark.sql(f"GRANT {as_sql(regular_privileges)} ON SCHEMA {name} TO `{regular}`")
+        except Exception as e:
+            if "PRINCIPAL_DOES_NOT_EXIST" not in str(e) and "could not find principal" not in str(e).lower():
+                raise
+            print(f"{regular} does not exist: only {privileged} has the schema.")
+
+
+# More time (and its hold), deleting it, or restoring its grants: only for a temporary schema of theirs
+# that still exists. Then nothing else runs.
 if action:
     if not exists or [r.tag_value for r in was] != ["temporary"]:
         raise ValueError(f"{catalog}.{schema} is not a temporary schema of {user}'s (it may have expired and been deleted)")
     name = f"`{catalog}`.`{schema}`"
     held = spark.sql(f"SELECT tag_value FROM `{catalog}`.information_schema.schema_tags "
                      f"WHERE schema_name = '{schema}' AND tag_name = 'cd_pending_request'").collect()
+    if action == "purge":   # deleted now, with everything in it: by its owner, or an approver for them (by)
+        spark.sql(f"DROP SCHEMA {name} CASCADE")
+        dbutils.notebook.exit(json.dumps({"catalog": catalog, "schema": schema, "kind": "temporary", "user": user, "by": by,
+                                          "action": "purge", "deleted": True}))
+    if action == "restore":   # someone removed their own grants: the ones it got when it was made, again
+        grant_to_owners(temporary_privileges)
+        dbutils.notebook.exit(json.dumps({"catalog": catalog, "schema": schema, "kind": "temporary", "user": user, "by": by,
+                                          "action": "restore", "granted": sorted(accounts)}))
     if action == "hold":   # waiting for an approver: the cleanup leaves it until it is decided
         spark.sql(f"ALTER SCHEMA {name} SET TAGS ('cd_pending_request' = '{request_id}')")
         dbutils.notebook.exit(json.dumps({"catalog": catalog, "schema": schema, "user": user, "action": "hold", "request_id": request_id}))
@@ -169,12 +212,33 @@ if kind == "temporary":
     for r in spark.sql(f"SELECT schema_name, tag_name, tag_value FROM `{catalog}`.information_schema.schema_tags "
                        "WHERE tag_name IN ('cd_user', 'cd_schema_kind', 'cd_expires')").collect():
         found.setdefault(r.schema_name, {})[r.tag_name] = r.tag_value
-    live = sorted((t.get("cd_expires", ""), s) for s, t in found.items() if s != schema and t.get("cd_user") == user
+    live = sorted((t.get("cd_expires", ""), s) for s, t in found.items() if s != schema and t.get("cd_user", "").lower() in accounts
                   and t.get("cd_schema_kind") == "temporary" and t.get("cd_expires", "") >= today.isoformat())
     if len(live) >= int(limit):
         mine = ", ".join(f"{catalog}.{s} (until {e})" for e, s in live)
         raise ValueError(f"You already have {len(live)} temporary schema{'' if len(live) == 1 else 's'}, the most you may have: "
                          f"{mine}. Ask for another once one expires.")
+
+# With two accounts, the privileged one must be a builder or publisher in this workspace (it reads and
+# writes the schema): one of builder_groups gives it access to the catalog, as Unity Catalog's
+# effective permissions say (group membership counts; the catalog's grants are Terraform's).
+def is_builder(account):
+    from databricks.sdk import WorkspaceClient
+    try:
+        out = WorkspaceClient().api_client.do("GET", f"/api/2.1/unity-catalog/effective-permissions/catalog/{catalog}",
+                                              query={"principal": account})
+    except Exception as e:
+        if "could not find principal" in str(e).lower() or "PRINCIPAL_DOES_NOT_EXIST" in str(e):
+            return False
+        print(f"Checking {account}'s access to {catalog}: {e}")
+        raise ValueError("Your privileged account's access can't be checked just now. Try again in a minute; "
+                         "if it keeps failing, tell your platform admin.") from e
+    return bool({a.get("principal") for a in out.get("privilege_assignments") or []} & set(builder_groups))
+
+
+if pim and not exists and not is_builder(privileged):
+    raise ValueError(f"Your Azure PIM account {privileged} is not in the Builder role in this workspace. "
+                     "Request Builder access for it in Request workspace access, then try again.")
 
 # COMMAND ----------
 
@@ -201,8 +265,9 @@ if not exists:
             raise ValueError(f"{catalog}.{schema} was just created by another request: choose another name") from e
         raise
 spark.sql(f"ALTER SCHEMA {name} SET TAGS ({', '.join(f'{k!r} = {v!r}' for k, v in tags.items())})")
-grant = ', '.join(p.replace('_', ' ') for p in (temporary_privileges if kind == "temporary" else privileges))
-spark.sql(f"GRANT {grant} ON SCHEMA {name} TO `{user}`")
+full = temporary_privileges if kind == "temporary" else privileges
+grant = ', '.join(p.replace('_', ' ') for p in full)
+grant_to_owners(full)
 if owner_group:
     try:
         spark.sql(f"GRANT {grant} ON SCHEMA {name} TO `{owner_group}`")
@@ -236,4 +301,5 @@ if owner:
     spark.sql(f"ALTER SCHEMA {name} OWNER TO `{owner}`")
 
 dbutils.notebook.exit(json.dumps({"catalog": catalog, "schema": schema, "kind": kind, "user": user, "owner_group": owner_group, "reason": reason, "created": not exists,
+                                  "granted": sorted(accounts),
                                   **({"expires": tags.get("cd_expires") or ""} if kind == "temporary" else {})}))

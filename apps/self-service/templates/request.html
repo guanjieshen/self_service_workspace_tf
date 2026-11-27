@@ -23,7 +23,7 @@
       <h2 class="card-label">Request information</h2>
       {%- set approval -%}
         {% if needs %}<span class="approval-outcome ok">{{ icon("check", "icon icon-xs") }}Approved by {{ approver or "an approver" }}</span>
-        {% else %}<span class="strong">Not needed</span> <span class="hint">(Auto-approved by policy)</span>{% endif %}
+        {% else %}<span class="strong">Not required</span> <span class="hint">(auto-approved by policy)</span>{% endif %}
       {%- endset -%}
       {{ kv([("Why", r.params.get("reason")), ("Approval", approval)]) }}
     </section>
@@ -43,16 +43,16 @@
         <div class="live-message" id="live-message" role="status" aria-live="polite">
           {% if r.status == "In progress" %}
             <div><p class="strong">Working on it <span class="elapsed" id="elapsed"></span></p>
-            <p>This usually takes under a minute. You can leave this page; the result will show under <a href="/requests">My requests</a>.</p></div>
+            <p>This usually takes under a minute. You can leave this page; the result appears under <a href="/requests">My requests</a>.</p></div>
           {% elif r.status == "Completed" %}
-            <div><p class="strong">Done: your {{ noun }} is ready</p>
-            <p>{{ noun | capitalize }} <span class="mono strong">{{ r.resource }}</span> is ready, and you can manage it.</p></div>
+            <div><p class="strong">Your {{ noun }} is ready</p>
+            <p>You can manage <span class="mono strong">{{ r.resource }}</span> and share it with others.</p></div>
             <div class="live-actions">
               {% if r.link %}<a class="button primary" href="{{ r.link }}" target="_blank" rel="noopener">Open {{ noun }} {{ icon("external", "icon icon-xs") }}</a>{% endif %}
               <button type="button" class="button" data-copy="{{ r.resource }}" aria-label="Copy the {{ noun }} name">Copy {{ "path" if noun == "folder" else "name" }}</button>
             </div>
           {% else %}
-            <div><p class="strong">It did not go through</p>
+            <div><p class="strong">Request failed</p>
             <p class="reason">{{ r.message or "The job failed; a platform admin can see why in its run." }}</p></div>
             <div class="live-actions"><a class="button primary" href="{{ retry }}">Try again</a></div>
           {% endif %}
@@ -80,7 +80,7 @@
     <section class="card card-body">
       <div class="card-head"><h2 class="card-label">Access</h2></div>
       {%- set level -%}<span class="id-chip plain">Can manage</span>{%- endset -%}
-      <div class="kv-side">{{ kv([("Access level", level), ("Shared with", r.params.get("owner_group") or "Only you"), ("Approval", "Approved by an approver" if needs else "Auto-approved by policy")]) }}</div>
+      <div class="kv-side">{{ kv([("Access level", level), ("Shared with", r.params.get("owner_group") or "Only you"), ("Approval", "Approval required" if needs else "Auto-approved by policy")]) }}</div>
     </section>
 
   </aside>
