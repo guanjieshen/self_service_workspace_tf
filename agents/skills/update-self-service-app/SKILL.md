@@ -52,7 +52,8 @@ The hub: the central workspace where both apps and their database run.
 
 | They want to... | Key |
 | --- | --- |
-| Who may open the self-service app | `hub.users_group` (`users` = everyone in the hub) |
+| Who may open the self-service app | `hub.users_group` (`users` = everyone in the hub; `account users` = anyone in the organization, including people in no workspace: the app's "Anyone in my organization can use") |
+| Deploys without an outage (several copies of the self-service app) | `instances` under `self_service_app` in `app.yaml` (2; `null` = one copy) |
 | Who may open the approvals app (the approvers) | `hub.approvals_group` (`null` = workspace admins only) |
 | People who may read the requests' data | `database.readers` (emails) |
 

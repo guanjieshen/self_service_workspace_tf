@@ -9,6 +9,12 @@
 
 self_service_app:
   name: cd-self-service                  # the app's name (lowercase letters, digits, dashes)
+  # How many copies of the self-service app run behind its address, 1 to 5 (horizontal scaling):
+  # a deploy updates one copy at a time, so the app never goes down, and one copy failing doesn't
+  # take it offline. Each copy is charged. 2 is enough for that. null = a standard app, one copy:
+  # a deploy restarts it (a short outage). The deploy converts a standard app at 1 copy first
+  # (the only way Databricks allows), then sets the number. Not the approvals app.
+  instances: null
   # The app's name in the header (its first word in colour) and in the browser's tab titles.
   # Platform admins change the first word, and its colour, in the admin app's Settings >
   # Branding (no pull request); the rest of the title, and the tab titles, come from here.
