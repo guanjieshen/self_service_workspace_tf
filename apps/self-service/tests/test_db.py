@@ -64,6 +64,13 @@ class Files(unittest.TestCase):
         self.assertIn("GRANT SELECT, INSERT ON self_service.guided_tours TO {self_service};", statements)
         self.assertFalse([s for s in statements if "guided_tours" in s and "{approvals}" in s], "nor a tour")
 
+    def test_the_approvals_app_records_what_an_approver_does_for_someone(self):
+        """Temporary schemas: an approver extends, restores or deletes one for its owner, and the approvals
+        app records that request (append only: never UPDATE or DELETE)."""
+        statements = [s for s, _ in migrate.grant_statements({"self_service": "a", "approvals": "b"})]
+        self.assertIn("GRANT SELECT, INSERT ON self_service.requests TO {approvals};", statements)
+        self.assertIn("GRANT SELECT, INSERT ON self_service.request_events TO {approvals};", statements)
+
     def test_unknown_roles_are_refused(self):
         with self.assertRaises(SystemExit):
             migrate.main(["--dsn", "x", "--grant", "admin=someone"])

@@ -13,7 +13,10 @@ GRANT SELECT ON self_service.chosen_business_units TO {self_service};
 -- Who has had the guided tour (the Open Databricks Genie One card): the self-service app records it.
 GRANT SELECT, INSERT ON self_service.guided_tours TO {self_service};
 GRANT USAGE ON SCHEMA self_service TO {approvals};
-GRANT SELECT ON self_service.requests, self_service.request_status TO {approvals};
+-- The approvals app records the requests an approver makes for someone (Temporary schemas: extend,
+-- restore, delete on their behalf), so it adds requests too.
+GRANT SELECT, INSERT ON self_service.requests TO {approvals};
+GRANT SELECT ON self_service.request_status TO {approvals};
 GRANT SELECT, INSERT ON self_service.request_events TO {approvals};
 GRANT SELECT, INSERT ON self_service.setting_events TO {approvals};
 GRANT SELECT ON self_service.settings TO {approvals};
